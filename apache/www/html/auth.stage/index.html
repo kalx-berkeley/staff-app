@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KALX — Authentication Endpoint (Staging)</title>
+<style>
+body { font-family: system-ui, -apple-system, sans-serif; max-width: 520px; margin: 6rem auto; padding: 0 1.5rem; color: #222; line-height: 1.6; }
+h1  { font-size: 1.25rem; margin-bottom: 0.5rem; }
+p   { margin: 0.75rem 0; color: #555; }
+a   { color: #1a6fb0; }
+</style>
+</head>
+<body>
+<h1>KALX Staff Authentication Endpoint (Staging)</h1>
+<p>This site handles Google OAuth2 callbacks for the KALX staff portal. It is
+not intended to be visited directly.</p>
+<p>If you are trying to reach the staff portal, go to
+<a id="staff-link" href="https://staff.stage.kalxstaff.org/">staff.stage.kalxstaff.org</a>.</p>
+<script>
+// This page is served at auth.stage.<suffix>; the staff portal is always at
+// staff.stage.<suffix> on the same suffix, so derive the link from the
+// hostname instead of hardcoding a domain suffix that differs between
+// environments.
+var staffHost = location.hostname.replace(/^auth\./, "staff.");
+var link = document.getElementById("staff-link");
+link.href = "https://" + staffHost + "/";
+link.textContent = staffHost;
+</script>
+</body>
+</html>

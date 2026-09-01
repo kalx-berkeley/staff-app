@@ -1,0 +1,282 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+  release:
+    types: [ published ]
+  workflow_dispatch:
+
+env:
+  ENV_NAME: ${{ github.event_name == 'release' && 'Production' || 'Staging' }}
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+    - name: Set up Python
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+      with:
+        python-version: '3.14'
+
+    - name: Install backend dependencies
+      working-directory: ./backend
+      run: |
+        sudo apt install libjpeg-dev
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run backend tests
+      working-directory: ./backend
+      run: |
+        black --check .
+        pytest --cov=app --cov-report=xml
+
+    - name: Set up Node.js
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+      with:
+        node-version: '26'
+
+    - name: Install frontend dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: Run frontend tests
+      working-directory: ./frontend
+      run: |
+        npm run lint
+        npx tsc --noEmit
+        npm test
+
+  deploy:
+    name: Deploy
+    needs: test
+    runs-on: ubuntu-latest
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'release' && github.event.action == 'published')
+    environment: ${{ github.event_name == 'release' && 'production' || 'staging' }}
+
+    env:
+      DEPLOY_USER: staff-app
+      DEPLOY_PATH: /home/staff-app/promotions-app
+      SYSTEMD_USER_PATH: /home/staff-app/.config/systemd/user
+      SITE_DOMAIN: ${{ vars.SITE_DOMAIN }}
+      DJ_STUDIO_NETWORK: ${{ vars.DJ_STUDIO_NETWORK }}
+      STATION_OFFICE_NETWORK: ${{ vars.STATION_OFFICE_NETWORK }}
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+    - name: Validate required secrets and variables
+      run: |
+        MISSING=()
+
+        # Check secrets
+        [ -z "${{ secrets.NETBIRD_SETUP_KEY }}" ] && MISSING+=("NETBIRD_SETUP_KEY (secret)")
+        [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ] && MISSING+=("SSH_PRIVATE_KEY (secret)")
+        [ -z "${{ secrets.AIRTABLE_API_KEY }}" ] && MISSING+=("AIRTABLE_API_KEY (secret)")
+        [ -z "${{ secrets.AIRTABLE_BASE_ID }}" ] && MISSING+=("AIRTABLE_BASE_ID (secret)")
+
+        # Warn (not fail) if smtp2go key is absent — emails will be logged instead of sent
+        if [ -z "${{ secrets.SMTP2GO_API_KEY }}" ]; then
+          echo "WARNING: SMTP2GO_API_KEY not set — email notifications will be logged only"
+        fi
+
+        # Warn (not fail) if spinitron key is absent — DJ names won't be resolved from Spinitron
+        if [ -z "${{ secrets.SPINITRON_API_KEY }}" ]; then
+          echo "WARNING: SPINITRON_API_KEY not set — DJ names will not be synced from Spinitron"
+        fi
+
+        # Check variables
+        [ -z "${{ vars.SITE_DOMAIN }}" ] && MISSING+=("SITE_DOMAIN (variable)")
+        [ -z "${{ vars.DJ_STUDIO_NETWORK }}" ] && MISSING+=("DJ_STUDIO_NETWORK (variable)")
+        [ -z "${{ vars.STATION_OFFICE_NETWORK }}" ] && MISSING+=("STATION_OFFICE_NETWORK (variable)")
+        [ -z "${{ vars.NETBIRD_HOSTNAME }}" ] && MISSING+=("NETBIRD_HOSTNAME (variable)")
+
+        if [ ${#MISSING[@]} -gt 0 ]; then
+          echo "ERROR: Missing required secrets/variables:"
+          printf '  - %s\n' "${MISSING[@]}"
+          echo ""
+          echo "Please configure these in GitHub Settings > Secrets and variables > Actions"
+          exit 1
+        fi
+
+        echo "All required secrets and variables are configured"
+
+    - name: Set environment variables
+      run: |
+        if [ "${{ github.event_name }}" == "release" ]; then
+          echo "ENV_NAME=production" >> $GITHUB_ENV
+        else
+          echo "ENV_NAME=staging" >> $GITHUB_ENV
+        fi
+
+    - name: Connect to Netbird
+      # uses: Alemiz112/netbird-connect@v1.0.1
+      uses: gene1wood/netbird-connect@v1.1.0
+      with:
+        setup-key: ${{ secrets.NETBIRD_SETUP_KEY }}
+        args: '--log-level DEBUG'
+
+    - name: Fetch Netbird IP of target server
+      id: get-target-ip
+      run: |
+        set -ex
+        attempts=1
+        while [ $attempts -lt 15 ]; do
+          (( attempts++ ))
+          IP="$(sudo netbird status --filter-by-names ${{ vars.NETBIRD_HOSTNAME }} --filter-by-status connected --json | jq --raw-output '.peers.details[0].netbirdIp')"
+          if [ -n "$IP" ] && [ "$IP" != "null" ]; then
+            echo "ip=$IP" >> "$GITHUB_OUTPUT"
+            break
+          else
+            sleep 2
+          fi
+        done
+        test -n "$IP" && test "$IP" != "null"
+
+    - name: Configure SSH
+      run: |
+        set -ex
+        SSH_HOST="${{ steps.get-target-ip.outputs.ip }}"
+        install --directory --mode=0700 ~/.ssh
+        install --no-target-directory --mode=0600 /dev/null ~/.ssh/deploy_key
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+        attempts=1
+        while ! ssh-keyscan ${SSH_HOST} > ~/.ssh/known_hosts; do
+          (( attempts++ ))
+          if [ $attempts -gt 5 ]; then
+            exit 1
+          fi
+          sleep 2
+        done
+        chmod 600 ~/.ssh/known_hosts
+
+    - name: Build frontend
+      working-directory: ./frontend
+      run: |
+        npm ci
+        npm run build
+
+    - name: Deploy application
+      run: |
+        set -ex
+        SSH_HOST="${{ steps.get-target-ip.outputs.ip }}"
+
+        # Prepare deployment directories and backup database
+        ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${SSH_HOST} bash << 'ENDSSH'
+        set -ex
+        mkdir -p ${{ env.DEPLOY_PATH }}/backend/data
+        mkdir -p ${{ env.DEPLOY_PATH }}/frontend/dist
+        if [ -f "${{ env.DEPLOY_PATH }}/backend/data/promotions.db" ]; then
+          cp "${{ env.DEPLOY_PATH }}/backend/data/promotions.db" \
+             "${{ env.DEPLOY_PATH }}/backend/data/backup_$(date +%Y%m%d_%H%M%S).db"
+        fi
+        ENDSSH
+
+        # Sync backend code
+        rsync --recursive --links --perms --times --itemize-changes --compress --delete --rsh="ssh -i ~/.ssh/deploy_key" \
+          --exclude='venv' \
+          --exclude='__pycache__' \
+          --exclude='.pytest_cache' \
+          --exclude='*.pyc' \
+          --exclude='.coverage' \
+          --exclude='test*.db' \
+          --exclude='data' \
+          ./backend/ ${{ env.DEPLOY_USER }}@${SSH_HOST}:${{ env.DEPLOY_PATH }}/backend/
+
+        # Sync frontend build
+        rsync --recursive --links --perms --times --itemize-changes --compress --delete --rsh="ssh -i ~/.ssh/deploy_key" \
+          ./frontend/dist/ ${{ env.DEPLOY_USER }}@${SSH_HOST}:${{ env.DEPLOY_PATH }}/frontend/dist/
+
+        # Install dependencies, run migrations, restart backend
+        ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${SSH_HOST} bash << 'ENDSSH'
+        set -ex
+
+        # Write .env
+        touch ${{ env.DEPLOY_PATH }}/backend/.env
+        chmod 600 ${{ env.DEPLOY_PATH }}/backend/.env
+        cat > ${{ env.DEPLOY_PATH }}/backend/.env << EOF
+        DATABASE_URL=sqlite:///${{ env.DEPLOY_PATH }}/backend/data/promotions.db
+        DJ_STUDIO_NETWORK=${{ env.DJ_STUDIO_NETWORK }}
+        STATION_OFFICE_NETWORK=${{ env.STATION_OFFICE_NETWORK }}
+        AIRTABLE_API_KEY=${{ secrets.AIRTABLE_API_KEY }}
+        AIRTABLE_BASE_ID=${{ secrets.AIRTABLE_BASE_ID }}
+        SPINITRON_API_KEY=${{ secrets.SPINITRON_API_KEY }}
+        CORS_ORIGINS=https://${{ env.SITE_DOMAIN }}
+        ENVIRONMENT=${{ env.ENV_NAME }}
+        SMTP2GO_API_KEY=${{ secrets.SMTP2GO_API_KEY }}
+        SMTP2GO_FROM_EMAIL=${{ vars.SMTP2GO_FROM_EMAIL }}
+        WEBMASTER_EMAIL=${{ vars.WEBMASTER_EMAIL }}
+        LEGACY_IMPORT_ENABLED=${{ vars.LEGACY_IMPORT_ENABLED || 'false' }}
+        EOF
+
+        # Install/update Python dependencies
+        cd ${{ env.DEPLOY_PATH }}/backend
+        python3 -m venv venv
+        venv/bin/pip install --upgrade pip
+        venv/bin/pip install -r requirements.txt
+
+        # Run database migrations
+        venv/bin/alembic upgrade head
+        ENDSSH
+
+        # Deploy systemd service file
+        rsync --times --itemize-changes --compress --rsh="ssh -i ~/.ssh/deploy_key" \
+          ./systemd/promotions-app-backend.service \
+          ${{ env.DEPLOY_USER }}@${SSH_HOST}:${{ env.SYSTEMD_USER_PATH }}/promotions-app-backend.service
+
+        # Reload systemd and restart backend service
+        ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${SSH_HOST} bash << 'ENDSSH'
+        set -ex
+        systemctl --user daemon-reload
+        systemctl --user restart promotions-app-backend
+        ENDSSH
+
+    - name: Verify deployment
+      run: |
+        set -ex
+        SSH_HOST="${{ steps.get-target-ip.outputs.ip }}"
+        ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${SSH_HOST} bash << 'ENDSSH'
+        set -ex
+
+        wait_for_service() {
+          local service_name=$1
+          local max_attempts=30
+          local attempt=0
+          echo "Waiting for $service_name to start..."
+          while [ $attempt -lt $max_attempts ]; do
+            if systemctl --user is-active --quiet $service_name; then
+              echo "$service_name is active"
+              return 0
+            fi
+            attempt=$((attempt + 1))
+            echo "Attempt $attempt/$max_attempts..."
+            sleep 2
+          done
+          echo "ERROR: $service_name failed to start within timeout"
+          systemctl --user status $service_name || true
+          return 1
+        }
+
+        wait_for_service promotions-app-backend
+
+        max_attempts=15
+        attempt=0
+        while [ $attempt -lt $max_attempts ]; do
+          if curl -f http://127.0.0.1:8000/health 2>/dev/null; then
+            echo "Backend health check passed"
+            break
+          fi
+          attempt=$((attempt + 1))
+          if [ $attempt -eq $max_attempts ]; then
+            echo "ERROR: Backend health check failed"
+            exit 1
+          fi
+          echo "Health check attempt $attempt/$max_attempts..."
+          sleep 2
+        done
+        ENDSSH

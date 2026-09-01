@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KALX Staff Portal</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+  color: #222;
+  line-height: 1.6;
+  background: #f9f9f9;
+}
+h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
+.subtitle { color: #666; margin-top: 0; margin-bottom: 2.5rem; font-size: 1rem; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.25rem; }
+.card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+.card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-color: #1a6fb0; }
+.card h2 { font-size: 1.1rem; margin: 0 0 0.5rem; color: #1a6fb0; }
+.card p  { margin: 0; color: #555; font-size: 0.9rem; }
+footer { margin-top: 3rem; font-size: 0.8rem; color: #aaa; text-align: center; }
+</style>
+</head>
+<body>
+<h1>KALX Staff Portal</h1>
+<p class="subtitle">Internal tools for KALX staff and volunteers.</p>
+
+<div class="cards">
+  <a class="card" href="/pass-giveaway/">
+    <h2>Radio Pass Giveaway</h2>
+    <p>Manage concert pass giveaways — create shows, distribute passes, and record on-air winners.</p>
+  </a>
+  <!-- Add new service cards here -->
+</div>
+
+<footer>KALX 90.7 FM &mdash; UC Berkeley</footer>
+</body>
+</html>

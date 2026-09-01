@@ -1,0 +1,261 @@
+event_name,genre,venue_name,show_date,show_time,special_instructions,age_restriction,wheelchair_accessible,num_pass_pairs
+The Hellp (DJ Set),Electronic,1015 Folsom,2026-05-16,22:00,,21+,Yes,2
+Pirlo,Electronic/Techno,1015 Folsom,2026-07-09,22:00,Doors open at 9:00 PM.,21+,Yes,1
+Cabaret Voltaire w/ I Speak Machine,Electronic/Industrial,1015 Folsom,2026-07-25,22:00,,21+,Yes,3
+Mosswood Residency DJ Night,Electronic,1015 Folsom,2026-08-15,22:00,,21+,Yes,2
+Throttle Thursdays (Resident Night),Electronic/Techno,1015 Folsom,2026-09-10,22:00,Resident DJs rotating lineup.,21+,Yes,1
+Punk in the Bay 2026 (Day 1),Punk,924 Gilman,2026-07-17,18:00,All-ages. $10 ADV/$12 DOS. Membership required ($2 at door).,all_ages,No,2
+Punk in the Bay 2026 (Day 2),Punk,924 Gilman,2026-07-18,18:00,All-ages. Volunteer-run venue. Membership required.,all_ages,No,3
+Punk in the Bay 2026 (Day 3),Punk,924 Gilman,2026-07-19,18:00,All-ages. Membership required.,all_ages,No,2
+Swept to Sea / Dr. Know,Punk/Hardcore,924 Gilman,2026-08-08,19:30,All-ages. $10 ADV/$12 DOS.,all_ages,No,1
+Naked Aggression / Poolside at the Flamingo,Punk,924 Gilman,2026-09-05,19:00,All-ages. Doors at 7:00 PM.,all_ages,No,2
+Special Screening: The Rocky Horror Picture Show,Film/Event,Alamo Drafthouse,2026-06-05,22:00,Interactive screening. Prop bags provided.,all_ages,Yes,3
+Analog Horror Night: Live Score + Screening,Film/Event,Alamo Drafthouse,2026-06-19,19:30,,all_ages,Yes,2
+Summer Cult Classic Series: Jaws,Film/Event,Alamo Drafthouse,2026-07-04,19:00,,all_ages,Yes,4
+Sing-Along Screening: Grease,Film/Event,Alamo Drafthouse,2026-07-11,19:30,,all_ages,Yes,3
+Animated Feature Marathon Night,Film/Event,Alamo Drafthouse,2026-08-01,18:00,Doors open 30 min prior.,all_ages,Yes,2
+Grateful Dead Night w/ Scott Guberman & Friends,Jam/Americana,Ashkenaz,2026-05-22,21:00,Dancing encouraged. Bar on site.,all_ages,Yes,3
+SambaDá (Brazilian Samba & Funk),World/Brazilian,Ashkenaz,2026-06-05,20:30,Free dance lesson at 7:30 PM before show.,all_ages,Yes,2
+Barton Hills Choir: Grateful Dead Tribute,Choral/Americana,Ashkenaz,2026-06-20,20:00,,all_ages,Yes,4
+Andrew Carriere: Cajun Zydeco Night,Cajun/Zydeco,Ashkenaz,2026-07-10,20:30,Dance floor show. Instruction included.,all_ages,Yes,2
+Cuban Son & Salsa Night,World/Latin,Ashkenaz,2026-08-07,20:30,Partner dancing. Beginners welcome.,all_ages,Yes,1
+The Audium Sound Experience,Sound Art/Experimental,The Audium,2026-05-22,20:30,"Doors 8:00 PM, show starts 8:30 PM sharp. No late entry.",all_ages,No,2
+The Audium Sound Experience,Sound Art/Experimental,The Audium,2026-05-29,20:30,Limited seating. Arrive early.,all_ages,No,1
+The Audium Sound Experience,Sound Art/Experimental,The Audium,2026-06-05,20:30,,all_ages,No,3
+The Audium Sound Experience,Sound Art/Experimental,The Audium,2026-06-12,20:30,No photography or recording inside.,all_ages,No,2
+The Audium Sound Experience,Sound Art/Experimental,The Audium,2026-06-19,20:30,,all_ages,No,1
+St. Lucia,Synth Pop,August Hall,2026-05-17,20:00,,all_ages,Yes,3
+Dry Cleaning w/ YHWH Nailgun,Post-Punk/Indie Rock,August Hall,2026-05-20,20:00,,all_ages,Yes,2
+Dance With the Dead + Magic Sword (The Face Off Tour 2026),Electronic Metal,August Hall,2026-05-26,20:00,,all_ages,Yes,4
+Chapterhouse: Whirlpool 35,Shoegaze,August Hall,2026-05-28,20:00,Anniversary show celebrating Whirlpool.,all_ages,Yes,1
+The Cab: Back From the Dead Tour,Pop Rock,August Hall,2026-06-02,19:30,,all_ages,Yes,2
+The Back Room Presents: Local Jazz Night,Jazz,the Back Room,2026-05-22,20:00,BYOB. Intimate seated setting. Limited capacity.,all_ages,No,2
+The Back Room Presents: World Music Evening,World Music,the Back Room,2026-06-05,20:00,Reserve in advance.,all_ages,No,1
+The Back Room Presents: Acoustic Folk Night,Folk/Acoustic,the Back Room,2026-07-03,20:00,,all_ages,No,3
+The Back Room Presents: Bay Area Strings Showcase,Classical/Chamber,the Back Room,2026-08-07,19:30,,all_ages,No,2
+The Back Room Presents: Experimental Evening,Experimental,the Back Room,2026-09-04,20:00,,all_ages,No,1
+BAMPFA: PFA Film Series - Pacific Rim Cinema,Film,BAMPFA (PFA films),2026-05-21,19:00,Free for UC Berkeley students.,all_ages,Yes,2
+BAMPFA: PFA Film Series - New American Cinema,Film,BAMPFA (PFA films),2026-06-04,19:30,,all_ages,Yes,3
+BAMPFA: PFA Film Series - Experimental Works,Film/Experimental,BAMPFA (PFA films),2026-06-18,19:30,,all_ages,Yes,1
+BAMPFA: PFA Film Series - Global Documentary,Documentary,BAMPFA (PFA films),2026-07-09,19:00,Q&A with filmmaker follows screening.,all_ages,Yes,4
+BAMPFA: PFA Live Score Screening,Film/Live Music,BAMPFA (PFA films),2026-08-06,20:00,,all_ages,Yes,2
+Baltic Kiss Open Mic,Roots/Americana,Baltic Kiss,2026-05-23,19:00,Cover TBD at door.,all_ages,No,1
+Baltic Kiss: Blues & Roots Night,Blues,Baltic Kiss,2026-06-06,20:00,,all_ages,No,2
+Baltic Kiss: Bye Bye Blackbirds Residency,Folk/Indie,Baltic Kiss,2026-07-11,20:00,,all_ages,No,3
+Baltic Kiss: Jazz Night,Jazz,Baltic Kiss,2026-07-25,20:00,,all_ages,No,1
+Baltic Kiss: Summer Concert Series,Americana/Roots,Baltic Kiss,2026-08-15,20:00,,all_ages,No,2
+JACK WHITE LIVE 2026,Rock,Bill Graham Civic Auditorium,2026-09-24,20:00,No professional cameras. Cashless payments.,all_ages,Yes,3
+Madeon presents Victory Live,Electronic,Bill Graham Civic Auditorium,2026-10-02,20:00,18+ show. Valid ID required.,18+,Yes,2
+The Neighbourhood: THE WOURLD TOUR,Indie Rock,Bill Graham Civic Auditorium,2026-10-07,19:00,,all_ages,Yes,4
+RAWAYANA: Donde es el after? World Tour,Latin Rock,Bill Graham Civic Auditorium,2026-10-15,20:00,,all_ages,Yes,1
+Dermot Kennedy: The Weight of the Woods Tour,Folk/Pop,Bill Graham Civic Auditorium,2026-10-24,20:00,,all_ages,Yes,3
+Melody's Echo Chamber: Unclouded Tour,Psychedelic Rock,Bimbo's 365,2026-05-20,20:00,21+ event. Valid ID required.,21+,Yes,2
+Naomi Scott (F.I.G Tour),Pop,Bimbo's 365,2026-06-11,20:00,All ages.,all_ages,Yes,4
+Sistas Who Kill: Back From the Dead,Comedy/Performance,Bimbo's 365,2026-06-13,20:00,21+ event. Fully seated show.,21+,Yes,1
+Tainted Love: The Best of the 80s Live,80s Tribute,Bimbo's 365,2026-06-26,20:00,21+ event.,21+,Yes,3
+Daniela Andrade w/ Brahny,Pop/Folk,Bimbo's 365,2026-06-27,20:00,,all_ages,Yes,2
+Useless Eaters / TINA!! / Johnny,Punk/Garage,Bottom Of The Hill,2026-05-16,20:00,,21+,Yes,1
+Closegood,Indie Rock,Bottom Of The Hill,2026-06-02,20:00,,21+,Yes,3
+Corbyn besson,Pop,Bottom Of The Hill,2026-06-21,20:00,,all_ages,Yes,2
+Zoe Ko,Indie/Singer-Songwriter,Bottom Of The Hill,2026-07-24,19:00,,all_ages,Yes,4
+Bad Cop/Bad Cop,Punk Pop,Bottom Of The Hill,2026-08-14,20:00,,all_ages,Yes,1
+Brothertiger / Hotel Pools,Synth Pop/Chillwave,Cafe Du Nord,2026-05-16,19:00,Doors at 7:00 PM. Standing room.,all_ages,No,2
+Briscoe,Country Pop,Cafe Du Nord,2026-08-21,20:00,,all_ages,No,3
+Zoh Amba,Jazz/Soul,Cafe Du Nord,2026-09-02,20:00,,all_ages,No,1
+Francis of Delirium,Indie Rock,Cafe Du Nord,2026-10-29,20:00,,all_ages,No,4
+IAN SWEET,Indie Rock,Cafe Du Nord,2026-11-06,20:00,,all_ages,No,2
+Cal Performances: Bang On A Can All-Stars,New Music/Contemporary Classical,Cal Performances (Zellerbach Hall etc.),2026-10-02,20:00,Zellerbach Hall. Tickets at calperformances.org.,all_ages,Yes,3
+Cal Performances: Attacca Quartet (Ensemble in Residence),Chamber Music,Cal Performances (Zellerbach Hall etc.),2026-10-16,19:30,Zellerbach Hall.,all_ages,Yes,2
+Cal Performances: Kronos Quartet,Contemporary Classical,Cal Performances (Zellerbach Hall etc.),2026-11-06,20:00,Zellerbach Hall.,all_ages,Yes,4
+Cal Performances: Vienna Philharmonic,Classical Orchestra,Cal Performances (Zellerbach Hall etc.),2027-03-02,20:00,Zellerbach Hall. 2026-27 season.,all_ages,Yes,1
+Cal Performances: Yannick Nezet-Seguin Conducts,Classical Orchestra,Cal Performances (Zellerbach Hall etc.),2027-03-04,20:00,Zellerbach Hall.,all_ages,Yes,3
+California Jazz Conservatory: Electric Squeezebox Orchestra,Jazz,California Jazz Conservatory,2026-05-29,20:00,Check cjc.edu for details.,all_ages,No,1
+California Jazz Conservatory: Student Ensemble Concert,Jazz,California Jazz Conservatory,2026-06-12,19:30,,all_ages,No,2
+California Jazz Conservatory: Summer Jazz Series,Jazz,California Jazz Conservatory,2026-07-10,19:30,,all_ages,No,3
+California Jazz Conservatory: Faculty Showcase,Jazz,California Jazz Conservatory,2026-08-07,19:30,,all_ages,No,1
+California Jazz Conservatory: Saturday Night Jazz,Jazz,California Jazz Conservatory,2026-09-05,20:00,,all_ages,No,2
+Center for New Music: Experimental Works Night,Experimental/Avant-Garde,Center For New Music,2026-05-22,20:00,Sliding scale admission.,all_ages,No,1
+Center for New Music: Visiting Composer Series,New Music/Contemporary,Center For New Music,2026-06-05,20:00,,all_ages,No,2
+Center for New Music: Electronics & Improv,Electronic/Experimental,Center For New Music,2026-07-10,20:00,,all_ages,No,3
+Center for New Music: Solo & Duo Works,Contemporary Classical,Center For New Music,2026-08-07,20:00,,all_ages,No,1
+Center for New Music: Fall Opening Night,Experimental,Center For New Music,2026-09-11,20:00,,all_ages,No,2
+Nick Waterhouse,Rock/R&B,the Chapel,2026-05-16,21:00,,all_ages,Yes,3
+Foolish Relics,Indie Rock,the Chapel,2026-06-04,20:00,,all_ages,Yes,2
+Half Past Two,Ska/Punk,the Chapel,2026-07-14,20:00,,all_ages,Yes,4
+Black Joe Lewis,Blues/Soul,the Chapel,2026-08-20,20:00,,21+,Yes,1
+Ariel Pink,Indie/Lo-fi Pop,the Chapel,2026-09-18,20:00,,all_ages,Yes,3
+California Shakespeare Theater: A Midsummer Night's Dream,Theater,California Shakespeare Theater,2026-06-19,19:30,Outdoor amphitheater in Orinda. Bring a cushion.,all_ages,Yes,3
+California Shakespeare Theater: As You Like It,Theater,California Shakespeare Theater,2026-07-10,19:30,Outdoor venue. Picnicking welcome.,all_ages,Yes,2
+California Shakespeare Theater: The Tempest,Theater,California Shakespeare Theater,2026-07-31,19:30,Picnic area opens 2 hrs before show.,all_ages,Yes,4
+California Shakespeare Theater: Twelfth Night,Theater,California Shakespeare Theater,2026-08-21,19:30,,all_ages,Yes,1
+California Shakespeare Theater: Season Closing Gala,Theater,California Shakespeare Theater,2026-09-12,19:00,Gala reception before show.,all_ages,Yes,3
+Che Guerrero & Willie Macc,Comedy,Cobb's Comedy Club,2026-06-07,19:00,18+ venue. Two-drink minimum.,18+,Yes,2
+Really Funny Comedians Who Happen to Be Women w/ Kat Bird,Comedy,Cobb's Comedy Club,2026-06-11,19:30,18+ venue. Two-drink minimum.,18+,Yes,3
+Ron Funches,Comedy,Cobb's Comedy Club,2026-06-12,19:30,18+ venue. Two-drink minimum.,18+,Yes,1
+Drag-Up Comedy,Comedy,Cobb's Comedy Club,2026-06-14,19:00,18+ venue. Two-drink minimum.,18+,Yes,4
+The Sklar Brothers,Comedy,Cobb's Comedy Club,2026-06-19,19:30,18+ venue. Two-drink minimum.,18+,Yes,2
+Ray,Jazz/Indie,Cornerstone,2026-06-09,20:00,Full bar and restaurant open.,all_ages,Yes,3
+Fleetwood Macrame (Fleetwood Mac Tribute),Tribute/Rock,Cornerstone,2026-07-03,21:00,,all_ages,Yes,2
+bishop snow,Indie Pop,Cornerstone,2026-07-17,20:00,,all_ages,Yes,4
+TROY: ZODIAC Tour,Pop,Cornerstone,2026-08-07,20:00,,all_ages,Yes,1
+Myles Parrish,Hip Hop/Pop,Cornerstone,2026-08-21,21:00,,21+,Yes,3
+SF Symphony: Blomstedt Conducts Mahler 9,Classical,Davies Symphony Hall,2026-05-16,19:30,Parking at Performing Arts Garage (Franklin & Grove).,all_ages,Yes,3
+Macelaru Conducts Dvorak's New World,Classical,Davies Symphony Hall,2026-05-22,20:00,,all_ages,Yes,2
+Yo-Yo Ma with the San Francisco Symphony,Classical/Cello,Davies Symphony Hall,2026-06-01,19:30,Elgar Cello Concerto + Mozart Jupiter Symphony.,all_ages,Yes,4
+Samara Joy with the SF Symphony,Jazz/Classical,Davies Symphony Hall,2026-09-08,20:00,,all_ages,Yes,1
+Fantastic Negrito with the SF Symphony,Blues/Soul/Classical,Davies Symphony Hall,2026-09-26,20:00,,all_ages,Yes,3
+Down & Rowdy R&B Club (DJs Hi-Tone & Russell Quan),R&B/Blues,Eli's Mile High Club,2026-05-22,21:00,21+ dive bar. Cover charge.,21+,No,2
+East Bay Blues Night,Blues,Eli's Mile High Club,2026-06-05,21:00,,21+,No,1
+Punk & Patio Night,Punk/Rock,Eli's Mile High Club,2026-06-19,20:00,Indoor and outdoor patio.,21+,No,3
+Psychedelia & Garage Rock Night,Psychedelic/Garage Rock,Eli's Mile High Club,2026-07-10,21:00,,21+,No,2
+Summer R&B Soul Night,R&B/Soul,Eli's Mile High Club,2026-07-24,21:00,,21+,No,4
+Mt. Joy: Celebrating 10 Years Of Mt. Joy,Indie Rock,Fillmore,2026-05-22,20:00,Doors at 7:00 PM. Complimentary poster at exit.,all_ages,Yes,3
+TK from Ling tosite sigure: TOUR 2026 NORTH AMERICA,Post-Rock/Alternative,Fillmore,2026-05-26,20:00,,all_ages,Yes,2
+Kes: Roots Rock Soca Tour,Soca/Reggae,Fillmore,2026-06-03,20:00,Doors at 7:00 PM.,all_ages,Yes,4
+Toadies: The Charmer Tour,Alternative Rock,Fillmore,2026-06-12,20:00,,all_ages,Yes,1
+JINJER: Duel North America 2026,Metal,Fillmore,2026-07-03,19:00,,all_ages,Yes,3
+Julien Dore,French Pop/Indie,Fox Theater,2026-05-17,19:30,Doors 6:00 PM. Box office at 19th St entrance.,all_ages,Yes,2
+The Last Dinner Party w/ Automatic,Art Rock/Indie,Fox Theater,2026-05-27,20:00,,18+,Yes,4
+Juvenile,Hip Hop,Fox Theater,2026-06-05,20:00,,21+,Yes,1
+Buju Banton with Stephen Marley,Reggae,Fox Theater,2026-06-20,19:00,,all_ages,Yes,3
+Marcus King Band: The Darling Blue Pt. 2 Tour,Blues Rock,Fox Theater,2026-07-07,20:00,,all_ages,Yes,2
+Rakesh Chaurasia and Amit Kavthekar,World/Indian Classical,Freight & Salvage,2026-05-16,20:00,Fully seated. Doors at 7:00 PM.,all_ages,Yes,3
+Hank Dutt / George Brooks / Molly Holm,Jazz/World,Freight & Salvage,2026-05-17,20:00,,all_ages,Yes,2
+Jason Crosby / Maria Muldaur / Eric & Suzy Thompson,Folk/Blues,Freight & Salvage,2026-05-22,20:00,,all_ages,Yes,4
+Booker T. Jones,R&B/Soul,Freight & Salvage,2026-06-06,20:00,Fully seated. Tickets at thefreight.org.,all_ages,Yes,1
+Tim O'Brien (with guests),Folk/Bluegrass,Freight & Salvage,2026-07-10,20:00,,all_ages,Yes,3
+caroline,Art Rock,Great American Music Hall,2026-05-18,20:00,Doors at 7:00 PM.,all_ages,Yes,2
+Wild Nothing,Dream Pop,Great American Music Hall,2026-05-22,21:00,,all_ages,Yes,4
+Feng,Electronic/Pop,Great American Music Hall,2026-05-23,20:00,,all_ages,Yes,1
+Forbidden,Thrash Metal,Great American Music Hall,2026-05-29,19:00,,all_ages,Yes,3
+Tigers Jaw,Emo/Pop Punk,Great American Music Hall,2026-06-09,20:00,,all_ages,Yes,2
+Khalid,R&B/Pop,Greek Theatre,2026-06-26,20:00,Doors at 6:30 PM. Limited campus parking.,all_ages,Yes,3
+Johnny Blue Skies & The Dark Clouds: Mutiny For The Masses 2026 Tour,Country/Americana,Greek Theatre,2026-09-15,19:00,,all_ages,Yes,2
+Bleachers Forever,Indie Pop,Greek Theatre,2026-09-17,18:30,,all_ages,Yes,4
+Jack Johnson: SURFILMUSIC Tour 2026,Folk/Reggae,Greek Theatre,2026-09-30,18:30,SOLD OUT. Waitlist at thegreekberkeley.com.,all_ages,Yes,1
+JUNGLE: World Tour 2026,Funk/Dance,Greek Theatre,2026-10-06,19:00,,all_ages,Yes,3
+California Honeydrops,Soul/R&B,Hopmonk Tavern(s),2026-05-25,20:00,Outdoor stage. Free parking.,all_ages,Yes,2
+Aja Monet,Jazz/Poetry/Soul,Hopmonk Tavern(s),2026-06-12,20:00,,all_ages,Yes,3
+Corb Lund,Country/Americana,Hopmonk Tavern(s),2026-07-10,20:00,,all_ages,Yes,1
+Steve Poltz,Singer-Songwriter,Hopmonk Tavern(s),2026-07-25,20:00,,all_ages,Yes,4
+Sambada,Brazilian/Funk,Hopmonk Tavern(s),2026-08-07,20:00,,all_ages,Yes,2
+Yumi Zouma w/ Ducks Ltd.,Dream Pop/Indie,the Independent,2026-05-16,21:00,,all_ages,Yes,3
+BRONCHO,Indie Rock,the Independent,2026-05-18,20:00,,all_ages,Yes,2
+Em Beihold: Tales of a Failed Shapeshifter Tour w/ Janani K. Jha,Pop,the Independent,2026-06-14,20:00,SOLD OUT.,all_ages,Yes,4
+Choker,R&B/Indie,the Independent,2026-06-17,20:00,,all_ages,Yes,1
+Novulent: VOL. 3 THE FINAL ALBUM TOUR w/ Babyteeth,Indie Rock,the Independent,2026-06-19,21:00,,all_ages,Yes,3
+Charlie Parr with The Lowest Pair,Folk/Roots,Ivy Room,2026-05-22,20:00,,all_ages,Yes,2
+The Avengers / Middle-Aged Queers,Punk,Ivy Room,2026-06-12,20:00,,21+,Yes,1
+John Doe (of X) / Penelope Houston,Punk/Alternative,Ivy Room,2026-06-26,20:00,,21+,Yes,3
+BOYF,Indie/Rock,Ivy Room,2026-07-10,20:00,,all_ages,Yes,2
+Double Plus Alright,Indie/Rock,Ivy Room,2026-08-07,20:00,,21+,Yes,4
+Bosco,Electronic/R&B,The Kilowatt,2026-06-12,21:00,Dive bar. Cash preferred.,21+,No,1
+Yea-Ming and the Rumours,Indie Pop,The Kilowatt,2026-07-17,20:00,,21+,No,3
+Nox Novacula,Metal,The Kilowatt,2026-08-26,20:00,,21+,No,2
+Grumpster / Social Cinema / Small Crush,Punk Pop/Indie,The Kilowatt,2026-09-04,20:00,,21+,No,4
+Karaoke Knockout,Karaoke/Event,The Kilowatt,2026-09-25,21:00,Competitive karaoke night.,21+,No,1
+Elori Saxl and Henry Solomon,Electronic/Experimental,the Lab,2026-05-29,20:00,Sliding scale admission.,all_ages,No,1
+New Media Art & Sound Night,Electronic/Experimental,the Lab,2026-06-12,20:00,,all_ages,No,2
+Emerging Bay Area Composers,Experimental/Classical,the Lab,2026-07-10,20:00,,all_ages,No,3
+Sound & Image Works,Experimental/AV,the Lab,2026-08-07,20:00,,all_ages,No,1
+Fall Lab Series Opening,Experimental,the Lab,2026-09-11,20:00,,all_ages,No,2
+Silvi Alcivar / Wave Chamber Collective,Folk/Experimental,the Lost Church,2026-06-05,20:00,Intimate seated theater.,all_ages,No,2
+Acoustic Showcase Night,Singer-Songwriter,the Lost Church,2026-06-19,20:00,,all_ages,No,1
+The Lost Church Comedy Showcase,Comedy/Cabaret,the Lost Church,2026-07-03,20:00,,all_ages,No,3
+Original Works in Progress,Theater/Music,the Lost Church,2026-07-17,20:00,,all_ages,No,2
+Summer Acoustic Series Finale,Folk/Acoustic,the Lost Church,2026-08-07,20:00,,all_ages,No,4
+The Kid Laroi,Pop/Hip Hop,Masonic Auditorium,2026-06-05,20:00,Doors at 7:00 PM.,all_ages,Yes,3
+Belle and Sebastian,Indie Pop,Masonic Auditorium,2026-06-10,20:00,,all_ages,Yes,2
+Jim Gaffigan,Comedy,Masonic Auditorium,2026-06-13,20:00,,all_ages,Yes,4
+Metric / Broken Social Scene / Stars,Indie Rock,Masonic Auditorium,2026-06-21,20:00,,all_ages,Yes,1
+CA7RIEL & Paco Amoroso,Latin/Trap,Masonic Auditorium,2026-07-11,20:00,,all_ages,Yes,3
+Mortified Presents: Mort-Pride!,Comedy/Storytelling,New Parish,2026-06-14,19:00,Doors at 6:30 PM.,all_ages,Yes,2
+Bay Area Funk Night,Funk/R&B,New Parish,2026-07-10,21:00,,21+,Yes,3
+Local Hip Hop Showcase,Hip Hop,New Parish,2026-07-24,21:00,,21+,Yes,1
+New Parish: Reggae Roots Night,Reggae,New Parish,2026-08-07,21:00,,21+,Yes,4
+New Parish: Latin Dance Night,Latin/Salsa,New Parish,2026-08-21,21:00,,21+,Yes,2
+Old First Concerts: Chamber Music Evening,Classical/Chamber,Old First Church,2026-05-22,19:30,Suggested donation $30. No late seating.,all_ages,Yes,3
+Old First Concerts: Folk & Acoustic Series,Folk/Acoustic,Old First Church,2026-06-05,19:30,,all_ages,Yes,2
+Old First Concerts: World Music Night,World Music,Old First Church,2026-07-10,19:30,Free for students.,all_ages,Yes,4
+Old First Concerts: Early Music Program,Early Music,Old First Church,2026-08-07,19:30,,all_ages,Yes,1
+Old First Concerts: Fall Season Opener,Classical/Choral,Old First Church,2026-09-11,19:30,,all_ages,Yes,3
+Bosco,Electronic/R&B,Palace of Fine Arts,2026-08-02,20:00,,all_ages,Yes,3
+Brad Williams: Stand-Up Comedy,Comedy,Palace of Fine Arts,2026-08-14,19:30,,18+,Yes,4
+Nimesh Patel: Stand-Up,Comedy,Palace of Fine Arts,2026-09-05,19:00,,18+,Yes,1
+SF Jazz Festival at Palace of Fine Arts,Jazz,Palace of Fine Arts,2026-09-19,19:30,,all_ages,Yes,2
+Fall Benefit Concert,Various,Palace of Fine Arts,2026-10-02,19:30,,all_ages,Yes,3
+Thee Parkside Rock Night,Rock,Thee Parkside,2026-05-17,20:00,Verify status before attending — venue subject to closure.,all_ages,No,1
+Thee Parkside: Local Bands Showcase,Punk/Rock,Thee Parkside,2026-06-05,20:00,Cash only. Backyard patio.,all_ages,No,2
+Thee Parkside: Sunday Afternoon BBQ & Music,Americana/Rock,Thee Parkside,2026-06-14,14:00,All ages afternoon show.,all_ages,No,3
+Thee Parkside: Punk Night,Punk,Thee Parkside,2026-07-03,20:00,,21+,No,1
+Thee Parkside: Final Season Showcase,Rock/Punk,Thee Parkside,2026-07-17,19:00,,all_ages,No,2
+S.F. Comedy Showcase,Comedy,Punch Line Comedy Club,2026-05-17,19:30,Two-drink minimum. Doors at 6:30 PM.,18+,Yes,3
+S.F. Comedy Showcase,Comedy,Punch Line Comedy Club,2026-06-07,19:30,Two-drink minimum.,18+,Yes,2
+Joe Klocek & Friends,Comedy,Punch Line Comedy Club,2026-06-09,19:30,Two-drink minimum.,18+,Yes,4
+Helen Hong,Comedy,Punch Line Comedy Club,2026-06-10,20:00,Two-drink minimum.,18+,Yes,1
+S.F. Comedy Showcase,Comedy,Punch Line Comedy Club,2026-06-14,19:30,Two-drink minimum.,18+,Yes,3
+Schools Out & Shordie Shordie,Hip Hop,Regency Ballroom,2026-06-18,20:00,Doors at 7:00 PM. No re-entry.,21+,Yes,2
+Ibrahim Maalouf: TRUMPETS OF MICHEL-ANGE VOL. 2,Jazz/World,Regency Ballroom,2026-06-20,20:00,,all_ages,Yes,3
+Slayyyter w/ Pearly Drops,Pop/Electronic,Regency Ballroom,2026-09-08,20:00,,all_ages,Yes,4
+The Black Angels w/ GHOSTWOMAN,Psychedelic Rock,Regency Ballroom,2026-11-05,20:00,,21+,Yes,1
+L7,Rock,Regency Ballroom,2026-11-13,20:00,,21+,Yes,3
+Rialto: Casablanca (35mm Classic Screening),Film,Rialto Cinemas Cerrito,2026-05-22,19:30,Classic film. Concessions available.,all_ages,Yes,2
+Rialto: 35mm Special Presentation,Film,Rialto Cinemas Cerrito,2026-06-05,20:00,Rare 35mm print format.,all_ages,Yes,3
+Rialto: Summer Horror Classics,Film,Rialto Cinemas Cerrito,2026-06-19,21:00,,18+,Yes,1
+Rialto: Director Q&A Screening,Film,Rialto Cinemas Cerrito,2026-07-10,19:00,Q&A after film.,all_ages,Yes,4
+Rialto: Late Night Double Feature,Film,Rialto Cinemas Cerrito,2026-07-24,21:30,,all_ages,Yes,2
+Rialto Elmwood: International Cinema Night,Film,Rialto Cinemas Elmwood Theater,2026-05-22,19:30,Subtitled foreign film.,all_ages,Yes,3
+Rialto Elmwood: Indie Spotlight,Film,Rialto Cinemas Elmwood Theater,2026-06-05,19:00,,all_ages,Yes,2
+Rialto Elmwood: Vintage Hollywood,Film,Rialto Cinemas Elmwood Theater,2026-06-19,19:30,,all_ages,Yes,4
+Rialto Elmwood: New Release Preview,Film,Rialto Cinemas Elmwood Theater,2026-07-10,20:00,,all_ages,Yes,1
+Rialto Elmwood: Summer Film Series,Film,Rialto Cinemas Elmwood Theater,2026-07-24,19:00,,all_ages,Yes,3
+Quinn XCII: From Michigan With Love,Singer-Songwriter/Pop,Rickshaw Stop,2026-05-28,21:00,Doors at 8:00 PM. All ages.,all_ages,Yes,3
+The Flatliners and Samiam,Punk/Rock,Rickshaw Stop,2026-05-29,21:00,,all_ages,Yes,2
+White Hills,Psychedelic Rock,Rickshaw Stop,2026-06-07,20:00,,all_ages,Yes,4
+Spa,Indie Rock,Rickshaw Stop,2026-07-25,20:00,,all_ages,Yes,1
+Jhariah,Alt Pop,Rickshaw Stop,2026-08-29,20:00,,all_ages,Yes,3
+Roxie Theater: Queer Film Festival Shorts,Film,Roxie Theater,2026-06-14,19:00,LGBTQ+ program. Donation welcome.,all_ages,Yes,2
+Roxie Theater: Bay Area Film Festival,Film,Roxie Theater,2026-07-10,19:30,,all_ages,Yes,3
+Roxie Theater: Midnight Madness,Film,Roxie Theater,2026-07-24,23:59,,18+,Yes,1
+Roxie Theater: Bay Area Independent Showcase,Film,Roxie Theater,2026-08-07,19:00,Local filmmaker Q&A after.,all_ages,Yes,4
+Roxie Theater: Classic Horror Night,Film,Roxie Theater,2026-10-30,20:00,,all_ages,Yes,2
+Lizz Wright,Jazz/Soul,SFJAZZ Center,2026-05-16,19:30,Miner Auditorium. Pre-concert talk at 6:45 PM.,all_ages,Yes,3
+Makaya McCraven,Jazz,SFJAZZ Center,2026-05-21,19:30,Miner Auditorium.,all_ages,Yes,2
+Musical Alchemy (Miner Auditorium),Jazz/Fusion,SFJAZZ Center,2026-05-28,19:30,Miner Auditorium.,all_ages,Yes,4
+Cuba & Beyond,Latin Jazz,SFJAZZ Center,2026-06-11,19:30,Miner Auditorium.,all_ages,Yes,1
+London Afrobeat & Jazz,Afrobeat/Jazz,SFJAZZ Center,2026-06-16,19:30,Miner Auditorium.,all_ages,Yes,3
+SF Symphony: Blomstedt Conducts Mahler 9,Classical,SF Symphony,2026-05-16,19:30,Davies Symphony Hall. Parking at Performing Arts Garage.,all_ages,Yes,2
+SF Symphony: Macelaru Conducts Dvorak's New World,Classical,SF Symphony,2026-05-22,20:00,Davies Symphony Hall.,all_ages,Yes,4
+Yo-Yo Ma with the San Francisco Symphony,Classical/Cello,SF Symphony,2026-06-01,19:30,Davies Symphony Hall. Elgar Cello Concerto.,all_ages,Yes,1
+Samara Joy with the SF Symphony,Jazz/Classical Crossover,SF Symphony,2026-09-08,20:00,Davies Symphony Hall.,all_ages,Yes,3
+Fantastic Negrito with the SF Symphony,Blues/Soul,SF Symphony,2026-09-26,20:00,Davies Symphony Hall.,all_ages,Yes,2
+Dirty Cello,Blues/Roots,Starry Plough,2026-05-29,20:30,,21+,No,3
+Irish Session Night,Celtic/Folk,Starry Plough,2026-06-07,20:00,Traditional Irish music. Free admission.,all_ages,No,2
+Ceili Night (Traditional Irish Dancing),Celtic/Folk,Starry Plough,2026-06-19,19:30,Dance instruction included.,all_ages,No,4
+Bay Area Bluegrass Night,Bluegrass/Roots,Starry Plough,2026-07-10,20:30,,21+,No,1
+Open Mic Night,Various,Starry Plough,2026-07-24,19:30,Sign-up at 7:00 PM.,all_ages,No,3
+Crooked Jades,Old-Time/Bluegrass,Stork Club,2026-06-27,20:00,21+ dive bar. Cash bar.,21+,No,2
+Sea Moss,Folk/Indie,Stork Club,2026-06-28,20:00,,21+,No,1
+Asha Wells / Ora Cogan / April Magazine,Indie/Experimental,Stork Club,2026-07-11,20:00,,21+,No,3
+Elements Party (Deep House),Electronic/House,Stork Club,2026-07-24,21:00,,21+,No,2
+Oakland Weekender Showcase,Indie/Punk/Rock,Stork Club,2026-08-08,20:00,,21+,No,4
+Brothertiger / Hotel Pools,Synth Pop/Chillwave,Swedish American Hall,2026-05-22,20:00,Upstairs hall. Tickets at cafedunord.com.,all_ages,Yes,3
+IAN SWEET,Indie Rock,Swedish American Hall,2026-06-19,20:00,,all_ages,Yes,2
+Zoh Amba,Jazz/Soul,Swedish American Hall,2026-09-04,20:00,,all_ages,Yes,4
+Francis of Delirium,Indie Rock,Swedish American Hall,2026-10-09,20:00,,all_ages,Yes,1
+Nick Waterhouse,Rock/R&B,Swedish American Hall,2026-11-13,20:00,,all_ages,Yes,3
+Cimafunk w/ Sun Hop Fat,Afro-Cuban/Latin Funk,UC Theatre,2026-05-16,20:00,Doors at 7:00 PM. General admission multi-tier.,all_ages,Yes,3
+BORNS,Pop/Indie,UC Theatre,2026-05-20,20:00,,all_ages,Yes,2
+Pennywise,Punk,UC Theatre,2026-06-26,20:00,,all_ages,Yes,4
+Protoje,Reggae/R&B,UC Theatre,2026-07-17,20:00,,all_ages,Yes,1
+Bill Callahan,Folk/Country,UC Theatre,2026-08-28,20:00,,all_ages,Yes,3
+Wale w/ Smino,Hip Hop/R&B,Warfield,2026-05-26,19:00,Doors at 6:00 PM.,all_ages,Yes,2
+Trap Karaoke: San Francisco,Hip Hop,Warfield,2026-05-29,19:00,,all_ages,Yes,3
+Clara La San,Pop/R&B,Warfield,2026-06-04,20:00,,all_ages,Yes,4
+The Human League / Soft Cell / Alison Moyet,Synth Pop,Warfield,2026-06-05,20:00,,all_ages,Yes,1
+Killswitch Engage,Metal,Warfield,2026-06-27,18:30,Doors at 5:30 PM. Bag check required.,all_ages,Yes,3
+Kurt Rosenwinkel Quartet,Jazz,Yoshi's Jack London,2026-05-20,19:30,Full dinner service available. Reservations recommended.,all_ages,Yes,2
+Miguel Zenon Quartet,Jazz,Yoshi's Jack London,2026-05-27,19:30,Full dinner service available.,all_ages,Yes,3
+The Smooth Jazz Alley,Smooth Jazz,Yoshi's Jack London,2026-06-02,19:30,,all_ages,Yes,4
+Lindsey Webster,R&B/Jazz,Yoshi's Jack London,2026-06-04,20:00,,all_ages,Yes,1
+Doug E. Fresh,Hip Hop,Yoshi's Jack London,2026-06-06,20:00,,all_ages,Yes,3

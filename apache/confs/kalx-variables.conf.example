@@ -1,0 +1,33 @@
+# Apache variable definitions for KALX staff portal (production and staging).
+# Non-secret configuration only — world-readable permissions are acceptable.
+#
+# This file is NOT a VirtualHost config — it defines variables consumed by
+# the site configs via ${VARIABLE} substitution.
+#
+# Secrets (CLIENT_SECRET, CRYPTO_PASSPHRASE) live in a separate file:
+#   apache/confs/kalx-secrets.conf.example → /etc/apache2/conf-available/kalx-secrets.conf
+# That file must NOT be world-readable; see it for permission instructions.
+#
+# Deployment:
+#   sudo cp apache/confs/kalx-variables.conf.example \
+#              /etc/apache2/conf-available/kalx-variables.conf
+#   # Fill in all values below, then:
+#   sudo a2enconf kalx-variables
+#   sudo apache2ctl configtest && sudo systemctl reload apache2
+#
+# Ubuntu/Debian Apache loads conf-enabled/ before sites-enabled/, so these
+# Define directives are available when the VirtualHost configs are parsed.
+# If either conf file is not enabled, Apache will refuse to start.
+
+# ─── Production (staff.kalx.berkeley.edu / auth.kalx.berkeley.edu) ───────────
+
+Define KALX_DOMAIN_SUFFIX              kalx.berkeley.edu
+Define KALX_CLIENT_ID                  YOUR_GOOGLE_CLIENT_ID
+Define KALX_DJ_STUDIO_NETWORK         YOUR_DJ_STUDIO_NETWORK
+Define KALX_STATION_OFFICE_NETWORK    YOUR_STATION_OFFICE_NETWORK
+
+# ─── Staging (staff.stage.kalx.berkeley.edu / auth.stage.kalx.berkeley.edu) ──
+
+Define KALXSTAGE_CLIENT_ID                  YOUR_STAGE_GOOGLE_CLIENT_ID
+Define KALXSTAGE_DJ_STUDIO_NETWORK         YOUR_STAGE_DJ_STUDIO_NETWORK
+Define KALXSTAGE_STATION_OFFICE_NETWORK    YOUR_STAGE_STATION_OFFICE_NETWORK
