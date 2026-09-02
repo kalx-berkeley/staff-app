@@ -80,9 +80,9 @@ jobs:
         [ -z "${{ secrets.AIRTABLE_API_KEY }}" ] && MISSING+=("AIRTABLE_API_KEY (secret)")
         [ -z "${{ secrets.AIRTABLE_BASE_ID }}" ] && MISSING+=("AIRTABLE_BASE_ID (secret)")
 
-        # Warn (not fail) if smtp2go key is absent — emails will be logged instead of sent
+        # Warn (not fail) if smtp2go key is absent — emails will fall back to the OS's local SMTP relay
         if [ -z "${{ secrets.SMTP2GO_API_KEY }}" ]; then
-          echo "WARNING: SMTP2GO_API_KEY not set — email notifications will be logged only"
+          echo "WARNING: SMTP2GO_API_KEY not set — email notifications will be sent via the local SMTP relay instead of smtp2go"
         fi
 
         # Warn (not fail) if spinitron key is absent — DJ names won't be resolved from Spinitron
@@ -209,7 +209,7 @@ jobs:
         CORS_ORIGINS=https://${{ env.SITE_DOMAIN }}
         ENVIRONMENT=${{ env.ENV_NAME }}
         SMTP2GO_API_KEY=${{ secrets.SMTP2GO_API_KEY }}
-        SMTP2GO_FROM_EMAIL=${{ vars.SMTP2GO_FROM_EMAIL }}
+        EMAIL_FROM_ADDRESS=${{ vars.EMAIL_FROM_ADDRESS }}
         WEBMASTER_EMAIL=${{ vars.WEBMASTER_EMAIL }}
         LEGACY_IMPORT_ENABLED=${{ vars.LEGACY_IMPORT_ENABLED || 'false' }}
         EOF

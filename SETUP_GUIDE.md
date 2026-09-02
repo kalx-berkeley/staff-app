@@ -332,11 +332,11 @@ The workflow writes these variables into `~/promotions-app/backend/.env`:
 | `AIRTABLE_API_KEY` | GitHub Actions secret `AIRTABLE_API_KEY` |
 | `AIRTABLE_BASE_ID` | GitHub Actions secret `AIRTABLE_BASE_ID` |
 | `SMTP2GO_API_KEY` | GitHub Actions secret `SMTP2GO_API_KEY` (optional) |
-| `SMTP2GO_FROM_EMAIL` | GitHub Actions variable `SMTP2GO_FROM_EMAIL` (optional) |
+| `EMAIL_FROM_ADDRESS` | GitHub Actions variable `EMAIL_FROM_ADDRESS` (optional) |
 
 Ensure all required values are configured in **Settings > Secrets and variables > Actions** before triggering the first deployment (see [GitHub Actions Deployment Setup](#github-actions-deployment-setup)).
 
-If `SMTP2GO_API_KEY` is absent, the deployment will still succeed — email notifications will be logged rather than sent until the key is added.
+If `SMTP2GO_API_KEY` is absent, the deployment will still succeed — email notifications will be sent via the server's local SMTP relay (`localhost:25` by default) instead of smtp2go until the key is added.
 
 ---
 
@@ -360,13 +360,13 @@ In **Settings > Secrets and variables > Actions**, create the following for each
 - `SSH_PRIVATE_KEY` — private deploy key
 - `AIRTABLE_API_KEY` — Airtable API key (optional)
 - `AIRTABLE_BASE_ID` — Airtable base ID (optional)
-- `SMTP2GO_API_KEY` — smtp2go API key for sending notification emails (optional; emails are logged only if absent)
+- `SMTP2GO_API_KEY` — smtp2go API key for sending notification emails (optional; falls back to the server's local SMTP relay if absent)
 
 **Variables:**
 - `SITE_DOMAIN` — e.g., `staff.kalx.berkeley.edu` (the staff/app domain)
 - `DJ_STUDIO_NETWORK` — CIDR of DJ studio network, e.g., `10.0.1.0/24`
 - `NETBIRD_HOSTNAME` — Netbird peer name of the server
-- `SMTP2GO_FROM_EMAIL` — From address for notification emails (optional; defaults to `noreply@kalx.berkeley.edu`)
+- `EMAIL_FROM_ADDRESS` — From address for notification emails (optional; defaults to `noreply@kalx.berkeley.edu`)
 
 ---
 

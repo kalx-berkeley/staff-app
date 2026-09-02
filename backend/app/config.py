@@ -37,9 +37,9 @@ class Settings(BaseSettings):
     # Contact URL included in User-Agent for external API requests
     api_contact_url: str = "https://kalx.berkeley.edu"
 
-    # Email notifications via smtp2go (primary) or local SMTP (fallback)
+    # Email notifications via smtp2go (primary) or the OS's local SMTP relay (fallback)
     smtp2go_api_key: Optional[str] = None
-    smtp2go_from_email: str = "noreply@kalx.berkeley.edu"
+    email_from_address: str = "noreply@kalx.berkeley.edu"
     local_smtp_host: str = "localhost"
     local_smtp_port: int = 25
 

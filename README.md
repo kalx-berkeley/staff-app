@@ -147,13 +147,15 @@ Client
 | `AIRTABLE_BASE_ID` | Airtable base ID | — |
 | `AIRTABLE_TABLE_NAME` | Staff directory table | `KALX Active Staff Directory` |
 | `CORS_ORIGINS` | Allowed CORS origins | `http://localhost:3000` (production: `https://staff.kalx.berkeley.edu`) |
-| `SMTP2GO_API_KEY` | smtp2go API key for email notifications | — (emails logged only when unset) |
-| `SMTP2GO_FROM_EMAIL` | From address for notification emails | `noreply@kalx.berkeley.edu` |
+| `SMTP2GO_API_KEY` | smtp2go API key for email notifications | — (falls back to local SMTP relay when unset) |
+| `EMAIL_FROM_ADDRESS` | From address for notification emails | `noreply@kalx.berkeley.edu` |
+| `LOCAL_SMTP_HOST` | Hostname of the local SMTP relay used when `SMTP2GO_API_KEY` is unset | `localhost` |
+| `LOCAL_SMTP_PORT` | Port of the local SMTP relay used when `SMTP2GO_API_KEY` is unset | `25` |
 | `WEBMASTER_EMAIL` | Recipient for in-app feedback and bug reports | — |
 
 Note: CORS is same-origin in production (frontend and API are both on `staff.kalx.berkeley.edu`), so `CORS_ORIGINS` only matters for local development.
 
-When `SMTP2GO_API_KEY` is not set, or when `ENVIRONMENT=staging`, emails are logged rather than sent. The one exception is `WEBMASTER_EMAIL`: in staging, emails to the webmaster are always delivered so that feedback submitted via the in-app form reaches the webmaster even during testing.
+When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, emails are sent via the OS's local SMTP relay (`LOCAL_SMTP_HOST`/`LOCAL_SMTP_PORT`, e.g. `sendmail`/Postfix listening on `localhost:25`) instead of failing or silently dropping the message. Separately, when `ENVIRONMENT=staging`, emails are logged rather than sent regardless of which path would otherwise be used. The one exception is `WEBMASTER_EMAIL`: in staging, emails to the webmaster are always delivered so that feedback submitted via the in-app form reaches the webmaster even during testing.
 
 ### Airtable Schema
 
@@ -177,13 +179,13 @@ When `SMTP2GO_API_KEY` is not set, or when `ENVIRONMENT=staging`, emails are log
 - `SSH_PRIVATE_KEY` (deploy key for `promotions` user)
 - `AIRTABLE_API_KEY`
 - `AIRTABLE_BASE_ID`
-- `SMTP2GO_API_KEY` (optional — emails are logged only if absent)
+- `SMTP2GO_API_KEY` (optional — falls back to the server's local SMTP relay if absent)
 
 **Variables:**
 - `SITE_DOMAIN`
 - `DJ_STUDIO_NETWORK`
 - `NETBIRD_HOSTNAME`
-- `SMTP2GO_FROM_EMAIL` (optional — defaults to `noreply@kalx.berkeley.edu`)
+- `EMAIL_FROM_ADDRESS` (optional — defaults to `noreply@kalx.berkeley.edu`)
 - `WEBMASTER_EMAIL` (optional — in-app feedback is disabled if unset; in staging, this is the only address that receives real email)
 
 ## Project Structure

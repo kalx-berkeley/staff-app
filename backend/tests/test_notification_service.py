@@ -9,7 +9,7 @@ def test_send_email_staging_logs_not_sends(caplog):
     with patch("app.services.notification_service.settings") as mock_settings:
         mock_settings.environment = "staging"
         mock_settings.smtp2go_api_key = "fake-key"
-        mock_settings.smtp2go_from_email = "noreply@kalx.berkeley.edu"
+        mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
         mock_settings.webmaster_email = None
 
         with caplog.at_level(logging.INFO, logger="app.services.notification_service"):
@@ -34,7 +34,7 @@ def test_send_email_no_api_key_uses_local_smtp():
     ):
         mock_settings.environment = "production"
         mock_settings.smtp2go_api_key = None
-        mock_settings.smtp2go_from_email = "noreply@kalx.berkeley.edu"
+        mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
         mock_settings.webmaster_email = None
         mock_settings.local_smtp_host = "localhost"
         mock_settings.local_smtp_port = 25
@@ -58,7 +58,7 @@ def test_send_email_production_calls_smtp2go():
     ):
         mock_settings.environment = "production"
         mock_settings.smtp2go_api_key = "real-key"
-        mock_settings.smtp2go_from_email = "noreply@kalx.berkeley.edu"
+        mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
 
         from app.services.notification_service import send_email
 

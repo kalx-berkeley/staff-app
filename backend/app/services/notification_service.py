@@ -69,7 +69,7 @@ def _send_via_smtp2go(
 
     client = Smtp2goClient(api_key=settings.smtp2go_api_key)
     kwargs: dict = {
-        "sender": settings.smtp2go_from_email,
+        "sender": settings.email_from_address,
         "recipients": [to_email],
         "subject": subject,
         "text": body_text,
@@ -103,12 +103,12 @@ def _send_via_local_smtp(
         msg = MIMEText(body_text, "plain")
 
     msg["Subject"] = subject
-    msg["From"] = settings.smtp2go_from_email
+    msg["From"] = settings.email_from_address
     msg["To"] = to_email
 
     try:
         with smtplib.SMTP(settings.local_smtp_host, settings.local_smtp_port) as smtp:
-            smtp.sendmail(settings.smtp2go_from_email, [to_email], msg.as_string())
+            smtp.sendmail(settings.email_from_address, [to_email], msg.as_string())
         logger.info("Email sent via local SMTP to=%s subject=%r", to_email, subject)
         _audit_email(db, to_email, subject, body_text, body_html, sent=True)
     except OSError:
