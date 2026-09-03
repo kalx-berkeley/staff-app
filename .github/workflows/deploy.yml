@@ -128,7 +128,8 @@ jobs:
         attempts=1
         while [ $attempts -lt 15 ]; do
           (( attempts++ ))
-          IP="$(sudo netbird status --filter-by-names ${{ vars.NETBIRD_HOSTNAME }} --filter-by-status connected --json | jq --raw-output '.peers.details[0].netbirdIp')"
+          STATUS="$(sudo netbird status --filter-by-names ${{ vars.NETBIRD_HOSTNAME }} --filter-by-status connected --json)"
+          IP="$(echo "$STATUS" | jq --raw-output '.peers.details[0].netbirdIp')"
           if [ -n "$IP" ] && [ "$IP" != "null" ]; then
             echo "ip=$IP" >> "$GITHUB_OUTPUT"
             break
@@ -171,6 +172,7 @@ jobs:
         set -ex
         mkdir -p ${{ env.DEPLOY_PATH }}/backend/data
         mkdir -p ${{ env.DEPLOY_PATH }}/frontend/dist
+        mkdir -p ${{ env.SYSTEMD_USER_PATH }}
         if [ -f "${{ env.DEPLOY_PATH }}/backend/data/promotions.db" ]; then
           cp "${{ env.DEPLOY_PATH }}/backend/data/promotions.db" \
              "${{ env.DEPLOY_PATH }}/backend/data/backup_$(date +%Y%m%d_%H%M%S).db"
