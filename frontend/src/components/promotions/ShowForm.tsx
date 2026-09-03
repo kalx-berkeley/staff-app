@@ -441,8 +441,8 @@ const ShowForm = () => {
       newErrors.num_pass_pairs = 'Number of pass pairs must be between 1 and 5';
     }
 
-    if (autoClose && (!plannedCloseDate || !plannedCloseTime)) {
-      newErrors.auto_close = 'Planned close date and time are required when auto-close is enabled';
+    if (!plannedCloseDate || !plannedCloseTime) {
+      newErrors.planned_close_date = 'Planned close date and time are required';
     }
 
     if (plannedCloseDate && showDate) {
@@ -940,7 +940,7 @@ const ShowForm = () => {
 
         <div className="form-group">
           <div style={{ fontWeight: 500, fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-            Planned Close Date / Time (Pacific)
+            Planned Close Date / Time (Pacific) <span className="required">*</span>
           </div>
           <div className="form-row">
             <div className="form-group">
@@ -950,7 +950,7 @@ const ShowForm = () => {
                 id="planned_close_date"
                 value={plannedCloseDate}
                 onChange={(e) => setPlannedCloseDate(e.target.value)}
-                className={errors.auto_close || errors.planned_close_date ? 'input-error' : ''}
+                className={errors.planned_close_date ? 'input-error' : ''}
                 disabled={submitting}
               />
             </div>
@@ -961,7 +961,7 @@ const ShowForm = () => {
                 id="planned_close_time"
                 value={plannedCloseTime}
                 onChange={(e) => setPlannedCloseTime(e.target.value)}
-                className={errors.auto_close || errors.planned_close_date ? 'input-error' : ''}
+                className={errors.planned_close_date ? 'input-error' : ''}
                 disabled={submitting}
               />
             </div>
@@ -981,9 +981,6 @@ const ShowForm = () => {
               owners at this time
             </label>
           </div>
-          {errors.auto_close && (
-            <span className="field-error">{errors.auto_close}</span>
-          )}
           {errors.planned_close_date && (
             <span className="field-error">{errors.planned_close_date}</span>
           )}
