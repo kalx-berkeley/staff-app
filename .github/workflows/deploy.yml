@@ -170,6 +170,9 @@ jobs:
         # Prepare deployment directories and backup database
         ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${SSH_HOST} bash << 'ENDSSH'
         set -ex
+        # Apache (www-data) needs traversal access into the home directory to
+        # serve the frontend static files from frontend/dist via Alias.
+        chmod 755 /home/staff-app
         mkdir -p ${{ env.DEPLOY_PATH }}/backend/data
         mkdir -p ${{ env.DEPLOY_PATH }}/frontend/dist
         mkdir -p ${{ env.SYSTEMD_USER_PATH }}
