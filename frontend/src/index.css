@@ -111,6 +111,42 @@ body {
   display: none;
 }
 
+/* Staging environment indicator (see StagingBanner.tsx) */
+.staging-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ff8f00;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(0, 0, 0, 0.12) 0,
+    rgba(0, 0, 0, 0.12) 10px,
+    transparent 10px,
+    transparent 20px
+  );
+  color: #1a1a1a;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 0 0.75rem;
+}
+
+/* Pushes fixed page content below the staging banner. Body padding alone
+   handles normal document flow (the layout divs below); the mobile topbar
+   and drawer are position: fixed and need an explicit offset, added in the
+   mobile media query below. */
+body.staging-active {
+  padding-top: 2rem;
+}
+
 /* App Nav (cross-view switcher) */
 .app-nav {
   margin-bottom: 0.5rem;
@@ -2354,6 +2390,17 @@ fieldset.radio-group legend {
   .staff-nav.nav-is-open,
   .dj-nav.nav-is-open {
     transform: translateX(0);
+  }
+
+  /* Offset fixed-position elements below the staging banner (see .staging-active above) */
+  body.staging-active .promotions-nav,
+  body.staging-active .staff-nav,
+  body.staging-active .dj-nav {
+    top: 2rem;
+  }
+
+  body.staging-active .mobile-topbar {
+    top: 2rem;
   }
 
   /* Main content: account for topbar height */

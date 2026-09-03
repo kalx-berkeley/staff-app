@@ -35,6 +35,8 @@ import {
 } from './components/dj';
 import { useAuth } from './contexts/authHooks';
 import { AUTH_DIAG_KEY } from './services/api';
+import { isStagingEnvironment } from './utils';
+import StagingBanner from './components/shared/StagingBanner';
 
 // Diagnostic banner: rendered when a 401 redirect loop has been detected.
 // Shows which API endpoint triggered the redirect and stops the loop from
@@ -59,7 +61,7 @@ function AuthDiagBanner() {
 
   return (
     <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+      position: 'fixed', top: isStagingEnvironment() ? '2rem' : 0, left: 0, right: 0, zIndex: 9999,
       background: '#b71c1c', color: '#fff', padding: '0.6rem 1rem',
       fontFamily: 'monospace', fontSize: '0.8rem', lineHeight: 1.6,
       display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap',
@@ -225,15 +227,16 @@ function App() {
   const { loading, error } = useAuth();
 
   if (loading) {
-    return <><AuthDiagBanner /><LoadingScreen /></>;
+    return <><StagingBanner /><AuthDiagBanner /><LoadingScreen /></>;
   }
 
   if (error) {
-    return <><AuthDiagBanner /><ErrorScreen message={error} /></>;
+    return <><StagingBanner /><AuthDiagBanner /><ErrorScreen message={error} /></>;
   }
 
   return (
     <>
+    <StagingBanner />
     <AuthDiagBanner />
     <BrowserRouter basename="/pass-giveaway">
       <Routes>

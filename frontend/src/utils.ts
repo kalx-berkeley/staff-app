@@ -6,3 +6,9 @@ export function formatPhone(phone: string | null | undefined): string {
   }
   return phone;
 }
+
+// Matches "stage" as a full hostname label (e.g. staff.stage.example.org or
+// stage.example.org) without matching unrelated labels like "backstage".
+export function isStagingEnvironment(hostname: string = window.location.hostname): boolean {
+  return /(^|\.)stage\./.test(hostname);
+}
