@@ -2117,6 +2117,46 @@ fieldset.radio-group legend {
   background-color: #f5f0ff;
 }
 
+/* Compact list / table view for venues */
+.venues-list {
+  margin-top: 0.75rem;
+}
+
+.venues-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.venues-list-table th {
+  background: var(--light-bg);
+  border-bottom: 2px solid var(--border-color);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #555;
+  white-space: nowrap;
+}
+
+.venues-list-table td {
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+
+.venues-list-table tr:last-child td {
+  border-bottom: none;
+}
+
+.venues-list-table tr:hover td {
+  background: var(--light-bg);
+}
+
 /* Small inline star for assigned shows in compact list */
 .assignment-indicator {
   color: #28a745;

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { venuesAPI, venuesMyAPI } from '../../services/api';
 import type { VenueResponse, APIError } from '../../types';
 
+const VIEW_MODE_KEY = 'kalx_venue_view_mode';
+
 const VenueList = () => {
   const navigate = useNavigate();
   const [venues, setVenues] = useState<VenueResponse[]>([]);
@@ -10,6 +12,9 @@ const VenueList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showMineOnly, setShowMineOnly] = useState(true);
+  const [viewMode, setViewMode] = useState<'card' | 'compact'>(
+    (localStorage.getItem(VIEW_MODE_KEY) as 'card' | 'compact') || 'card'
+  );
 
   const loadVenues = useCallback(async () => {
     try {
@@ -39,6 +44,11 @@ const VenueList = () => {
 
   const handleEditClick = (venue: VenueResponse) => {
     navigate(`/promotions/venues/${venue.id}/edit`);
+  };
+
+  const handleViewMode = (mode: 'card' | 'compact') => {
+    setViewMode(mode);
+    localStorage.setItem(VIEW_MODE_KEY, mode);
   };
 
   if (loading) {
@@ -101,12 +111,57 @@ const VenueList = () => {
             Clear
           </button>
         )}
+
+        <div className="view-toggle">
+          <button
+            className={viewMode === 'card' ? 'active' : ''}
+            onClick={() => handleViewMode('card')}
+            title="Card view"
+          >
+            Cards
+          </button>
+          <button
+            className={viewMode === 'compact' ? 'active' : ''}
+            onClick={() => handleViewMode('compact')}
+            title="Compact list view"
+          >
+            List
+          </button>
+        </div>
       </div>
 
       {filteredVenues.length === 0 ? (
         <p className="empty-message">
           {venueFilter ? 'No venues match your filter.' : 'No venues found. Create your first venue!'}
         </p>
+      ) : viewMode === 'compact' ? (
+        <div className="venues-list">
+          <table className="venues-list-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Address</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredVenues.map((venue) => (
+                <tr key={venue.id}>
+                  <td>{venue.name}</td>
+                  <td>{venue.address}</td>
+                  <td>
+                    <button
+                      onClick={() => handleEditClick(venue)}
+                      className="btn-secondary btn-sm"
+                    >
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="venue-grid">
           {filteredVenues.map((venue) => (
