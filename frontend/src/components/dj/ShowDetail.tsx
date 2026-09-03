@@ -191,7 +191,7 @@ const ShowDetail = () => {
             className="btn-primary btn-winner-huge"
             onClick={() => navigate(`/dj/shows/${id}/giveaway`)}
           >
-            We've got a winner!
+            I'm off the mic
           </button>
         </div>
       )}
