@@ -138,8 +138,9 @@ describe('VenueForm', () => {
     });
 
     it('should disable buttons while submitting', async () => {
+      let resolveCreate: (venue: VenueResponse) => void;
       vi.mocked(venuesAPI.create).mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 100))
+        () => new Promise((resolve) => { resolveCreate = resolve; })
       );
 
       render(
@@ -159,6 +160,11 @@ describe('VenueForm', () => {
       await waitFor(() => {
         expect(submitButton).toBeDisabled();
         expect(screen.getByRole('button', { name: /cancel/i })).toBeDisabled();
+      });
+
+      // Resolve and let the submission finish so it doesn't leak into later tests.
+      await act(async () => {
+        resolveCreate(makeVenue({ name: 'Test Venue', address: '123 Main St' }));
       });
     });
 
