@@ -300,6 +300,9 @@ body {
 .app-nav-feedback {
   margin-top: auto;
   padding-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .feedback-link {
