@@ -133,12 +133,15 @@ describe('ShowForm', () => {
       const genreInput = screen.getByLabelText(/genre/i);
       const venueSelect = screen.getByRole('combobox', { name: /Venue/ });
       const dateInput = screen.getByLabelText(/show date/i);
+      const timeInput = screen.getByLabelText(/show time/i);
 
       eventNameInput.textContent = 'Test Event';
       fireEvent.input(eventNameInput);
       fireEvent.change(genreInput, { target: { value: 'Rock' } });
       fireEvent.change(venueSelect, { target: { value: '1' } });
       fireEvent.change(dateInput, { target: { value: '2024-12-31' } });
+      // Show time defaults to 7:00 PM; clear it to exercise the required-field validation.
+      fireEvent.change(timeInput, { target: { value: '' } });
 
       const submitButton = screen.getByRole('button', { name: /save draft/i });
       fireEvent.click(submitButton);

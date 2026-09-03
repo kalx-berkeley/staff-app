@@ -179,7 +179,7 @@ const ShowForm = () => {
   const [venueId, setVenueId] = useState<number | ''>('');
   const [promoterId, setPromoterId] = useState<number | null>(null);
   const [showDate, setShowDate] = useState('');
-  const [showTime, setShowTime] = useState('');
+  const [showTime, setShowTime] = useState('19:00');
   const [showStartDate, setShowStartDate] = useState('');
   const [isMultiDay, setIsMultiDay] = useState(false);
   const [onAirDescription, setOnAirDescription] = useState('');
@@ -331,18 +331,11 @@ const ShowForm = () => {
   };
 
   const handleShowTimeChange = (newTime: string) => {
-    let adjustedTime = newTime;
-    if (!showTime && newTime) {
-      const hours = parseInt(newTime.split(':')[0], 10);
-      if (hours >= 1 && hours <= 11) {
-        adjustedTime = `${String(hours + 12).padStart(2, '0')}:${newTime.slice(3)}`;
-      }
-    }
-    setShowTime(adjustedTime);
-    if (!plannedCloseDate && !plannedCloseTime && showDate && adjustedTime) {
+    setShowTime(newTime);
+    if (!plannedCloseDate && !plannedCloseTime && showDate && newTime) {
       const selected = venueId !== '' ? venues.find((v) => v.id === venueId) : undefined;
       if (selected?.default_close_hours_before_show != null) {
-        applyVenueCloseDefault(showDate, adjustedTime, selected.default_close_hours_before_show);
+        applyVenueCloseDefault(showDate, newTime, selected.default_close_hours_before_show);
       }
     }
   };
