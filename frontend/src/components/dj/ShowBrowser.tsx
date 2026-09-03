@@ -138,21 +138,6 @@ const ShowBrowser = () => {
     return a.venue.name.localeCompare(b.venue.name);
   });
 
-  if (loading) {
-    return <div className="loading">Loading shows...</div>;
-  }
-
-  if (error) {
-    return (
-      <div className="error">
-        <p>Error: {error}</p>
-        <button onClick={loadShows} className="btn-primary">
-          Retry
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="show-browser">
       <div className="page-header">
@@ -304,7 +289,16 @@ const ShowBrowser = () => {
         </div>
       )}
 
-      {sortedShows.length === 0 ? (
+      {error ? (
+        <div className="error">
+          <p>Error: {error}</p>
+          <button onClick={loadShows} className="btn-primary">
+            Retry
+          </button>
+        </div>
+      ) : loading ? (
+        <div className="loading">Loading shows...</div>
+      ) : sortedShows.length === 0 ? (
         <div className="no-shows">
           <p>No shows available at this time.</p>
         </div>

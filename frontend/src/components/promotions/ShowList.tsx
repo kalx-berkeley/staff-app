@@ -134,19 +134,6 @@ const ShowList = () => {
     return a.venue.name.localeCompare(b.venue.name);
   });
 
-  if (loading) {
-    return <div className="loading">Loading shows...</div>;
-  }
-
-  if (error) {
-    return (
-      <div className="error">
-        <p>Error: {error}</p>
-        <button onClick={loadShows}>Retry</button>
-      </div>
-    );
-  }
-
   return (
     <div className="show-list">
       <div className="show-list-header">
@@ -240,7 +227,14 @@ const ShowList = () => {
         </div>
       </div>
 
-      {sortedShows.length === 0 ? (
+      {error ? (
+        <div className="error">
+          <p>Error: {error}</p>
+          <button onClick={loadShows}>Retry</button>
+        </div>
+      ) : loading ? (
+        <div className="loading">Loading shows...</div>
+      ) : sortedShows.length === 0 ? (
         <p className="empty-message">
           {statusFilter === 'all'
             ? 'No shows found. Create your first show!'

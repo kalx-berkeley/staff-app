@@ -10,10 +10,18 @@ vi.mock('./services/api', () => ({
   usersAPI: {
     getMe: vi.fn(),
   },
-  showsAPI: {},
-  venuesAPI: {},
-  passesAPI: {},
-  autocompleteAPI: {},
+  showsAPI: {
+    list: vi.fn().mockResolvedValue([]),
+  },
+  venuesAPI: {
+    list: vi.fn().mockResolvedValue([]),
+  },
+  passesAPI: {
+    getMyGiveaways: vi.fn().mockResolvedValue([]),
+  },
+  autocompleteAPI: {
+    getDJNames: vi.fn().mockResolvedValue([]),
+  },
   specialtyShowsAPI: {
     listMy: vi.fn().mockResolvedValue([]),
   },
