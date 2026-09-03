@@ -150,6 +150,41 @@ describe('ShowForm', () => {
         expect(screen.getByText('Show time is required')).toBeInTheDocument();
       });
     });
+
+    it('should show validation error when multi-day end date is before start date', async () => {
+      renderShowForm();
+
+      await waitFor(() => {
+        expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+      });
+
+      const eventNameInput = screen.getByLabelText(/event name/i);
+      const genreInput = screen.getByLabelText(/genre/i);
+      const venueSelect = screen.getByRole('combobox', { name: /Venue/ });
+
+      eventNameInput.textContent = 'Test Event';
+      fireEvent.input(eventNameInput);
+      fireEvent.change(genreInput, { target: { value: 'Rock' } });
+      fireEvent.change(venueSelect, { target: { value: '1' } });
+
+      fireEvent.click(screen.getByRole('button', { name: /multi-day/i }));
+
+      const startDateInput = screen.getByLabelText(/start date/i);
+      const endDateInput = screen.getByLabelText(/end date/i);
+      fireEvent.change(startDateInput, { target: { value: '2024-12-31' } });
+      fireEvent.change(endDateInput, { target: { value: '2024-12-30' } });
+
+      const submitButton = screen.getByRole('button', { name: /save draft/i });
+      fireEvent.click(submitButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('End date must be on or after the start date')
+        ).toBeInTheDocument();
+      });
+
+      expect(showsAPI.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('Button Interactions', () => {

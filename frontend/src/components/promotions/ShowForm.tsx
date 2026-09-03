@@ -437,6 +437,10 @@ const ShowForm = () => {
       newErrors.show_time = 'Show time is required';
     }
 
+    if (isMultiDay && showStartDate && showDate && showStartDate > showDate) {
+      newErrors.show_date = 'End date must be on or after the start date';
+    }
+
     if (numPassPairs < 1 || numPassPairs > 5) {
       newErrors.num_pass_pairs = 'Number of pass pairs must be between 1 and 5';
     }
@@ -783,6 +787,7 @@ const ShowForm = () => {
                   type="date"
                   id="show_start_date"
                   value={showStartDate}
+                  max={showDate || undefined}
                   onChange={(e) => setShowStartDate(e.target.value)}
                   disabled={submitting}
                 />
@@ -796,6 +801,7 @@ const ShowForm = () => {
                   type="date"
                   id="show_date"
                   value={showDate}
+                  min={showStartDate || undefined}
                   onChange={(e) => setShowDate(e.target.value)}
                   className={errors.show_date ? 'input-error' : ''}
                   disabled={submitting}
