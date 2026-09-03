@@ -184,7 +184,7 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 **Variables:**
 - `SITE_DOMAIN`
 - `DJ_STUDIO_NETWORK`
-- `NETBIRD_HOSTNAME`
+- `NETBIRD_HOSTNAME` (the bare Netbird peer hostname, not the FQDN)
 - `EMAIL_FROM_ADDRESS` (optional — defaults to `noreply@kalx.berkeley.edu`)
 - `WEBMASTER_EMAIL` (optional — in-app feedback is disabled if unset; in staging, this is the only address that receives real email)
 

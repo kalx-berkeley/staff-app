@@ -365,7 +365,7 @@ In **Settings > Secrets and variables > Actions**, create the following for each
 **Variables:**
 - `SITE_DOMAIN` — e.g., `staff.kalx.berkeley.edu` (the staff/app domain)
 - `DJ_STUDIO_NETWORK` — CIDR of DJ studio network, e.g., `10.0.1.0/24`
-- `NETBIRD_HOSTNAME` — Netbird peer name of the server
+- `NETBIRD_HOSTNAME` — Netbird peer name of the server (the bare hostname, not the FQDN)
 - `EMAIL_FROM_ADDRESS` — From address for notification emails (optional; defaults to `noreply@kalx.berkeley.edu`)
 
 ---

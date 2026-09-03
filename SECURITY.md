@@ -43,7 +43,7 @@ Ensure all GitHub secrets and variables are properly configured per environment 
 **Variables:**
 - `SITE_DOMAIN` - Your application domain
 - `DJ_STUDIO_NETWORK` - DJ studio network CIDR
-- `NETBIRD_HOSTNAME` - Netbird hostname (without .netbird.cloud suffix)
+- `NETBIRD_HOSTNAME` - Netbird hostname (the bare peer hostname, not the FQDN — no domain suffix)
 
 **Secrets:**
 - `NETBIRD_SETUP_KEY` - Netbird setup key
