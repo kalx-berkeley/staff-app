@@ -83,7 +83,7 @@ This application implements several security best practices:
 - **Error Handling**: Sanitized error messages without internal details
 
 #### Infrastructure Security
-- **User Separation**: Backend service runs as non-root `promotions` user
+- **User Separation**: Backend service runs as non-root `staff-app` user
 - **Systemd Hardening**: NoNewPrivileges, PrivateTmp, ProtectSystem
 - **Netbird Mesh Network**: Secure deployment without exposing SSH to internet
 - **Automated Deployments**: GitHub Actions with secrets management
@@ -171,7 +171,7 @@ The DJ studio network bypass is intentional to support live broadcast workflow. 
 #### SQLite Database
 The application uses SQLite for simplicity. For production:
 - SQLite is appropriate for this use case (low concurrent writes)
-- Database file permissions are restricted to the `promotions` user
+- Database file permissions are restricted to the `staff-app` user
 - Regular backups are essential (no built-in replication)
 - Consider PostgreSQL for higher-scale deployments
 

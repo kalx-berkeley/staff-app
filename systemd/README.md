@@ -4,7 +4,7 @@ This directory contains user systemd service files for the Promotions Pass Givea
 
 ## Services
 
-- `promotions-app-backend.service`: Backend API service (uvicorn) - runs as `promotions` user
+- `promotions-app-backend.service`: Backend API service (uvicorn) - runs as `staff-app` user
 
 ## Installation
 
@@ -13,7 +13,7 @@ These services are installed as **user services** (not system services).
 ### Backend Service Installation
 
 ```bash
-# As promotions user
+# As staff-app user
 mkdir -p ~/.config/systemd/user
 
 # Copy service file
@@ -66,7 +66,7 @@ systemctl --user disable promotions-app-backend
 
 ## Service Details
 
-### Backend Service (promotions user)
+### Backend Service (staff-app user)
 
 - **Type**: Simple
 - **Port**: 8000 (localhost only)
@@ -81,10 +81,10 @@ For the user service to start at boot (before the user logs in), lingering must 
 
 ```bash
 # As root
-sudo loginctl enable-linger promotions
+sudo loginctl enable-linger staff-app
 
 # Verify
-loginctl show-user promotions | grep Linger
+loginctl show-user staff-app | grep Linger
 ```
 
 This is done automatically during initial server setup.
@@ -131,7 +131,7 @@ The backend service includes security hardening:
 
 ## Notes
 
-- Backend service runs as the `promotions` user (non-root)
+- Backend service runs as the `staff-app` user (non-root)
 - Service binds to localhost only (127.0.0.1)
 - Apache reverse proxies to this service
 - Service automatically restarts on failure

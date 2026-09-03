@@ -106,35 +106,35 @@ systemctl restart apache2
 ### 2. Create Application User
 
 ```bash
-useradd --create-home --shell /bin/bash promotions
+useradd --create-home --shell /bin/bash staff-app
 
 # Allow user services to run at boot
-loginctl enable-linger promotions
+loginctl enable-linger staff-app
 
 # Create log directory
-install --mode 0750 --owner promotions --group adm --directory /var/log/promotions
+install --mode 0750 --owner staff-app --group adm --directory /var/log/staff-app
 
 # Set up SSH access for deployments
-mkdir -p /home/promotions/.ssh
-chmod 700 /home/promotions/.ssh
-touch /home/promotions/.ssh/authorized_keys
-chmod 600 /home/promotions/.ssh/authorized_keys
-chown --recursive promotions:promotions /home/promotions/.ssh
+mkdir -p /home/staff-app/.ssh
+chmod 700 /home/staff-app/.ssh
+touch /home/staff-app/.ssh/authorized_keys
+chmod 600 /home/staff-app/.ssh/authorized_keys
+chown --recursive staff-app:staff-app /home/staff-app/.ssh
 
 # Add deploy key (generated separately — see GitHub Actions setup)
-cat deploy_key.pub >> /home/promotions/.ssh/authorized_keys
+cat deploy_key.pub >> /home/staff-app/.ssh/authorized_keys
 ```
 
 ### 3. Create Application Directories
 
 ```bash
-# As promotions user
-sudo -u promotions bash << 'EOF'
-mkdir -p /home/promotions/.config/systemd/user
-mkdir -p /home/promotions/promotions-app/backend/data
-mkdir -p /home/promotions/promotions-app/frontend/dist
+# As staff-app user
+sudo -u staff-app bash << 'EOF'
+mkdir -p /home/staff-app/.config/systemd/user
+mkdir -p /home/staff-app/promotions-app/backend/data
+mkdir -p /home/staff-app/promotions-app/frontend/dist
 EOF
-chmod 755 /home/promotions
+chmod 755 /home/staff-app
 ```
 
 ---
@@ -285,19 +285,19 @@ Apache `mod_auth_openidc` handles the entire OAuth2 flow:
 
 ### How the Service Works
 
-The backend runs as a **user systemd service** under the `promotions` account — not a system service managed by root. A few things follow from this:
+The backend runs as a **user systemd service** under the `staff-app` account — not a system service managed by root. A few things follow from this:
 
-- All `systemctl` and `journalctl` commands must be run with `--user` **as the `promotions` user**. They will silently operate on the wrong service manager if run as root.
-- `systemctl --user` requires a proper login session with `XDG_RUNTIME_DIR` set. It does **not** work inside a `sudo -u promotions bash` subshell, which lacks that environment variable. Always SSH into the server as the `promotions` user directly to run these commands.
-- The service starts at boot because `loginctl enable-linger promotions` was run during server setup. Lingering keeps the user's systemd instance alive after logout; without it the backend would stop whenever no one is logged in.
+- All `systemctl` and `journalctl` commands must be run with `--user` **as the `staff-app` user**. They will silently operate on the wrong service manager if run as root.
+- `systemctl --user` requires a proper login session with `XDG_RUNTIME_DIR` set. It does **not** work inside a `sudo -u staff-app bash` subshell, which lacks that environment variable. Always SSH into the server as the `staff-app` user directly to run these commands.
+- The service starts at boot because `loginctl enable-linger staff-app` was run during server setup. Lingering keeps the user's systemd instance alive after logout; without it the backend would stop whenever no one is logged in.
 - The service file sets `ProtectHome=read-only` for security hardening, but grants write access to `~/promotions-app/backend/data` via `ReadWritePaths`. That directory must exist before the service starts — it was created in Server Setup step 3.
 
 ### 1. Install the systemd Service
 
-SSH into the server as the `promotions` user:
+SSH into the server as the `staff-app` user:
 
 ```bash
-ssh promotions@your-server
+ssh staff-app@your-server
 ```
 
 Then copy the service file, enable it, and start it:
@@ -348,7 +348,7 @@ If `SMTP2GO_API_KEY` is absent, the deployment will still succeed — email noti
 ssh-keygen -t ed25519 -C "kalx-promotions-deploy" -f deploy_key -N ""
 ```
 
-- Add `deploy_key.pub` contents to `/home/promotions/.ssh/authorized_keys` on the server
+- Add `deploy_key.pub` contents to `/home/staff-app/.ssh/authorized_keys` on the server
 - Add `deploy_key` (private key) as the `SSH_PRIVATE_KEY` GitHub secret
 
 ### 2. Configure GitHub Secrets
@@ -394,7 +394,7 @@ On every push to `main` (staging) or published release (production) the workflow
 
 The workflow assumes the server is already set up (see [Server Setup](#server-setup) and [Apache Configuration](#apache-configuration)) and in particular:
 
-- The `promotions` user exists and the deploy SSH key is in its `authorized_keys`
+- The `staff-app` user exists and the deploy SSH key is in its `authorized_keys`
 - The systemd service file is installed and **enabled** (step 1 of [Backend Service Setup](#backend-service-setup)); the workflow does `restart` not `start --now`, so `enable` must have been run first
 - All GitHub Actions secrets and variables are configured
 
@@ -475,7 +475,7 @@ Secrets and variables live in `/etc/apache2/conf-available/kalx-secrets.conf` an
 `kalx-variables.conf` — they are never overwritten by a conf file update.
 
 The `/pass-giveaway/` location blocks live directly inside `apache/sites/staff.conf`
-(root-owned, in `/etc/apache2/sites-available/`) rather than in a file the `promotions` OS user
+(root-owned, in `/etc/apache2/sites-available/`) rather than in a file the `staff-app` OS user
 can write to. Changes to those blocks require manually copying the updated config and reloading
 Apache — the GitHub Actions workflow does not deploy them.
 
@@ -626,7 +626,7 @@ chmod -R 755 ~/promotions-app/frontend/dist
 Check GitHub Actions logs in the browser. On the server:
 ```bash
 sudo netbird status
-ssh promotions@your-server   # Test SSH connectivity
+ssh staff-app@your-server   # Test SSH connectivity
 df -h                         # Check disk space
 ```
 
@@ -636,7 +636,7 @@ df -h                         # Check disk space
 
 ### One-Time Server Setup
 - [ ] Installed Apache, mod_auth_openidc, Python, Netbird
-- [ ] Created `promotions` user with lingering enabled
+- [ ] Created `staff-app` user with lingering enabled
 - [ ] Created application directories
 
 ### Google OAuth
@@ -657,15 +657,15 @@ df -h                         # Check disk space
 - [ ] Verified `apache2ctl -S` shows both hostnames routed to the correct config files (not the default VirtualHost)
 
 ### Backend
-- [ ] Copied `promotions-app-backend.service` to `~/.config/systemd/user/` as the `promotions` user
-- [ ] Ran `systemctl --user daemon-reload` and `systemctl --user enable promotions-app-backend` (via SSH as `promotions`, not via sudo)
+- [ ] Copied `promotions-app-backend.service` to `~/.config/systemd/user/` as the `staff-app` user
+- [ ] Ran `systemctl --user daemon-reload` and `systemctl --user enable promotions-app-backend` (via SSH as `staff-app`, not via sudo)
 - [ ] **Note:** do not manually create `.env` — the GitHub Actions workflow generates it from secrets/variables on first deployment
 
 ### GitHub Actions
 - [ ] `SSH_PRIVATE_KEY` secret configured
 - [ ] `NETBIRD_SETUP_KEY` secret configured
 - [ ] `SITE_DOMAIN`, `DJ_STUDIO_NETWORK`, `NETBIRD_HOSTNAME` variables set
-- [ ] Deploy key public key added to `promotions` user's `authorized_keys`
+- [ ] Deploy key public key added to `staff-app` user's `authorized_keys`
 
 ### First Deployment
 - [ ] Pushed to `main` (staging) or published a release (production) to trigger GitHub Actions

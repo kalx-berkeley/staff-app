@@ -104,7 +104,7 @@ Common causes:
 sudo netbird status
 
 # Test SSH
-ssh promotions@your-server
+ssh staff-app@your-server
 
 # Check disk space
 df -h

@@ -8,7 +8,7 @@ The data that the Radio Pass Giveaway system handles includes
   * Public data about Venues and Shows such as postal address, date/time, what band is playing and wheelchair accessibility of the venue
 * GitHub Action Workflow
   * Netbird setup-key which grants network access to the KALX stream server
-  * SSH Private key which grants ssh access to the KALX stream server as the "promotions" user
+  * SSH Private key which grants ssh access to the KALX stream server as the "staff-app" user
 
 These data can be categorized in the "UC Berkeley Data and IT Resource Classification Standard". Under this standard the data is classified as described below.
 

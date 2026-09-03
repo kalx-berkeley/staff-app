@@ -118,9 +118,9 @@ Client
               │    X-Forwarded-User: OIDC email (absent for DJ-network-only requests)
               │    X-Forwarded-For: real client IP (set by mod_proxy)
               │
-              ├── Static files  →  /home/promotions/promotions-app/frontend/dist/
+              ├── Static files  →  /home/staff-app/promotions-app/frontend/dist/
               │
-              └── /pass-giveaway/api/*  →  Uvicorn (127.0.0.1:8000, promotions user)
+              └── /pass-giveaway/api/*  →  Uvicorn (127.0.0.1:8000, staff-app user)
                                               │  (Apache strips /pass-giveaway prefix)
                                               │  Defense-in-depth: 400 if neither
                                               │  X-Forwarded-User nor DJ network IP present
@@ -176,7 +176,7 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 
 **Secrets:**
 - `NETBIRD_SETUP_KEY`
-- `SSH_PRIVATE_KEY` (deploy key for `promotions` user)
+- `SSH_PRIVATE_KEY` (deploy key for `staff-app` user)
 - `AIRTABLE_API_KEY`
 - `AIRTABLE_BASE_ID`
 - `SMTP2GO_API_KEY` (optional — falls back to the server's local SMTP relay if absent)
@@ -216,7 +216,7 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 ### Logs
 
 ```bash
-# Backend (as promotions user)
+# Backend (as staff-app user)
 journalctl --user -u promotions-app-backend -f
 
 # Apache (requires sudo)
@@ -227,7 +227,7 @@ sudo tail -f /var/log/apache2/kalx-staff-error.log
 ### Restarting Services
 
 ```bash
-# Backend (as promotions user)
+# Backend (as staff-app user)
 systemctl --user restart promotions-app-backend
 
 # Apache (requires sudo)

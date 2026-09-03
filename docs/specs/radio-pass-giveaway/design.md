@@ -836,7 +836,7 @@ class SyncResult(BaseModel):
 
 The application runs on a single server:
 
-**`promotions` user:**
+**`staff-app` user:**
 - Runs the FastAPI backend as a systemd user service (`promotions-app-backend`)
 - Stores the SQLite database in `~/promotions-app/backend/data/promotions.db`
 - Frontend static files served from `~/promotions-app/frontend/dist/`
