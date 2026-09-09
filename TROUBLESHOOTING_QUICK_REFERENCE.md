@@ -9,7 +9,7 @@ Quick commands for common issues. For detailed troubleshooting, see [SETUP_GUIDE
 systemctl --user status promotions-app-backend
 
 # Test backend locally
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8420/health
 
 # Test via Apache
 curl https://staff.kalx.berkeley.edu/pass-giveaway/api/health
@@ -27,7 +27,7 @@ journalctl --user -u promotions-app-backend -n 50
 journalctl --user -u promotions-app-backend --no-pager -n 100
 
 # Check for port conflicts
-ss -tlnp | grep 8000
+ss -tlnp | grep 8420
 
 # Restart service
 systemctl --user restart promotions-app-backend
@@ -38,7 +38,7 @@ systemctl --user restart promotions-app-backend
 ```bash
 # Check if backend is running
 systemctl --user is-active promotions-app-backend
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8420/health
 
 # Check Apache config
 sudo apache2ctl configtest
@@ -218,10 +218,10 @@ sudo systemctl reload apache2
 
 ```bash
 # Check if backend port is listening
-ss -tlnp | grep 8000
+ss -tlnp | grep 8420
 
 # Test from localhost
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8420/health
 
 # Test via Apache
 curl https://staff.kalx.berkeley.edu/pass-giveaway/api/health
@@ -311,7 +311,7 @@ alias rt-restart='systemctl --user restart promotions-app-backend'
 alias rt-logs='journalctl --user -u promotions-app-backend -f'
 
 # Health checks
-alias rt-health='curl http://127.0.0.1:8000/health'
+alias rt-health='curl http://127.0.0.1:8420/health'
 
 # Database backup
 alias rt-backup='cp ~/promotions-app/backend/data/promotions.db ~/promotions-app/backend/data/backup_$(date +%Y%m%d_%H%M%S).db'

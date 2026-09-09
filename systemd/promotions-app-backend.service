@@ -8,7 +8,7 @@ WorkingDirectory=%h/promotions-app/backend
 Environment="PATH=%h/promotions-app/backend/venv/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="TZ=America/Los_Angeles"
 ExecStartPre=%h/promotions-app/backend/venv/bin/alembic upgrade head
-ExecStart=%h/promotions-app/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+ExecStart=%h/promotions-app/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8420
 Restart=always
 RestartSec=10
 

@@ -9,7 +9,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/pass-giveaway/api': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:8420',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/pass-giveaway/, ''),
       },

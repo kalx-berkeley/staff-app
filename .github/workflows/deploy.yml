@@ -272,7 +272,7 @@ jobs:
         max_attempts=15
         attempt=0
         while [ $attempt -lt $max_attempts ]; do
-          if curl -f http://127.0.0.1:8000/health 2>/dev/null; then
+          if curl -f http://127.0.0.1:8420/health 2>/dev/null; then
             echo "Backend health check passed"
             break
           fi

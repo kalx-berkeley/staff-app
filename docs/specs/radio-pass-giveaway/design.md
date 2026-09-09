@@ -905,7 +905,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 alembic upgrade head
 pytest          # Run tests
-uvicorn app.main:app --reload  # Start dev server on port 8000
+uvicorn app.main:app --reload  # Start dev server on port 8420
 ```
 
 **Frontend Setup:**

@@ -315,7 +315,7 @@ Verify it is running:
 
 ```bash
 systemctl --user status promotions-app-backend
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8420/health
 ```
 
 ### 2. Backend Environment
@@ -388,7 +388,7 @@ On every push to `main` (staging) or published release (production) the workflow
 8. **Installs Python dependencies** — creates/updates `venv/` and runs `pip install -r requirements.txt`
 9. **Runs database migrations** — `venv/bin/alembic upgrade head`
 10. **Restarts the backend service** — `systemctl --user restart promotions-app-backend`
-11. **Verifies** — polls until the backend responds on `http://127.0.0.1:8000/health`
+11. **Verifies** — polls until the backend responds on `http://127.0.0.1:8420/health`
 
 ### Prerequisites before first deployment
 
@@ -428,7 +428,7 @@ sudo netbird status
 
 ```bash
 # Backend health (from server, direct)
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8420/health
 
 # Via Apache (public)
 curl https://staff.kalx.berkeley.edu/pass-giveaway/api/health
@@ -595,7 +595,7 @@ If the file is missing, the frontend has not been built or deployed yet.
 ```bash
 # Check backend is running
 systemctl --user is-active promotions-app-backend
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8420/health
 
 # Check Apache config
 sudo apache2ctl configtest
@@ -610,7 +610,7 @@ journalctl --user -u promotions-app-backend --no-pager -n 50
 # Test manually
 cd ~/promotions-app/backend
 source venv/bin/activate
-uvicorn app.main:app --host 127.0.0.1 --port 8000
+uvicorn app.main:app --host 127.0.0.1 --port 8420
 ```
 
 ### Frontend Not Loading

@@ -69,9 +69,9 @@ systemctl --user disable promotions-app-backend
 ### Backend Service (staff-app user)
 
 - **Type**: Simple
-- **Port**: 8000 (localhost only)
+- **Port**: 8420 (localhost only)
 - **Working Directory**: `~/promotions-app/backend`
-- **Command**: `uvicorn app.main:app --host 127.0.0.1 --port 8000`
+- **Command**: `uvicorn app.main:app --host 127.0.0.1 --port 8420`
 - **Restart**: Always (with 10s delay)
 - **Security**: NoNewPrivileges, PrivateTmp, ProtectSystem=strict
 
@@ -101,7 +101,7 @@ systemctl --user status promotions-app-backend
 journalctl --user -u promotions-app-backend --no-pager -n 50
 
 # Check if port is already in use
-ss -tlnp | grep 8000
+ss -tlnp | grep 8420
 ```
 
 ### Service Crashes Immediately
@@ -116,7 +116,7 @@ systemctl --user daemon-reload
 # Try starting manually to see errors
 cd ~/promotions-app/backend
 source venv/bin/activate
-uvicorn app.main:app --host 127.0.0.1 --port 8000
+uvicorn app.main:app --host 127.0.0.1 --port 8420
 ```
 
 ## Security Features

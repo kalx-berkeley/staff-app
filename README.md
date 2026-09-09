@@ -60,7 +60,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-API docs: http://localhost:8000/docs
+API docs: http://localhost:8420/docs
 
 ### Frontend
 
@@ -120,7 +120,7 @@ Client
               │
               ├── Static files  →  /home/staff-app/promotions-app/frontend/dist/
               │
-              └── /pass-giveaway/api/*  →  Uvicorn (127.0.0.1:8000, staff-app user)
+              └── /pass-giveaway/api/*  →  Uvicorn (127.0.0.1:8420, staff-app user)
                                               │  (Apache strips /pass-giveaway prefix)
                                               │  Defense-in-depth: 400 if neither
                                               │  X-Forwarded-User nor DJ network IP present
@@ -237,7 +237,7 @@ sudo systemctl reload apache2
 ### Health Check
 
 ```bash
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8420/health
 ```
 
 ### Database Migrations
@@ -255,12 +255,12 @@ Migrations run automatically on each deployment.
 Check that `mod_auth_openidc` is setting the header correctly:
 
 ```bash
-curl -H "X-Forwarded-User: test@example.com" http://127.0.0.1:8000/api/users/me
+curl -H "X-Forwarded-User: test@example.com" http://127.0.0.1:8420/api/users/me
 ```
 
 Use the debug endpoint (from the server, bypassing Apache):
 
 ```bash
-curl http://127.0.0.1:8000/api/users/debug/headers
+curl http://127.0.0.1:8420/api/users/debug/headers
 ```
 
