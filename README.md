@@ -263,3 +263,4 @@ Use the debug endpoint (from the server, bypassing Apache):
 ```bash
 curl http://127.0.0.1:8000/api/users/debug/headers
 ```
+
