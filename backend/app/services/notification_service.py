@@ -33,7 +33,8 @@ def send_email(
     :param subject: Email subject line.
     :param body_text: Plain-text body.
     :param body_html: Optional HTML body.
-    :param db: Optional database session; when provided, a successful send is audit-logged.
+    :param db: Optional database session; when provided, every send attempt (success or
+        failure) is audit-logged, including response/error details.
 
     Uses smtp2go when SMTP2GO_API_KEY is set; falls back to the local mail server otherwise.
     In staging mode, suppresses delivery to non-webmaster recipients.
@@ -47,7 +48,15 @@ def send_email(
             subject,
             preview,
         )
-        _audit_email(db, to_email, subject, body_text, body_html, sent=False)
+        _audit_email(
+            db,
+            to_email,
+            subject,
+            body_text,
+            body_html,
+            sent=False,
+            response_details={"reason": "staging_suppressed"},
+        )
         return
 
     if settings.smtp2go_api_key:
@@ -65,6 +74,15 @@ def _send_via_smtp2go(
 ) -> None:
     if Smtp2goClient is None:
         logger.error("smtp2go package is not installed; cannot send email to %s", to_email)
+        _audit_email(
+            db,
+            to_email,
+            subject,
+            body_text,
+            body_html,
+            sent=False,
+            response_details={"error": "smtp2go package is not installed"},
+        )
         return
 
     client = Smtp2goClient(api_key=settings.smtp2go_api_key)
@@ -82,9 +100,34 @@ def _send_via_smtp2go(
         logger.error(
             "smtp2go send failed to=%s subject=%r: %s", to_email, subject, response
         )
+        _audit_email(
+            db,
+            to_email,
+            subject,
+            body_text,
+            body_html,
+            sent=False,
+            response_details={
+                "status_code": response.status_code,
+                "request_id": response.request_id,
+                "errors": response.errors,
+            },
+        )
     else:
         logger.info("Email sent via smtp2go to=%s subject=%r", to_email, subject)
-        _audit_email(db, to_email, subject, body_text, body_html, sent=True)
+        _audit_email(
+            db,
+            to_email,
+            subject,
+            body_text,
+            body_html,
+            sent=True,
+            response_details={
+                "status_code": response.status_code,
+                "request_id": response.request_id,
+                "email_id": response.json.get("data", {}).get("email_id"),
+            },
+        )
 
 
 def _send_via_local_smtp(
@@ -108,11 +151,38 @@ def _send_via_local_smtp(
 
     try:
         with smtplib.SMTP(settings.local_smtp_host, settings.local_smtp_port) as smtp:
-            smtp.sendmail(settings.email_from_address, [to_email], msg.as_string())
+            refused = smtp.sendmail(
+                settings.email_from_address, [to_email], msg.as_string()
+            )
         logger.info("Email sent via local SMTP to=%s subject=%r", to_email, subject)
-        _audit_email(db, to_email, subject, body_text, body_html, sent=True)
-    except OSError:
+        _audit_email(
+            db,
+            to_email,
+            subject,
+            body_text,
+            body_html,
+            sent=True,
+            response_details={
+                "smtp_host": settings.local_smtp_host,
+                "smtp_port": settings.local_smtp_port,
+                "refused_recipients": refused or None,
+            },
+        )
+    except OSError as exc:
         logger.exception("Local SMTP send failed to=%s subject=%r", to_email, subject)
+        _audit_email(
+            db,
+            to_email,
+            subject,
+            body_text,
+            body_html,
+            sent=False,
+            response_details={
+                "smtp_host": settings.local_smtp_host,
+                "smtp_port": settings.local_smtp_port,
+                "error": str(exc),
+            },
+        )
 
 
 def _audit_email(
@@ -122,6 +192,7 @@ def _audit_email(
     body_text: str,
     body_html: str | None,
     sent: bool,
+    response_details: dict | None = None,
 ) -> None:
     if db is None:
         return
@@ -135,6 +206,8 @@ def _audit_email(
     }
     if body_html is not None:
         details["body_html"] = body_html
+    if response_details is not None:
+        details["response"] = response_details
 
     log_event(
         db,
