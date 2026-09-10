@@ -7,6 +7,7 @@ import pathlib
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from PIL import Image
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -32,6 +33,24 @@ router = APIRouter(prefix="/api/venues", tags=["venues"])
 
 def _venue_response(venue) -> VenueResponse:
     return VenueResponse.from_orm_venue(venue)
+
+
+class PromotionsStaffOption(BaseModel):
+    id: int
+    name: str
+    email: str
+
+
+@router.get("/promotions-staff", response_model=list[PromotionsStaffOption])
+def list_promotions_staff(
+    promotions: Staff = Depends(get_promotions_staff),
+    db: Session = Depends(get_db),
+):
+    """List promotions department staff, for owner-picker autocompletes."""
+    return [
+        PromotionsStaffOption(id=s.id, name=s.name, email=s.email)
+        for s in VenueService.list_promotions_staff(db)
+    ]
 
 
 @router.get("/deleted", response_model=list[VenueResponse])

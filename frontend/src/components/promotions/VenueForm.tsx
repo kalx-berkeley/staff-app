@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { venuesAPI, adminAPI, promotersAPI } from '../../services/api';
+import { venuesAPI, promotersAPI } from '../../services/api';
 import { Tooltip } from '../shared';
 import type {
   VenueResponse,
@@ -10,7 +10,15 @@ import type {
   APIError,
   ValidationError,
   PromoterResponse,
+  PromotionsStaffOption,
 } from '../../types';
+
+/** Pulls the email out of "Name (email@example.com)", or returns the input as-is. */
+const extractOwnerEmail = (input: string): string => {
+  const trimmed = input.trim();
+  const match = trimmed.match(/\(([^()]+)\)\s*$/);
+  return (match ? match[1] : trimmed).trim();
+};
 
 const venueLogoUrl = (id: number) => `/pass-giveaway/api/venues/${id}/logo`;
 
@@ -48,8 +56,11 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   const [showsHaveExternalPromoter, setShowsHaveExternalPromoter] = useState(false);
   const [promotersList, setPromotersList] = useState<PromoterResponse[]>([]);
   const [ownerEmails, setOwnerEmails] = useState<string[]>([]);
-  const [newOwnerEmail, setNewOwnerEmail] = useState('');
+  const [newOwnerInput, setNewOwnerInput] = useState('');
+  const [promotionsStaff, setPromotionsStaff] = useState<PromotionsStaffOption[]>([]);
   const [emailToName, setEmailToName] = useState<Record<string, string>>({});
+  const [ownerSuggestions, setOwnerSuggestions] = useState<PromotionsStaffOption[]>([]);
+  const [showOwnerAutocomplete, setShowOwnerAutocomplete] = useState(false);
   const [contacts, setContacts] = useState<VenueContactCreate[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -113,9 +124,10 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   }, [venue]);
 
   useEffect(() => {
-    adminAPI.listUsers().then((users) => {
+    venuesAPI.listPromotionsStaff().then((staff) => {
+      setPromotionsStaff(staff);
       const map: Record<string, string> = {};
-      users.forEach((u) => { map[u.email] = u.name; });
+      staff.forEach((s) => { map[s.email] = s.name; });
       setEmailToName(map);
     }).catch(() => {});
     promotersAPI.list().then(setPromotersList).catch(() => {});
@@ -135,16 +147,31 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleAddOwner = () => {
-    const email = newOwnerEmail.trim();
+  const handleAddOwner = (rawInput?: string) => {
+    const email = extractOwnerEmail(rawInput ?? newOwnerInput);
     if (email && !ownerEmails.includes(email)) {
       setOwnerEmails([...ownerEmails, email]);
-      setNewOwnerEmail('');
     }
+    setNewOwnerInput('');
+    setShowOwnerAutocomplete(false);
   };
 
   const handleRemoveOwner = (email: string) => {
     setOwnerEmails(ownerEmails.filter((e) => e !== email));
+  };
+
+  const handleOwnerInputChange = (value: string) => {
+    setNewOwnerInput(value);
+    const query = value.trim().toLowerCase();
+    if (query) {
+      const filtered = promotionsStaff.filter(
+        (s) => s.name.toLowerCase().includes(query) || s.email.toLowerCase().includes(query)
+      );
+      setOwnerSuggestions(filtered);
+      setShowOwnerAutocomplete(filtered.length > 0);
+    } else {
+      setShowOwnerAutocomplete(false);
+    }
   };
 
   const handleAddContact = () => {
@@ -673,26 +700,47 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
 
           <div className="form-section">
             <h4>Owners</h4>
-            <p className="field-hint">Promotions staff emails with access to manage this venue.</p>
+            <p className="field-hint">
+              Promotions staff with access to manage this venue. Type a name or email address.
+            </p>
             <div className="tag-input-row">
-              <input
-                type="email"
-                value={newOwnerEmail}
-                onChange={(e) => setNewOwnerEmail(e.target.value)}
-                placeholder="Add owner email..."
-                disabled={submitting}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddOwner();
-                  }
-                }}
-              />
+              <div className="autocomplete-wrapper" style={{ flex: 1 }}>
+                <input
+                  type="text"
+                  value={newOwnerInput}
+                  onChange={(e) => handleOwnerInputChange(e.target.value)}
+                  placeholder="Add owner by name or email..."
+                  disabled={submitting}
+                  autoComplete="off"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddOwner();
+                    } else if (e.key === 'Escape') {
+                      setShowOwnerAutocomplete(false);
+                    }
+                  }}
+                  onBlur={() => setTimeout(() => setShowOwnerAutocomplete(false), 200)}
+                />
+                {showOwnerAutocomplete && (
+                  <ul className="autocomplete-list">
+                    {ownerSuggestions.map((s) => (
+                      <li
+                        key={s.id}
+                        onMouseDown={() => handleAddOwner(s.email)}
+                        className="autocomplete-item"
+                      >
+                        {s.name} ({s.email})
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               <button
                 type="button"
-                onClick={handleAddOwner}
+                onClick={() => handleAddOwner()}
                 className="btn-secondary btn-small"
-                disabled={submitting || !newOwnerEmail.trim()}
+                disabled={submitting || !newOwnerInput.trim()}
               >
                 Add
               </button>

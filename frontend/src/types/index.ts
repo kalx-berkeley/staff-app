@@ -549,6 +549,13 @@ export interface UserListItem {
   role: 'promotions' | 'staff';
 }
 
+// Promotions staff option, for owner-picker autocompletes
+export interface PromotionsStaffOption {
+  id: number;
+  name: string;
+  email: string;
+}
+
 // Audit log
 export interface AuditLogItem {
   id: number;

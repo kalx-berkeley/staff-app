@@ -32,6 +32,17 @@ class VenueService:
     """Service for managing venue operations."""
 
     @staticmethod
+    def list_promotions_staff(db: Session) -> list[Staff]:
+        """List all promotions department staff, ordered by name (for owner pickers)."""
+        return (
+            db.query(Staff)
+            .join(StaffDepartment, Staff.id == StaffDepartment.staff_id)
+            .filter(StaffDepartment.department == "Promotions")
+            .order_by(Staff.name)
+            .all()
+        )
+
+    @staticmethod
     def create_venue(
         db: Session, venue_data: VenueCreate, owner_email: str | None = None
     ) -> Venue:

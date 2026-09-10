@@ -1035,6 +1035,47 @@ fieldset.radio-group legend {
   border-top: 1px solid var(--border-color);
 }
 
+/* Tag input (e.g. venue/promoter owner lists) */
+.tag-input-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.tag-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tag-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.6rem;
+  background: var(--light-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.tag-remove {
+  background: none;
+  border: none;
+  color: #6c757d;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 0.25rem;
+}
+
+.tag-remove:hover {
+  color: #dc3545;
+}
+
 /* Specialty Show Detail item lists */
 .item-list {
   list-style: none;

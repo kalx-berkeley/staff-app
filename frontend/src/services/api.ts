@@ -20,6 +20,7 @@ import type {
   VenueCreate,
   VenueUpdate,
   VenueResponse,
+  PromotionsStaffOption,
   ShowCreate,
   ShowUpdate,
   ShowResponse,
@@ -409,6 +410,20 @@ export const venuesAPI = {
   list: async (): Promise<VenueResponse[]> => {
     try {
       const response = await apiClient.get<VenueResponse[]>('/venues');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * List promotions department staff, for owner-picker autocompletes.
+   *
+   * @returns Promise resolving to array of promotions staff options
+   */
+  listPromotionsStaff: async (): Promise<PromotionsStaffOption[]> => {
+    try {
+      const response = await apiClient.get<PromotionsStaffOption[]>('/venues/promotions-staff');
       return response.data;
     } catch (error) {
       return handleAPIError(error);
