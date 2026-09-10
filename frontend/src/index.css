@@ -165,6 +165,20 @@ body.staging-active {
   padding-top: 2rem;
 }
 
+/* #root (below) is min-height: 100vh regardless of the body padding above,
+   and the layout columns are height: 100vh — both would make the page 2rem
+   taller than the viewport, forcing a scroll to reach the bottom of the nav
+   pane. Shrink them by the banner height so nothing scrolls. */
+body.staging-active #root {
+  min-height: calc(100vh - 2rem);
+}
+
+body.staging-active .promotions-layout,
+body.staging-active .staff-layout,
+body.staging-active .dj-layout {
+  height: calc(100vh - 2rem);
+}
+
 /* App Nav (cross-view switcher) */
 .app-nav {
   margin-bottom: 0.5rem;
@@ -2459,11 +2473,14 @@ fieldset.radio-group legend {
     transform: translateX(0);
   }
 
-  /* Offset fixed-position elements below the staging banner (see .staging-active above) */
+  /* Offset fixed-position elements below the staging banner (see .staging-active above).
+     Same overflow issue as the desktop layout above: these are position: fixed
+     with height: 100vh, so shrink by the banner height alongside the offset. */
   body.staging-active .promotions-nav,
   body.staging-active .staff-nav,
   body.staging-active .dj-nav {
     top: 2rem;
+    height: calc(100vh - 2rem);
   }
 
   body.staging-active .mobile-topbar {
