@@ -9,6 +9,7 @@ vi.mock('../../services/api', () => ({
   venuesAPI: {
     create: vi.fn(),
     update: vi.fn(),
+    listPromotionsStaff: vi.fn().mockResolvedValue([]),
   },
   adminAPI: {
     listUsers: vi.fn().mockResolvedValue([]),
