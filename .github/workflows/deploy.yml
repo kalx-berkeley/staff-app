@@ -163,9 +163,9 @@ jobs:
       run: |
         npm ci
         if [ "${{ github.event_name }}" == "release" ]; then
-          npm run build
+          VITE_RELEASE_VERSION="${{ github.event.release.tag_name }}" npm run build
         else
-          npm run build:staging
+          VITE_COMMIT_SHA="${{ github.sha }}" npm run build:staging
         fi
 
     - name: Deploy application

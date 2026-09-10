@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/authHooks';
 import { adminAPI } from '../../services/api';
 import FeedbackModal from './FeedbackModal';
+import BuildInfo from './BuildInfo';
 
 const ROLE_LABELS: Record<string, string> = {
   promotions: 'Promotions Staff',
@@ -160,6 +161,7 @@ const AppNav = ({ showGoogleLogout = false }: AppNavProps) => {
         >
           Send Feedback / Report a Bug
         </button>
+        <BuildInfo />
       </div>
       {showFeedback && (
         <FeedbackModal onClose={() => setShowFeedback(false)} />

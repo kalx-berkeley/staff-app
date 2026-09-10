@@ -356,6 +356,17 @@ body.staging-active {
   color: var(--primary-color);
 }
 
+.app-nav-build-info {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.3);
+  text-decoration: none;
+}
+
+.app-nav-build-info:hover {
+  color: rgba(255, 255, 255, 0.6);
+  text-decoration: underline;
+}
+
 /* Feedback modal context block */
 .feedback-context {
   background: var(--light-bg);
