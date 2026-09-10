@@ -162,7 +162,11 @@ jobs:
       working-directory: ./frontend
       run: |
         npm ci
-        npm run build
+        if [ "${{ github.event_name }}" == "release" ]; then
+          npm run build
+        else
+          npm run build:staging
+        fi
 
     - name: Deploy application
       run: |
