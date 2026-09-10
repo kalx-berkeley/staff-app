@@ -14,7 +14,6 @@ const BuildInfo = () => {
     if (!commitSha) return null;
     return (
       <a
-        className="app-nav-build-info"
         href={`${REPO_URL}/commit/${commitSha}`}
         target="_blank"
         rel="noopener noreferrer"
@@ -28,7 +27,6 @@ const BuildInfo = () => {
   if (!releaseVersion) return null;
   return (
     <a
-      className="app-nav-build-info"
       href={`${REPO_URL}/releases/tag/${releaseVersion}`}
       target="_blank"
       rel="noopener noreferrer"

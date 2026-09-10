@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, Outlet } from 'react-router-dom';
-import { AppNav } from '../shared';
+import { AppNav, BuildInfo } from '../shared';
 import { legacyImportAPI } from '../../services/api';
 
 const PromotionsLayout = () => {
@@ -71,6 +71,9 @@ const PromotionsLayout = () => {
           )}
         </ul>
 
+        <div className="nav-build-info">
+          <BuildInfo />
+        </div>
       </nav>
       <main className="promotions-content">
         <Outlet />

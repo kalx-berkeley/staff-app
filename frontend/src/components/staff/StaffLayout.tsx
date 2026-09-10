@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, Outlet } from 'react-router-dom';
-import { AppNav } from '../shared';
+import { AppNav, BuildInfo } from '../shared';
 import { useAuth } from '../../contexts/authHooks';
 import { specialtyShowsAPI } from '../../services/api';
 import type { SpecialtyShowResponse } from '../../types';
@@ -74,6 +74,9 @@ const StaffLayout = () => {
           </li>
         </ul>
 
+        <div className="nav-build-info">
+          <BuildInfo />
+        </div>
       </nav>
       <main className="staff-content">
         <Outlet />

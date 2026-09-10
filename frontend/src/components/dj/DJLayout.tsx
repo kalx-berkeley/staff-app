@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, Outlet } from 'react-router-dom';
-import { AppNav } from '../shared';
+import { AppNav, BuildInfo } from '../shared';
 
 const DJLayout = () => {
   const [navOpen, setNavOpen] = useState(false);
@@ -54,6 +54,9 @@ const DJLayout = () => {
           </li>
         </ul>
 
+        <div className="nav-build-info">
+          <BuildInfo />
+        </div>
       </nav>
       <main className="dj-content">
         <Outlet />
