@@ -834,18 +834,22 @@ class SyncResult(BaseModel):
 
 ### Server Structure
 
-The application runs on a single server:
+Production and staging run on the same server as two fully independent deployments — separate
+directories, separate backend ports, separate systemd services — so a staging deploy can never
+overwrite production code or data.
 
 **`staff-app` user:**
-- Runs the FastAPI backend as a systemd user service (`promotions-app-backend`)
-- Stores the SQLite database in `~/promotions-app/backend/data/promotions.db`
-- Frontend static files served from `~/promotions-app/frontend/dist/`
+- Runs the FastAPI backend as two systemd user services:
+  - `promotions-app-backend-production` — port 8420, working directory `~/promotions-app-production/backend`
+  - `promotions-app-backend-staging` — port 8421, working directory `~/promotions-app-staging/backend`
+- Each stores its own SQLite database (`backend/data/promotions.db` under its own deploy path)
+- Each serves its frontend static files from its own `frontend/dist/`
 
 **Apache (system service, managed by root/sudo):**
-- Two VirtualHost configs in `/etc/apache2/sites-available/`:
-  - `auth.kalx.berkeley.edu`: `mod_auth_openidc` handles Google OAuth2 callbacks; session cookies scoped to `.kalx.berkeley.edu`
-  - `staff.kalx.berkeley.edu`: enforces auth via shared session cookie, serves frontend static files, reverse proxies `/api/`
-- DJ-facing routes on the staff site allow unauthenticated access; backend enforces IP-based check
+- Four VirtualHost configs in `/etc/apache2/sites-available/`:
+  - `auth.kalx.berkeley.edu` / `auth.stage.kalx.berkeley.edu`: `mod_auth_openidc` handles Google OAuth2 callbacks; session cookies scoped to `.kalx.berkeley.edu` / `.stage.kalx.berkeley.edu` respectively
+  - `staff.kalx.berkeley.edu` / `staff.stage.kalx.berkeley.edu`: enforces auth via shared session cookie, serves frontend static files from the corresponding deploy path, reverse proxies `/api/` to the corresponding backend port
+- DJ-facing routes on the staff sites allow unauthenticated access; backend enforces IP-based check
 
 ### Deployment Workflow (GitHub Actions)
 

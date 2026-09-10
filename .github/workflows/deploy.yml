@@ -61,8 +61,10 @@ jobs:
 
     env:
       DEPLOY_USER: staff-app
-      DEPLOY_PATH: /home/staff-app/promotions-app
+      DEPLOY_PATH: ${{ github.event_name == 'release' && '/home/staff-app/promotions-app-production' || '/home/staff-app/promotions-app-staging' }}
       SYSTEMD_USER_PATH: /home/staff-app/.config/systemd/user
+      SERVICE_NAME: ${{ github.event_name == 'release' && 'promotions-app-backend-production' || 'promotions-app-backend-staging' }}
+      BACKEND_PORT: ${{ github.event_name == 'release' && '8420' || '8421' }}
       SITE_DOMAIN: ${{ vars.SITE_DOMAIN }}
       DJ_STUDIO_NETWORK: ${{ vars.DJ_STUDIO_NETWORK }}
       STATION_OFFICE_NETWORK: ${{ vars.STATION_OFFICE_NETWORK }}
@@ -231,14 +233,16 @@ jobs:
 
         # Deploy systemd service file
         rsync --times --itemize-changes --compress --rsh="ssh -i ~/.ssh/deploy_key" \
-          ./systemd/promotions-app-backend.service \
-          ${{ env.DEPLOY_USER }}@${SSH_HOST}:${{ env.SYSTEMD_USER_PATH }}/promotions-app-backend.service
+          ./systemd/${{ env.SERVICE_NAME }}.service \
+          ${{ env.DEPLOY_USER }}@${SSH_HOST}:${{ env.SYSTEMD_USER_PATH }}/${{ env.SERVICE_NAME }}.service
 
-        # Reload systemd and restart backend service
+        # Reload systemd, enable (idempotent, needed on first deploy to a new
+        # environment), and restart the backend service to pick up new code
         ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${SSH_HOST} bash << 'ENDSSH'
         set -ex
         systemctl --user daemon-reload
-        systemctl --user restart promotions-app-backend
+        systemctl --user enable ${{ env.SERVICE_NAME }}
+        systemctl --user restart ${{ env.SERVICE_NAME }}
         ENDSSH
 
     - name: Verify deployment
@@ -267,12 +271,12 @@ jobs:
           return 1
         }
 
-        wait_for_service promotions-app-backend
+        wait_for_service ${{ env.SERVICE_NAME }}
 
         max_attempts=15
         attempt=0
         while [ $attempt -lt $max_attempts ]; do
-          if curl -f http://127.0.0.1:8420/health 2>/dev/null; then
+          if curl -f http://127.0.0.1:${{ env.BACKEND_PORT }}/health 2>/dev/null; then
             echo "Backend health check passed"
             break
           fi

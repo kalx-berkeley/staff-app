@@ -2,20 +2,37 @@
 
 Quick commands for common issues. For detailed troubleshooting, see [SETUP_GUIDE.md](SETUP_GUIDE.md).
 
+Production and staging are independent deployments on the same server. Most commands below take
+an environment-specific service name, port, and deploy path — set these once per shell session
+and reuse them:
+
+```bash
+# Production
+SERVICE=promotions-app-backend-production
+PORT=8420
+DEPLOY_PATH=~/promotions-app-production
+
+# Staging
+SERVICE=promotions-app-backend-staging
+PORT=8421
+DEPLOY_PATH=~/promotions-app-staging
+```
+
 ## Quick Diagnostics
 
 ```bash
 # Check all services
-systemctl --user status promotions-app-backend
+systemctl --user status $SERVICE
 
 # Test backend locally
-curl http://127.0.0.1:8420/health
+curl http://127.0.0.1:$PORT/health
 
 # Test via Apache
-curl https://staff.kalx.berkeley.edu/pass-giveaway/api/health
+curl https://staff.kalx.berkeley.edu/pass-giveaway/api/health          # production
+curl https://staff.stage.kalx.berkeley.edu/pass-giveaway/api/health    # staging
 
 # View recent logs
-journalctl --user -u promotions-app-backend -n 50
+journalctl --user -u $SERVICE -n 50
 ```
 
 ## Common Issues
@@ -24,21 +41,21 @@ journalctl --user -u promotions-app-backend -n 50
 
 ```bash
 # View detailed logs
-journalctl --user -u promotions-app-backend --no-pager -n 100
+journalctl --user -u $SERVICE --no-pager -n 100
 
 # Check for port conflicts
-ss -tlnp | grep 8420
+ss -tlnp | grep $PORT
 
 # Restart service
-systemctl --user restart promotions-app-backend
+systemctl --user restart $SERVICE
 ```
 
 ### 502 Bad Gateway
 
 ```bash
 # Check if backend is running
-systemctl --user is-active promotions-app-backend
-curl http://127.0.0.1:8420/health
+systemctl --user is-active $SERVICE
+curl http://127.0.0.1:$PORT/health
 
 # Check Apache config
 sudo apache2ctl configtest
@@ -51,13 +68,13 @@ sudo tail -50 /var/log/apache2/kalx-staff-error.log
 
 ```bash
 # Check if files exist
-ls -la ~/promotions-app/frontend/dist/
+ls -la $DEPLOY_PATH/frontend/dist/
 
 # Fix permissions
 chmod 755 ~
-chmod 755 ~/promotions-app
-chmod 755 ~/promotions-app/frontend
-chmod -R 755 ~/promotions-app/frontend/dist
+chmod 755 $DEPLOY_PATH
+chmod 755 $DEPLOY_PATH/frontend
+chmod -R 755 $DEPLOY_PATH/frontend/dist
 
 # Check Apache logs
 sudo tail -50 /var/log/apache2/kalx-staff-error.log
@@ -66,8 +83,8 @@ sudo tail -50 /var/log/apache2/kalx-staff-error.log
 ### Authentication Not Working
 
 Google OAuth is handled by two Apache VirtualHosts using `mod_auth_openidc`:
-- `auth.kalx.berkeley.edu` — handles the OAuth2 callback from Google
-- `staff.kalx.berkeley.edu` — enforces authentication for the app
+- `auth.kalx.berkeley.edu` / `auth.stage.kalx.berkeley.edu` — handles the OAuth2 callback from Google
+- `staff.kalx.berkeley.edu` / `staff.stage.kalx.berkeley.edu` — enforces authentication for the app
 
 Check Apache logs on both sites:
 
@@ -89,10 +106,10 @@ sudo systemctl reload apache2
 ```
 
 Common causes:
-- `OIDCClientID` or `OIDCClientSecret` incorrect — must be identical in **both** VirtualHost blocks
+- `OIDCClientID` or `OIDCClientSecret` incorrect — must be identical in **both** VirtualHost blocks for a given environment
 - `OIDCCryptoPassphrase` differs between the two VirtualHost blocks — must be identical for session sharing to work
-- Redirect URI `https://auth.kalx.berkeley.edu/redirect_uri` not registered in Google Cloud Console
-- `OIDCCookieDomain` not set to `.kalx.berkeley.edu` in both VirtualHost blocks
+- Redirect URI (`https://auth.kalx.berkeley.edu/redirect_uri` or the `.stage.` equivalent) not registered in Google Cloud Console
+- `OIDCCookieDomain` not set to `.kalx.berkeley.edu` (or `.stage.kalx.berkeley.edu`) in both VirtualHost blocks
 
 ### Deployment Failed
 
@@ -114,78 +131,82 @@ df -h
 
 ```bash
 # Check database file
-ls -la ~/promotions-app/backend/data/promotions.db
+ls -la $DEPLOY_PATH/backend/data/promotions.db
 
 # Backup database
-cp ~/promotions-app/backend/data/promotions.db \
-   ~/promotions-app/backend/data/backup_$(date +%Y%m%d_%H%M%S).db
+cp $DEPLOY_PATH/backend/data/promotions.db \
+   $DEPLOY_PATH/backend/data/backup_$(date +%Y%m%d_%H%M%S).db
 
 # Restart backend
-systemctl --user restart promotions-app-backend
+systemctl --user restart $SERVICE
 ```
 
 ## Service Management
 
 ```bash
 # Start service
-systemctl --user start promotions-app-backend
+systemctl --user start $SERVICE
 
 # Stop service
-systemctl --user stop promotions-app-backend
+systemctl --user stop $SERVICE
 
 # Restart service
-systemctl --user restart promotions-app-backend
+systemctl --user restart $SERVICE
 
 # View status
-systemctl --user status promotions-app-backend
+systemctl --user status $SERVICE
 
 # Enable/disable auto-start
-systemctl --user enable promotions-app-backend
-systemctl --user disable promotions-app-backend
+systemctl --user enable $SERVICE
+systemctl --user disable $SERVICE
 ```
 
 ## Log Management
 
 ```bash
 # Follow logs in real-time
-journalctl --user -u promotions-app-backend -f
+journalctl --user -u $SERVICE -f
 
 # Last N lines
-journalctl --user -u promotions-app-backend -n 100
+journalctl --user -u $SERVICE -n 100
 
 # Since specific time
-journalctl --user -u promotions-app-backend --since "2024-01-15 10:00:00"
+journalctl --user -u $SERVICE --since "2024-01-15 10:00:00"
 
 # Between times
-journalctl --user -u promotions-app-backend --since "10:00" --until "11:00"
+journalctl --user -u $SERVICE --since "10:00" --until "11:00"
 
 # Search logs
-journalctl --user -u promotions-app-backend | grep -i error
+journalctl --user -u $SERVICE | grep -i error
 
-# Apache logs — auth site (OAuth2 callback)
+# Apache logs — auth site (OAuth2 callback), shared error/access log for both environments
 sudo tail -f /var/log/apache2/kalx-auth-access.log
 sudo tail -f /var/log/apache2/kalx-auth-error.log
+sudo tail -f /var/log/apache2/kalx-stage-auth-access.log
+sudo tail -f /var/log/apache2/kalx-stage-auth-error.log
 
 # Apache logs — staff site (app, API proxy)
 sudo tail -f /var/log/apache2/kalx-staff-access.log
 sudo tail -f /var/log/apache2/kalx-staff-error.log
+sudo tail -f /var/log/apache2/kalx-stage-staff-access.log
+sudo tail -f /var/log/apache2/kalx-stage-staff-error.log
 ```
 
 ## Database Operations
 
 ```bash
 # Backup database
-cp ~/promotions-app/backend/data/promotions.db \
-   ~/promotions-app/backend/data/backup_$(date +%Y%m%d).db
+cp $DEPLOY_PATH/backend/data/promotions.db \
+   $DEPLOY_PATH/backend/data/backup_$(date +%Y%m%d).db
 
 # Restore database
-systemctl --user stop promotions-app-backend
-cp ~/promotions-app/backend/data/backup_YYYYMMDD.db \
-   ~/promotions-app/backend/data/promotions.db
-systemctl --user start promotions-app-backend
+systemctl --user stop $SERVICE
+cp $DEPLOY_PATH/backend/data/backup_YYYYMMDD.db \
+   $DEPLOY_PATH/backend/data/promotions.db
+systemctl --user start $SERVICE
 
 # Check database integrity
-cd ~/promotions-app/backend
+cd $DEPLOY_PATH/backend
 source venv/bin/activate
 python3 << EOF
 import sqlite3
@@ -201,15 +222,17 @@ EOF
 
 ```bash
 # Edit backend environment
-nano ~/promotions-app/backend/.env
-systemctl --user restart promotions-app-backend
+nano $DEPLOY_PATH/backend/.env
+systemctl --user restart $SERVICE
 
 # Edit Apache config (requires root/sudo)
-# Both auth and staff VirtualHosts are in the same file.
+# Both auth and staff VirtualHosts for an environment are in the same file.
 # Remember: OIDCClientID, OIDCClientSecret, and OIDCCryptoPassphrase
-# must be identical in both VirtualHost blocks.
-sudo nano /etc/apache2/sites-available/auth.kalx.conf
-sudo nano /etc/apache2/sites-available/staff.kalx.conf
+# must be identical in both VirtualHost blocks for that environment.
+sudo nano /etc/apache2/sites-available/auth.conf          # production
+sudo nano /etc/apache2/sites-available/staff.conf          # production
+sudo nano /etc/apache2/sites-available/auth.stage.conf     # staging
+sudo nano /etc/apache2/sites-available/staff.stage.conf     # staging
 sudo apache2ctl configtest
 sudo systemctl reload apache2
 ```
@@ -218,10 +241,10 @@ sudo systemctl reload apache2
 
 ```bash
 # Check if backend port is listening
-ss -tlnp | grep 8420
+ss -tlnp | grep $PORT
 
 # Test from localhost
-curl http://127.0.0.1:8420/health
+curl http://127.0.0.1:$PORT/health
 
 # Test via Apache
 curl https://staff.kalx.berkeley.edu/pass-giveaway/api/health
@@ -251,7 +274,7 @@ df -h
 free -h
 
 # Check service resource usage
-systemctl --user status promotions-app-backend
+systemctl --user status $SERVICE
 ```
 
 ## Emergency Procedures
@@ -260,10 +283,10 @@ systemctl --user status promotions-app-backend
 
 ```bash
 # Restart backend
-systemctl --user restart promotions-app-backend
+systemctl --user restart $SERVICE
 
 # Verify
-systemctl --user status promotions-app-backend
+systemctl --user status $SERVICE
 
 # Restart Apache (if auth issues)
 sudo systemctl reload apache2
@@ -276,7 +299,8 @@ sudo systemctl reload apache2
 git revert HEAD
 git push origin main
 
-# This triggers automatic deployment of previous version
+# This triggers automatic deployment of previous version to staging.
+# For production, publish a new release from the reverted commit.
 # Monitor in GitHub Actions
 ```
 
@@ -284,19 +308,19 @@ git push origin main
 
 ```bash
 # Stop service
-systemctl --user stop promotions-app-backend
+systemctl --user stop $SERVICE
 
 # Clear any locks
-rm -f ~/promotions-app/backend/data/*.lock
+rm -f $DEPLOY_PATH/backend/data/*.lock
 
 # Restart service
-systemctl --user start promotions-app-backend
+systemctl --user start $SERVICE
 ```
 
 ## Getting Help
 
-1. **Check logs first**: `journalctl --user -u promotions-app-backend -n 100`
-2. **Review Apache logs**: `sudo tail -50 /var/log/apache2/kalx-staff-error.log` (auth issues: `kalx-auth-error.log`)
+1. **Check logs first**: `journalctl --user -u $SERVICE -n 100`
+2. **Review Apache logs**: `sudo tail -50 /var/log/apache2/kalx-staff-error.log` (auth issues: `kalx-auth-error.log`; staging equivalents are prefixed `kalx-stage-`)
 3. **Check GitHub Actions**: For deployment issues
 4. **Create issue**: In GitHub repository with logs and error messages
 
@@ -305,16 +329,19 @@ systemctl --user start promotions-app-backend
 Add to `~/.bashrc` for convenience:
 
 ```bash
-# Service management
-alias rt-status='systemctl --user status promotions-app-backend'
-alias rt-restart='systemctl --user restart promotions-app-backend'
-alias rt-logs='journalctl --user -u promotions-app-backend -f'
+# Production
+alias rtp-status='systemctl --user status promotions-app-backend-production'
+alias rtp-restart='systemctl --user restart promotions-app-backend-production'
+alias rtp-logs='journalctl --user -u promotions-app-backend-production -f'
+alias rtp-health='curl http://127.0.0.1:8420/health'
+alias rtp-backup='cp ~/promotions-app-production/backend/data/promotions.db ~/promotions-app-production/backend/data/backup_$(date +%Y%m%d_%H%M%S).db'
 
-# Health checks
-alias rt-health='curl http://127.0.0.1:8420/health'
-
-# Database backup
-alias rt-backup='cp ~/promotions-app/backend/data/promotions.db ~/promotions-app/backend/data/backup_$(date +%Y%m%d_%H%M%S).db'
+# Staging
+alias rts-status='systemctl --user status promotions-app-backend-staging'
+alias rts-restart='systemctl --user restart promotions-app-backend-staging'
+alias rts-logs='journalctl --user -u promotions-app-backend-staging -f'
+alias rts-health='curl http://127.0.0.1:8421/health'
+alias rts-backup='cp ~/promotions-app-staging/backend/data/promotions.db ~/promotions-app-staging/backend/data/backup_$(date +%Y%m%d_%H%M%S).db'
 ```
 
 Then reload: `source ~/.bashrc`

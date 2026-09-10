@@ -1,0 +1,23 @@
+[Unit]
+Description=Promotions Pass Giveaway Backend API (Staging)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/promotions-app-staging/backend
+Environment="PATH=%h/promotions-app-staging/backend/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="TZ=America/Los_Angeles"
+ExecStartPre=%h/promotions-app-staging/backend/venv/bin/alembic upgrade head
+ExecStart=%h/promotions-app-staging/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8421
+Restart=always
+RestartSec=10
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/promotions-app-staging/backend/data
+
+[Install]
+WantedBy=default.target

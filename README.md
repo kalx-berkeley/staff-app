@@ -118,9 +118,11 @@ Client
               │    X-Forwarded-User: OIDC email (absent for DJ-network-only requests)
               │    X-Forwarded-For: real client IP (set by mod_proxy)
               │
-              ├── Static files  →  /home/staff-app/promotions-app/frontend/dist/
+              ├── Static files  →  /home/staff-app/promotions-app-production/frontend/dist/
+              │                    (staging: /home/staff-app/promotions-app-staging/frontend/dist/)
               │
               └── /pass-giveaway/api/*  →  Uvicorn (127.0.0.1:8420, staff-app user)
+                                              (staging: 127.0.0.1:8421)
                                               │  (Apache strips /pass-giveaway prefix)
                                               │  Defense-in-depth: 400 if neither
                                               │  X-Forwarded-User nor DJ network IP present
@@ -205,7 +207,8 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 │   ├── src/
 │   └── package.json
 ├── systemd/                    # Systemd service files
-│   └── promotions-app-backend.service
+│   ├── promotions-app-backend-production.service
+│   └── promotions-app-backend-staging.service
 ├── docs/specs/                 # Architecture and requirements
 └── .github/workflows/
     └── deploy.yml
@@ -217,7 +220,8 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 
 ```bash
 # Backend (as staff-app user)
-journalctl --user -u promotions-app-backend -f
+journalctl --user -u promotions-app-backend-production -f
+journalctl --user -u promotions-app-backend-staging -f
 
 # Apache (requires sudo)
 sudo tail -f /var/log/apache2/kalx-auth-error.log
@@ -228,7 +232,8 @@ sudo tail -f /var/log/apache2/kalx-staff-error.log
 
 ```bash
 # Backend (as staff-app user)
-systemctl --user restart promotions-app-backend
+systemctl --user restart promotions-app-backend-production
+systemctl --user restart promotions-app-backend-staging
 
 # Apache (requires sudo)
 sudo systemctl reload apache2
@@ -237,13 +242,14 @@ sudo systemctl reload apache2
 ### Health Check
 
 ```bash
-curl http://127.0.0.1:8420/health
+curl http://127.0.0.1:8420/health   # production
+curl http://127.0.0.1:8421/health   # staging
 ```
 
 ### Database Migrations
 
 ```bash
-cd ~/promotions-app/backend
+cd ~/promotions-app-production/backend   # or ~/promotions-app-staging/backend
 source venv/bin/activate
 alembic upgrade head
 ```
