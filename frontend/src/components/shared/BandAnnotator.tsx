@@ -344,7 +344,14 @@ export default function BandAnnotator({
           </div>
 
           {searching && (
-            <div className="band-search-panel__loading">Searching MusicBrainz…</div>
+            <div className="band-search-panel__loading">
+              Searching MusicBrainz
+              <span className="loading-dots" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+              </span>
+            </div>
           )}
 
           {!searching && results.length === 0 && (
