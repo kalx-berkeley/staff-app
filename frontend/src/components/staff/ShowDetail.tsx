@@ -400,6 +400,29 @@ const ShowDetail = () => {
   const formatLotteryDeadline = (d: Date) =>
     d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
+  // First date on or after which DJ pass-pair reservations are prohibited
+  // (within `dj_preassign_prohibition_days` of the planned close date).
+  let prohibitedFromDate: Date | null = null;
+  if (show.dj_preassign_prohibition_days != null && show.planned_close_date) {
+    const closeDate = new Date(show.planned_close_date + 'T00:00:00');
+    prohibitedFromDate = new Date(closeDate);
+    prohibitedFromDate.setDate(prohibitedFromDate.getDate() - show.dj_preassign_prohibition_days);
+  }
+
+  const toDateInputValue = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  // Latest date selectable in the DJ reservation/lottery date pickers.
+  let maxDJReservationDate = show.show_date;
+  if (prohibitedFromDate) {
+    const lastAllowed = new Date(prohibitedFromDate);
+    lastAllowed.setDate(lastAllowed.getDate() - 1);
+    const lastAllowedStr = toDateInputValue(lastAllowed);
+    if (lastAllowedStr < maxDJReservationDate) {
+      maxDJReservationDate = lastAllowedStr;
+    }
+  }
+
   return (
     <div className="show-detail">
       <div className="page-header">
@@ -549,21 +572,18 @@ const ShowDetail = () => {
               </div>
             )}
 
-            {show.dj_preassign_prohibition_days != null && show.planned_close_date && (() => {
-              const closeDate = new Date(show.planned_close_date + 'T00:00:00');
-              const prohibitedFrom = new Date(closeDate);
-              prohibitedFrom.setDate(prohibitedFrom.getDate() - show.dj_preassign_prohibition_days);
-              const prohibitedFromStr = prohibitedFrom.toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric', year: 'numeric',
-              });
-              return (
-                <div className="field-hint" style={{ marginBottom: '0.5rem' }}>
-                  Reservations are not allowed for shifts on or after{' '}
-                  <strong>{prohibitedFromStr}</strong> (within {show.dj_preassign_prohibition_days} day
-                  {show.dj_preassign_prohibition_days !== 1 ? 's' : ''} of the planned close date).
-                </div>
-              );
-            })()}
+            {prohibitedFromDate && (
+              <div className="field-hint" style={{ marginBottom: '0.5rem' }}>
+                Reservations are not allowed for shifts on or after{' '}
+                <strong>
+                  {prohibitedFromDate.toLocaleDateString('en-US', {
+                    month: 'short', day: 'numeric', year: 'numeric',
+                  })}
+                </strong>{' '}
+                (within {show.dj_preassign_prohibition_days} day
+                {show.dj_preassign_prohibition_days !== 1 ? 's' : ''} of the planned close date).
+              </div>
+            )}
 
             {lotteryActionError && (
               <p className="field-error">{lotteryActionError}</p>
@@ -585,57 +605,62 @@ const ShowDetail = () => {
                   </button>
                 </div>
               ) : showDJLotteryForm ? (
-                <div className="preassignment-form">
-                  {showReserveForDropdown ? (
-                    <div className="form-group">
-                      <label htmlFor="lottery-reserve-for">Reserve for:</label>
-                      <select
-                        id="lottery-reserve-for"
-                        value={lotteryDJReserveFor}
-                        onChange={(e) => setLotteryDJReserveFor(e.target.value)}
+                <div className="passes-list">
+                  <div className="pass-card">
+                    <div className="preassignment-form">
+                      {showReserveForDropdown ? (
+                        <div className="form-group">
+                          <label htmlFor="lottery-reserve-for">Reserve for:</label>
+                          <select
+                            id="lottery-reserve-for"
+                            value={lotteryDJReserveFor}
+                            onChange={(e) => setLotteryDJReserveFor(e.target.value)}
+                            disabled={lotteryActionLoading}
+                          >
+                            {myDjNames.map((name, i) => (
+                              <option key={name} value={i === 0 ? '' : `dj:${name}`}>
+                                {name} (my DJ name)
+                              </option>
+                            ))}
+                            {myDJSpecialtyShows.map((s) => (
+                              <option key={s.id} value={`ss:${s.id}`}>
+                                {s.name} (specialty show)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <input
+                          type="text"
+                          value={myDjNames[0] ?? ''}
+                          readOnly
+                          disabled
+                          className="input-readonly"
+                        />
+                      )}
+                      <input
+                        type="date"
+                        value={lotteryDJDate}
+                        onChange={(e) => setLotteryDJDate(e.target.value)}
+                        max={maxDJReservationDate}
+                        disabled={lotteryActionLoading}
+                      />
+                      <button
+                        onClick={handleEnterDJLottery}
+                        className="btn-small btn-primary"
+                        disabled={lotteryActionLoading || !lotteryDJDate}
+                      >
+                        {lotteryActionLoading ? 'Entering…' : 'Enter Lottery'}
+                      </button>
+                      <button
+                        onClick={() => { setShowDJLotteryForm(false); setLotteryDJDate(''); setLotteryDJReserveFor(''); }}
+                        className="btn-small"
                         disabled={lotteryActionLoading}
                       >
-                        {myDjNames.map((name, i) => (
-                          <option key={name} value={i === 0 ? '' : `dj:${name}`}>
-                            {name} (my DJ name)
-                          </option>
-                        ))}
-                        {myDJSpecialtyShows.map((s) => (
-                          <option key={s.id} value={`ss:${s.id}`}>
-                            {s.name} (specialty show)
-                          </option>
-                        ))}
-                      </select>
+                        Cancel
+                      </button>
                     </div>
-                  ) : (
-                    <input
-                      type="text"
-                      value={myDjNames[0] ?? ''}
-                      readOnly
-                      className="input-readonly"
-                    />
-                  )}
-                  <input
-                    type="date"
-                    value={lotteryDJDate}
-                    onChange={(e) => setLotteryDJDate(e.target.value)}
-                    max={show.show_date}
-                    disabled={lotteryActionLoading}
-                  />
-                  <button
-                    onClick={handleEnterDJLottery}
-                    className="btn-small btn-primary"
-                    disabled={lotteryActionLoading || !lotteryDJDate}
-                  >
-                    {lotteryActionLoading ? 'Entering…' : 'Enter Lottery'}
-                  </button>
-                  <button
-                    onClick={() => { setShowDJLotteryForm(false); setLotteryDJDate(''); setLotteryDJReserveFor(''); }}
-                    className="btn-small"
-                    disabled={lotteryActionLoading}
-                  >
-                    Cancel
-                  </button>
+                  </div>
                 </div>
               ) : (
                 <button
@@ -711,6 +736,7 @@ const ShowDetail = () => {
                                   type="text"
                                   value={myDjNames[0] ?? ''}
                                   readOnly
+                                  disabled
                                   className="input-readonly"
                                 />
                               )}
@@ -718,7 +744,7 @@ const ShowDetail = () => {
                                 type="date"
                                 value={preassignSelfDate}
                                 onChange={(e) => setPreassignSelfDate(e.target.value)}
-                                max={show.show_date}
+                                max={maxDJReservationDate}
                                 disabled={preassignSelfLoading}
                               />
                               <button

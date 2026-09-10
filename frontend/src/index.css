@@ -979,6 +979,12 @@ fieldset.radio-group legend {
   font-size: 0.875rem;
 }
 
+.input-readonly {
+  background-color: #e9ecef;
+  color: #6c757d;
+  cursor: not-allowed;
+}
+
 .attempt-info {
   margin-top: 0.4rem;
   padding-top: 0.4rem;
