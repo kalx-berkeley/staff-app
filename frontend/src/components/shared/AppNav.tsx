@@ -160,14 +160,6 @@ const AppNav = ({ showGoogleLogout = false }: AppNavProps) => {
         >
           Send Feedback / Report a Bug
         </button>
-        <a
-          className="feedback-link"
-          href="https://github.com/kalx-berkeley/staff-app/issues"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Report an Issue on GitHub
-        </a>
       </div>
       {showFeedback && (
         <FeedbackModal onClose={() => setShowFeedback(false)} />

@@ -697,6 +697,7 @@ fieldset.radio-group legend {
 
 .modal-content {
   background: white;
+  color: #333;
   border-radius: 8px;
   padding: 1.5rem;
   max-width: 500px;
