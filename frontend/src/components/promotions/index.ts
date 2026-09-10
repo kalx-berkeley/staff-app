@@ -6,7 +6,6 @@ export { default as VenueEdit } from './VenueEdit';
 export { default as ShowList } from './ShowList';
 export { default as ShowForm } from './ShowForm';
 export { default as ShowDetail } from './ShowDetail';
-export { default as ProfileSettings } from './ProfileSettings';
 export { default as SearchBar } from './SearchBar';
 export { default as Admin } from './Admin';
 export { default as PromoterList } from './PromoterList';

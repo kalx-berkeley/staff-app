@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { usersAPI } from '../../services/api';
-import type { PromotionsStaffProfile, NotificationPreferences, APIError } from '../../types';
+import type { PromotionsStaffProfile, StaffProfile, NotificationPreferences, APIError } from '../../types';
 
 const ProfileSettings = () => {
-  const [profile, setProfile] = useState<PromotionsStaffProfile | null>(null);
+  const [profile, setProfile] = useState<PromotionsStaffProfile | StaffProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,7 +17,7 @@ const ProfileSettings = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await usersAPI.getProfile() as PromotionsStaffProfile;
+      const data = await usersAPI.getProfile();
       setProfile(data);
     } catch (err) {
       const apiError = err as APIError;
@@ -125,6 +125,22 @@ const ProfileSettings = () => {
               Email notifications enabled
             </label>
           </div>
+          <p className="field-hint">
+            When enabled, you'll receive emails for:
+          </p>
+          <ul className="field-hint">
+            <li>Lottery results — whether you won or lost a pass (or on-air pass pair) lottery you entered</li>
+            <li>Lottery entry cancellations — if a show you entered a lottery for is cancelled before the drawing</li>
+            <li>
+              Venue owner alerts, if you manage a venue — show cancellations, pass count
+              reductions affecting assigned or claimed passes, auto-closed show guest
+              lists, reminders for shows not yet closed after their date, and pass
+              winner releases
+            </li>
+          </ul>
+          <p className="field-hint">
+            Disabling this stops all of the above; you'll need to check the app directly instead.
+          </p>
         </div>
       ) : (
         <div className="error">

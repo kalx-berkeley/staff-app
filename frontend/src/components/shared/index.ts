@@ -6,3 +6,4 @@ export { default as DjNameInput, DJ_NAME_KEY } from './DjNameInput';
 export { default as BandAnnotator } from './BandAnnotator';
 export { default as EnrichedShowName } from './EnrichedShowName';
 export { default as MarkdownContent } from './MarkdownContent';
+export { default as ProfileSettings } from './ProfileSettings';

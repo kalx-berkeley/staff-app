@@ -9,7 +9,6 @@ import {
   VenueList,
   VenueNew,
   VenueEdit,
-  ProfileSettings as PromotionsProfileSettings,
   Admin,
   PromoterList,
   PromoterNew,
@@ -20,7 +19,6 @@ import {
   StaffLayout,
   ShowBrowser as StaffShowBrowser,
   ShowDetail as StaffShowDetail,
-  ProfileSettings as StaffProfileSettings,
   MyPasses as StaffMyPasses,
   SpecialtyShowList as StaffSpecialtyShowList,
   SpecialtyShowDetail as StaffSpecialtyShowDetail,
@@ -37,6 +35,7 @@ import { useAuth } from './contexts/authHooks';
 import { AUTH_DIAG_KEY } from './services/api';
 import { isStagingEnvironment } from './utils';
 import StagingBanner from './components/shared/StagingBanner';
+import ProfileSettings from './components/shared/ProfileSettings';
 
 // Diagnostic banner: rendered when a 401 redirect loop has been detected.
 // Shows which API endpoint triggered the redirect and stops the loop from
@@ -263,7 +262,7 @@ function App() {
           <Route path="promoters/new" element={<PromoterNew />} />
           <Route path="promoters/:id/edit" element={<PromoterEdit />} />
           <Route path="promoters" element={<PromoterList />} />
-          <Route path="profile" element={<PromotionsProfileSettings />} />
+          <Route path="profile" element={<ProfileSettings />} />
           <Route path="admin" element={<Admin />} />
           <Route path="legacy-import" element={<LegacyImport />} />
         </Route>
@@ -283,7 +282,7 @@ function App() {
           <Route path="my-passes" element={<StaffMyPasses />} />
           <Route path="specialty-shows" element={<StaffSpecialtyShowList />} />
           <Route path="specialty-shows/:id" element={<StaffSpecialtyShowDetail />} />
-          <Route path="profile" element={<StaffProfileSettings />} />
+          <Route path="profile" element={<ProfileSettings />} />
         </Route>
 
         {/* DJ routes - accessible from DJ studio network or as promotions staff */}

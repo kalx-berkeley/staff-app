@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ProfileSettings from './ProfileSettings';
 import { usersAPI } from '../../services/api';
-import type { PromotionsStaffProfile } from '../../types';
+import type { PromotionsStaffProfile, StaffProfile } from '../../types';
 
 vi.mock('../../services/api', () => ({
   usersAPI: {
@@ -11,9 +11,16 @@ vi.mock('../../services/api', () => ({
 }));
 
 describe('ProfileSettings', () => {
-  const mockProfile: PromotionsStaffProfile = {
+  const mockPromotionsProfile: PromotionsStaffProfile = {
     name: 'John Doe',
     phone: '555-123-4567',
+  };
+
+  const mockStaffProfile: StaffProfile = {
+    name: 'Jane Smith',
+    phone: '555-987-6543',
+    dj_name: null,
+    is_sublist_dj: false,
   };
 
   beforeEach(() => {
@@ -30,8 +37,8 @@ describe('ProfileSettings', () => {
     expect(screen.getByText('Loading profile...')).toBeInTheDocument();
   });
 
-  it('should display profile name and phone after loading', async () => {
-    vi.mocked(usersAPI.getProfile).mockResolvedValue(mockProfile);
+  it('should display profile name and phone for a promotions profile', async () => {
+    vi.mocked(usersAPI.getProfile).mockResolvedValue(mockPromotionsProfile);
 
     render(<ProfileSettings />);
 
@@ -43,8 +50,21 @@ describe('ProfileSettings', () => {
     expect(screen.getByText('555-123-4567')).toBeInTheDocument();
   });
 
+  it('should display profile name and phone for a staff profile', async () => {
+    vi.mocked(usersAPI.getProfile).mockResolvedValue(mockStaffProfile);
+
+    render(<ProfileSettings />);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading profile...')).not.toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    expect(screen.getByText('555-987-6543')).toBeInTheDocument();
+  });
+
   it('should display the Airtable notice', async () => {
-    vi.mocked(usersAPI.getProfile).mockResolvedValue(mockProfile);
+    vi.mocked(usersAPI.getProfile).mockResolvedValue(mockPromotionsProfile);
 
     render(<ProfileSettings />);
 
@@ -56,7 +76,7 @@ describe('ProfileSettings', () => {
   });
 
   it('should not render any editable inputs or save button', async () => {
-    vi.mocked(usersAPI.getProfile).mockResolvedValue(mockProfile);
+    vi.mocked(usersAPI.getProfile).mockResolvedValue(mockPromotionsProfile);
 
     render(<ProfileSettings />);
 
@@ -84,7 +104,7 @@ describe('ProfileSettings', () => {
   it('should reload profile when retry button is clicked', async () => {
     vi.mocked(usersAPI.getProfile)
       .mockRejectedValueOnce({ detail: 'Failed to load profile' })
-      .mockResolvedValueOnce(mockProfile);
+      .mockResolvedValueOnce(mockPromotionsProfile);
 
     render(<ProfileSettings />);
 
