@@ -479,7 +479,7 @@ const ShowDetail = () => {
             <>
               <button
                 onClick={() => setConfirmAction('unpublish')}
-                className="btn-secondary"
+                className="btn-primary"
                 disabled={actionLoading}
                 title="Return this show to draft status, hiding it from DJs."
               >
@@ -487,7 +487,7 @@ const ShowDetail = () => {
               </button>
               <button
                 onClick={() => setConfirmAction('close')}
-                className="btn-secondary"
+                className="btn-primary"
                 disabled={actionLoading}
                 title="Mark this show as complete. No further pass giveaways or staff claims will be allowed."
               >
@@ -498,7 +498,7 @@ const ShowDetail = () => {
           {show.status === 'closed' && show.show_date >= new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) && (
             <button
               onClick={() => setConfirmAction('reopen')}
-              className="btn-secondary"
+              className="btn-primary"
               disabled={actionLoading}
               title="Re-open this show so pass giveaways and staff claims are allowed again."
             >
@@ -507,7 +507,7 @@ const ShowDetail = () => {
           )}
           <Link
             to={`/promotions/shows/${show.id}/edit`}
-            className="btn-secondary"
+            className="btn-primary"
           >
             Edit
           </Link>
