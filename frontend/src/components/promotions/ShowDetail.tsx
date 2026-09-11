@@ -134,11 +134,16 @@ const ShowDetail = () => {
   // the input's blur (which fires right after, for the same name) only fetches once.
   const lastScheduleFetchNameRef = useRef<string | null>(null);
 
-  const loadShow = useCallback(async () => {
+  const loadShow = useCallback(async (silent = false) => {
     if (!id) return;
 
     try {
-      setLoading(true);
+      // `silent` skips the `loading` flag, which otherwise blanks the whole
+      // page behind a "Loading show details…" message — used to quietly
+      // re-sync after an action (like a pass claim) that can affect more
+      // than the one pass we already know about (e.g. a guest hold pass),
+      // without flashing the page for what should feel like a live update.
+      if (!silent) setLoading(true);
       setError(null);
       const data = await showsAPI.get(parseInt(id));
       setShow(data);
@@ -150,7 +155,7 @@ const ShowDetail = () => {
           : 'Failed to load show'
       );
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [id]);
 
@@ -525,7 +530,7 @@ const ShowDetail = () => {
     return (
       <div className="error">
         <p>Error: {error || 'Show not found'}</p>
-        <button onClick={loadShow}>Retry</button>
+        <button onClick={() => loadShow()}>Retry</button>
       </div>
     );
   }

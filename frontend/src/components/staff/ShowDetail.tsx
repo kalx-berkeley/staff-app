@@ -53,10 +53,15 @@ const ShowDetail = () => {
   const [lotteryScheduleDates, setLotteryScheduleDates] = useState<string[] | null>(null);
   const [lotteryScheduleLoading, setLotteryScheduleLoading] = useState(false);
 
-  const loadShow = useCallback(async () => {
+  const loadShow = useCallback(async (silent = false) => {
     if (!id) return;
     try {
-      setLoading(true);
+      // `silent` skips the `loading` flag, which otherwise blanks the whole
+      // page behind a "Loading show details…" message — used to quietly
+      // re-sync after an action that can affect more than one pass (e.g. a
+      // guest hold pass on claim) or has no updated-pass response to patch
+      // in directly (lottery entries), without flashing the page.
+      if (!silent) setLoading(true);
       setError(null);
       const data = await showsAPI.get(parseInt(id));
       setShow(data);
@@ -68,7 +73,7 @@ const ShowDetail = () => {
           : 'Failed to load show'
       );
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [id]);
 
@@ -201,7 +206,7 @@ const ShowDetail = () => {
       setGuestClaimPassId(null);
       setGuestName('');
       setOnlyWithGuest(false);
-      await loadShow();
+      await loadShow(true);
     } catch (err) {
       const apiError = err as APIError;
       setPassActionError(
@@ -231,9 +236,16 @@ const ShowDetail = () => {
     setPassActionError(null);
     setSuccessMessage(null);
     try {
-      await passesAPI.removePreassignment(passId);
+      const updatedPass = await passesAPI.removePreassignment(passId);
+      // Patch just this pass into local state instead of re-fetching the whole
+      // show — loadShow() flips `loading`, which blanks the entire page behind
+      // a "Loading show details…" message for what should be a quiet update.
+      setShow((prev) =>
+        prev
+          ? { ...prev, passes: prev.passes.map((p) => (p.id === updatedPass.id ? updatedPass : p)) }
+          : prev
+      );
       showEphemeralSuccess('Pre-assignment removed.');
-      await loadShow();
     } catch (err) {
       const apiError = err as APIError;
       setPassActionError(
@@ -251,7 +263,7 @@ const ShowDetail = () => {
     try {
       await passesAPI.releaseClaim(passId);
       showEphemeralSuccess('Pass released.');
-      await loadShow();
+      await loadShow(true);
     } catch (err) {
       const apiError = err as APIError;
       setPassActionError(
@@ -277,16 +289,22 @@ const ShowDetail = () => {
       const djNameOverride = preassignSelfReserveFor.startsWith('dj:')
         ? preassignSelfReserveFor.slice(3)
         : undefined;
-      await passesAPI.selfPreassign(passId, {
+      const updatedPass = await passesAPI.selfPreassign(passId, {
         assignment_date: preassignSelfDate,
         specialty_show_id: specialtyShowId,
         dj_name_override: djNameOverride,
       });
+      // Patch just this pass into local state instead of re-fetching the whole
+      // show — see handleUnassignSelf for why loadShow() isn't used here.
+      setShow((prev) =>
+        prev
+          ? { ...prev, passes: prev.passes.map((p) => (p.id === updatedPass.id ? updatedPass : p)) }
+          : prev
+      );
       setPreassignSelfPassId(null);
       setPreassignSelfDate('');
       setPreassignSelfReserveFor('');
       showEphemeralSuccess('Pass pre-assigned successfully!');
-      await loadShow();
     } catch (err) {
       const apiError = err as APIError;
       setPassActionError(
@@ -316,7 +334,7 @@ const ShowDetail = () => {
       setLotteryGuestName('');
       setLotteryOnlyWithGuest(false);
       showEphemeralSuccess("You've entered the lottery! You'll receive an email with the result after the lottery closes.");
-      await loadShow();
+      await loadShow(true);
     } catch (err) {
       const apiError = err as APIError;
       setLotteryActionError(typeof apiError.detail === 'string' ? apiError.detail : 'Failed to enter lottery');
@@ -333,7 +351,7 @@ const ShowDetail = () => {
       await lotteryAPI.withdrawStaff(show.id);
       setLotteryStatus(null);
       showEphemeralSuccess('Your lottery entry has been withdrawn.');
-      await loadShow();
+      await loadShow(true);
     } catch (err) {
       const apiError = err as APIError;
       setLotteryActionError(typeof apiError.detail === 'string' ? apiError.detail : 'Failed to withdraw entry');
@@ -365,7 +383,7 @@ const ShowDetail = () => {
       setLotteryDJDate('');
       setLotteryDJReserveFor('');
       showEphemeralSuccess("You've entered the lottery for a pass pair! You'll receive an email with the result after the lottery closes.");
-      await loadShow();
+      await loadShow(true);
     } catch (err) {
       const apiError = err as APIError;
       setLotteryActionError(typeof apiError.detail === 'string' ? apiError.detail : 'Failed to enter lottery');
@@ -382,7 +400,7 @@ const ShowDetail = () => {
       await lotteryAPI.withdrawDJ(show.id);
       setLotteryStatus(null);
       showEphemeralSuccess('Your DJ lottery entry has been withdrawn.');
-      await loadShow();
+      await loadShow(true);
     } catch (err) {
       const apiError = err as APIError;
       setLotteryActionError(typeof apiError.detail === 'string' ? apiError.detail : 'Failed to withdraw entry');
