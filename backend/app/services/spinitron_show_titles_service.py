@@ -22,7 +22,7 @@ _PAST_SHOW_HOSTS_CACHE_KEY = "spinitron:past-show-hosts"
 
 
 class SpinitronShowTitlesService:
-    """Read-through caches over Spinitron's `/shows` schedule, by title."""
+    """Read-through caches over Spinitron's schedule and on-air log, by title."""
 
     @staticmethod
     async def get_upcoming_titles(db: Session) -> List[str]:
@@ -56,7 +56,7 @@ class SpinitronShowTitlesService:
         async def producer() -> dict:
             end = datetime.now(timezone.utc)
             start = end - timedelta(days=HISTORY_WINDOW_DAYS)
-            shows = await SpinitronService.fetch_shows(end, start=start)
+            shows = await SpinitronService.fetch_playlists(start, end)
             resolved = await SpinitronScheduleService.resolve_dj_names(db, shows)
 
             entries = []

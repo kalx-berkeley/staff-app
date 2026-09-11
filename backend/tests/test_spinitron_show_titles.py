@@ -82,7 +82,7 @@ class TestGetDjHistoryForTitle:
     async def test_matches_by_exact_title_and_dedupes(self, db: Session, monkeypatch):
         now = datetime.now(timezone.utc)
 
-        async def fake_fetch_shows(end, start=None):
+        async def fake_fetch_playlists(start, end):
             return [
                 _show(
                     1,
@@ -112,8 +112,8 @@ class TestGetDjHistoryForTitle:
             return {1: "Wolfman", 2: "Nightowl", 3: "Wolfman"}
 
         monkeypatch.setattr(
-            "app.services.spinitron_show_titles_service.SpinitronService.fetch_shows",
-            fake_fetch_shows,
+            "app.services.spinitron_show_titles_service.SpinitronService.fetch_playlists",
+            fake_fetch_playlists,
         )
         monkeypatch.setattr(
             "app.services.spinitron_show_titles_service.SpinitronScheduleService.resolve_dj_names",
@@ -129,15 +129,15 @@ class TestGetDjHistoryForTitle:
     async def test_no_match_returns_empty(self, db: Session, monkeypatch):
         now = datetime.now(timezone.utc)
 
-        async def fake_fetch_shows(end, start=None):
+        async def fake_fetch_playlists(start, end):
             return [_show(1, now, now, 1, "The Howl")]
 
         async def fake_resolve_dj_names(db, shows):
             return {1: "Wolfman"}
 
         monkeypatch.setattr(
-            "app.services.spinitron_show_titles_service.SpinitronService.fetch_shows",
-            fake_fetch_shows,
+            "app.services.spinitron_show_titles_service.SpinitronService.fetch_playlists",
+            fake_fetch_playlists,
         )
         monkeypatch.setattr(
             "app.services.spinitron_show_titles_service.SpinitronScheduleService.resolve_dj_names",
