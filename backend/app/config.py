@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     environment: str = "production"
 
     # Contact URL included in User-Agent for external API requests
-    api_contact_url: str = "https://kalx.berkeley.edu"
+    api_contact_url: str = "https://cs.cementhorizon.com/contact/"
 
     # Email notifications via smtp2go (primary) or the OS's local SMTP relay (fallback)
     smtp2go_api_key: Optional[str] = None

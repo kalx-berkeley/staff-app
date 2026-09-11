@@ -42,7 +42,7 @@ class SpinitronService:
     def _request_headers() -> Dict[str, str]:
         return {
             "Authorization": f"Bearer {settings.spinitron_api_key}",
-            "User-Agent": f"kalx-promotions/1.0 ({settings.api_contact_url})",
+            "User-Agent": f"kalx-staff-app/1.0 ({settings.api_contact_url})",
         }
 
     @staticmethod
