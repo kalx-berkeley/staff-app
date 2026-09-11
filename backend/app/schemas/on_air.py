@@ -20,6 +20,7 @@ class SpinMatchShow(BaseModel):
 
     id: int
     event_name: str
+    venue_name: str
     show_date: date
 
 

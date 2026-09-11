@@ -122,7 +122,7 @@ class SpinMatchService:
         )
         return (
             db.query(Show)
-            .options(joinedload(Show.bands))
+            .options(joinedload(Show.bands), joinedload(Show.venue))
             .filter(Show.status == "published", Show.id.in_(show_ids_with_pairs))
             .all()
         )

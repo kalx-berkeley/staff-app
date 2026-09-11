@@ -179,6 +179,7 @@ class TestCheckForMatches:
         assert matches[0].song == "Cielo"
         assert matches[0].image == "http://example.com/x.jpg"
         assert matches[0].show.id == show.id
+        assert matches[0].show.venue.name == "Test Venue"
         assert (
             db.query(SurfacedSpinMatch).filter(SurfacedSpinMatch.spin_id == 101).count()
             == 1
@@ -291,4 +292,5 @@ class TestSpinMatchesEndpoint:
         assert body[0]["spin_id"] == 101
         assert body[0]["artist"] == "Murcof"
         assert body[0]["show"]["id"] == show.id
+        assert body[0]["show"]["venue_name"] == "Test Venue"
         assert body[0]["show"]["event_name"] == "Some Show"

@@ -634,6 +634,7 @@ export interface OnAirInfo {
 export interface SpinMatchShow {
   id: number;
   event_name: string;
+  venue_name: string;
   show_date: string;
 }
 

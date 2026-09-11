@@ -75,8 +75,8 @@ const SpinMatchNotifier = () => {
           <div className="spin-match-toast-body">
             <p className="spin-match-toast-headline">You just played {match.artist}!</p>
             <p className="spin-match-toast-detail">
-              We have passes to give away for <strong>{match.show.event_name}</strong> on{' '}
-              {formatShowDate(match.show.show_date)}.
+              We have passes to give away for <strong>{match.show.event_name}</strong> at{' '}
+              {match.show.venue_name} on {formatShowDate(match.show.show_date)}.
             </p>
             <Link
               className="spin-match-toast-link"

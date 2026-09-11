@@ -62,7 +62,10 @@ async def get_spin_matches(
             song=m.song,
             image=m.image,
             show=SpinMatchShow(
-                id=m.show.id, event_name=m.show.event_name, show_date=m.show.show_date
+                id=m.show.id,
+                event_name=m.show.event_name,
+                venue_name=m.show.venue.name,
+                show_date=m.show.show_date,
             ),
         )
         for m in matches
