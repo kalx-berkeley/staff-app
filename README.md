@@ -115,6 +115,13 @@ the library, complete with the release's dot-color status and a listen link
   changes over. The DJ Name field auto-fills from this, flags a warning with a one-click fix when
   the entered name doesn't match who's actually scheduled, and auto-advances to the next DJ (with a
   notice) right when a show ends.
+- **Live spin-match notifications** — polling `GET /api/dj/spin-matches` roughly every 30 seconds,
+  the DJ view fuzzy-matches recently played Spinitron spins against shows with passes still to give
+  away (`backend/app/services/spin_match_service.py`, reusing the feature bin's rapidfuzz approach)
+  and pops up a dismissible toast with the artist, show, date, and a link straight to that show's
+  giveaway page — so a DJ can catch a match and give tickets away in the next mic break. The
+  Spinitron API itself is only re-polled once the cached spins are over a minute old, and a given
+  spin is never surfaced more than once.
 - **Winner phone-number lookup**, restricted to the station office network or promotions staff and
   rate-limited per IP, so whoever answers the phone can verify a caller's story and release their
   passes back to the pool if it checks out.

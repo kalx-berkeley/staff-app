@@ -57,6 +57,7 @@ import type {
   StaffLotteryEntryCreate,
   DJLotteryEntryCreate,
   OnAirInfo,
+  SpinMatch,
 } from '../types';
 
 /**
@@ -879,6 +880,20 @@ export const onAirAPI = {
   getCurrent: async (): Promise<OnAirInfo> => {
     try {
       const response = await apiClient.get<OnAirInfo>('/dj/on-air');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * Get spins matching a show with passes to give away, not yet surfaced to this DJ view.
+   *
+   * @returns Promise resolving to the list of new matches (usually empty)
+   */
+  getSpinMatches: async (): Promise<SpinMatch[]> => {
+    try {
+      const response = await apiClient.get<SpinMatch[]>('/dj/spin-matches');
       return response.data;
     } catch (error) {
       return handleAPIError(error);

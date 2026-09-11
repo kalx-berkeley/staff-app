@@ -3262,3 +3262,76 @@ fieldset.radio-group legend {
   color: inherit;
   padding: 0 0.2rem;
 }
+
+/* Spin match notifications (DJLayout) */
+.spin-match-toast-container {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  left: 1rem;
+  max-width: 380px;
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  z-index: 5000;
+}
+
+.spin-match-toast {
+  position: relative;
+  display: flex;
+  gap: 0.75rem;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--primary-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 0.75rem 1.75rem 0.75rem 0.9rem;
+}
+
+.spin-match-toast-image {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.spin-match-toast-body {
+  min-width: 0;
+}
+
+.spin-match-toast-headline {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+}
+
+.spin-match-toast-detail {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.spin-match-toast-link {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.spin-match-toast-link:hover {
+  text-decoration: underline;
+}
+
+.spin-match-toast-close {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--secondary-color);
+  padding: 0.2rem;
+}

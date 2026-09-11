@@ -25,6 +25,8 @@ from .specialty_show_dj import SpecialtyShowDJ
 from .external_api_cache import ExternalApiCache
 from .feature_bin_release import FeatureBinRelease
 from .spinitron_show import SpinitronShow
+from .spinitron_spin_cache import SpinitronSpinCache
+from .surfaced_spin_match import SurfacedSpinMatch
 
 __all__ = [
     "AuditLog",
@@ -52,4 +54,6 @@ __all__ = [
     "ExternalApiCache",
     "FeatureBinRelease",
     "SpinitronShow",
+    "SpinitronSpinCache",
+    "SurfacedSpinMatch",
 ]

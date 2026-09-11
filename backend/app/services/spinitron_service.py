@@ -25,6 +25,16 @@ class SpinitronShowItem(TypedDict):
     persona_id: Optional[int]
 
 
+class SpinitronSpinItem(TypedDict):
+    """A single Spinitron spin (played song), as relevant to feature-show matching."""
+
+    id: int
+    start: datetime
+    artist: str
+    song: str
+    image: Optional[str]
+
+
 class SpinitronService:
     """Service for interacting with the Spinitron v2 API."""
 
@@ -159,6 +169,73 @@ class SpinitronService:
 
         logger.info("Fetched %d Spinitron shows", len(shows))
         return shows
+
+    @staticmethod
+    async def fetch_spins(start: datetime) -> List[SpinitronSpinItem]:
+        """
+        Fetch Spinitron spins (played songs) logged since *start*.
+
+        Fetches all pages using the maximum page size of 200. Spins with a
+        blank artist are skipped since there's nothing to match against.
+
+        :param start: Lower bound of the lookback window (used as the "start"
+            query argument, formatted as UTC ISO-8601 with a numeric offset).
+        :returns: List of spin dicts with id, start, artist, song, and image,
+            most-recent first (Spinitron's own ordering).
+        :raises RuntimeError: If the Spinitron API returns an error.
+        """
+        if not settings.spinitron_api_key:
+            logger.warning("SPINITRON_API_KEY not configured, skipping spin fetch")
+            return []
+
+        url = f"{SPINITRON_API_BASE}/spins"
+        headers = SpinitronService._request_headers()
+        start_param = start.strftime("%Y-%m-%dT%H:%M:%S%z")
+        spins: List[SpinitronSpinItem] = []
+
+        async with httpx.AsyncClient() as client:
+            page = 1
+            while True:
+                try:
+                    response = await client.get(
+                        url,
+                        headers=headers,
+                        params={"start": start_param, "count": 200, "page": page},
+                        timeout=30.0,
+                    )
+                    response.raise_for_status()
+                except httpx.HTTPStatusError as e:
+                    raise RuntimeError(
+                        f"Spinitron API error {e.response.status_code}: {e.response.text}"
+                    ) from e
+                except httpx.RequestError as e:
+                    raise RuntimeError(f"Spinitron API request failed: {e}") from e
+
+                data = response.json()
+                for item in data.get("items", []):
+                    spin_id = item.get("id")
+                    start_str = item.get("start")
+                    artist = (item.get("artist") or "").strip()
+                    if spin_id is None or not start_str or not artist:
+                        continue
+
+                    spins.append(
+                        SpinitronSpinItem(
+                            id=int(spin_id),
+                            start=datetime.strptime(start_str, "%Y-%m-%dT%H:%M:%S%z"),
+                            artist=artist,
+                            song=(item.get("song") or "").strip(),
+                            image=item.get("image") or None,
+                        )
+                    )
+
+                meta = data.get("_meta", {})
+                if page >= meta.get("pageCount", 1):
+                    break
+                page += 1
+
+        logger.info("Fetched %d Spinitron spin(s)", len(spins))
+        return spins
 
     @staticmethod
     async def fetch_persona_name(persona_id: int) -> Optional[str]:

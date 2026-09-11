@@ -629,3 +629,18 @@ export interface OnAirInfo {
   current_show_ends_at: string | null;
   next_dj_name: string | null;
 }
+
+// Spinitron spin matches (played songs matching a show with passes to give away)
+export interface SpinMatchShow {
+  id: number;
+  event_name: string;
+  show_date: string;
+}
+
+export interface SpinMatch {
+  spin_id: number;
+  artist: string;
+  song: string;
+  image: string | null;
+  show: SpinMatchShow;
+}

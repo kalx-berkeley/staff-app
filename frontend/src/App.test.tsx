@@ -28,6 +28,7 @@ vi.mock('./services/api', () => ({
       current_show_ends_at: null,
       next_dj_name: null,
     }),
+    getSpinMatches: vi.fn().mockResolvedValue([]),
   },
   specialtyShowsAPI: {
     listMy: vi.fn().mockResolvedValue([]),

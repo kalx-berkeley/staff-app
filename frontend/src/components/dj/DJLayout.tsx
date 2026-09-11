@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, Outlet } from 'react-router-dom';
 import { AppNav, BuildInfo } from '../shared';
+import SpinMatchNotifier from './SpinMatchNotifier';
 
 const DJLayout = () => {
   const [navOpen, setNavOpen] = useState(false);
@@ -61,6 +62,7 @@ const DJLayout = () => {
       <main className="dj-content">
         <Outlet />
       </main>
+      <SpinMatchNotifier />
     </div>
   );
 };
