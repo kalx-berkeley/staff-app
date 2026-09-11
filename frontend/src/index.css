@@ -1213,6 +1213,10 @@ fieldset.radio-group legend {
   cursor: not-allowed;
 }
 
+.date-picker-input[aria-invalid="true"] {
+  border-color: var(--danger-color);
+}
+
 .date-picker-clear,
 .date-picker-toggle {
   display: inline-flex;

@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { DayPicker, type Matcher } from 'react-day-picker';
 import 'react-day-picker/style.css';
-import { parseDateValue, formatDateValue } from '../../utils';
+import { parseDateValue, formatDateValue, formatDateForDisplay, parseFreeformDate } from '../../utils';
 
 interface DatePickerProps {
   value: string;
@@ -23,10 +23,15 @@ interface DatePickerProps {
 }
 
 /**
- * A date field: a native `<input type="date">` (typeable, with every browser's
- * own keyboard entry and built-in clear affordance) paired with a calendar
- * popover button for mouse users who'd rather browse. Both stay in sync with
- * the same `value`.
+ * A date field: free-typed text (`MM/DD/YYYY`, parsed as you type — no
+ * browser-imposed mm/dd/yyyy sub-fields or native calendar icon) paired with
+ * a calendar popover button for mouse users who'd rather browse. Both stay
+ * in sync with the same `value`.
+ *
+ * Text that isn't a real, in-range date commits `''` upstream instead of the
+ * typed text, so a caller's existing "value is required" check also rejects
+ * bad manual entry — the invalid text stays visible (with an error style)
+ * until it's fixed or cleared.
  */
 const DatePicker = ({
   value,
@@ -37,10 +42,13 @@ const DatePicker = ({
   id,
   className,
   style,
-  placeholder = 'Select date…',
+  placeholder = 'MM/DD/YYYY',
   isDateDisabled,
 }: DatePickerProps) => {
   const [open, setOpen] = useState(false);
+  const [text, setText] = useState(() => formatDateForDisplay(value));
+  const [invalid, setInvalid] = useState(false);
+  const lastCommittedRef = useRef(value);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const generatedId = useId();
@@ -64,6 +72,18 @@ const DatePicker = ({
     };
   }, [open]);
 
+  useEffect(() => {
+    // Only resync from an externally-driven value change (e.g. the parent
+    // resetting the field) — a change we committed ourselves already has
+    // matching local text, including the '' committed while showing invalid
+    // typed text, which must stay on screen rather than being wiped here.
+    if (value !== lastCommittedRef.current) {
+      lastCommittedRef.current = value;
+      setText(formatDateForDisplay(value));
+      setInvalid(false);
+    }
+  }, [value]);
+
   const selectedDate = parseDateValue(value);
   const minDate = min ? parseDateValue(min) : undefined;
   const maxDate = max ? parseDateValue(max) : undefined;
@@ -72,8 +92,28 @@ const DatePicker = ({
   if (minDate) disabledMatchers.push({ before: minDate });
   if (maxDate) disabledMatchers.push({ after: maxDate });
 
+  const commit = (raw: string, nextValue: string, isInvalid: boolean) => {
+    setText(raw);
+    setInvalid(isInvalid);
+    lastCommittedRef.current = nextValue;
+    onChange(nextValue);
+  };
+
+  const handleTextChange = (raw: string) => {
+    const parsed = parseFreeformDate(raw);
+    if (parsed === null) {
+      commit(raw, '', true);
+      return;
+    }
+    // Format/real-date validity only — min/max stay advisory here (as they
+    // were for the native date input this replaced), so each caller's own
+    // range validation still runs downstream instead of being pre-empted.
+    commit(raw, parsed, false);
+  };
+
   const handleSelect = (date: Date | undefined) => {
-    onChange(date ? formatDateValue(date) : '');
+    const iso = date ? formatDateValue(date) : '';
+    commit(iso ? formatDateForDisplay(iso) : '', iso, false);
     setOpen(false);
     toggleRef.current?.focus();
   };
@@ -81,23 +121,25 @@ const DatePicker = ({
   return (
     <div className="date-picker-wrapper" style={style} ref={wrapperRef}>
       <input
-        type="date"
+        type="text"
+        inputMode="numeric"
         id={inputId}
         className={`date-picker-input ${className ?? ''}`}
-        value={value}
-        min={min}
-        max={max}
+        value={text}
+        placeholder={placeholder}
         disabled={disabled}
         aria-label={id ? undefined : placeholder}
-        onChange={(e) => onChange(e.target.value)}
+        aria-invalid={invalid || undefined}
+        title={invalid ? `Enter a valid date as ${placeholder}` : undefined}
+        onChange={(e) => handleTextChange(e.target.value)}
       />
-      {value && !disabled && (
+      {text && !disabled && (
         <button
           type="button"
           className="date-picker-clear"
           aria-label="Clear date"
           title="Clear date"
-          onClick={() => onChange('')}
+          onClick={() => commit('', '', false)}
         >
           ×
         </button>

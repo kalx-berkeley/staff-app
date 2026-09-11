@@ -307,13 +307,20 @@ const ShowDetail = () => {
         dj_name: preassignDj.trim(),
         assignment_date: preassignDate,
       };
-      await passesAPI.setPreassignment(passId, data);
+      const updatedPass = await passesAPI.setPreassignment(passId, data);
+      // Patch just this pass into local state instead of re-fetching the whole
+      // show — loadShow() flips `loading`, which blanks the entire page behind
+      // a "Loading show details…" message for what should be a quiet update.
+      setShow((prev) =>
+        prev
+          ? { ...prev, passes: prev.passes.map((p) => (p.id === updatedPass.id ? updatedPass : p)) }
+          : prev
+      );
       setPreassignPassId(null);
       setPreassignDj('');
       setPreassignDate('');
       setScheduleDates(null);
       lastScheduleFetchNameRef.current = null;
-      await loadShow();
     } catch (err) {
       const apiError = err as APIError;
       setActionError(
