@@ -88,6 +88,26 @@ async def notify_unclosed_past_shows():
         db.close()
 
 
+async def sync_feature_bin():
+    """
+    Scheduled task to sync the feature bin from the Google Sheet.
+    Runs daily at 1 AM.
+    """
+    from app.database import SessionLocal
+    from app.services.feature_bin_service import FeatureBinService
+
+    logger.info("Starting scheduled feature bin sync")
+
+    db = SessionLocal()
+    try:
+        count = FeatureBinService.sync_feature_bin(db, trigger="scheduled")
+        logger.info(f"Scheduled feature bin sync completed: {count} release(s) stored")
+    except Exception as e:
+        logger.error(f"Scheduled feature bin sync failed: {str(e)}", exc_info=True)
+    finally:
+        db.close()
+
+
 async def bootstrap_users_if_empty():
     """
     On startup, check if user tables are empty and sync from Airtable if so.
@@ -350,6 +370,15 @@ def start_scheduler():
 
     _PT = "America/Los_Angeles"
 
+    # Add daily feature bin sync job at 1 AM Pacific, ahead of the other jobs
+    scheduler.add_job(
+        sync_feature_bin,
+        trigger=CronTrigger(hour=1, minute=0, timezone=_PT),
+        id="feature_bin_sync",
+        name="Sync feature bin from Google Sheet",
+        replace_existing=True,
+    )
+
     # Add daily sync job at 2 AM Pacific
     scheduler.add_job(
         sync_users_from_airtable,
@@ -379,8 +408,8 @@ def start_scheduler():
 
     scheduler.start()
     logger.info(
-        "Scheduler started - Airtable sync at 2 AM PT, stale preassignment expiry at 3 AM"
-        " PT, unclosed past show notifications at 4 AM PT"
+        "Scheduler started - Feature bin sync at 1 AM PT, Airtable sync at 2 AM PT, stale"
+        " preassignment expiry at 3 AM PT, unclosed past show notifications at 4 AM PT"
     )
     _reschedule_pending_auto_close_jobs()
     _reschedule_pending_lottery_jobs()

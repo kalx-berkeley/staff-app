@@ -272,6 +272,18 @@ class DescriptionAnalysisResponse(BaseModel):
     summary: str
 
 
+class FeatureBinMatchResponse(BaseModel):
+    """A feature-bin release matched to a show's artist(s), for the feature-bin badge."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    artist: str
+    album: str
+    added_date: str | None
+    dot: str | None
+    media_url: str | None
+
+
 class PromotionsContact(BaseModel):
     """Contact info for a promotions staff owner of the venue."""
 
@@ -329,6 +341,13 @@ class ShowResponse(BaseModel):
         default_factory=list, description="Band annotations"
     )
     is_mine: bool = False
+    in_feature_bin: bool = Field(
+        default=False,
+        description="Whether a performing artist has a release in the feature bin",
+    )
+    feature_bin_releases: list[FeatureBinMatchResponse] = Field(
+        default_factory=list, description="Matched feature bin releases"
+    )
 
 
 class VenueShowSummary(BaseModel):
@@ -364,6 +383,8 @@ class ShowSummary(BaseModel):
     published_at: UtcDatetime | None = None
     bands: list[ShowBandResponse] = Field(default_factory=list)
     is_mine: bool = False
+    in_feature_bin: bool = False
+    feature_bin_releases: list[FeatureBinMatchResponse] = Field(default_factory=list)
 
 
 # Import PassResponse and VenueResponse after ShowResponse to avoid circular import

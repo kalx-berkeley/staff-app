@@ -223,6 +223,8 @@ jobs:
         EMAIL_FROM_ADDRESS=${{ vars.EMAIL_FROM_ADDRESS }}
         WEBMASTER_EMAIL=${{ vars.WEBMASTER_EMAIL }}
         LEGACY_IMPORT_ENABLED=${{ vars.LEGACY_IMPORT_ENABLED || 'false' }}
+        FEATURE_BIN_SHEET_ID=${{ secrets.FEATURE_BIN_SHEET_ID }}
+        FEATURE_BIN_SHEET_GID=${{ secrets.FEATURE_BIN_SHEET_GID }}
         EOF
 
         # Install/update Python dependencies

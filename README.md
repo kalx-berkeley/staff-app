@@ -154,6 +154,8 @@ Client
 | `LOCAL_SMTP_HOST` | Hostname of the local SMTP relay used when `SMTP2GO_API_KEY` is unset | `localhost` |
 | `LOCAL_SMTP_PORT` | Port of the local SMTP relay used when `SMTP2GO_API_KEY` is unset | `25` |
 | `WEBMASTER_EMAIL` | Recipient for in-app feedback and bug reports | — |
+| `FEATURE_BIN_SHEET_ID` | Google Sheet ID for the KALX feature bin (new-arrivals) list | — (feature bin sync is disabled if unset) |
+| `FEATURE_BIN_SHEET_GID` | Worksheet `gid` of the sheet's "Current Active A-Z" tab | — (feature bin sync is disabled if unset) |
 
 Note: CORS is same-origin in production (frontend and API are both on `staff.kalx.berkeley.edu`), so `CORS_ORIGINS` only matters for local development.
 
@@ -182,6 +184,8 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 - `AIRTABLE_API_KEY`
 - `AIRTABLE_BASE_ID`
 - `SMTP2GO_API_KEY` (optional — falls back to the server's local SMTP relay if absent)
+- `FEATURE_BIN_SHEET_ID` (not public data — see the maintainers for the value; feature bin sync is disabled if unset)
+- `FEATURE_BIN_SHEET_GID` (not public data — see the maintainers for the value; the sheet's "Current Active A-Z" tab)
 
 **Variables:**
 - `SITE_DOMAIN`

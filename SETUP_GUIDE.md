@@ -350,6 +350,8 @@ The `.env` file is **generated automatically by GitHub Actions** on every deploy
 | `AIRTABLE_BASE_ID` | GitHub Actions secret `AIRTABLE_BASE_ID` |
 | `SMTP2GO_API_KEY` | GitHub Actions secret `SMTP2GO_API_KEY` (optional) |
 | `EMAIL_FROM_ADDRESS` | GitHub Actions variable `EMAIL_FROM_ADDRESS` (optional) |
+| `FEATURE_BIN_SHEET_ID` | GitHub Actions secret `FEATURE_BIN_SHEET_ID` (optional — feature bin sync is disabled if unset) |
+| `FEATURE_BIN_SHEET_GID` | GitHub Actions secret `FEATURE_BIN_SHEET_GID` (optional — feature bin sync is disabled if unset) |
 
 Ensure all required values are configured in **Settings > Secrets and variables > Actions** before triggering the first deployment (see [GitHub Actions Deployment Setup](#github-actions-deployment-setup)).
 
@@ -378,6 +380,8 @@ In **Settings > Secrets and variables > Actions**, create the following for each
 - `AIRTABLE_API_KEY` — Airtable API key (optional)
 - `AIRTABLE_BASE_ID` — Airtable base ID (optional)
 - `SMTP2GO_API_KEY` — smtp2go API key for sending notification emails (optional; falls back to the server's local SMTP relay if absent)
+- `FEATURE_BIN_SHEET_ID` — Google Sheet ID for the KALX feature bin (not public data; optional — feature bin sync is disabled if unset)
+- `FEATURE_BIN_SHEET_GID` — Worksheet `gid` of the sheet's "Current Active A-Z" tab (not public data; optional — feature bin sync is disabled if unset)
 
 **Variables:**
 - `SITE_DOMAIN` — e.g., `staff.kalx.berkeley.edu` (the staff/app domain)

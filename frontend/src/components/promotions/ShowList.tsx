@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { showsAPI } from '../../services/api';
 import type { ShowSummary, ShowStatus, APIError } from '../../types';
 import SearchBar from './SearchBar';
-import { Tooltip, EnrichedShowName } from '../shared';
+import { Tooltip, EnrichedShowName, FeatureBinBadge } from '../shared';
 
 type SortBy = 'date' | 'band' | 'venue' | 'published';
 
@@ -265,6 +265,11 @@ const ShowList = () => {
                     {show.co_announce && (
                       <span className="co-announce-badge" style={{ marginLeft: '0.5rem' }}>📢 Co-Announce</span>
                     )}
+                    {show.in_feature_bin && (
+                      <span style={{ marginLeft: '0.5rem' }}>
+                        <FeatureBinBadge releases={show.feature_bin_releases} />
+                      </span>
+                    )}
                   </td>
                   <td>{show.venue.name}</td>
                   <td>{show.show_start_date ? formatDateRange(show.show_start_date, show.show_date) : formatDateShort(show.show_date)}</td>
@@ -296,6 +301,7 @@ const ShowList = () => {
                   <span className={getStatusBadgeClass(show.status)}>
                     {show.status}
                   </span>
+                  {show.in_feature_bin && <FeatureBinBadge releases={show.feature_bin_releases} />}
                 </div>
               </div>
               <div className="show-card-body">

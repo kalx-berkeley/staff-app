@@ -730,6 +730,20 @@ fieldset.radio-group legend {
   color: white;
 }
 
+.status-feature-bin {
+  background-color: #fff3cd;
+  color: #664d03;
+  border: 1px solid #ffe69c;
+  cursor: pointer;
+  font: inherit;
+}
+
+.status-feature-bin:hover,
+.status-feature-bin:focus {
+  background-color: #ffe69c;
+  outline: none;
+}
+
 /* Grids */
 .venue-grid,
 .show-grid {
@@ -3144,6 +3158,51 @@ fieldset.radio-group legend {
 
 .band-popup__mb-link:hover {
   text-decoration: underline;
+}
+
+/* Feature bin popup */
+.feature-bin-release {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid #eee;
+}
+
+.feature-bin-release:first-of-type {
+  padding-top: 0;
+  border-top: none;
+}
+
+.feature-bin-release__title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.feature-bin-dot {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.feature-bin-dot-red {
+  background-color: #dc3545;
+}
+
+.feature-bin-dot-ylw {
+  background-color: #ffc107;
+}
+
+.feature-bin-dot-grn {
+  background-color: #28a745;
+}
+
+.feature-bin-dot-g2r {
+  background-color: #dc3545;
+  border: 2px solid #28a745;
 }
 
 /* Lottery UI */

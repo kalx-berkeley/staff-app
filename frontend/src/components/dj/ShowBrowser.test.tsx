@@ -44,6 +44,8 @@ describe('ShowBrowser', () => {
       published_at: null,
       bands: [],
       is_mine: false,
+      in_feature_bin: false,
+      feature_bin_releases: [],
     },
     {
       id: 2,
@@ -65,6 +67,8 @@ describe('ShowBrowser', () => {
       published_at: null,
       bands: [],
       is_mine: false,
+      in_feature_bin: false,
+      feature_bin_releases: [],
     },
     {
       id: 3,
@@ -86,6 +90,8 @@ describe('ShowBrowser', () => {
       published_at: null,
       bands: [],
       is_mine: false,
+      in_feature_bin: false,
+      feature_bin_releases: [],
     },
     {
       id: 4,
@@ -107,6 +113,8 @@ describe('ShowBrowser', () => {
       published_at: null,
       bands: [],
       is_mine: false,
+      in_feature_bin: false,
+      feature_bin_releases: [],
     },
   ];
 

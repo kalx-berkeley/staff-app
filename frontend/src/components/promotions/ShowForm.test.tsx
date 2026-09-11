@@ -266,6 +266,8 @@ describe('ShowForm', () => {
         published_at: null,
         bands: [],
       is_mine: false,
+      in_feature_bin: false,
+      feature_bin_releases: [],
       });
 
       renderShowForm();

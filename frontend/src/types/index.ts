@@ -184,6 +184,17 @@ export interface ShowBand extends ShowBandCreate {
   show_id: number;
 }
 
+// Feature bin (KALX music library new arrivals) types
+export type FeatureBinDot = 'RED' | 'YLW' | 'GRN' | 'G2R';
+
+export interface FeatureBinMatch {
+  artist: string;
+  album: string;
+  added_date: string | null;
+  dot: FeatureBinDot | null;
+  media_url: string | null;
+}
+
 // Show types
 export type AgeRestriction = 'all_ages' | '18+' | '21+';
 export type ShowStatus = 'draft' | 'published' | 'closed' | 'deleted';
@@ -369,6 +380,8 @@ export interface ShowResponse {
   pass_adjustment?: PassAdjustmentResult | null;
   bands: ShowBand[];
   is_mine: boolean;
+  in_feature_bin: boolean;
+  feature_bin_releases: FeatureBinMatch[];
 }
 
 export interface VenueShowSummary {
@@ -396,6 +409,8 @@ export interface ShowSummary {
   published_at: string | null;
   bands: ShowBand[];
   is_mine: boolean;
+  in_feature_bin: boolean;
+  feature_bin_releases: FeatureBinMatch[];
 }
 
 // Pass types

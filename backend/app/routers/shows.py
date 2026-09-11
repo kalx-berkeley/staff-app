@@ -21,6 +21,7 @@ from app.schemas.show import (
 )
 from app.services.language_analysis_service import analyze_description
 from app.services.show_service import ShowService
+from app.services.feature_bin_service import FeatureBinService, FeatureBinIndex
 from app.auth import (
     get_user_role,
     get_user_role_or_dj,
@@ -105,11 +106,38 @@ def _build_promotions_contacts(show) -> list[dict]:
     return contacts
 
 
-def _build_show_response(show, pass_adjustment=None, is_mine: bool = False) -> dict:
+def _feature_bin_release_dicts(index: FeatureBinIndex | None, show) -> list[dict]:
+    """Return feature-bin matches for a show as response dicts."""
+    if index is None:
+        return []
+    return [
+        {
+            "artist": r.artist,
+            "album": r.album,
+            "added_date": r.added_date,
+            "dot": r.dot,
+            "media_url": r.media_url,
+        }
+        for r in FeatureBinService.find_matches(index, show)
+    ]
+
+
+def _build_show_response(
+    show,
+    pass_adjustment=None,
+    is_mine: bool = False,
+    feature_bin_index: FeatureBinIndex | None = None,
+) -> dict:
     """
     Build show response with nested venue info and promotions contacts.
     Includes all pass details and attempt history.
     """
+    if feature_bin_index is None:
+        from sqlalchemy.orm import object_session
+
+        db = object_session(show)
+        feature_bin_index = FeatureBinService.build_index(db) if db is not None else None
+    feature_bin_releases = _feature_bin_release_dicts(feature_bin_index, show)
     available_pair_count = sum(
         1 for t in show.passes if t.pass_type == "pair" and t.status == "available"
     )
@@ -227,6 +255,8 @@ def _build_show_response(show, pass_adjustment=None, is_mine: bool = False) -> d
             }
             for b in show.bands or []
         ],
+        "in_feature_bin": bool(feature_bin_releases),
+        "feature_bin_releases": feature_bin_releases,
     }
 
 
@@ -275,8 +305,10 @@ def _build_show_summary(
     staff_count: int = 0,
     guest_hold_count: int = 0,
     is_mine: bool = False,
+    feature_bin_index: FeatureBinIndex | None = None,
 ) -> dict:
     """Build lean show dict for list endpoints — no passes or attempts."""
+    feature_bin_releases = _feature_bin_release_dicts(feature_bin_index, show)
     return {
         "id": show.id,
         "event_name": show.event_name,
@@ -311,6 +343,8 @@ def _build_show_summary(
             for b in show.bands or []
         ],
         "is_mine": is_mine,
+        "in_feature_bin": bool(feature_bin_releases),
+        "feature_bin_releases": feature_bin_releases,
     }
 
 
@@ -365,6 +399,7 @@ def list_shows(
     """List shows filtered by user role and optional date range."""
     shows = ShowService.list_shows(db, user_role, date_from=date_from, date_to=date_to)
     counts = _precompute_pass_counts(db, [s.id for s in shows])
+    feature_bin_index = FeatureBinService.build_index(db)
     staff = _get_promotions_staff_by_email(db, email) if email else None
     if staff:
         owned_venue_ids, owned_promoter_ids, via_promoter_venue_ids = _compute_mine_set(
@@ -379,6 +414,7 @@ def list_shows(
                 is_mine=_show_is_mine(
                     show, owned_venue_ids, owned_promoter_ids, via_promoter_venue_ids
                 ),
+                feature_bin_index=feature_bin_index,
             )
             for show in shows
         ]
@@ -388,6 +424,7 @@ def list_shows(
             pair_count=counts.get(show.id, [0, 0, 0])[0],
             staff_count=counts.get(show.id, [0, 0, 0])[1],
             guest_hold_count=counts.get(show.id, [0, 0, 0])[2],
+            feature_bin_index=feature_bin_index,
         )
         for show in shows
     ]
@@ -416,12 +453,14 @@ def search_shows(
         date_to=date_to,
     )
     counts = _precompute_pass_counts(db, [s.id for s in shows])
+    feature_bin_index = FeatureBinService.build_index(db)
     return [
         _build_show_summary(
             show,
             pair_count=counts.get(show.id, [0, 0, 0])[0],
             staff_count=counts.get(show.id, [0, 0, 0])[1],
             guest_hold_count=counts.get(show.id, [0, 0, 0])[2],
+            feature_bin_index=feature_bin_index,
         )
         for show in shows
     ]
@@ -491,7 +530,10 @@ def list_deleted_shows(
 ):
     """List all soft-deleted shows (promotions staff only)."""
     shows = ShowService.list_deleted_shows(db)
-    return [_build_show_response(show) for show in shows]
+    feature_bin_index = FeatureBinService.build_index(db)
+    return [
+        _build_show_response(show, feature_bin_index=feature_bin_index) for show in shows
+    ]
 
 
 @router.get("/genres", response_model=list[str])

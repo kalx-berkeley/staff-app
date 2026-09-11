@@ -135,6 +135,7 @@ def list_all_users(
 
 
 _KNOWN_JOBS = [
+    ("feature_bin_sync", "Sync feature bin from Google Sheet"),
     ("airtable_user_sync", "Sync users from Airtable"),
     ("expire_stale_dj_preassignments", "Expire stale DJ pre-assignments"),
     ("notify_unclosed_past_shows", "Notify venue owners of unclosed past shows"),
@@ -184,6 +185,19 @@ async def run_job(
     """Manually trigger a scheduled job by ID."""
     from app.services.user_service import UserService
     from app.services.pass_service import PassService
+    from app.services.feature_bin_service import FeatureBinService
+
+    if job_id == "feature_bin_sync":
+        if not FeatureBinService.is_configured():
+            return JobRunResult(
+                success=False,
+                message=(
+                    "Feature bin sheet not configured — set FEATURE_BIN_SHEET_ID and"
+                    " FEATURE_BIN_SHEET_GID"
+                ),
+            )
+        count = FeatureBinService.sync_feature_bin(db, trigger="manual")
+        return JobRunResult(success=True, message=f"Synced {count} feature bin release(s)")
 
     if job_id == "airtable_user_sync":
         result = await UserService.sync_from_airtable(db, trigger="manual")

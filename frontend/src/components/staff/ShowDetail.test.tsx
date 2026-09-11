@@ -117,6 +117,8 @@ describe('Staff ShowDetail', () => {
     published_at: null,
     bands: [],
       is_mine: false,
+      in_feature_bin: false,
+      feature_bin_releases: [],
   };
 
   beforeEach(() => {

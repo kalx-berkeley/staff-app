@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { showsAPI, passesAPI, autocompleteAPI, lotteryAPI } from '../../services/api';
-import { Tooltip, EnrichedShowName, MarkdownContent } from '../shared';
+import { Tooltip, EnrichedShowName, MarkdownContent, FeatureBinBadge } from '../shared';
 import { formatPhone } from '../../utils';
 import { useAuth } from '../../contexts/authHooks';
 import type {
@@ -462,6 +462,7 @@ const ShowDetail = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
             <span className={getStatusBadgeClass(show.status)}>{show.status}</span>
             {show.co_announce && <span className="co-announce-badge">📢 Co-Announce</span>}
+            {show.in_feature_bin && <FeatureBinBadge releases={show.feature_bin_releases} />}
           </div>
         </div>
         <div className="header-actions">

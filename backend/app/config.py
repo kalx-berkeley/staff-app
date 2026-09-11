@@ -55,6 +55,16 @@ class Settings(BaseSettings):
     # Legacy paper-form import feature — set to True only during cutover from paper forms
     legacy_import_enabled: bool = False
 
+    # Feature bin (KALX music library new-arrivals) Google Sheet, fetched nightly.
+    # Not given a default here since the sheet ID isn't public data and this repo
+    # is public — set via the FEATURE_BIN_SHEET_ID/FEATURE_BIN_SHEET_GID env vars.
+    # FeatureBinService treats the feature as disabled when either is unset.
+    # Currently a public sheet fetched via CSV export; no auth required. If it
+    # becomes restricted, FeatureBinService.fetch_sheet_csv is the only place that
+    # needs to change (e.g. to an authenticated Sheets API v4 call).
+    feature_bin_sheet_id: Optional[str] = None
+    feature_bin_sheet_gid: Optional[str] = None
+
 
 # Global settings instance
 settings = Settings()

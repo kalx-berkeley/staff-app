@@ -357,7 +357,9 @@ const Admin = () => {
                       <span className="error-message">{jobError[job.id]}</span>
                     )}
                     {jobResult[job.id] && (
-                      <span className="text-success">{jobResult[job.id]!.message}</span>
+                      <span className={jobResult[job.id]!.success ? 'text-success' : 'error-message'}>
+                        {jobResult[job.id]!.message}
+                      </span>
                     )}
                   </td>
                 </tr>

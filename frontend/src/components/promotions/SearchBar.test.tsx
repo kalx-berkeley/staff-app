@@ -52,6 +52,8 @@ const makeShow = (overrides: Partial<ShowSummary> = {}): ShowSummary => ({
   published_at: null,
   bands: [],
   is_mine: false,
+  in_feature_bin: false,
+  feature_bin_releases: [],
   ...overrides,
 });
 
