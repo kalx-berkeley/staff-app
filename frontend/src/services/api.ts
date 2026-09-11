@@ -31,6 +31,7 @@ import type {
   ShowListParams,
   ShowSearchParams,
   ShowAttempt,
+  DescriptionAnalysis,
   PassResponse,
   GiveawayData,
   PreAssignmentData,
@@ -320,6 +321,26 @@ export const showsAPI = {
   listGenres: async (): Promise<string[]> => {
     try {
       const response = await apiClient.get<string[]>('/shows/genres');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * Analyze an on-air description for language that is not value neutral.
+   * Detects praise of the band, promotion of the show, calls to action and
+   * use of "ticket" where "pass" is required. Advisory only.
+   *
+   * @param text - The on-air description as typed by the user
+   * @returns Promise resolving to the analysis findings and summary
+   */
+  analyzeDescription: async (text: string): Promise<DescriptionAnalysis> => {
+    try {
+      const response = await apiClient.post<DescriptionAnalysis>(
+        '/shows/analyze-description',
+        { text }
+      );
       return response.data;
     } catch (error) {
       return handleAPIError(error);

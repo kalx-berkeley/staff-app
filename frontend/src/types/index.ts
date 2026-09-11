@@ -246,6 +246,37 @@ export interface ShowAttempt {
   attempted_at: string; // ISO datetime string
 }
 
+export type DescriptionFindingCategory =
+  | 'terminology'
+  | 'call_to_action'
+  | 'comparative'
+  | 'endorsement'
+  | 'hype'
+  | 'emphasis'
+  | 'subjective';
+
+export type DescriptionFindingSeverity = 'high' | 'medium' | 'low';
+
+/** One phrase in an on-air description that may not be value neutral. */
+export interface DescriptionFinding {
+  category: DescriptionFindingCategory;
+  severity: DescriptionFindingSeverity;
+  phrase: string;
+  start: number;
+  end: number;
+  message: string;
+  suggestion: string;
+}
+
+/** Result of analyzing an on-air description for non-value-neutral language. */
+export interface DescriptionAnalysis {
+  findings: DescriptionFinding[];
+  sentiment_compound: number;
+  sentiment_positive: number;
+  reads_promotional: boolean;
+  summary: string;
+}
+
 export interface LotteryEntryResponse {
   id: number;
   show_id: number;

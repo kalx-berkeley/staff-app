@@ -4,6 +4,8 @@ import { showsAPI, venuesAPI, venuesMyAPI, promotersAPI } from '../../services/a
 import { Tooltip, BandAnnotator } from '../shared';
 import { formatPhone } from '../../utils';
 import type {
+  DescriptionAnalysis,
+  DescriptionFindingCategory,
   ShowCreate,
   ShowUpdate,
   ShowBand,
@@ -149,6 +151,17 @@ const PassAdjustmentModal = ({ eventName, adjustment, onClose }: PassAdjustmentM
   </div>
 );
 
+/** Short label shown beside each finding in the on-air description warning. */
+const FINDING_CATEGORY_LABELS: Record<DescriptionFindingCategory, string> = {
+  terminology: 'Wrong term',
+  call_to_action: 'Call to action',
+  comparative: 'Comparative claim',
+  endorsement: 'Endorsement',
+  hype: 'Station hype',
+  emphasis: 'Emphasis',
+  subjective: 'Opinion',
+};
+
 const ShowForm = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -167,6 +180,15 @@ const ShowForm = () => {
   const [showMineOnly, setShowMineOnly] = useState(true);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const venueToggleMounted = useRef(false);
+
+  const [descriptionAnalysis, setDescriptionAnalysis] = useState<DescriptionAnalysis | null>(
+    null
+  );
+  const [analyzingDescription, setAnalyzingDescription] = useState(false);
+  const [analysisDismissed, setAnalysisDismissed] = useState(false);
+  // The exact text last sent for analysis, so leaving the field without
+  // changing anything does not re-run the check.
+  const analyzedText = useRef<string | null>(null);
 
   const [genreLookupInProgress, setGenreLookupInProgress] = useState(false);
   const [knownGenres, setKnownGenres] = useState<string[]>([]);
@@ -410,6 +432,31 @@ const ShowForm = () => {
     }
   };
 
+  const handleOnAirDescriptionBlur = async () => {
+    const text = onAirDescription.trim();
+    if (text === analyzedText.current) return;
+    analyzedText.current = text;
+    setAnalysisDismissed(false);
+    if (!text) {
+      setDescriptionAnalysis(null);
+      return;
+    }
+    setAnalyzingDescription(true);
+    try {
+      const analysis = await showsAPI.analyzeDescription(text);
+      // Drop the result if the description changed while we were waiting.
+      if (analyzedText.current === text) {
+        setDescriptionAnalysis(analysis);
+      }
+    } catch {
+      // The check is advisory, so a failure must never get in the way of
+      // writing or saving the show.
+      setDescriptionAnalysis(null);
+    } finally {
+      setAnalyzingDescription(false);
+    }
+  };
+
   const handleBandAdded = (artist: MusicBrainzArtist) => {
     if (!artist.tags || artist.tags.length === 0) return;
     setGenres((prev) => {
@@ -588,6 +635,21 @@ const ShowForm = () => {
       setSubmitting(false);
     }
   };
+
+  // Overall enthusiasm counts as a warning on its own: the wording can read as
+  // promotional even when no single phrase is quotable.
+  const hasLanguageWarning =
+    !!descriptionAnalysis &&
+    (descriptionAnalysis.findings.length > 0 || descriptionAnalysis.reads_promotional);
+
+  // Several findings usually share one piece of advice, so only spell it out
+  // the first time it comes up.
+  const seenSuggestions = new Set<string>();
+  const languageFindings = (descriptionAnalysis?.findings ?? []).map((finding) => {
+    const showSuggestion = !seenSuggestions.has(finding.suggestion);
+    seenSuggestions.add(finding.suggestion);
+    return { finding, showSuggestion };
+  });
 
   if (loading) {
     return <div className="loading">Loading...</div>;
@@ -859,10 +921,63 @@ const ShowForm = () => {
             id="on_air_description"
             value={onAirDescription}
             onChange={(e) => setOnAirDescription(e.target.value)}
+            onBlur={handleOnAirDescriptionBlur}
             disabled={submitting}
             rows={3}
             placeholder="Optional on-air description of the show..."
           />
+          {analyzingDescription && (
+            <span className="field-help">
+              Checking the description for non-value-neutral language...
+            </span>
+          )}
+          {!analyzingDescription && descriptionAnalysis && !hasLanguageWarning && (
+            <span className="field-help">
+              No non-value-neutral language detected.
+            </span>
+          )}
+          {descriptionAnalysis && hasLanguageWarning && !analysisDismissed && (
+            <div className="description-warning" role="status">
+              <div className="description-warning-header">
+                <strong>This description may not be value neutral</strong>
+                <button
+                  type="button"
+                  className="description-warning-dismiss"
+                  onClick={() => setAnalysisDismissed(true)}
+                  aria-label="Dismiss description warning"
+                >
+                  &times;
+                </button>
+              </div>
+              <p className="description-warning-summary">{descriptionAnalysis.summary}</p>
+              {languageFindings.length > 0 && (
+                <ul className="description-warning-findings">
+                  {languageFindings.map(({ finding, showSuggestion }) => (
+                    <li key={`${finding.start}-${finding.category}`}>
+                      <span className={`finding-tag finding-${finding.category}`}>
+                        {FINDING_CATEGORY_LABELS[finding.category]}
+                      </span>{' '}
+                      {finding.message}
+                      {showSuggestion && (
+                        <>
+                          {' '}
+                          <span className="description-warning-suggestion">
+                            {finding.suggestion}
+                          </span>
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="description-warning-disclaimer">
+                This assessment is automated and it can be wrong &mdash; band names,
+                genre words and plain factual wording sometimes trip it. If the
+                description reads fine as written, ignore this warning. It does not
+                stop you from saving the show.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="form-group">

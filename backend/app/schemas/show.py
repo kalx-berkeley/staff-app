@@ -226,6 +226,52 @@ class ShowAttemptResponse(BaseModel):
     attempted_at: UtcDatetime
 
 
+class DescriptionAnalysisRequest(BaseModel):
+    """Schema for requesting a value-neutrality check of an on-air description."""
+
+    text: str = Field("", max_length=2000, description="On-air description text to analyze")
+
+
+class DescriptionFinding(BaseModel):
+    """A phrase in an on-air description that may not be value neutral."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    category: Literal[
+        "terminology",
+        "call_to_action",
+        "comparative",
+        "endorsement",
+        "hype",
+        "emphasis",
+        "subjective",
+    ]
+    severity: Literal["high", "medium", "low"]
+    phrase: str
+    start: int
+    end: int
+    message: str
+    suggestion: str
+
+
+class DescriptionAnalysisResponse(BaseModel):
+    """Schema for the result of analyzing an on-air description."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    findings: list[DescriptionFinding]
+    sentiment_compound: float = Field(
+        ..., description="VADER compound sentiment of the evaluative text, -1 to 1"
+    )
+    sentiment_positive: float = Field(
+        ..., description="Share of the evaluative text scored as positive, 0 to 1"
+    )
+    reads_promotional: bool = Field(
+        ..., description="Whether the description reads as enthusiastic overall"
+    )
+    summary: str
+
+
 class PromotionsContact(BaseModel):
     """Contact info for a promotions staff owner of the venue."""
 

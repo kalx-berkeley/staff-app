@@ -9,6 +9,8 @@ from pydantic import BaseModel
 
 from app.database import get_db
 from app.schemas.show import (
+    DescriptionAnalysisRequest,
+    DescriptionAnalysisResponse,
     ShowBandCreate,
     ShowBandResponse,
     ShowCreate,
@@ -17,6 +19,7 @@ from app.schemas.show import (
     ShowUpdate,
     ShowAttemptResponse,
 )
+from app.services.language_analysis_service import analyze_description
 from app.services.show_service import ShowService
 from app.auth import (
     get_user_role,
@@ -463,6 +466,22 @@ def create_show(
         },
     )
     return _build_show_response(show)
+
+
+@router.post("/analyze-description", response_model=DescriptionAnalysisResponse)
+def analyze_on_air_description(
+    analysis_request: DescriptionAnalysisRequest,
+    promotions: Staff = Depends(get_promotions_staff),
+):
+    """
+    Check an on-air description for language that is not value neutral.
+
+    Flags praise of the band, promotion of the show, calls to action and use of
+    the word "ticket" where "pass" is required. The result is advisory only --
+    it is a heuristic that can misfire on band names and factual copy, and
+    nothing about it blocks saving the show.
+    """
+    return analyze_description(analysis_request.text)
 
 
 @router.get("/deleted", response_model=list[ShowResponse])
