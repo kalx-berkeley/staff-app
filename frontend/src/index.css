@@ -3224,3 +3224,41 @@ fieldset.radio-group legend {
   margin-bottom: 0.75rem;
   font-size: 0.9rem;
 }
+
+/* On-air DJ schedule sync (DjNameInput / MyPasses) */
+.dj-name-mismatch-warning {
+  background: #fff8e1;
+  border: 1px solid #f9a825;
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: #5d4037;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.dj-name-transition-notice {
+  background: #e8f5e9;
+  border: 1px solid #66bb6a;
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.dj-name-notice-dismiss {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: inherit;
+  padding: 0 0.2rem;
+}

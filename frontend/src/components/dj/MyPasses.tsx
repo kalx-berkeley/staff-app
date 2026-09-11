@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { passesAPI, autocompleteAPI } from '../../services/api';
+import { useOnAirDj } from '../shared';
 import type { PassResponse, APIError } from '../../types';
 import { formatPhone } from '../../utils';
 
@@ -72,6 +73,11 @@ const MyPasses = () => {
     setShowAutocomplete(false);
     loadPasses(name);
   };
+
+  const { currentDjName, mismatch, transitionNotice, dismissTransitionNotice } = useOnAirDj(
+    djName,
+    selectDjName
+  );
 
   const handleDjKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -164,6 +170,31 @@ const MyPasses = () => {
             {loading ? 'Loading...' : 'Load'}
           </button>
         </div>
+        {mismatch && currentDjName && (
+          <div className="dj-name-mismatch-warning">
+            This doesn't match the scheduled on-air DJ ({currentDjName}).{' '}
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => selectDjName(currentDjName)}
+            >
+              Use {currentDjName}
+            </button>
+          </div>
+        )}
+        {transitionNotice && (
+          <div className="dj-name-transition-notice">
+            {transitionNotice}
+            <button
+              type="button"
+              className="dj-name-notice-dismiss"
+              aria-label="Dismiss"
+              onClick={dismissTransitionNotice}
+            >
+              ×
+            </button>
+          </div>
+        )}
       </div>
 
       {error && (

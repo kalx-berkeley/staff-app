@@ -622,3 +622,10 @@ export interface AuditLogFilters {
   limit?: number;
   offset?: number;
 }
+
+// On-air DJ schedule
+export interface OnAirInfo {
+  current_dj_name: string | null;
+  current_show_ends_at: string | null;
+  next_dj_name: string | null;
+}

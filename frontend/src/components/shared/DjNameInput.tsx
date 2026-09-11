@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { autocompleteAPI } from '../../services/api';
+import { useOnAirDj } from './useOnAirDj';
 
 export const DJ_NAME_KEY = 'kalx_dj_name';
 
@@ -48,6 +49,11 @@ const DjNameInput = ({ value, onChange, id = 'dj-name-input' }: DjNameInputProps
     }
   };
 
+  const { currentDjName, mismatch, transitionNotice, dismissTransitionNotice } = useOnAirDj(
+    value,
+    selectName
+  );
+
   return (
     <div className="dj-name-section">
       <div className="form-group-inline">
@@ -81,6 +87,31 @@ const DjNameInput = ({ value, onChange, id = 'dj-name-input' }: DjNameInputProps
           )}
         </div>
       </div>
+      {mismatch && currentDjName && (
+        <div className="dj-name-mismatch-warning">
+          This doesn't match the scheduled on-air DJ ({currentDjName}).{' '}
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => selectName(currentDjName)}
+          >
+            Use {currentDjName}
+          </button>
+        </div>
+      )}
+      {transitionNotice && (
+        <div className="dj-name-transition-notice">
+          {transitionNotice}
+          <button
+            type="button"
+            className="dj-name-notice-dismiss"
+            aria-label="Dismiss"
+            onClick={dismissTransitionNotice}
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 };

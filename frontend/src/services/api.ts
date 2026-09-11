@@ -56,6 +56,7 @@ import type {
   LotteryEntryResponse,
   StaffLotteryEntryCreate,
   DJLotteryEntryCreate,
+  OnAirInfo,
 } from '../types';
 
 /**
@@ -859,6 +860,25 @@ export const autocompleteAPI = {
   getDJNames: async (): Promise<string[]> => {
     try {
       const response = await apiClient.get<string[]>('/autocomplete/djs');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+};
+
+/**
+ * On-air DJ schedule API methods, backed by the cached Spinitron schedule.
+ */
+export const onAirAPI = {
+  /**
+   * Get the currently and next scheduled on-air DJ.
+   *
+   * @returns Promise resolving to the current/next on-air DJ info
+   */
+  getCurrent: async (): Promise<OnAirInfo> => {
+    try {
+      const response = await apiClient.get<OnAirInfo>('/dj/on-air');
       return response.data;
     } catch (error) {
       return handleAPIError(error);

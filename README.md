@@ -110,6 +110,11 @@ the library, complete with the release's dot-color status and a listen link
   shows up in the guest-list email to the venue.
 - **DJ name autocomplete**, remembered locally and backed by the staff directory plus historical
   on-air winner records.
+- **Spinitron on-air schedule sync** — the app polls Spinitron's schedule API every 6 hours (12-hour
+  lookahead, also refreshed immediately on startup) and caches who's on air and when each show
+  changes over. The DJ Name field auto-fills from this, flags a warning with a one-click fix when
+  the entered name doesn't match who's actually scheduled, and auto-advances to the next DJ (with a
+  notice) right when a show ends.
 - **Winner phone-number lookup**, restricted to the station office network or promotions staff and
   rate-limited per IP, so whoever answers the phone can verify a caller's story and release their
   passes back to the pool if it checks out.

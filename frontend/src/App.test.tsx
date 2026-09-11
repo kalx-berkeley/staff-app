@@ -22,6 +22,13 @@ vi.mock('./services/api', () => ({
   autocompleteAPI: {
     getDJNames: vi.fn().mockResolvedValue([]),
   },
+  onAirAPI: {
+    getCurrent: vi.fn().mockResolvedValue({
+      current_dj_name: null,
+      current_show_ends_at: null,
+      next_dj_name: null,
+    }),
+  },
   specialtyShowsAPI: {
     listMy: vi.fn().mockResolvedValue([]),
   },

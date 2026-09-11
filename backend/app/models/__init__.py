@@ -24,6 +24,7 @@ from .specialty_show_owner import SpecialtyShowOwner
 from .specialty_show_dj import SpecialtyShowDJ
 from .external_api_cache import ExternalApiCache
 from .feature_bin_release import FeatureBinRelease
+from .spinitron_show import SpinitronShow
 
 __all__ = [
     "AuditLog",
@@ -50,4 +51,5 @@ __all__ = [
     "SpecialtyShowDJ",
     "ExternalApiCache",
     "FeatureBinRelease",
+    "SpinitronShow",
 ]

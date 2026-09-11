@@ -18,6 +18,7 @@ from app.routers import (
     promoters,
     lottery,
     specialty_shows,
+    on_air,
 )
 from app.routers import legacy_import as legacy_import_router
 from app.scheduler import (
@@ -25,6 +26,7 @@ from app.scheduler import (
     shutdown_scheduler,
     bootstrap_users_if_empty,
     bootstrap_feature_bin_if_stale,
+    bootstrap_spinitron_schedule,
 )
 from app.auth import check_apache_auth_layer
 from app.config import settings
@@ -121,6 +123,7 @@ async def lifespan(app: FastAPI):
     start_scheduler()
     await bootstrap_users_if_empty()
     await bootstrap_feature_bin_if_stale()
+    await bootstrap_spinitron_schedule()
     yield
     # Shutdown
     shutdown_scheduler()
@@ -237,6 +240,7 @@ app.include_router(admin.router, dependencies=_auth_check)
 app.include_router(promoters.router, dependencies=_auth_check)
 app.include_router(lottery.router, dependencies=_auth_check)
 app.include_router(specialty_shows.router, dependencies=_auth_check)
+app.include_router(on_air.router, dependencies=_auth_check)
 if settings.legacy_import_enabled:
     app.include_router(legacy_import_router.router, dependencies=_auth_check)
 

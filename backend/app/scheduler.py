@@ -108,6 +108,26 @@ async def sync_feature_bin():
         db.close()
 
 
+async def sync_spinitron_schedule():
+    """
+    Scheduled task to sync the upcoming Spinitron on-air schedule.
+    Runs every 6 hours.
+    """
+    from app.database import SessionLocal
+    from app.services.spinitron_schedule_service import SpinitronScheduleService
+
+    logger.info("Starting scheduled Spinitron schedule sync")
+
+    db = SessionLocal()
+    try:
+        count = await SpinitronScheduleService.sync_schedule(db, trigger="scheduled")
+        logger.info(f"Scheduled Spinitron schedule sync completed: {count} show(s) cached")
+    except Exception as e:
+        logger.error(f"Scheduled Spinitron schedule sync failed: {str(e)}", exc_info=True)
+    finally:
+        db.close()
+
+
 async def bootstrap_users_if_empty():
     """
     On startup, check if user tables are empty and sync from Airtable if so.
@@ -168,6 +188,23 @@ async def bootstrap_feature_bin_if_stale():
             logger.info("Feature bin data present and fresh on startup - skipping sync")
     finally:
         db.close()
+
+
+async def bootstrap_spinitron_schedule():
+    """
+    On startup, fetch the Spinitron on-air schedule immediately rather than
+    waiting for the next 6-hour scheduled run.
+    """
+    if os.getenv("TESTING") == "1":
+        return
+
+    from app.config import settings
+
+    if not settings.spinitron_api_key:
+        logger.info("SPINITRON_API_KEY not configured - skipping startup schedule sync")
+        return
+
+    await sync_spinitron_schedule()
 
 
 async def auto_close_show(show_id: int):
@@ -435,10 +472,21 @@ def start_scheduler():
         replace_existing=True,
     )
 
+    # Add Spinitron on-air schedule sync every 6 hours (offset from the hour to
+    # avoid colliding with the other jobs above)
+    scheduler.add_job(
+        sync_spinitron_schedule,
+        trigger=CronTrigger(hour="*/6", minute=15, timezone=_PT),
+        id="spinitron_schedule_sync",
+        name="Sync Spinitron on-air schedule",
+        replace_existing=True,
+    )
+
     scheduler.start()
     logger.info(
         "Scheduler started - Feature bin sync at 1 AM PT, Airtable sync at 2 AM PT, stale"
-        " preassignment expiry at 3 AM PT, unclosed past show notifications at 4 AM PT"
+        " preassignment expiry at 3 AM PT, unclosed past show notifications at 4 AM PT,"
+        " Spinitron schedule sync every 6 hours"
     )
     _reschedule_pending_auto_close_jobs()
     _reschedule_pending_lottery_jobs()

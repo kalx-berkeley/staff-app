@@ -1,7 +1,9 @@
 """Spinitron API service for fetching DJ personas and other data."""
 
 import logging
-from typing import Dict
+import re
+from datetime import datetime
+from typing import Dict, List, Optional, TypedDict
 
 import httpx
 
@@ -10,6 +12,17 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 SPINITRON_API_BASE = "https://spinitron.com/api"
+
+_PERSONA_ID_RE = re.compile(r"/personas/(\d+)")
+
+
+class SpinitronShowItem(TypedDict):
+    """A single Spinitron show, as relevant to the on-air schedule cache."""
+
+    id: int
+    start: datetime
+    end: datetime
+    persona_id: Optional[int]
 
 
 class SpinitronService:
@@ -73,3 +86,105 @@ class SpinitronService:
 
         logger.info("Fetched %d Spinitron personas", len(personas))
         return personas
+
+    @staticmethod
+    async def fetch_shows(end: datetime) -> List[SpinitronShowItem]:
+        """
+        Fetch Spinitron shows from now through *end*.
+
+        Fetches all pages using the maximum page size of 200. Each item's
+        first-listed persona (if any) is extracted from its `_links.personas`
+        hrefs; a show is not expected to change DJ mid-slot for our purposes.
+
+        :param end: Upper bound of the schedule window (used as the "end"
+            query argument, formatted as UTC ISO-8601 with a numeric offset).
+        :returns: List of show dicts with id, start, end, and persona_id.
+        :raises RuntimeError: If the Spinitron API returns an error.
+        """
+        if not settings.spinitron_api_key:
+            logger.warning("SPINITRON_API_KEY not configured, skipping show fetch")
+            return []
+
+        url = f"{SPINITRON_API_BASE}/shows"
+        headers = SpinitronService._request_headers()
+        end_param = end.strftime("%Y-%m-%dT%H:%M:%S%z")
+        shows: List[SpinitronShowItem] = []
+
+        async with httpx.AsyncClient() as client:
+            page = 1
+            while True:
+                try:
+                    response = await client.get(
+                        url,
+                        headers=headers,
+                        params={"end": end_param, "count": 200, "page": page},
+                        timeout=30.0,
+                    )
+                    response.raise_for_status()
+                except httpx.HTTPStatusError as e:
+                    raise RuntimeError(
+                        f"Spinitron API error {e.response.status_code}: {e.response.text}"
+                    ) from e
+                except httpx.RequestError as e:
+                    raise RuntimeError(f"Spinitron API request failed: {e}") from e
+
+                data = response.json()
+                for item in data.get("items", []):
+                    show_id = item.get("id")
+                    start_str = item.get("start")
+                    end_str = item.get("end")
+                    if show_id is None or not start_str or not end_str:
+                        continue
+
+                    persona_id = None
+                    persona_links = item.get("_links", {}).get("personas") or []
+                    if persona_links:
+                        match = _PERSONA_ID_RE.search(persona_links[0].get("href", ""))
+                        if match:
+                            persona_id = int(match.group(1))
+
+                    shows.append(
+                        SpinitronShowItem(
+                            id=int(show_id),
+                            start=datetime.strptime(start_str, "%Y-%m-%dT%H:%M:%S%z"),
+                            end=datetime.strptime(end_str, "%Y-%m-%dT%H:%M:%S%z"),
+                            persona_id=persona_id,
+                        )
+                    )
+
+                meta = data.get("_meta", {})
+                if page >= meta.get("pageCount", 1):
+                    break
+                page += 1
+
+        logger.info("Fetched %d Spinitron shows", len(shows))
+        return shows
+
+    @staticmethod
+    async def fetch_persona_name(persona_id: int) -> Optional[str]:
+        """
+        Fetch a single Spinitron persona's on-air DJ name.
+
+        :param persona_id: Spinitron persona ID.
+        :returns: The persona's name, or None if it has no name.
+        :raises RuntimeError: If the Spinitron API returns an error.
+        """
+        if not settings.spinitron_api_key:
+            logger.warning("SPINITRON_API_KEY not configured, skipping persona fetch")
+            return None
+
+        url = f"{SPINITRON_API_BASE}/personas/{persona_id}"
+        headers = SpinitronService._request_headers()
+
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(url, headers=headers, timeout=30.0)
+                response.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                raise RuntimeError(
+                    f"Spinitron API error {e.response.status_code}: {e.response.text}"
+                ) from e
+            except httpx.RequestError as e:
+                raise RuntimeError(f"Spinitron API request failed: {e}") from e
+
+        return response.json().get("name")
