@@ -29,6 +29,124 @@ The system provides three distinct user interfaces:
 The app is mounted at `/pass-giveaway/` on the staff site, managed by the
 [`apache/`](apache/) directory in this repo, which owns the Apache VirtualHost and landing page.
 
+## Features
+
+The core workflow — create a show, allocate pass pairs, give them away on-air or let staff
+claim them — is only part of what the app does. Some of the more notable features, grouped by
+area:
+
+### Show & venue management
+
+- **Artist tagging in event names.** In the show form, promotions staff select any substring of
+  the event name (e.g. the band's name inside `"Foo Fighters w/ Death Cab for Cutie"`) and a
+  MusicBrainz artist search panel pops up at the selection; picking a result — or pasting a
+  MusicBrainz artist URL — tags that exact span with the artist's MusicBrainz ID, type, country,
+  and genre tags (`frontend/src/components/shared/BandAnnotator.tsx`).
+- **Enriched show names.** Anywhere a tagged event name is displayed, the tagged spans become
+  clickable: a popup shows a live Wikipedia extract (via MusicBrainz → Wikidata → Wikipedia), the
+  artist's genre tags (click one to filter the show list by that genre), and a MusicBrainz link
+  (`frontend/src/components/shared/EnrichedShowName.tsx`). If a show has no genre set, the app
+  falls back to looking up the artist's MusicBrainz tags automatically.
+- **Full show lifecycle** — draft → published → closed — plus soft-delete/undelete for shows,
+  venues, and promoters, recoverable from the admin panel.
+- **Auto-close scheduling.** A show can be set to close itself automatically at a planned date and
+  time; the app emails the venue's guest list at that moment without anyone having to close it by
+  hand. Shows that go unclosed past their date get a daily nag email to the venue owners instead.
+- **Venue logo upload** with server-side validation, resizing, and re-encoding.
+- **Promoters** can own a venue by default or override per show, with their own contacts and
+  notification recipients.
+- **DJ pre-assignment blackout window** — a venue (or an individual show) can forbid DJs from
+  reserving a pass pair within N days of the show's close date, to keep last-minute reservations
+  from crowding out the giveaway.
+- **Legacy paper-form import** — a self-contained, removable feature for backfilling historical
+  shows (with already-decided winners and claimants) during the cutover from the old paper-based
+  process.
+
+### Content safety: non-value-neutral language detection
+
+KALX is a non-commercial station, so on-air copy about a show can state facts but can't praise
+the band, promote the show, or tell listeners to go. As promotions staff type the on-air
+description, the app flags language that reads as promotional rather than neutral
+(`backend/app/services/language_analysis_service.py`):
+
+- A curated lexicon catches endorsement words ("legendary," "unforgettable"), comparative/
+  superlative claims ("the best," "unrivaled"), calls to action ("don't miss," "grab your"),
+  station hype ("we're thrilled"), and a hard rule that it's "passes," never "tickets."
+- A VADER sentiment pass catches other positively-charged words the lexicon doesn't list, while
+  filtering out band/venue names and ordinary giveaway vocabulary ("free," "winner," "support")
+  so they aren't mistaken for opinions.
+- All-caps "shouting" and excessive exclamation points are flagged too.
+- Every finding is advisory — a suggestion staff can dismiss, never a hard validation error,
+  since band names and genre vocabulary can trip the heuristics.
+
+### Lottery system
+
+Shows can allocate passes by lottery instead of first-come giveaway/claiming
+(`backend/app/services/lottery_service.py`). Staff and DJs enter separately during a configurable
+window after the show is published:
+
+- Staff entrants can request to bring a guest, and can mark that they'll only attend *with* that
+  guest — in which case, if no guest pass is available, their own pass is returned to the pool for
+  someone else.
+- DJs enter for a specific on-air shift/date (optionally through a recurring "specialty show"),
+  and winners get their pass pair pre-assigned automatically.
+- The draw runs itself the moment the window closes (or can be triggered manually from the admin
+  panel), and every entrant gets one of eight distinct outcome emails explaining exactly what
+  happened to them and their guest.
+
+### Feature bin (new releases) matching
+
+KALX's "feature bin" — recently added releases — lives in a public Google Sheet. The app syncs it
+nightly and fuzzy-matches feature-bin artists against tagged show artists (or, failing that, the
+event name itself) so a show gets a **★ Feature Bin** badge when a performer has a new release in
+the library, complete with the release's dot-color status and a listen link
+(`backend/app/services/feature_bin_service.py`).
+
+### DJ on-air tools
+
+- **On-air giveaways** with a one-pair-per-DJ-per-4-hours guard so a single shift can't sweep the
+  pool.
+- **Failed-attempt logging** — a DJ can note that they announced a show but got no callers, which
+  shows up in the guest-list email to the venue.
+- **DJ name autocomplete**, remembered locally and backed by the staff directory plus historical
+  on-air winner records.
+- **Winner phone-number lookup**, restricted to the station office network or promotions staff and
+  rate-limited per IP, so whoever answers the phone can verify a caller's story and release their
+  passes back to the pool if it checks out.
+
+### Staff experience
+
+- Self-service pass claiming with an optional guest, including "only attend with guest" logic and
+  a notification email if another staff member's claim bumps a pending guest.
+- Per-user notification preferences (email on/off), honored by every email the app sends.
+- A staff view for specialty (recurring DJ) shows the staff member belongs to.
+
+### Admin & operations
+
+- **Job dashboards** for every scheduled task (Airtable sync, feature bin sync, stale
+  pre-assignment cleanup, unclosed-show notifications) with manual "run now" buttons, plus
+  dashboards of every pending auto-close and lottery job with live countdowns.
+- **Audit log viewer**, paginated and filterable by event type, actor, and date range — every
+  giveaway, release, upload, and email send is logged with full details.
+- **User impersonation** (staging only) — a promotions staff member can act as another user, or
+  simulate the DJ studio network or station office network, to test role-specific views without
+  borrowing real credentials.
+- **Test-data seeding** (staging only) for populating a staging environment with sample venues and
+  shows.
+- **In-app feedback / bug report tool** that captures the current page and logged-in user and
+  emails it straight to the webmaster.
+
+### Auth & integrations
+
+- Three-tier role model (promotions / staff / DJ) computed from Airtable-sourced staff status and
+  department, with two separate trusted-network bypasses (the DJ studio and the station office)
+  so those locations don't need Google logins, backed by a defense-in-depth check that rejects any
+  request Apache didn't actually authenticate.
+- Nightly syncs from **Airtable** (staff directory), **Google Sheets** (feature bin), and on-demand
+  lookups against **MusicBrainz**, **Wikipedia**, and **Spinitron** (on-air DJ personas).
+- Dual-path email delivery (smtp2go or local SMTP relay) that never silently drops a message, with
+  staging mail suppressed except to the webmaster so feedback still works during testing.
+
 ## Technology Stack
 
 **Backend:**
