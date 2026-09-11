@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { showsAPI } from '../../services/api';
 import SearchBar from '../promotions/SearchBar';
-import { Tooltip, EnrichedShowName } from '../shared';
+import { Tooltip, EnrichedShowName, FeatureBinBadge } from '../shared';
 import type { ShowSummary, APIError } from '../../types';
 
 const VIEW_MODE_KEY = 'kalx_staff_view_mode';
@@ -242,6 +242,11 @@ const ShowBrowser = () => {
                       {show.co_announce && (
                         <span className="co-announce-badge" style={{ marginLeft: '0.5rem' }}>📢 Co-Announce</span>
                       )}
+                      {show.in_feature_bin && (
+                        <span style={{ marginLeft: '0.5rem' }}>
+                          <FeatureBinBadge releases={show.feature_bin_releases} />
+                        </span>
+                      )}
                     </td>
                     <td>{show.venue.name}</td>
                     <td>{show.show_start_date ? formatDateRange(show.show_start_date, show.show_date) : formatDateShort(show.show_date)}</td>
@@ -280,6 +285,7 @@ const ShowBrowser = () => {
                     <h3 style={{ margin: 0 }}><EnrichedShowName eventName={show.event_name} bands={show.bands ?? []} onGenreClick={(g) => setSelectedGenre(currentGenre ? currentGenre + ', ' + g : g)} /></h3>
                     {isClosed && <span className="status-badge status-closed">Closed</span>}
                     {show.co_announce && <span className="co-announce-badge">📢 Co-Announce</span>}
+                    {show.in_feature_bin && <FeatureBinBadge releases={show.feature_bin_releases} />}
                   </div>
                   <span className="show-genre-list">
                     {(show.genre ?? []).map((g) => (

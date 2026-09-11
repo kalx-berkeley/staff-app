@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { showsAPI, passesAPI, lotteryAPI, specialtyShowsAPI } from '../../services/api';
-import { Tooltip, EnrichedShowName, MarkdownContent } from '../shared';
+import { Tooltip, EnrichedShowName, MarkdownContent, FeatureBinBadge } from '../shared';
 import { formatPhone } from '../../utils';
 import { useAuth } from '../../contexts/authHooks';
 import type { ShowResponse, StaffProfile, APIError, ClaimData, LotteryStatus, SpecialtyShowResponse } from '../../types';
@@ -430,6 +430,11 @@ const ShowDetail = () => {
           ← Back to Shows
         </button>
         <h2><EnrichedShowName eventName={show.event_name} bands={show.bands ?? []} /></h2>
+        {show.in_feature_bin && (
+          <div style={{ marginTop: '0.25rem' }}>
+            <FeatureBinBadge releases={show.feature_bin_releases} />
+          </div>
+        )}
       </div>
 
       {successMessage && (

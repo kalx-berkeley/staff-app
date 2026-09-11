@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { showsAPI } from '../../services/api';
-import { DjNameInput, DJ_NAME_KEY, EnrichedShowName, MarkdownContent } from '../shared';
+import { DjNameInput, DJ_NAME_KEY, EnrichedShowName, MarkdownContent, FeatureBinBadge } from '../shared';
 import { formatPhone } from '../../utils';
 import type { ShowResponse, PassResponse, APIError } from '../../types';
 
@@ -132,6 +132,11 @@ const ShowDetail = () => {
         <h1 className="kalx-show-name">
           <EnrichedShowName eventName={show.event_name} bands={show.bands ?? []} />
           {show.co_announce && <span className="co-announce-badge" style={{ marginLeft: '0.75rem', fontSize: '0.65em', verticalAlign: 'middle' }}>📢 Co-Announce</span>}
+          {show.in_feature_bin && (
+            <span style={{ marginLeft: '0.75rem', fontSize: '0.65em', verticalAlign: 'middle' }}>
+              <FeatureBinBadge releases={show.feature_bin_releases} />
+            </span>
+          )}
         </h1>
         <p className="kalx-show-genre">{(show.genre ?? []).join(', ')}</p>
         <div className="kalx-doc-fields">

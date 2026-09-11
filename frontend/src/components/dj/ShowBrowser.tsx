@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { showsAPI, passesAPI } from '../../services/api';
 import SearchBar from '../promotions/SearchBar';
-import { Tooltip, DjNameInput, DJ_NAME_KEY, EnrichedShowName } from '../shared';
+import { Tooltip, DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge } from '../shared';
 import type { ShowSummary, PassResponse, APIError } from '../../types';
 
 const VIEW_MODE_KEY = 'kalx_dj_view_mode';
@@ -335,6 +335,11 @@ const ShowBrowser = () => {
                       {show.co_announce && (
                         <span className="co-announce-badge" style={{ marginLeft: '0.5rem' }}>📢 Co-Announce</span>
                       )}
+                      {show.in_feature_bin && (
+                        <span style={{ marginLeft: '0.5rem' }}>
+                          <FeatureBinBadge releases={show.feature_bin_releases} />
+                        </span>
+                      )}
                     </td>
                     <td>{show.venue.name}</td>
                     <td>{show.show_start_date ? formatDateRange(show.show_start_date, show.show_date) : formatDateShort(show.show_date)}</td>
@@ -368,6 +373,7 @@ const ShowBrowser = () => {
                     {show.co_announce && (
                       <span className="co-announce-badge">📢 Co-Announce</span>
                     )}
+                    {show.in_feature_bin && <FeatureBinBadge releases={show.feature_bin_releases} />}
                   </div>
                   <span className="show-genre-list">
                     {(show.genre ?? []).map((g) => (
