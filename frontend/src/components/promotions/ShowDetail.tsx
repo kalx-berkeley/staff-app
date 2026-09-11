@@ -338,8 +338,14 @@ const ShowDetail = () => {
     setActionError(null);
 
     try {
-      await passesAPI.removePreassignment(passId);
-      await loadShow();
+      const updatedPass = await passesAPI.removePreassignment(passId);
+      // Patch just this pass into local state instead of re-fetching the whole
+      // show — see handlePreassignSubmit for why loadShow() isn't used here.
+      setShow((prev) =>
+        prev
+          ? { ...prev, passes: prev.passes.map((p) => (p.id === updatedPass.id ? updatedPass : p)) }
+          : prev
+      );
     } catch (err) {
       const apiError = err as APIError;
       setActionError(
@@ -431,10 +437,16 @@ const ShowDetail = () => {
   const isVenueOwner = user?.email ? (show?.venue.owner_emails.includes(user.email) ?? false) : false;
   const userDjName = (user?.profile as PromotionsStaffProfile | null)?.dj_name ?? null;
 
-  // Of the checked schedule dates, which fall on or before the pass-pair's
-  // reservation deadline (the show closing) — the actual pickable range.
+  // The pass-pair reservation deadline the backend actually enforces — a
+  // plain date comparison against `planned_close_date` (see
+  // PassService.set_preassignment), not the show date itself. Falls back to
+  // the show date when there's no planned close date.
+  const maxPreassignDate = show ? show.planned_close_date ?? show.show_date : undefined;
+
+  // Of the checked schedule dates, which fall on or before that deadline —
+  // the actual pickable range.
   const scheduleDatesBeforeClose = show
-    ? (scheduleDates?.filter((d) => d <= show.show_date) ?? null)
+    ? (scheduleDates?.filter((d) => d <= maxPreassignDate!) ?? null)
     : null;
 
   const reqPhone = show?.venue.requires_phone_number ?? false;
@@ -812,14 +824,14 @@ const ShowDetail = () => {
                         scheduleDatesBeforeClose?.length === 0 && (
                           <p className="field-hint">
                             {preassignDj.trim() || 'This DJ'} has upcoming on-air dates, but none
-                            before this show closes on {formatDate(show.show_date)}. You can still
-                            pick a date below.
+                            before this show closes on {formatDate(maxPreassignDate!)}. You can
+                            still pick a date below.
                           </p>
                         )}
                       <DatePicker
                         value={preassignDate}
                         onChange={setPreassignDate}
-                        max={show.show_date}
+                        max={maxPreassignDate}
                         disabled={actionLoading}
                         isDateDisabled={
                           scheduleDates && scheduleDates.length > 0

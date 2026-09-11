@@ -498,7 +498,13 @@ const ShowDetail = () => {
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
   // Latest date selectable in the DJ reservation/lottery date pickers.
+  // PassService.set_preassignment rejects any date after `planned_close_date`
+  // regardless of the prohibition-window setting below, so that's the real
+  // ceiling — not the show date — whenever it's set and earlier.
   let maxDJReservationDate = show.show_date;
+  if (show.planned_close_date && show.planned_close_date < maxDJReservationDate) {
+    maxDJReservationDate = show.planned_close_date;
+  }
   if (prohibitedFromDate) {
     const lastAllowed = new Date(prohibitedFromDate);
     lastAllowed.setDate(lastAllowed.getDate() - 1);
