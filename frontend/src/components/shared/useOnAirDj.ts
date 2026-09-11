@@ -20,7 +20,11 @@ interface UseOnAirDjResult {
  * Keeps a DJ Name field in sync with the cached Spinitron on-air schedule:
  * auto-populates it when empty, flags a mismatch against who's actually
  * scheduled, and auto-advances to the next DJ (with a transient notice)
- * right when the current show ends.
+ * right when the current show ends. When the schedule has no specific DJ for
+ * the current show (a placeholder/rotating slot, or no persona at all) —
+ * reflected as a null `current_dj_name` from the API — none of that applies:
+ * the field is left alone if already empty, never flagged as a mismatch, and
+ * cleared (not auto-filled) at the changeover into such a show.
  */
 export function useOnAirDj(value: string, onChange: (name: string) => void): UseOnAirDjResult {
   const [currentDjName, setCurrentDjName] = useState<string | null>(null);
@@ -39,6 +43,12 @@ export function useOnAirDj(value: string, onChange: (name: string) => void): Use
     }
   };
 
+  const showTransitionNotice = (message: string) => {
+    setTransitionNotice(message);
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setTransitionNotice(null), TRANSITION_NOTICE_MS);
+  };
+
   const applyOnAirInfo = (info: {
     current_dj_name: string | null;
     current_show_ends_at: string | null;
@@ -49,9 +59,13 @@ export function useOnAirDj(value: string, onChange: (name: string) => void): Use
     if (isChangeover) {
       if (info.current_dj_name) {
         onChangeRef.current(info.current_dj_name);
-        setTransitionNotice(`DJ name updated to ${info.current_dj_name}`);
-        if (noticeTimer.current) clearTimeout(noticeTimer.current);
-        noticeTimer.current = setTimeout(() => setTransitionNotice(null), TRANSITION_NOTICE_MS);
+        showTransitionNotice(`DJ name updated to ${info.current_dj_name}`);
+      } else if (valueRef.current.trim()) {
+        // No specific DJ for the new show (a placeholder slot like "DJ Trainee",
+        // or no persona at all) — clear the outgoing DJ's name rather than
+        // leaving it in place or flagging it as a mismatch.
+        onChangeRef.current('');
+        showTransitionNotice('DJ name cleared — no specific DJ scheduled');
       }
     } else if (!valueRef.current.trim() && info.current_dj_name) {
       onChangeRef.current(info.current_dj_name);

@@ -35,6 +35,20 @@ describe('DjNameInput on-air sync', () => {
     await waitFor(() => expect(handleChange).toHaveBeenCalledWith('Murky Logic'));
   });
 
+  it('leaves an empty field empty when no specific DJ is on air', async () => {
+    vi.mocked(onAirAPI.getCurrent).mockResolvedValue({
+      current_dj_name: null,
+      current_show_ends_at: null,
+      next_dj_name: null,
+    });
+    const handleChange = vi.fn();
+
+    render(<DjNameInput value="" onChange={handleChange} />);
+
+    await waitFor(() => expect(onAirAPI.getCurrent).toHaveBeenCalled());
+    expect(handleChange).not.toHaveBeenCalled();
+  });
+
   it('does not overwrite a non-empty value on mount', async () => {
     vi.mocked(onAirAPI.getCurrent).mockResolvedValue({
       current_dj_name: 'Murky Logic',
@@ -103,5 +117,32 @@ describe('DjNameInput on-air sync', () => {
 
     expect(handleChange).toHaveBeenCalledWith('Next DJ');
     expect(screen.getByText(/DJ name updated to Next DJ/i)).toBeInTheDocument();
+  });
+
+  it('clears the field (with a notice) when the schedule moves to a show with no specific DJ', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+
+    const endsAt = new Date(Date.now() + 1000).toISOString();
+    vi.mocked(onAirAPI.getCurrent)
+      .mockResolvedValueOnce({
+        current_dj_name: 'Murky Logic',
+        current_show_ends_at: endsAt,
+        next_dj_name: null,
+      })
+      .mockResolvedValueOnce({
+        current_dj_name: null,
+        current_show_ends_at: null,
+        next_dj_name: null,
+      });
+    const handleChange = vi.fn();
+
+    render(<DjNameInput value="Murky Logic" onChange={handleChange} />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    expect(handleChange).toHaveBeenCalledWith('');
+    expect(screen.getByText(/DJ name cleared/i)).toBeInTheDocument();
   });
 });

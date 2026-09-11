@@ -156,6 +156,62 @@ class TestSyncSchedule:
         assert count == 1
         assert db.query(SpinitronShow).one().dj_name is None
 
+    async def test_placeholder_persona_stores_no_dj_name(self, db: Session, monkeypatch):
+        monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
+        monkeypatch.setattr(settings, "spinitron_placeholder_persona_ids", "176287,193517")
+        now = datetime.now(timezone.utc)
+
+        async def fake_fetch_shows(end):
+            return [_show(1, now, now + timedelta(hours=1), 176287)]
+
+        async def fake_fetch_persona_name(persona_id):
+            raise AssertionError("should not resolve a name for a placeholder persona")
+
+        monkeypatch.setattr(
+            "app.services.spinitron_schedule_service.SpinitronService.fetch_shows",
+            fake_fetch_shows,
+        )
+        monkeypatch.setattr(
+            "app.services.spinitron_schedule_service.SpinitronService.fetch_persona_name",
+            fake_fetch_persona_name,
+        )
+
+        count = await SpinitronScheduleService.sync_schedule(db, trigger="scheduled")
+
+        assert count == 1
+        row = db.query(SpinitronShow).one()
+        assert row.dj_name is None
+        assert row.persona_id == 176287
+
+    async def test_placeholder_persona_ignores_staff_shortcut_too(
+        self, db: Session, monkeypatch
+    ):
+        monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
+        monkeypatch.setattr(settings, "spinitron_placeholder_persona_ids", "176287")
+        now = datetime.now(timezone.utc)
+
+        staff = Staff(
+            email="trainee@example.com",
+            name="Whoever Is Training",
+            phone="5555555555",
+            spinitron_ids=[176287],
+            dj_name="DJ Trainee",
+        )
+        db.add(staff)
+        db.commit()
+
+        async def fake_fetch_shows(end):
+            return [_show(1, now, now + timedelta(hours=1), 176287)]
+
+        monkeypatch.setattr(
+            "app.services.spinitron_schedule_service.SpinitronService.fetch_shows",
+            fake_fetch_shows,
+        )
+
+        await SpinitronScheduleService.sync_schedule(db, trigger="scheduled")
+
+        assert db.query(SpinitronShow).one().dj_name is None
+
     async def test_sync_replaces_existing_rows(self, db: Session, monkeypatch):
         monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
         now = datetime.now(timezone.utc)
@@ -184,6 +240,22 @@ class TestSyncSchedule:
         rows = db.query(SpinitronShow).all()
         assert len(rows) == 1
         assert rows[0].id == 1
+
+
+class TestPlaceholderPersonaIds:
+    def test_parses_comma_separated_ids(self, monkeypatch):
+        monkeypatch.setattr(
+            settings, "spinitron_placeholder_persona_ids", " 176287, 193517 ,169919"
+        )
+        assert SpinitronScheduleService._placeholder_persona_ids() == {
+            176287,
+            193517,
+            169919,
+        }
+
+    def test_empty_setting_yields_empty_set(self, monkeypatch):
+        monkeypatch.setattr(settings, "spinitron_placeholder_persona_ids", "")
+        assert SpinitronScheduleService._placeholder_persona_ids() == set()
 
 
 class TestOnAirEndpoint:

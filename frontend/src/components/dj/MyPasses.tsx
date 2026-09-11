@@ -71,7 +71,17 @@ const MyPasses = () => {
   const selectDjName = (name: string) => {
     setDjName(name);
     setShowAutocomplete(false);
-    loadPasses(name);
+    if (name.trim()) {
+      loadPasses(name);
+    } else {
+      // Cleared automatically (e.g. the on-air schedule moved to a show with
+      // no specific DJ) rather than searched for — don't show a "please
+      // enter your DJ name" error for this.
+      localStorage.setItem(DJ_NAME_KEY, '');
+      setPasses([]);
+      setError(null);
+      setLoaded(false);
+    }
   };
 
   const { currentDjName, mismatch, transitionNotice, dismissTransitionNotice } = useOnAirDj(
