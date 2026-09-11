@@ -184,6 +184,72 @@ class TestFindMatches:
         matches = FeatureBinService.find_matches(index, show)
         assert [r.id for r in matches] == [release.id]
 
+    def test_single_word_artist_does_not_match_via_event_name_fallback(
+        self, db: Session, test_venue
+    ):
+        """A single-word artist ("Nothing") shouldn't match "Wild Nothing" just
+        because the word appears in the event name — it's a different band."""
+        self._release(db, "Nothing")
+        show = Show(
+            event_name="Wild Nothing",
+            venue_id=test_venue.id,
+            show_date=date(2024, 12, 31),
+            show_time=time(20, 0),
+            age_restriction="all_ages",
+            wheelchair_accessible=True,
+            num_pass_pairs=2,
+        )
+        db.add(show)
+        db.commit()
+        db.refresh(show)
+
+        index = FeatureBinService.build_index(db)
+        assert FeatureBinService.find_matches(index, show) == []
+
+    def test_single_word_artist_does_not_match_coincidental_surname(
+        self, db: Session, test_venue
+    ):
+        """A single-word artist ("Solomon") shouldn't match an event name that
+        happens to contain that word as part of a different performer's name."""
+        self._release(db, "Solomon")
+        show = Show(
+            event_name="Elori Saxl and Henry Solomon",
+            venue_id=test_venue.id,
+            show_date=date(2024, 12, 31),
+            show_time=time(20, 0),
+            age_restriction="all_ages",
+            wheelchair_accessible=True,
+            num_pass_pairs=2,
+        )
+        db.add(show)
+        db.commit()
+        db.refresh(show)
+
+        index = FeatureBinService.build_index(db)
+        assert FeatureBinService.find_matches(index, show) == []
+
+    def test_multi_word_artist_still_matches_via_event_name_fallback(
+        self, db: Session, test_venue
+    ):
+        """The single-word exclusion shouldn't break the intended multi-word case."""
+        release = self._release(db, "Henry Solomon")
+        show = Show(
+            event_name="Elori Saxl and Henry Solomon",
+            venue_id=test_venue.id,
+            show_date=date(2024, 12, 31),
+            show_time=time(20, 0),
+            age_restriction="all_ages",
+            wheelchair_accessible=True,
+            num_pass_pairs=2,
+        )
+        db.add(show)
+        db.commit()
+        db.refresh(show)
+
+        index = FeatureBinService.build_index(db)
+        matches = FeatureBinService.find_matches(index, show)
+        assert [r.id for r in matches] == [release.id]
+
     def test_no_match_returns_empty(self, db: Session, test_venue):
         self._release(db, "Completely Unrelated Artist")
         show = Show(

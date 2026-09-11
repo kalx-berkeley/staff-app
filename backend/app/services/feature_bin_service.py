@@ -223,7 +223,23 @@ class FeatureBinService:
 
         if not show.event_name:
             return []
-        choices = {release.id: release.artist for release in index.releases}
+        # token_set_ratio scores 100 whenever one side's tokens are a full
+        # subset of the other's — exactly what we want for "Burnham, Aaron &
+        # The Brushfires" matching an event name with extra supporting-act
+        # text, but it also means any single-word artist name that happens to
+        # appear anywhere in the event name (e.g. artist "Solomon" against
+        # "Elori Saxl and Henry Solomon", or "Nothing" against "Wild
+        # Nothing") scores 100 too, even though it's an unrelated artist.
+        # Multi-word names carry enough of their own content that a
+        # coincidental full-token-subset match is far less likely, so only
+        # they are eligible for this fallback.
+        choices = {
+            release.id: release.artist
+            for release in index.releases
+            if len(release.artist.split()) > 1
+        }
+        if not choices:
+            return []
         results = process.extract(
             show.event_name,
             choices,
