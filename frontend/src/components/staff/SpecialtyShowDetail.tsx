@@ -28,6 +28,7 @@ const SpecialtyShowDetail = () => {
   const [djSuggestions, setDjSuggestions] = useState<string[]>([]);
   const [allDJNames, setAllDJNames] = useState<string[]>([]);
   const [showDJSuggestions, setShowDJSuggestions] = useState(false);
+  const [djHistory, setDjHistory] = useState<string[]>([]);
 
   const loadShow = useCallback(async () => {
     if (!id) return;
@@ -49,7 +50,10 @@ const SpecialtyShowDetail = () => {
   useEffect(() => {
     loadShow();
     autocompleteAPI.getDJNames().then(setAllDJNames).catch(() => {});
-  }, [loadShow]);
+    if (id) {
+      specialtyShowsAPI.getDjHistory(parseInt(id)).then(setDjHistory).catch(() => {});
+    }
+  }, [id, loadShow]);
 
   const showEphemeralSuccess = (msg: string) => {
     setSuccessMessage(msg);
@@ -186,6 +190,8 @@ const SpecialtyShowDetail = () => {
     ? show.owner_emails.includes(user.email)
     : false;
 
+  const suggestedHosts = show ? djHistory.filter((name) => !show.dj_names.includes(name)) : [];
+
   if (loading) return <div className="loading">Loading...</div>;
 
   if (error || !show) {
@@ -316,6 +322,23 @@ const SpecialtyShowDetail = () => {
               <li className="item-list-empty">No DJs yet.</li>
             )}
           </ul>
+          {suggestedHosts.length > 0 && (
+            <div className="field-hint" style={{ marginBottom: '0.5rem' }}>
+              Hosted this show recently:{' '}
+              {suggestedHosts.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  className="btn-small"
+                  style={{ marginRight: '0.25rem', marginBottom: '0.25rem' }}
+                  onClick={() => handleAddDJ(name)}
+                  disabled={saving}
+                >
+                  + {name}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="add-item-form">
             <div className="autocomplete-wrapper">
               <input

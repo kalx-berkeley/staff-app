@@ -131,7 +131,7 @@ the library, complete with the release's dot-color status and a listen link
 - Self-service pass claiming with an optional guest, including "only attend with guest" logic and
   a notification email if another staff member's claim bumps a pending guest.
 - Per-user notification preferences (email on/off), honored by every email the app sends.
-- A staff view for specialty (recurring DJ) shows the staff member belongs to.
+- A staff view for specialty shows the staff member belongs to.
 
 ### Admin & operations
 

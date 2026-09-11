@@ -3,6 +3,7 @@
 import logging
 import time
 from datetime import datetime, timedelta, timezone
+from typing import Awaitable, Callable
 
 import httpx
 from sqlalchemy.orm import Session
@@ -56,6 +57,52 @@ def fetch_cached(
     else:
         db.add(
             ExternalApiCache(url=url, payload=data, fetched_at=now, expires_at=expires_at)
+        )
+    db.commit()
+
+    return data
+
+
+async def fetch_cached_async(
+    db: Session,
+    key: str,
+    producer: Callable[[], Awaitable[dict]],
+    *,
+    ttl_days: int = 1,
+) -> dict:
+    """Return cached JSON for *key* if fresh; otherwise call *producer*, cache, and return.
+
+    Same read-check-write shape as `fetch_cached`, but calls an async *producer*
+    instead of doing an HTTP GET itself — for sources like an async, paginated
+    API client that `fetch_cached`'s single synchronous GET can't express.
+    Reuses the same `external_api_cache` table; *key* need not be a real URL.
+
+    :param db: Database session.
+    :param key: Cache key (stored in the table's `url` column).
+    :param producer: Async callable returning the JSON-serializable payload to cache on a miss.
+    :param ttl_days: How long a cached entry is considered fresh.
+    """
+    now = datetime.now(timezone.utc)
+
+    entry = (
+        db.query(ExternalApiCache)
+        .filter(ExternalApiCache.url == key, ExternalApiCache.expires_at > now)
+        .first()
+    )
+    if entry is not None:
+        return entry.payload
+
+    data = await producer()
+
+    expires_at = now + timedelta(days=ttl_days)
+    existing = db.query(ExternalApiCache).filter(ExternalApiCache.url == key).first()
+    if existing is not None:
+        existing.payload = data
+        existing.fetched_at = now
+        existing.expires_at = expires_at
+    else:
+        db.add(
+            ExternalApiCache(url=key, payload=data, fetched_at=now, expires_at=expires_at)
         )
     db.commit()
 

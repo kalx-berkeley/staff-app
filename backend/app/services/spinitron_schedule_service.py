@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional, Set
+from typing import Dict, List, Optional, Set
 
 from sqlalchemy.orm import Session
 
@@ -10,7 +10,7 @@ from app.config import settings
 from app.models.job_log import JobLog
 from app.models.spinitron_show import SpinitronShow
 from app.models.staff import Staff
-from app.services.spinitron_service import SpinitronService
+from app.services.spinitron_service import SpinitronService, SpinitronShowItem
 
 logger = logging.getLogger(__name__)
 
@@ -47,33 +47,18 @@ class SpinitronScheduleService:
         end = datetime.now(timezone.utc) + timedelta(hours=hours_ahead)
         shows = await SpinitronService.fetch_shows(end)
 
-        staff_persona_names = SpinitronScheduleService._single_persona_staff_names(db)
-        placeholder_ids = SpinitronScheduleService._placeholder_persona_ids()
-        resolved: Dict[int, Optional[str]] = {}
+        resolved = await SpinitronScheduleService.resolve_dj_names(db, shows)
 
-        rows: list[SpinitronShow] = []
-        for show in shows:
-            persona_id = show["persona_id"]
-            dj_name = None
-            if persona_id is not None and persona_id not in placeholder_ids:
-                if persona_id in resolved:
-                    dj_name = resolved[persona_id]
-                elif persona_id in staff_persona_names:
-                    dj_name = staff_persona_names[persona_id]
-                    resolved[persona_id] = dj_name
-                else:
-                    dj_name = await SpinitronService.fetch_persona_name(persona_id)
-                    resolved[persona_id] = dj_name
-
-            rows.append(
-                SpinitronShow(
-                    id=show["id"],
-                    start=show["start"],
-                    end=show["end"],
-                    dj_name=dj_name,
-                    persona_id=persona_id,
-                )
+        rows: list[SpinitronShow] = [
+            SpinitronShow(
+                id=show["id"],
+                start=show["start"],
+                end=show["end"],
+                dj_name=resolved.get(show["persona_id"]),
+                persona_id=show["persona_id"],
             )
+            for show in shows
+        ]
 
         db.query(SpinitronShow).delete()
         db.add_all(rows)
@@ -82,6 +67,41 @@ class SpinitronScheduleService:
 
         logger.info("Spinitron schedule sync cached %d show(s)", len(rows))
         return len(rows)
+
+    @staticmethod
+    async def resolve_dj_names(
+        db: Session, shows: List[SpinitronShowItem]
+    ) -> Dict[int, Optional[str]]:
+        """
+        Resolve each distinct persona ID among *shows* to a DJ name.
+
+        Prefers the local Staff directory (already resolved during the
+        Airtable sync) over a Spinitron persona API call. A show whose
+        persona is a configured "placeholder" (a rotating slot like "DJ
+        Trainee" rather than a specific DJ) resolves to no name, same as a
+        show with no persona at all.
+
+        :param db: Database session.
+        :param shows: Shows to resolve personas for.
+        :returns: Dict mapping persona ID to DJ name (or None if unresolved
+            or a placeholder); persona IDs that are None are not included.
+        """
+        staff_persona_names = SpinitronScheduleService._single_persona_staff_names(db)
+        placeholder_ids = SpinitronScheduleService._placeholder_persona_ids()
+        resolved: Dict[int, Optional[str]] = {}
+
+        for show in shows:
+            persona_id = show["persona_id"]
+            if persona_id is None or persona_id in resolved:
+                continue
+            if persona_id in placeholder_ids:
+                resolved[persona_id] = None
+            elif persona_id in staff_persona_names:
+                resolved[persona_id] = staff_persona_names[persona_id]
+            else:
+                resolved[persona_id] = await SpinitronService.fetch_persona_name(persona_id)
+
+        return resolved
 
     @staticmethod
     def _placeholder_persona_ids() -> Set[int]:

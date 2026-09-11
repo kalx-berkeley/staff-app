@@ -1146,6 +1146,24 @@ export const specialtyShowsAPI = {
       return handleAPIError(error);
     }
   },
+
+  getUpcomingTitles: async (): Promise<string[]> => {
+    try {
+      const response = await apiClient.get<string[]>('/specialty-shows/upcoming-titles');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  getDjHistory: async (id: number): Promise<string[]> => {
+    try {
+      const response = await apiClient.get<string[]>(`/specialty-shows/${id}/dj-history`);
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
 };
 
 export const lotteryAPI = {

@@ -23,6 +23,7 @@ class SpinitronShowItem(TypedDict):
     start: datetime
     end: datetime
     persona_id: Optional[int]
+    title: Optional[str]
 
 
 class SpinitronSpinItem(TypedDict):
@@ -98,9 +99,11 @@ class SpinitronService:
         return personas
 
     @staticmethod
-    async def fetch_shows(end: datetime) -> List[SpinitronShowItem]:
+    async def fetch_shows(
+        end: datetime, start: Optional[datetime] = None
+    ) -> List[SpinitronShowItem]:
         """
-        Fetch Spinitron shows from now through *end*.
+        Fetch Spinitron shows through *end*, optionally starting from *start*.
 
         Fetches all pages using the maximum page size of 200. Each item's
         first-listed persona (if any) is extracted from its `_links.personas`
@@ -108,7 +111,10 @@ class SpinitronService:
 
         :param end: Upper bound of the schedule window (used as the "end"
             query argument, formatted as UTC ISO-8601 with a numeric offset).
-        :returns: List of show dicts with id, start, end, and persona_id.
+        :param start: Optional lower bound of the schedule window (used as
+            the "start" query argument); when omitted, Spinitron defaults to
+            "now".
+        :returns: List of show dicts with id, start, end, persona_id, title.
         :raises RuntimeError: If the Spinitron API returns an error.
         """
         if not settings.spinitron_api_key:
@@ -117,7 +123,12 @@ class SpinitronService:
 
         url = f"{SPINITRON_API_BASE}/shows"
         headers = SpinitronService._request_headers()
-        end_param = end.strftime("%Y-%m-%dT%H:%M:%S%z")
+        params: Dict[str, object] = {
+            "end": end.strftime("%Y-%m-%dT%H:%M:%S%z"),
+            "count": 200,
+        }
+        if start is not None:
+            params["start"] = start.strftime("%Y-%m-%dT%H:%M:%S%z")
         shows: List[SpinitronShowItem] = []
 
         async with httpx.AsyncClient() as client:
@@ -127,7 +138,7 @@ class SpinitronService:
                     response = await client.get(
                         url,
                         headers=headers,
-                        params={"end": end_param, "count": 200, "page": page},
+                        params={**params, "page": page},
                         timeout=30.0,
                     )
                     response.raise_for_status()
@@ -153,12 +164,15 @@ class SpinitronService:
                         if match:
                             persona_id = int(match.group(1))
 
+                    title = (item.get("title") or "").strip() or None
+
                     shows.append(
                         SpinitronShowItem(
                             id=int(show_id),
                             start=datetime.strptime(start_str, "%Y-%m-%dT%H:%M:%S%z"),
                             end=datetime.strptime(end_str, "%Y-%m-%dT%H:%M:%S%z"),
                             persona_id=persona_id,
+                            title=title,
                         )
                     )
 

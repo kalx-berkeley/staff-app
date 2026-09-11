@@ -18,6 +18,10 @@ const SpecialtyShowList = () => {
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [upcomingTitles, setUpcomingTitles] = useState<string[]>([]);
+  const [titleSuggestions, setTitleSuggestions] = useState<string[]>([]);
+  const [showTitleSuggestions, setShowTitleSuggestions] = useState(false);
+
   const loadShows = useCallback(async () => {
     try {
       setLoading(true);
@@ -32,12 +36,32 @@ const SpecialtyShowList = () => {
     }
   }, []);
 
-  useEffect(() => { loadShows(); }, [loadShows]);
+  useEffect(() => {
+    loadShows();
+    specialtyShowsAPI.getUpcomingTitles().then(setUpcomingTitles).catch(() => {});
+  }, [loadShows]);
 
   const isOwner = (show: SpecialtyShowResponse) =>
     user?.email ? show.owner_emails.includes(user.email) : false;
 
   const canManage = (show: SpecialtyShowResponse) => isPromotions || isOwner(show);
+
+  const handleNameInputChange = (value: string) => {
+    setNewName(value);
+    if (value.trim()) {
+      const filtered = upcomingTitles.filter((n) => n.toLowerCase().includes(value.toLowerCase()));
+      setTitleSuggestions(filtered);
+      setShowTitleSuggestions(filtered.length > 0);
+    } else {
+      setTitleSuggestions([]);
+      setShowTitleSuggestions(false);
+    }
+  };
+
+  const selectTitle = (name: string) => {
+    setNewName(name);
+    setShowTitleSuggestions(false);
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +69,7 @@ const SpecialtyShowList = () => {
     if (!name) return;
     setSubmitting(true);
     setFormError(null);
+    setShowTitleSuggestions(false);
     try {
       const created = await specialtyShowsAPI.create({ name });
       navigate(`/staff/specialty-shows/${created.id}`);
@@ -91,19 +116,50 @@ const SpecialtyShowList = () => {
 
       <p className="field-hint">
         Specialty shows are on-air DJ shifts that can receive pre-assigned pass pairs.
-        Their names appear alongside DJ names in all DJ name autocomplete fields.
+        Their names appear alongside DJ names in all DJ name autocomplete fields. When
+        adding one, use its exact on-air schedule name (the "New specialty show name"
+        field suggests titles from the upcoming Spinitron schedule) so it matches.
       </p>
 
       {isPromotions && (
         <form onSubmit={handleCreate} className="venue-filter" style={{ alignItems: 'flex-start', gap: '0.5rem' }}>
-          <input
-            type="text"
-            placeholder="New specialty show name..."
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            className="venue-filter-input"
-            disabled={submitting}
-          />
+          <div className="autocomplete-wrapper">
+            <input
+              type="text"
+              placeholder="New specialty show name..."
+              value={newName}
+              onChange={(e) => handleNameInputChange(e.target.value)}
+              onFocus={() => { if (newName.trim()) setShowTitleSuggestions(true); }}
+              onBlur={() => setTimeout(() => setShowTitleSuggestions(false), 200)}
+              className="venue-filter-input"
+              disabled={submitting}
+              autoComplete="off"
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') { setShowTitleSuggestions(false); }
+                else if (e.key === 'Tab' && titleSuggestions.length === 1) {
+                  e.preventDefault();
+                  setNewName(titleSuggestions[0]);
+                  setShowTitleSuggestions(false);
+                }
+              }}
+            />
+            {showTitleSuggestions && titleSuggestions.length > 0 && (
+              <ul className="autocomplete-list">
+                {titleSuggestions.map((name) => (
+                  <li
+                    key={name}
+                    onMouseDown={() => selectTitle(name)}
+                    className="autocomplete-item"
+                  >
+                    {name}
+                  </li>
+                ))}
+                {titleSuggestions.length === 1 && (
+                  <li className="autocomplete-hint">Press Tab to complete</li>
+                )}
+              </ul>
+            )}
+          </div>
           <button type="submit" className="btn-primary" disabled={submitting || !newName.trim()}>
             {submitting ? 'Adding...' : 'Add'}
           </button>

@@ -11,6 +11,7 @@ from app.schemas.specialty_show import (
     SpecialtyShowResponse,
 )
 from app.services import audit_service
+from app.services.spinitron_show_titles_service import SpinitronShowTitlesService
 from app.auth import get_promotions_staff, get_staff_member, require_promotions_or_staff
 from app.models.staff import Staff
 from app.models.specialty_show import SpecialtyShow
@@ -92,6 +93,15 @@ def list_my_specialty_shows(
     )
 
 
+@router.get("/upcoming-titles", response_model=list[str])
+async def list_upcoming_spinitron_titles(db: Session = Depends(get_db)):
+    """List distinct Spinitron show titles scheduled in the next ~2 weeks.
+
+    Declared before `/{show_id}` so it isn't swallowed by that route.
+    """
+    return await SpinitronShowTitlesService.get_upcoming_titles(db)
+
+
 @router.post("", response_model=SpecialtyShowResponse, status_code=status.HTTP_201_CREATED)
 def create_specialty_show(
     data: SpecialtyShowCreate,
@@ -138,6 +148,17 @@ def get_specialty_show(show_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND, detail="Specialty show not found"
         )
     return show
+
+
+@router.get("/{show_id}/dj-history", response_model=list[str])
+async def get_specialty_show_dj_history(show_id: int, db: Session = Depends(get_db)):
+    """List DJs who hosted a Spinitron show with this exact name in the past ~2 months."""
+    show = db.query(SpecialtyShow).filter(SpecialtyShow.id == show_id).first()
+    if not show:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Specialty show not found"
+        )
+    return await SpinitronShowTitlesService.get_dj_history_for_title(db, show.name)
 
 
 @router.put("/{show_id}", response_model=SpecialtyShowResponse)
