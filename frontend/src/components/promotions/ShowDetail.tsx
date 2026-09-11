@@ -129,7 +129,10 @@ const ShowDetail = () => {
   // null = unknown (name not yet checked, or the check failed); [] = checked, no matching dates.
   const [scheduleDates, setScheduleDates] = useState<string[] | null>(null);
   const [scheduleLoading, setScheduleLoading] = useState(false);
-  const [dateOverride, setDateOverride] = useState(false);
+  // Tracks the name a schedule check was last fetched (or is in flight) for, so
+  // selecting an autocomplete suggestion (which immediately fetches) followed by
+  // the input's blur (which fires right after, for the same name) only fetches once.
+  const lastScheduleFetchNameRef = useRef<string | null>(null);
 
   const loadShow = useCallback(async () => {
     if (!id) return;
@@ -179,19 +182,24 @@ const ShowDetail = () => {
   const fetchScheduleForName = async (name: string) => {
     const trimmed = name.trim();
     if (!trimmed) {
+      lastScheduleFetchNameRef.current = null;
       setScheduleDates(null);
-      setDateOverride(false);
       return;
     }
+    if (lastScheduleFetchNameRef.current === trimmed) {
+      // Already fetched (or fetching) for this exact name — e.g. selecting an
+      // autocomplete suggestion fetches immediately, and the blur that follows
+      // shouldn't repeat the same request.
+      return;
+    }
+    lastScheduleFetchNameRef.current = trimmed;
     setScheduleLoading(true);
     try {
       const dates = await passesAPI.getPreassignSchedule(trimmed);
       setScheduleDates(dates);
-      setDateOverride(dates.length === 0);
     } catch {
       // Non-fatal — degrade to an unrestricted date picker with no warning.
       setScheduleDates(null);
-      setDateOverride(false);
     } finally {
       setScheduleLoading(false);
     }
@@ -199,6 +207,9 @@ const ShowDetail = () => {
 
   const handlePreassignDjChange = (value: string) => {
     setPreassignDj(value);
+    // The name no longer matches whatever was last checked — let the next
+    // fetch (on blur, or on selecting a suggestion) run again.
+    lastScheduleFetchNameRef.current = null;
     if (value.trim()) {
       const filtered = djNames.filter((name) =>
         name.toLowerCase().includes(value.toLowerCase())
@@ -301,7 +312,7 @@ const ShowDetail = () => {
       setPreassignDj('');
       setPreassignDate('');
       setScheduleDates(null);
-      setDateOverride(false);
+      lastScheduleFetchNameRef.current = null;
       await loadShow();
     } catch (err) {
       const apiError = err as APIError;
@@ -412,6 +423,12 @@ const ShowDetail = () => {
   const staffPasses = show?.passes.filter((t) => t.pass_type === 'staff') || [];
   const isVenueOwner = user?.email ? (show?.venue.owner_emails.includes(user.email) ?? false) : false;
   const userDjName = (user?.profile as PromotionsStaffProfile | null)?.dj_name ?? null;
+
+  // Of the checked schedule dates, which fall on or before the pass-pair's
+  // reservation deadline (the show closing) — the actual pickable range.
+  const scheduleDatesBeforeClose = show
+    ? (scheduleDates?.filter((d) => d <= show.show_date) ?? null)
+    : null;
 
   const reqPhone = show?.venue.requires_phone_number ?? false;
   const reqEmail = show?.venue.requires_email_address ?? false;
@@ -777,32 +794,32 @@ const ShowDetail = () => {
                       {scheduleLoading && (
                         <p className="field-hint">Checking on-air schedule…</p>
                       )}
-                      {scheduleDates?.length === 0 && (
+                      {scheduleDates !== null && scheduleDates.length === 0 && (
                         <p className="field-hint">
                           No scheduled on-air dates found for "{preassignDj.trim()}" in the next
                           ~4 weeks. You can still pick a date below.
                         </p>
                       )}
+                      {scheduleDates !== null &&
+                        scheduleDates.length > 0 &&
+                        scheduleDatesBeforeClose?.length === 0 && (
+                          <p className="field-hint">
+                            {preassignDj.trim() || 'This DJ'} has upcoming on-air dates, but none
+                            before this show closes on {formatDate(show.show_date)}. You can still
+                            pick a date below.
+                          </p>
+                        )}
                       <DatePicker
                         value={preassignDate}
                         onChange={setPreassignDate}
                         max={show.show_date}
                         disabled={actionLoading}
                         isDateDisabled={
-                          !dateOverride && scheduleDates && scheduleDates.length > 0
+                          scheduleDates && scheduleDates.length > 0
                             ? (date) => !scheduleDates.includes(formatDateValue(date))
                             : undefined
                         }
                       />
-                      {scheduleDates !== null && scheduleDates.length > 0 && (
-                        <button
-                          type="button"
-                          className="date-override-toggle"
-                          onClick={() => setDateOverride((o) => !o)}
-                        >
-                          {dateOverride ? 'Only show scheduled dates' : "Date not listed? Override"}
-                        </button>
-                      )}
                       {scheduleDates !== null &&
                         preassignDate &&
                         !scheduleDates.includes(preassignDate) && (
@@ -825,7 +842,7 @@ const ShowDetail = () => {
                           setPreassignDj('');
                           setPreassignDate('');
                           setScheduleDates(null);
-                          setDateOverride(false);
+                          lastScheduleFetchNameRef.current = null;
                         }}
                         className="btn-small"
                         disabled={actionLoading}

@@ -3,14 +3,6 @@ import { DayPicker, type Matcher } from 'react-day-picker';
 import 'react-day-picker/style.css';
 import { parseDateValue, formatDateValue } from '../../utils';
 
-const formatDisplayValue = (date: Date): string =>
-  date.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-
 interface DatePickerProps {
   value: string;
   onChange: (value: string) => void;
@@ -21,21 +13,20 @@ interface DatePickerProps {
   className?: string;
   style?: React.CSSProperties;
   placeholder?: string;
-  /** Extra dates to disable beyond the min/max range (e.g. a schedule mismatch). */
+  /**
+   * Dates to flag as unavailable (e.g. a schedule mismatch). These are shown
+   * struck through in the calendar popover but remain selectable — only
+   * `min`/`max` are hard limits. Pair this with a warning message next to
+   * the field for when the caller picks a flagged date anyway.
+   */
   isDateDisabled?: (date: Date) => boolean;
 }
 
 /**
- * A calendar-grid date field, replacing the browser's native `<input type="date">`
- * everywhere in the app so every date picker looks and behaves the same way.
- *
- * A real (visually hidden) native `<input type="date">` still backs the field —
- * it's what `id`/`<label htmlFor>` points to, so keyboard and screen-reader
- * users get normal native typing, and it's what existing form-level `required`/
- * validation wiring keeps working against. The visible calendar button is a
- * mouse-friendly popover on top of it, and is the only way to see the
- * `isDateDisabled` restriction rendered as greyed-out days — something a plain
- * native date input has no way to express for a non-contiguous set of dates.
+ * A date field: a native `<input type="date">` (typeable, with every browser's
+ * own keyboard entry and built-in clear affordance) paired with a calendar
+ * popover button for mouse users who'd rather browse. Both stay in sync with
+ * the same `value`.
  */
 const DatePicker = ({
   value,
@@ -51,7 +42,7 @@ const DatePicker = ({
 }: DatePickerProps) => {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const generatedId = useId();
   const inputId = id ?? generatedId;
 
@@ -80,12 +71,11 @@ const DatePicker = ({
   const disabledMatchers: Matcher[] = [];
   if (minDate) disabledMatchers.push({ before: minDate });
   if (maxDate) disabledMatchers.push({ after: maxDate });
-  if (isDateDisabled) disabledMatchers.push(isDateDisabled);
 
   const handleSelect = (date: Date | undefined) => {
     onChange(date ? formatDateValue(date) : '');
     setOpen(false);
-    triggerRef.current?.focus();
+    toggleRef.current?.focus();
   };
 
   return (
@@ -93,29 +83,37 @@ const DatePicker = ({
       <input
         type="date"
         id={inputId}
-        className="visually-hidden"
+        className={`date-picker-input ${className ?? ''}`}
         value={value}
         min={min}
         max={max}
         disabled={disabled}
+        aria-label={id ? undefined : placeholder}
         onChange={(e) => onChange(e.target.value)}
       />
+      {value && !disabled && (
+        <button
+          type="button"
+          className="date-picker-clear"
+          aria-label="Clear date"
+          title="Clear date"
+          onClick={() => onChange('')}
+        >
+          ×
+        </button>
+      )}
       <button
         type="button"
-        ref={triggerRef}
-        className={`date-picker-trigger ${className ?? ''}`}
+        ref={toggleRef}
+        className="date-picker-toggle"
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={selectedDate ? undefined : placeholder}
+        aria-label="Open calendar"
+        title="Open calendar"
       >
-        <span className={selectedDate ? undefined : 'date-picker-placeholder'}>
-          {selectedDate ? formatDisplayValue(selectedDate) : placeholder}
-        </span>
-        <span className="date-picker-icon" aria-hidden="true">
-          📅
-        </span>
+        📅
       </button>
       {open && (
         <div className="date-picker-popover" role="dialog" aria-label="Choose a date">
@@ -125,8 +123,16 @@ const DatePicker = ({
             defaultMonth={selectedDate ?? minDate ?? new Date()}
             onSelect={handleSelect}
             disabled={disabledMatchers}
+            modifiers={isDateDisabled ? { unavailable: isDateDisabled } : undefined}
+            modifiersClassNames={{ unavailable: 'date-picker-day-unavailable' }}
             showOutsideDays
           />
+          {isDateDisabled && (
+            <p className="date-picker-legend">
+              <span className="date-picker-legend-swatch" aria-hidden="true" />
+              No on-air show scheduled — still selectable
+            </p>
+          )}
         </div>
       )}
     </div>

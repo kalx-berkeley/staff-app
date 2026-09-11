@@ -10,9 +10,12 @@ from app.config import settings
 from app.models.job_log import JobLog
 from app.models.spinitron_show import SpinitronShow
 from app.models.staff import Staff
+from app.services import cache_service
 from app.services.spinitron_service import SpinitronService, SpinitronShowItem
 
 logger = logging.getLogger(__name__)
+
+_PERSONAS_CACHE_KEY = "spinitron:personas"
 
 
 class SpinitronScheduleService:
@@ -76,7 +79,8 @@ class SpinitronScheduleService:
         Resolve each distinct persona ID among *shows* to a DJ name.
 
         Prefers the local Staff directory (already resolved during the
-        Airtable sync) over a Spinitron persona API call. A show whose
+        Airtable sync) over Spinitron's persona directory (bulk-fetched and
+        cached for a week, see `_cached_persona_names`). A show whose
         persona is a configured "placeholder" (a rotating slot like "DJ
         Trainee" rather than a specific DJ) resolves to no name, same as a
         show with no persona at all.
@@ -90,6 +94,19 @@ class SpinitronScheduleService:
         placeholder_ids = SpinitronScheduleService._placeholder_persona_ids()
         resolved: Dict[int, Optional[str]] = {}
 
+        unresolved_ids = {
+            show["persona_id"]
+            for show in shows
+            if show["persona_id"] is not None
+            and show["persona_id"] not in placeholder_ids
+            and show["persona_id"] not in staff_persona_names
+        }
+        persona_names = (
+            await SpinitronScheduleService._cached_persona_names(db)
+            if unresolved_ids
+            else {}
+        )
+
         for show in shows:
             persona_id = show["persona_id"]
             if persona_id is None or persona_id in resolved:
@@ -99,9 +116,31 @@ class SpinitronScheduleService:
             elif persona_id in staff_persona_names:
                 resolved[persona_id] = staff_persona_names[persona_id]
             else:
-                resolved[persona_id] = await SpinitronService.fetch_persona_name(persona_id)
+                resolved[persona_id] = persona_names.get(persona_id)
 
         return resolved
+
+    @staticmethod
+    async def _cached_persona_names(db: Session) -> Dict[int, str]:
+        """
+        Read-through cache (~1 week TTL) over Spinitron's full persona directory.
+
+        Persona names change rarely, so one bulk `/personas` fetch (paginated
+        internally by `fetch_all_personas`), shared across every caller for a
+        week, replaces what would otherwise be a separate `/personas/{id}`
+        API call for every distinct unresolved persona on every cache miss.
+        """
+
+        async def producer() -> dict:
+            personas = await SpinitronService.fetch_all_personas()
+            return {
+                "personas": {str(persona_id): name for persona_id, name in personas.items()}
+            }
+
+        data = await cache_service.fetch_cached_async(
+            db, _PERSONAS_CACHE_KEY, producer, ttl_days=7
+        )
+        return {int(persona_id): name for persona_id, name in data["personas"].items()}
 
     @staticmethod
     def _placeholder_persona_ids() -> Set[int]:

@@ -331,32 +331,3 @@ class SpinitronService:
 
         logger.info("Fetched %d Spinitron spin(s)", len(spins))
         return spins
-
-    @staticmethod
-    async def fetch_persona_name(persona_id: int) -> Optional[str]:
-        """
-        Fetch a single Spinitron persona's on-air DJ name.
-
-        :param persona_id: Spinitron persona ID.
-        :returns: The persona's name, or None if it has no name.
-        :raises RuntimeError: If the Spinitron API returns an error.
-        """
-        if not settings.spinitron_api_key:
-            logger.warning("SPINITRON_API_KEY not configured, skipping persona fetch")
-            return None
-
-        url = f"{SPINITRON_API_BASE}/personas/{persona_id}"
-        headers = SpinitronService._request_headers()
-
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.get(url, headers=headers, timeout=30.0)
-                response.raise_for_status()
-            except httpx.HTTPStatusError as e:
-                raise RuntimeError(
-                    f"Spinitron API error {e.response.status_code}: {e.response.text}"
-                ) from e
-            except httpx.RequestError as e:
-                raise RuntimeError(f"Spinitron API request failed: {e}") from e
-
-        return response.json().get("name")

@@ -26,7 +26,6 @@ const ShowDetail = () => {
   // null = unknown (not yet checked, or the check failed); [] = checked, no matching dates.
   const [scheduleDates, setScheduleDates] = useState<string[] | null>(null);
   const [scheduleLoading, setScheduleLoading] = useState(false);
-  const [dateOverride, setDateOverride] = useState(false);
 
   // Specialty shows the current DJ belongs to (for specialty show pre-assignment)
   const [myDJSpecialtyShows, setMyDJSpecialtyShows] = useState<SpecialtyShowResponse[]>([]);
@@ -50,10 +49,9 @@ const ShowDetail = () => {
   const [lotteryDJDate, setLotteryDJDate] = useState('');
   // '' = first DJ name (default); 'dj:NAME' = specific DJ name; 'ss:ID' = specialty show
   const [lotteryDJReserveFor, setLotteryDJReserveFor] = useState('');
-  // On-air schedule check for lotteryDJReserveFor, mirroring scheduleDates/dateOverride above.
+  // On-air schedule check for lotteryDJReserveFor, mirroring scheduleDates above.
   const [lotteryScheduleDates, setLotteryScheduleDates] = useState<string[] | null>(null);
   const [lotteryScheduleLoading, setLotteryScheduleLoading] = useState(false);
-  const [lotteryDateOverride, setLotteryDateOverride] = useState(false);
 
   const loadShow = useCallback(async () => {
     if (!id) return;
@@ -128,13 +126,11 @@ const ShowDetail = () => {
   useEffect(() => {
     if (preassignSelfPassId === null) {
       setScheduleDates(null);
-      setDateOverride(false);
       return;
     }
     const name = resolveReserveForName(preassignSelfReserveFor);
     if (!name) {
       setScheduleDates(null);
-      setDateOverride(false);
       return;
     }
     let cancelled = false;
@@ -144,12 +140,10 @@ const ShowDetail = () => {
       .then((dates) => {
         if (cancelled) return;
         setScheduleDates(dates);
-        setDateOverride(dates.length === 0);
       })
       .catch(() => {
         if (cancelled) return;
         setScheduleDates(null);
-        setDateOverride(false);
       })
       .finally(() => {
         if (!cancelled) setScheduleLoading(false);
@@ -162,13 +156,11 @@ const ShowDetail = () => {
   useEffect(() => {
     if (!showDJLotteryForm) {
       setLotteryScheduleDates(null);
-      setLotteryDateOverride(false);
       return;
     }
     const name = resolveReserveForName(lotteryDJReserveFor);
     if (!name) {
       setLotteryScheduleDates(null);
-      setLotteryDateOverride(false);
       return;
     }
     let cancelled = false;
@@ -178,12 +170,10 @@ const ShowDetail = () => {
       .then((dates) => {
         if (cancelled) return;
         setLotteryScheduleDates(dates);
-        setLotteryDateOverride(dates.length === 0);
       })
       .catch(() => {
         if (cancelled) return;
         setLotteryScheduleDates(null);
-        setLotteryDateOverride(false);
       })
       .finally(() => {
         if (!cancelled) setLotteryScheduleLoading(false);
@@ -518,6 +508,13 @@ const ShowDetail = () => {
     }
   }
 
+  // Of the checked schedule dates, which fall on or before the reservation
+  // deadline above — the actual pickable range.
+  const scheduleDatesBeforeClose =
+    scheduleDates?.filter((d) => d <= maxDJReservationDate) ?? null;
+  const lotteryScheduleDatesBeforeClose =
+    lotteryScheduleDates?.filter((d) => d <= maxDJReservationDate) ?? null;
+
   return (
     <div className="show-detail">
       <div className="page-header">
@@ -741,32 +738,32 @@ const ShowDetail = () => {
                       {lotteryScheduleLoading && (
                         <p className="field-hint">Checking on-air schedule…</p>
                       )}
-                      {lotteryScheduleDates?.length === 0 && (
+                      {lotteryScheduleDates !== null && lotteryScheduleDates.length === 0 && (
                         <p className="field-hint">
                           No scheduled on-air dates found in the next ~4 weeks. You can still pick
                           a date below.
                         </p>
                       )}
+                      {lotteryScheduleDates !== null &&
+                        lotteryScheduleDates.length > 0 &&
+                        lotteryScheduleDatesBeforeClose?.length === 0 && (
+                          <p className="field-hint">
+                            You have upcoming on-air dates, but none before the reservation
+                            deadline ({formatDate(maxDJReservationDate)}). You can still pick a
+                            date below.
+                          </p>
+                        )}
                       <DatePicker
                         value={lotteryDJDate}
                         onChange={setLotteryDJDate}
                         max={maxDJReservationDate}
                         disabled={lotteryActionLoading}
                         isDateDisabled={
-                          !lotteryDateOverride && lotteryScheduleDates && lotteryScheduleDates.length > 0
+                          lotteryScheduleDates && lotteryScheduleDates.length > 0
                             ? (date) => !lotteryScheduleDates.includes(formatDateValue(date))
                             : undefined
                         }
                       />
-                      {lotteryScheduleDates !== null && lotteryScheduleDates.length > 0 && (
-                        <button
-                          type="button"
-                          className="date-override-toggle"
-                          onClick={() => setLotteryDateOverride((o) => !o)}
-                        >
-                          {lotteryDateOverride ? 'Only show scheduled dates' : "Date not listed? Override"}
-                        </button>
-                      )}
                       {lotteryScheduleDates !== null &&
                         lotteryDJDate &&
                         !lotteryScheduleDates.includes(lotteryDJDate) && (
@@ -873,32 +870,32 @@ const ShowDetail = () => {
                               {scheduleLoading && (
                                 <p className="field-hint">Checking on-air schedule…</p>
                               )}
-                              {scheduleDates?.length === 0 && (
+                              {scheduleDates !== null && scheduleDates.length === 0 && (
                                 <p className="field-hint">
                                   No scheduled on-air dates found in the next ~4 weeks. You can
                                   still pick a date below.
                                 </p>
                               )}
+                              {scheduleDates !== null &&
+                                scheduleDates.length > 0 &&
+                                scheduleDatesBeforeClose?.length === 0 && (
+                                  <p className="field-hint">
+                                    You have upcoming on-air dates, but none before the
+                                    reservation deadline ({formatDate(maxDJReservationDate)}). You
+                                    can still pick a date below.
+                                  </p>
+                                )}
                               <DatePicker
                                 value={preassignSelfDate}
                                 onChange={setPreassignSelfDate}
                                 max={maxDJReservationDate}
                                 disabled={preassignSelfLoading}
                                 isDateDisabled={
-                                  !dateOverride && scheduleDates && scheduleDates.length > 0
+                                  scheduleDates && scheduleDates.length > 0
                                     ? (date) => !scheduleDates.includes(formatDateValue(date))
                                     : undefined
                                 }
                               />
-                              {scheduleDates !== null && scheduleDates.length > 0 && (
-                                <button
-                                  type="button"
-                                  className="date-override-toggle"
-                                  onClick={() => setDateOverride((o) => !o)}
-                                >
-                                  {dateOverride ? 'Only show scheduled dates' : "Date not listed? Override"}
-                                </button>
-                              )}
                               {scheduleDates !== null &&
                                 preassignSelfDate &&
                                 !scheduleDates.includes(preassignSelfDate) && (

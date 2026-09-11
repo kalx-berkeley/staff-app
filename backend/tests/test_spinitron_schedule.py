@@ -52,7 +52,7 @@ class TestSyncSchedule:
         async def fake_fetch_shows(end):
             return [_show(1, now, now + timedelta(hours=1), 169765)]
 
-        async def fake_fetch_persona_name(persona_id):
+        async def fake_fetch_all_personas():
             raise AssertionError("should not call the persona API when Staff has the name")
 
         monkeypatch.setattr(
@@ -60,8 +60,8 @@ class TestSyncSchedule:
             fake_fetch_shows,
         )
         monkeypatch.setattr(
-            "app.services.spinitron_schedule_service.SpinitronService.fetch_persona_name",
-            fake_fetch_persona_name,
+            "app.services.spinitron_schedule_service.SpinitronService.fetch_all_personas",
+            fake_fetch_all_personas,
         )
 
         count = await SpinitronScheduleService.sync_schedule(db, trigger="scheduled")
@@ -93,17 +93,16 @@ class TestSyncSchedule:
         async def fake_fetch_shows(end):
             return [_show(1, now, now + timedelta(hours=1), 111)]
 
-        async def fake_fetch_persona_name(persona_id):
-            assert persona_id == 111
-            return "Resolved From API"
+        async def fake_fetch_all_personas():
+            return {111: "Resolved From API"}
 
         monkeypatch.setattr(
             "app.services.spinitron_schedule_service.SpinitronService.fetch_shows",
             fake_fetch_shows,
         )
         monkeypatch.setattr(
-            "app.services.spinitron_schedule_service.SpinitronService.fetch_persona_name",
-            fake_fetch_persona_name,
+            "app.services.spinitron_schedule_service.SpinitronService.fetch_all_personas",
+            fake_fetch_all_personas,
         )
 
         count = await SpinitronScheduleService.sync_schedule(db, trigger="scheduled")
@@ -121,17 +120,16 @@ class TestSyncSchedule:
         async def fake_fetch_shows(end):
             return [_show(1, now, now + timedelta(hours=1), 999)]
 
-        async def fake_fetch_persona_name(persona_id):
-            assert persona_id == 999
-            return "API Resolved DJ"
+        async def fake_fetch_all_personas():
+            return {999: "API Resolved DJ"}
 
         monkeypatch.setattr(
             "app.services.spinitron_schedule_service.SpinitronService.fetch_shows",
             fake_fetch_shows,
         )
         monkeypatch.setattr(
-            "app.services.spinitron_schedule_service.SpinitronService.fetch_persona_name",
-            fake_fetch_persona_name,
+            "app.services.spinitron_schedule_service.SpinitronService.fetch_all_personas",
+            fake_fetch_all_personas,
         )
 
         count = await SpinitronScheduleService.sync_schedule(db, trigger="scheduled")
@@ -164,7 +162,7 @@ class TestSyncSchedule:
         async def fake_fetch_shows(end):
             return [_show(1, now, now + timedelta(hours=1), 176287)]
 
-        async def fake_fetch_persona_name(persona_id):
+        async def fake_fetch_all_personas():
             raise AssertionError("should not resolve a name for a placeholder persona")
 
         monkeypatch.setattr(
@@ -172,8 +170,8 @@ class TestSyncSchedule:
             fake_fetch_shows,
         )
         monkeypatch.setattr(
-            "app.services.spinitron_schedule_service.SpinitronService.fetch_persona_name",
-            fake_fetch_persona_name,
+            "app.services.spinitron_schedule_service.SpinitronService.fetch_all_personas",
+            fake_fetch_all_personas,
         )
 
         count = await SpinitronScheduleService.sync_schedule(db, trigger="scheduled")
@@ -256,6 +254,81 @@ class TestPlaceholderPersonaIds:
     def test_empty_setting_yields_empty_set(self, monkeypatch):
         monkeypatch.setattr(settings, "spinitron_placeholder_persona_ids", "")
         assert SpinitronScheduleService._placeholder_persona_ids() == set()
+
+
+class TestCachedPersonaNames:
+    async def test_one_bulk_fetch_resolves_every_distinct_unresolved_persona(
+        self, db: Session, monkeypatch
+    ):
+        now = datetime.now(timezone.utc)
+        shows = [
+            _show(1, now, now + timedelta(hours=1), 111),
+            _show(2, now, now + timedelta(hours=1), 222),
+            _show(3, now, now + timedelta(hours=1), 111),  # same persona again
+        ]
+
+        calls = []
+
+        async def fake_fetch_all_personas():
+            calls.append(1)
+            return {111: "DJ One", 222: "DJ Two"}
+
+        monkeypatch.setattr(
+            "app.services.spinitron_schedule_service.SpinitronService.fetch_all_personas",
+            fake_fetch_all_personas,
+        )
+
+        resolved = await SpinitronScheduleService.resolve_dj_names(db, shows)
+
+        assert resolved == {111: "DJ One", 222: "DJ Two"}
+        assert len(calls) == 1
+
+    async def test_second_lookup_is_served_from_the_week_long_cache(
+        self, db: Session, monkeypatch
+    ):
+        now = datetime.now(timezone.utc)
+        calls = []
+
+        async def fake_fetch_all_personas():
+            calls.append(1)
+            return {333: "DJ Three"}
+
+        monkeypatch.setattr(
+            "app.services.spinitron_schedule_service.SpinitronService.fetch_all_personas",
+            fake_fetch_all_personas,
+        )
+
+        first = await SpinitronScheduleService.resolve_dj_names(
+            db, [_show(1, now, now + timedelta(hours=1), 333)]
+        )
+        second = await SpinitronScheduleService.resolve_dj_names(
+            db, [_show(2, now, now + timedelta(hours=1), 333)]
+        )
+
+        assert first == {333: "DJ Three"}
+        assert second == {333: "DJ Three"}
+        assert len(calls) == 1
+
+    async def test_no_bulk_fetch_when_nothing_needs_resolving(
+        self, db: Session, monkeypatch
+    ):
+        now = datetime.now(timezone.utc)
+
+        async def fake_fetch_all_personas():
+            raise AssertionError(
+                "should not fetch personas when there's nothing to resolve"
+            )
+
+        monkeypatch.setattr(
+            "app.services.spinitron_schedule_service.SpinitronService.fetch_all_personas",
+            fake_fetch_all_personas,
+        )
+
+        resolved = await SpinitronScheduleService.resolve_dj_names(
+            db, [_show(1, now, now + timedelta(hours=1), None)]
+        )
+
+        assert resolved == {}
 
 
 class TestOnAirEndpoint:

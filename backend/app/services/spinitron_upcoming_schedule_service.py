@@ -7,6 +7,7 @@ the next ~4 weeks of Spinitron shows, filtered by name on read — mirrors the
 
 from datetime import datetime, timedelta, timezone
 from typing import List, TypedDict
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
@@ -17,6 +18,7 @@ from app.services.spinitron_service import SpinitronService
 SCHEDULE_WINDOW_DAYS = 28
 
 _UPCOMING_SCHEDULE_CACHE_KEY = "spinitron:upcoming-schedule"
+_LA = ZoneInfo("America/Los_Angeles")
 
 
 class _ScheduleEntry(TypedDict):
@@ -56,7 +58,11 @@ class SpinitronUpcomingScheduleService:
 
             entries: List[_ScheduleEntry] = [
                 {
-                    "date": show["start"].date().isoformat(),
+                    # Spinitron gives `start` in UTC; bucket by the station's
+                    # own (Pacific) calendar day, not UTC's — otherwise a show
+                    # airing anytime after ~4-5pm Pacific gets stamped with
+                    # tomorrow's UTC date instead of today's.
+                    "date": show["start"].astimezone(_LA).date().isoformat(),
                     "dj_name": (
                         resolved.get(show["persona_id"]) if show["persona_id"] else None
                     ),

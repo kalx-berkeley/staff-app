@@ -13,6 +13,13 @@ from app.services.spinitron_upcoming_schedule_service import (
 from app.models.staff import Staff
 from app.models.staff_status import StaffStatus
 
+# A fixed anchor (noon UTC, mid-June to stay clear of any DST-transition week)
+# instead of datetime.now(): noon UTC is unambiguously the same calendar day
+# in Pacific time (UTC-7/8), so date-bucketing tests that aren't specifically
+# about the UTC/Pacific boundary stay deterministic regardless of when the
+# suite runs.
+_ANCHOR = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+
 
 @pytest.fixture
 def staff_member(db: Session) -> Staff:
@@ -40,7 +47,7 @@ def _show(
 
 class TestGetDatesForName:
     async def test_matches_by_dj_name_case_insensitive(self, db: Session, monkeypatch):
-        now = datetime.now(timezone.utc)
+        now = _ANCHOR
         day1 = now + timedelta(days=3)
         day2 = now + timedelta(days=10)
 
@@ -68,7 +75,7 @@ class TestGetDatesForName:
         assert dates == sorted({day1.date().isoformat(), day2.date().isoformat()})
 
     async def test_matches_by_exact_specialty_show_title(self, db: Session, monkeypatch):
-        now = datetime.now(timezone.utc)
+        now = _ANCHOR
         day1 = now + timedelta(days=5)
 
         async def fake_fetch_shows(end):
@@ -95,7 +102,7 @@ class TestGetDatesForName:
         assert dates == [day1.date().isoformat()]
 
     async def test_no_match_returns_empty(self, db: Session, monkeypatch):
-        now = datetime.now(timezone.utc)
+        now = _ANCHOR
 
         async def fake_fetch_shows(end):
             return [_show(1, now, now + timedelta(hours=1), 1, "The Howl")]
@@ -116,8 +123,46 @@ class TestGetDatesForName:
 
         assert dates == []
 
+    async def test_buckets_by_station_local_date_not_utc_date(
+        self, db: Session, monkeypatch
+    ):
+        """
+        An evening Pacific show should land on today's date, not tomorrow's.
+
+        Spinitron gives `start` in UTC. A show airing at 7pm PDT (2am UTC the
+        *next* day, since PDT is UTC-7) must still be bucketed under the
+        Pacific calendar date it actually airs on — not the later UTC date —
+        or a DJ with a show later today can look like they have no show
+        until tomorrow.
+        """
+        # 2026-06-16T02:00:00+00:00 is 2026-06-15 19:00 PDT (7pm Pacific).
+        show_start_utc = datetime(2026, 6, 16, 2, 0, tzinfo=timezone.utc)
+
+        async def fake_fetch_shows(end):
+            return [
+                _show(
+                    1, show_start_utc, show_start_utc + timedelta(hours=1), 1, "Night Shift"
+                )
+            ]
+
+        async def fake_resolve_dj_names(db, shows):
+            return {1: "Nightowl"}
+
+        monkeypatch.setattr(
+            "app.services.spinitron_upcoming_schedule_service.SpinitronService.fetch_shows",
+            fake_fetch_shows,
+        )
+        monkeypatch.setattr(
+            "app.services.spinitron_upcoming_schedule_service.SpinitronScheduleService.resolve_dj_names",
+            fake_resolve_dj_names,
+        )
+
+        dates = await SpinitronUpcomingScheduleService.get_dates_for_name(db, "Nightowl")
+
+        assert dates == ["2026-06-15"]
+
     async def test_second_call_is_served_from_cache(self, db: Session, monkeypatch):
-        now = datetime.now(timezone.utc)
+        now = _ANCHOR
         call_count = 0
 
         async def fake_fetch_shows(end):
