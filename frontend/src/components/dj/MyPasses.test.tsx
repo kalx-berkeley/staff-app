@@ -185,10 +185,12 @@ describe('MyPasses', () => {
       expect(screen.getByLabelText(/dj name/i)).toBeInTheDocument();
     });
 
-    it('should pre-fill DJ name from localStorage', () => {
+    it('should pre-fill DJ name from localStorage', async () => {
       localStorage.setItem(DJ_NAME_KEY, 'DJ Sarah');
       render(<MyPasses />);
-      expect(screen.getByLabelText(/dj name/i)).toHaveValue('DJ Sarah');
+      await waitFor(() => {
+        expect(screen.getByLabelText(/dj name/i)).toHaveValue('DJ Sarah');
+      });
     });
 
     it('should auto-load passes when localStorage has a DJ name', async () => {

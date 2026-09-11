@@ -426,6 +426,15 @@ describe('ShowForm', () => {
       const description = screen.getByLabelText(/on-air description/i);
       fireEvent.change(description, { target: { value: text } });
       fireEvent.blur(description);
+
+      // Wait for the analysis request (if any) to settle so its resulting
+      // state update lands inside act() instead of leaking into the next test.
+      await waitFor(() => {
+        expect(
+          screen.queryByText(/Checking the description for non-value-neutral language/)
+        ).not.toBeInTheDocument();
+      });
+
       return description;
     };
 

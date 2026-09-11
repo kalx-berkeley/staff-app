@@ -287,7 +287,7 @@ describe('ShowBrowser', () => {
   });
 
   describe('Loading and Error States', () => {
-    it('should display loading message while fetching shows', () => {
+    it('should display loading message while fetching shows', async () => {
       vi.mocked(showsAPI.list).mockImplementation(
         () => new Promise(() => {}) // Never resolves
       );
@@ -299,6 +299,11 @@ describe('ShowBrowser', () => {
       );
 
       expect(screen.getByText('Loading shows...')).toBeInTheDocument();
+
+      // Let the DJ name field's own mount-time lookups (autocomplete names,
+      // on-air schedule) and the venue dropdown's fetch settle before the
+      // test ends, so their state updates land inside act().
+      await waitFor(() => expect(autocompleteAPI.getDJNames).toHaveBeenCalled());
     });
 
     it('should display error message when API call fails', async () => {

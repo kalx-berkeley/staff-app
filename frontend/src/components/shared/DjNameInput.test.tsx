@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import DjNameInput from './DjNameInput';
 import { autocompleteAPI, specialtyShowsAPI, onAirAPI } from '../../services/api';
 
@@ -78,7 +78,7 @@ describe('DjNameInput on-air sync', () => {
     render(<DjNameInput value="Someone Else" onChange={handleChange} />);
 
     const fixButton = await screen.findByRole('button', { name: /use murky logic/i });
-    fixButton.click();
+    fireEvent.click(fixButton);
 
     expect(handleChange).toHaveBeenCalledWith('Murky Logic');
   });
