@@ -14,6 +14,7 @@ describe('ProfileSettings', () => {
   const mockPromotionsProfile: PromotionsStaffProfile = {
     name: 'John Doe',
     phone: '555-123-4567',
+    is_sublist_dj: false,
   };
 
   const mockStaffProfile: StaffProfile = {
@@ -120,7 +121,7 @@ describe('ProfileSettings', () => {
   });
 
   it('should display em-dash for missing name or phone', async () => {
-    vi.mocked(usersAPI.getProfile).mockResolvedValue({ name: '', phone: '' });
+    vi.mocked(usersAPI.getProfile).mockResolvedValue({ name: '', phone: '', is_sublist_dj: false });
 
     render(<ProfileSettings />);
 

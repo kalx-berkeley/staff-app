@@ -148,6 +148,7 @@ export interface PromotionsStaffProfile {
   name: string;
   phone: string;
   dj_name?: string | null;
+  is_sublist_dj: boolean;
 }
 
 export interface StaffProfile {

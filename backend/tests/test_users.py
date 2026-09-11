@@ -48,6 +48,26 @@ def test_get_current_user_promotions_via_department(client: TestClient, db: Sess
     assert data["profile"]["phone"] == "555-1234"
 
 
+def test_get_current_user_promotions_who_is_also_sublist_dj(
+    client: TestClient, db: Session
+):
+    """A promotions-role staff member who also holds Sublist DJ status must still
+    see is_sublist_dj=True on their profile, even though role resolves to
+    'promotions' rather than 'staff'."""
+    staff = _make_promotions_staff(db, "promo-dj@example.com", "Promo DJ User", "555-1234")
+    db.add(StaffStatus(staff_id=staff.id, status="Sublist DJ"))
+    db.commit()
+
+    response = client.get(
+        "/api/users/me", headers={"X-Forwarded-User": "promo-dj@example.com"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["role"] == "promotions"
+    assert data["profile"]["is_sublist_dj"] is True
+
+
 def test_get_current_user_promotions_via_paid_staff_status(client: TestClient, db: Session):
     """'Paid Staff' + 'Active' statuses → role=promotions, regardless of department."""
     staff = Staff(email="paid@example.com", name="Paid Staff User", phone="555-9999")
@@ -239,6 +259,22 @@ def test_get_profile_promotions(client: TestClient, db: Session):
     assert data["email"] == "promo@example.com"
     assert data["name"] == "Promo User"
     assert data["phone"] == "555-1234"
+
+
+def test_get_profile_promotions_who_is_also_sublist_dj(client: TestClient, db: Session):
+    """The /profile endpoint must also report is_sublist_dj for a promotions-role
+    staff member who holds Sublist DJ status."""
+    staff = _make_promotions_staff(db, "promo-dj@example.com", "Promo DJ User", "555-1234")
+    db.add(StaffStatus(staff_id=staff.id, status="Sublist DJ"))
+    db.commit()
+
+    response = client.get(
+        "/api/users/profile", headers={"X-Forwarded-User": "promo-dj@example.com"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_sublist_dj"] is True
 
 
 def test_get_profile_staff(client: TestClient, db: Session):

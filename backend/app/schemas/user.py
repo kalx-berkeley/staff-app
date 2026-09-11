@@ -27,6 +27,7 @@ class PromotionsStaffResponse(BaseModel):
     name: str
     phone: str
     dj_name: str | None = None
+    is_sublist_dj: bool = False
 
 
 class StaffResponse(BaseModel):

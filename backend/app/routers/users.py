@@ -189,6 +189,7 @@ def get_current_user(
                 name=promotions.name or "",
                 phone=promotions.phone or "",
                 dj_name=promotions.dj_name,
+                is_sublist_dj=SUBLIST_DJ_STATUS in _staff_statuses(promotions),
             )
     elif role == "staff":
         staff = db.query(Staff).filter(Staff.email == effective_email).first()
@@ -244,6 +245,7 @@ def get_user_profile(
             email=profile.email,
             name=profile.name or "",
             phone=profile.phone or "",
+            is_sublist_dj=SUBLIST_DJ_STATUS in _staff_statuses(profile),
         )
     elif role == "staff":
         profile = UserService.get_or_create_staff_profile(db, email)
