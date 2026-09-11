@@ -1,6 +1,6 @@
 """Tests for FeatureBinService: CSV parsing, artist transform, and matching."""
 
-from datetime import date, time
+from datetime import date, datetime, time, timedelta, timezone
 
 import pytest
 from sqlalchemy.orm import Session
@@ -242,3 +242,38 @@ class TestIsConfiguredAndSync:
         assert count == 0
         assert db.query(FeatureBinRelease).count() == 0
         assert db.query(JobLog).filter(JobLog.job_id == "feature_bin_sync").count() == 0
+
+
+class TestNeedsSync:
+    def test_no_data_needs_sync(self, db: Session):
+        assert FeatureBinService.needs_sync(db) is True
+
+    def test_fresh_data_does_not_need_sync(self, db: Session):
+        release = FeatureBinRelease(artist="Some Artist", album="Some Album")
+        db.add(release)
+        db.commit()
+        db.refresh(release)
+        release.fetched_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        db.commit()
+
+        assert FeatureBinService.needs_sync(db) is False
+
+    def test_stale_data_needs_sync(self, db: Session):
+        release = FeatureBinRelease(artist="Some Artist", album="Some Album")
+        db.add(release)
+        db.commit()
+        db.refresh(release)
+        release.fetched_at = datetime.now(timezone.utc) - timedelta(days=1, minutes=1)
+        db.commit()
+
+        assert FeatureBinService.needs_sync(db) is True
+
+    def test_data_just_under_a_day_old_does_not_need_sync(self, db: Session):
+        release = FeatureBinRelease(artist="Some Artist", album="Some Album")
+        db.add(release)
+        db.commit()
+        db.refresh(release)
+        release.fetched_at = datetime.now(timezone.utc) - timedelta(hours=23, minutes=59)
+        db.commit()
+
+        assert FeatureBinService.needs_sync(db) is False

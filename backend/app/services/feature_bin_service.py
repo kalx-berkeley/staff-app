@@ -12,10 +12,12 @@ import io
 import logging
 import re
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from rapidfuzz import fuzz, process
 from rapidfuzz.utils import default_process
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -27,6 +29,10 @@ logger = logging.getLogger(__name__)
 _SHEET_EXPORT_URL = (
     "https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
 )
+
+# How old feature-bin data can get before a fresh sync is considered overdue
+# (used by the startup bootstrap check, not the nightly schedule itself).
+_STALE_AFTER = timedelta(days=1)
 
 # A tagged artist (from ShowBand) is already an isolated, normalized name, so
 # the only slop expected is casing/punctuation — a high threshold avoids false
@@ -103,6 +109,23 @@ class FeatureBinService:
         repo — the feature is simply disabled until both are configured.
         """
         return bool(settings.feature_bin_sheet_id and settings.feature_bin_sheet_gid)
+
+    @staticmethod
+    def needs_sync(db: Session) -> bool:
+        """Whether the feature bin has no data yet, or its data is more than a day old.
+
+        Used by the startup bootstrap check to catch a freshly deployed
+        instance or a long period of scheduler downtime.
+        """
+        count, latest_fetched_at = db.query(
+            func.count(FeatureBinRelease.id), func.max(FeatureBinRelease.fetched_at)
+        ).one()
+        if count == 0 or latest_fetched_at is None:
+            return True
+        # SQLite drops tzinfo on round-trip even though fetched_at is stored
+        # timezone-aware (UTC) — re-attach it before comparing.
+        latest_fetched_at = latest_fetched_at.replace(tzinfo=timezone.utc)
+        return latest_fetched_at < datetime.now(timezone.utc) - _STALE_AFTER
 
     @staticmethod
     def fetch_sheet_csv() -> str:

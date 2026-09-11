@@ -20,7 +20,12 @@ from app.routers import (
     specialty_shows,
 )
 from app.routers import legacy_import as legacy_import_router
-from app.scheduler import start_scheduler, shutdown_scheduler, bootstrap_users_if_empty
+from app.scheduler import (
+    start_scheduler,
+    shutdown_scheduler,
+    bootstrap_users_if_empty,
+    bootstrap_feature_bin_if_stale,
+)
 from app.auth import check_apache_auth_layer
 from app.config import settings
 from app.rate_limiter import RateLimitExceeded
@@ -115,6 +120,7 @@ async def lifespan(app: FastAPI):
     check_network_config()
     start_scheduler()
     await bootstrap_users_if_empty()
+    await bootstrap_feature_bin_if_stale()
     yield
     # Shutdown
     shutdown_scheduler()

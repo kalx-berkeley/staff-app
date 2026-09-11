@@ -141,6 +141,35 @@ async def bootstrap_users_if_empty():
         db.close()
 
 
+async def bootstrap_feature_bin_if_stale():
+    """
+    On startup, sync the feature bin if there's no local data yet or the
+    existing data is more than a day old. Handles both a freshly deployed
+    instance and a long period of scheduler downtime leaving it stale.
+    """
+    if os.getenv("TESTING") == "1":
+        return
+
+    from app.database import SessionLocal
+    from app.services.feature_bin_service import FeatureBinService
+
+    if not FeatureBinService.is_configured():
+        logger.info("Feature bin sheet not configured - skipping startup sync check")
+        return
+
+    db = SessionLocal()
+    try:
+        if FeatureBinService.needs_sync(db):
+            logger.info(
+                "Feature bin data missing or stale on startup - performing initial sync"
+            )
+            await sync_feature_bin()
+        else:
+            logger.info("Feature bin data present and fresh on startup - skipping sync")
+    finally:
+        db.close()
+
+
 async def auto_close_show(show_id: int):
     """DateTrigger job that closes a show and emails venue owners the guest list."""
     from app.database import SessionLocal
