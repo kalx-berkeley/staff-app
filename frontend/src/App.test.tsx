@@ -31,6 +31,7 @@ vi.mock('./services/api', () => ({
     getSpinMatches: vi.fn().mockResolvedValue([]),
   },
   specialtyShowsAPI: {
+    list: vi.fn().mockResolvedValue([]),
     listMy: vi.fn().mockResolvedValue([]),
   },
   legacyImportAPI: {

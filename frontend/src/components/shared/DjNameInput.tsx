@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { autocompleteAPI } from '../../services/api';
+import { autocompleteAPI, specialtyShowsAPI } from '../../services/api';
 import { useOnAirDj } from './useOnAirDj';
 
 export const DJ_NAME_KEY = 'kalx_dj_name';
@@ -14,10 +14,14 @@ const DjNameInput = ({ value, onChange, id = 'dj-name-input' }: DjNameInputProps
   const [djNames, setDjNames] = useState<string[]>([]);
   const [filteredDjNames, setFilteredDjNames] = useState<string[]>([]);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [specialtyShowNames, setSpecialtyShowNames] = useState<Set<string>>(new Set());
   const autocompleteRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
     autocompleteAPI.getDJNames().then(setDjNames).catch(() => {});
+    specialtyShowsAPI.list()
+      .then((shows) => setSpecialtyShowNames(new Set(shows.map((s) => s.name.toLowerCase()))))
+      .catch(() => {});
   }, []);
 
   const handleChange = (newValue: string) => {
@@ -71,15 +75,21 @@ const DjNameInput = ({ value, onChange, id = 'dj-name-input' }: DjNameInputProps
           />
           {showAutocomplete && (
             <ul className="autocomplete-list" ref={autocompleteRef}>
-              {filteredDjNames.map((name) => (
-                <li
-                  key={name}
-                  onMouseDown={() => selectName(name)}
-                  className="autocomplete-item"
-                >
-                  {name}
-                </li>
-              ))}
+              {filteredDjNames.map((name) => {
+                const isSpecialty = specialtyShowNames.has(name.toLowerCase());
+                return (
+                  <li
+                    key={name}
+                    onMouseDown={() => selectName(name)}
+                    className="autocomplete-item"
+                  >
+                    <span>{name}</span>
+                    <span className={isSpecialty ? 'specialty-show-badge' : 'dj-name-badge'}>
+                      {isSpecialty ? 'Specialty Show' : 'DJ'}
+                    </span>
+                  </li>
+                );
+              })}
               {filteredDjNames.length === 1 && (
                 <li className="autocomplete-hint">Press Tab to complete</li>
               )}

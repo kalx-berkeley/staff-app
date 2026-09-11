@@ -1159,6 +1159,127 @@ fieldset.radio-group legend {
   border-top: 1px solid var(--border-color);
 }
 
+.autocomplete-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.dj-name-badge,
+.specialty-show-badge {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.dj-name-badge {
+  color: #1565c0;
+  background-color: #e3f2fd;
+}
+
+.specialty-show-badge {
+  color: #6a1b9a;
+  background-color: #f3e5f5;
+}
+
+/* Date picker (react-day-picker), used in place of native <input type="date"> everywhere */
+.date-picker-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+/* Kept focusable/typable (for keyboard + screen-reader users, and label association) but
+   not shown — the visible date-picker-trigger button is the sighted/mouse affordance. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.date-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 160px;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  background-color: #fff;
+  color: #333;
+  cursor: pointer;
+}
+
+.date-picker-trigger:hover:not(:disabled) {
+  border-color: var(--primary-color);
+}
+
+.date-picker-trigger:disabled {
+  background-color: #e9ecef;
+  color: #6c757d;
+  cursor: not-allowed;
+}
+
+.date-picker-placeholder {
+  color: #6c757d;
+}
+
+.date-picker-icon {
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+
+.date-picker-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 200;
+  margin-top: 0.25rem;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 0.5rem;
+}
+
+.form-group .date-picker-wrapper {
+  display: block;
+}
+
+.form-group .date-picker-trigger {
+  width: 100%;
+}
+
+.date-override-toggle {
+  display: block;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0.3rem 0;
+  color: var(--primary-color);
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.date-override-toggle:hover {
+  color: #2f6bb3;
+}
+
 /* Tag input (e.g. venue/promoter owner lists) */
 .tag-input-row {
   display: flex;

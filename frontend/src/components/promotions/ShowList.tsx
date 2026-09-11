@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { showsAPI } from '../../services/api';
 import type { ShowSummary, ShowStatus, APIError } from '../../types';
 import SearchBar from './SearchBar';
-import { Tooltip, EnrichedShowName, FeatureBinBadge } from '../shared';
+import { Tooltip, EnrichedShowName, FeatureBinBadge, DatePicker } from '../shared';
 
 type SortBy = 'date' | 'band' | 'venue' | 'published';
 
@@ -190,21 +190,19 @@ const ShowList = () => {
 
         <span style={{ marginLeft: '1rem' }}>
           <label htmlFor="promo-date-from">From:</label>{' '}
-          <input
-            type="date"
+          <DatePicker
             id="promo-date-from"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={setDateFrom}
             style={{ fontSize: '0.9rem' }}
           />
         </span>
         <span style={{ marginLeft: '0.5rem' }}>
           <label htmlFor="promo-date-to">To:</label>{' '}
-          <input
-            type="date"
+          <DatePicker
             id="promo-date-to"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={setDateTo}
             style={{ fontSize: '0.9rem' }}
           />
         </span>

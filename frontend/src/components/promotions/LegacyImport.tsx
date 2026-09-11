@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { legacyImportAPI, venuesAPI, showsAPI } from '../../services/api';
 import type { VenueResponse, AgeRestriction } from '../../types';
+import { DatePicker } from '../shared';
 
 interface StaffMember {
   id: number;
@@ -442,11 +443,10 @@ const LegacyImport = () => {
           <div className="form-row" style={{ display: 'flex', gap: '1rem' }}>
             <div className="form-group" style={{ flex: 1 }}>
               <label htmlFor="li_show_start_date">Start Date <span className="required">*</span></label>
-              <input
+              <DatePicker
                 id="li_show_start_date"
-                type="date"
                 value={showStartDate}
-                onChange={(e) => setShowStartDate(e.target.value)}
+                onChange={setShowStartDate}
                 className={errors.show_start_date ? 'input-error' : ''}
                 disabled={submitting}
               />
@@ -454,11 +454,10 @@ const LegacyImport = () => {
             </div>
             <div className="form-group" style={{ flex: 1 }}>
               <label htmlFor="li_show_date_multi">End Date <span className="required">*</span></label>
-              <input
+              <DatePicker
                 id="li_show_date_multi"
-                type="date"
                 value={showDate}
-                onChange={(e) => setShowDate(e.target.value)}
+                onChange={setShowDate}
                 className={errors.show_date ? 'input-error' : ''}
                 disabled={submitting}
               />
@@ -469,11 +468,10 @@ const LegacyImport = () => {
           <div className="form-row" style={{ display: 'flex', gap: '1rem' }}>
             <div className="form-group" style={{ flex: 1 }}>
               <label htmlFor="li_show_date">Show Date <span className="required">*</span></label>
-              <input
+              <DatePicker
                 id="li_show_date"
-                type="date"
                 value={showDate}
-                onChange={(e) => setShowDate(e.target.value)}
+                onChange={setShowDate}
                 className={errors.show_date ? 'input-error' : ''}
                 disabled={submitting}
               />

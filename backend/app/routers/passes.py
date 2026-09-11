@@ -14,6 +14,9 @@ from app.schemas.pass_schema import (
 )
 from app.services.pass_service import PassService, normalize_phone, format_phone
 from app.services import audit_service
+from app.services.spinitron_upcoming_schedule_service import (
+    SpinitronUpcomingScheduleService,
+)
 from app.auth import (
     require_promotions_or_staff,
     get_promotions_staff,
@@ -500,6 +503,24 @@ def release_winner(
 
     db.refresh(pass_item)
     return PassResponse.model_validate(pass_item)
+
+
+@router.get("/passes/preassign/schedule", response_model=list[str])
+async def get_preassign_schedule(
+    name: str = Query(..., min_length=1, max_length=100),
+    role_and_staff: tuple = Depends(require_promotions_or_staff),
+    db: Session = Depends(get_db),
+):
+    """
+    List upcoming dates (next ~4 weeks) that *name* is scheduled on-air.
+
+    *name* is matched the same way the "Reserve for"/"Pre-assign to DJ"
+    autocomplete conflates DJs and specialty shows: either a DJ's persona name
+    or an exact specialty-show title. Used to restrict the date picker when
+    pre-assigning a pass pair, so a promotions or Sublist-DJ staff member
+    only sees dates the schedule actually backs up.
+    """
+    return await SpinitronUpcomingScheduleService.get_dates_for_name(db, name)
 
 
 @router.post("/passes/{pass_id}/preassign", response_model=PassResponse)

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { showsAPI, passesAPI } from '../../services/api';
 import SearchBar from '../promotions/SearchBar';
-import { Tooltip, DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge } from '../shared';
+import { Tooltip, DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, DatePicker } from '../shared';
 import type { ShowSummary, PassResponse, APIError } from '../../types';
 
 const VIEW_MODE_KEY = 'kalx_dj_view_mode';
@@ -164,21 +164,19 @@ const ShowBrowser = () => {
 
         <span style={{ marginLeft: '1rem' }}>
           <label htmlFor="dj-date-from">From:</label>{' '}
-          <input
-            type="date"
+          <DatePicker
             id="dj-date-from"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={setDateFrom}
             style={{ fontSize: '0.9rem' }}
           />
         </span>
         <span style={{ marginLeft: '0.5rem' }}>
           <label htmlFor="dj-date-to">To:</label>{' '}
-          <input
-            type="date"
+          <DatePicker
             id="dj-date-to"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={setDateTo}
             style={{ fontSize: '0.9rem' }}
           />
         </span>

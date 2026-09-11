@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import DjNameInput from './DjNameInput';
-import { autocompleteAPI, onAirAPI } from '../../services/api';
+import { autocompleteAPI, specialtyShowsAPI, onAirAPI } from '../../services/api';
 
 vi.mock('../../services/api', () => ({
   autocompleteAPI: {
     getDJNames: vi.fn(),
+  },
+  specialtyShowsAPI: {
+    list: vi.fn(),
   },
   onAirAPI: {
     getCurrent: vi.fn(),
@@ -15,6 +18,7 @@ vi.mock('../../services/api', () => ({
 describe('DjNameInput on-air sync', () => {
   beforeEach(() => {
     vi.mocked(autocompleteAPI.getDJNames).mockResolvedValue([]);
+    vi.mocked(specialtyShowsAPI.list).mockResolvedValue([]);
     localStorage.clear();
   });
 

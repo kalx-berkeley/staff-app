@@ -14,6 +14,7 @@ import type {
   APIError,
 } from '../../types';
 import { useAuth } from '../../contexts/authHooks';
+import { DatePicker } from '../shared';
 
 const AUDIT_PAGE_SIZE = 50;
 
@@ -787,19 +788,11 @@ const Admin = () => {
         <div className="audit-log-filters">
           <label className="audit-log-filter-label">
             From
-            <input
-              type="date"
-              value={auditSince}
-              onChange={(e) => setAuditSince(e.target.value)}
-            />
+            <DatePicker value={auditSince} onChange={setAuditSince} />
           </label>
           <label className="audit-log-filter-label">
             To
-            <input
-              type="date"
-              value={auditUntil}
-              onChange={(e) => setAuditUntil(e.target.value)}
-            />
+            <DatePicker value={auditUntil} onChange={setAuditUntil} />
           </label>
           <input
             type="text"

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { showsAPI, passesAPI, lotteryAPI, specialtyShowsAPI } from '../../services/api';
-import { Tooltip, EnrichedShowName, MarkdownContent, FeatureBinBadge } from '../shared';
-import { formatPhone } from '../../utils';
+import { Tooltip, EnrichedShowName, MarkdownContent, FeatureBinBadge, DatePicker } from '../shared';
+import { formatPhone, formatDateValue } from '../../utils';
 import { useAuth } from '../../contexts/authHooks';
 import type { ShowResponse, StaffProfile, APIError, ClaimData, LotteryStatus, SpecialtyShowResponse } from '../../types';
 
@@ -22,6 +22,11 @@ const ShowDetail = () => {
   const [preassignSelfLoading, setPreassignSelfLoading] = useState(false);
   // '' = first DJ name (default); 'dj:NAME' = specific DJ name; 'ss:ID' = specialty show
   const [preassignSelfReserveFor, setPreassignSelfReserveFor] = useState('');
+  // On-air schedule check for preassignSelfReserveFor, to restrict/warn on the reservation date.
+  // null = unknown (not yet checked, or the check failed); [] = checked, no matching dates.
+  const [scheduleDates, setScheduleDates] = useState<string[] | null>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [dateOverride, setDateOverride] = useState(false);
 
   // Specialty shows the current DJ belongs to (for specialty show pre-assignment)
   const [myDJSpecialtyShows, setMyDJSpecialtyShows] = useState<SpecialtyShowResponse[]>([]);
@@ -45,6 +50,10 @@ const ShowDetail = () => {
   const [lotteryDJDate, setLotteryDJDate] = useState('');
   // '' = first DJ name (default); 'dj:NAME' = specific DJ name; 'ss:ID' = specialty show
   const [lotteryDJReserveFor, setLotteryDJReserveFor] = useState('');
+  // On-air schedule check for lotteryDJReserveFor, mirroring scheduleDates/dateOverride above.
+  const [lotteryScheduleDates, setLotteryScheduleDates] = useState<string[] | null>(null);
+  const [lotteryScheduleLoading, setLotteryScheduleLoading] = useState(false);
+  const [lotteryDateOverride, setLotteryDateOverride] = useState(false);
 
   const loadShow = useCallback(async () => {
     if (!id) return;
@@ -97,6 +106,92 @@ const ShowDetail = () => {
       // non-fatal
     });
   }, [user]);
+
+  // Resolve a "Reserve for" value ('' | 'dj:NAME' | 'ss:ID') to the plain DJ or
+  // specialty-show name used to check the on-air schedule.
+  const resolveReserveForName = useCallback(
+    (reserveFor: string): string => {
+      if (reserveFor.startsWith('ss:')) {
+        const showId = parseInt(reserveFor.slice(3));
+        return myDJSpecialtyShows.find((s) => s.id === showId)?.name ?? '';
+      }
+      if (reserveFor.startsWith('dj:')) {
+        return reserveFor.slice(3);
+      }
+      const staffProfile = user?.profile as StaffProfile | undefined;
+      const myDjName = staffProfile?.dj_name ?? '';
+      return myDjName.split(',').map((n) => n.trim()).filter(Boolean)[0] ?? '';
+    },
+    [user, myDJSpecialtyShows]
+  );
+
+  useEffect(() => {
+    if (preassignSelfPassId === null) {
+      setScheduleDates(null);
+      setDateOverride(false);
+      return;
+    }
+    const name = resolveReserveForName(preassignSelfReserveFor);
+    if (!name) {
+      setScheduleDates(null);
+      setDateOverride(false);
+      return;
+    }
+    let cancelled = false;
+    setScheduleLoading(true);
+    passesAPI
+      .getPreassignSchedule(name)
+      .then((dates) => {
+        if (cancelled) return;
+        setScheduleDates(dates);
+        setDateOverride(dates.length === 0);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setScheduleDates(null);
+        setDateOverride(false);
+      })
+      .finally(() => {
+        if (!cancelled) setScheduleLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [preassignSelfPassId, preassignSelfReserveFor, resolveReserveForName]);
+
+  useEffect(() => {
+    if (!showDJLotteryForm) {
+      setLotteryScheduleDates(null);
+      setLotteryDateOverride(false);
+      return;
+    }
+    const name = resolveReserveForName(lotteryDJReserveFor);
+    if (!name) {
+      setLotteryScheduleDates(null);
+      setLotteryDateOverride(false);
+      return;
+    }
+    let cancelled = false;
+    setLotteryScheduleLoading(true);
+    passesAPI
+      .getPreassignSchedule(name)
+      .then((dates) => {
+        if (cancelled) return;
+        setLotteryScheduleDates(dates);
+        setLotteryDateOverride(dates.length === 0);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLotteryScheduleDates(null);
+        setLotteryDateOverride(false);
+      })
+      .finally(() => {
+        if (!cancelled) setLotteryScheduleLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showDJLotteryForm, lotteryDJReserveFor, resolveReserveForName]);
 
   const showEphemeralSuccess = (msg: string) => {
     setSuccessMessage(msg);
@@ -643,13 +738,43 @@ const ShowDetail = () => {
                           className="input-readonly"
                         />
                       )}
-                      <input
-                        type="date"
+                      {lotteryScheduleLoading && (
+                        <p className="field-hint">Checking on-air schedule…</p>
+                      )}
+                      {lotteryScheduleDates?.length === 0 && (
+                        <p className="field-hint">
+                          No scheduled on-air dates found in the next ~4 weeks. You can still pick
+                          a date below.
+                        </p>
+                      )}
+                      <DatePicker
                         value={lotteryDJDate}
-                        onChange={(e) => setLotteryDJDate(e.target.value)}
+                        onChange={setLotteryDJDate}
                         max={maxDJReservationDate}
                         disabled={lotteryActionLoading}
+                        isDateDisabled={
+                          !lotteryDateOverride && lotteryScheduleDates && lotteryScheduleDates.length > 0
+                            ? (date) => !lotteryScheduleDates.includes(formatDateValue(date))
+                            : undefined
+                        }
                       />
+                      {lotteryScheduleDates !== null && lotteryScheduleDates.length > 0 && (
+                        <button
+                          type="button"
+                          className="date-override-toggle"
+                          onClick={() => setLotteryDateOverride((o) => !o)}
+                        >
+                          {lotteryDateOverride ? 'Only show scheduled dates' : "Date not listed? Override"}
+                        </button>
+                      )}
+                      {lotteryScheduleDates !== null &&
+                        lotteryDJDate &&
+                        !lotteryScheduleDates.includes(lotteryDJDate) && (
+                          <p className="field-warning">
+                            The on-air schedule doesn't show you on {formatDate(lotteryDJDate)}.
+                            Only enter the lottery for this date if you're sure that's correct.
+                          </p>
+                        )}
                       <button
                         onClick={handleEnterDJLottery}
                         className="btn-small btn-primary"
@@ -745,13 +870,44 @@ const ShowDetail = () => {
                                   className="input-readonly"
                                 />
                               )}
-                              <input
-                                type="date"
+                              {scheduleLoading && (
+                                <p className="field-hint">Checking on-air schedule…</p>
+                              )}
+                              {scheduleDates?.length === 0 && (
+                                <p className="field-hint">
+                                  No scheduled on-air dates found in the next ~4 weeks. You can
+                                  still pick a date below.
+                                </p>
+                              )}
+                              <DatePicker
                                 value={preassignSelfDate}
-                                onChange={(e) => setPreassignSelfDate(e.target.value)}
+                                onChange={setPreassignSelfDate}
                                 max={maxDJReservationDate}
                                 disabled={preassignSelfLoading}
+                                isDateDisabled={
+                                  !dateOverride && scheduleDates && scheduleDates.length > 0
+                                    ? (date) => !scheduleDates.includes(formatDateValue(date))
+                                    : undefined
+                                }
                               />
+                              {scheduleDates !== null && scheduleDates.length > 0 && (
+                                <button
+                                  type="button"
+                                  className="date-override-toggle"
+                                  onClick={() => setDateOverride((o) => !o)}
+                                >
+                                  {dateOverride ? 'Only show scheduled dates' : "Date not listed? Override"}
+                                </button>
+                              )}
+                              {scheduleDates !== null &&
+                                preassignSelfDate &&
+                                !scheduleDates.includes(preassignSelfDate) && (
+                                  <p className="field-warning">
+                                    The on-air schedule doesn't show you on{' '}
+                                    {formatDate(preassignSelfDate)}. Only save this if you're sure
+                                    that's correct.
+                                  </p>
+                                )}
                               <button
                                 onClick={() => handleSelfPreassignSubmit(pass.id)}
                                 className="btn-small btn-primary"

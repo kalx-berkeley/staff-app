@@ -690,6 +690,26 @@ export const passesAPI = {
     }
   },
 
+  /**
+   * List upcoming dates (next ~4 weeks) that a DJ or specialty show name is scheduled on-air.
+   *
+   * Used to restrict the pre-assignment date picker to dates the Spinitron
+   * schedule actually backs up.
+   *
+   * @param name - DJ name or specialty show name, exactly as shown in the autocomplete
+   * @returns Promise resolving to an array of YYYY-MM-DD date strings
+   */
+  getPreassignSchedule: async (name: string): Promise<string[]> => {
+    try {
+      const response = await apiClient.get<string[]>('/passes/preassign/schedule', {
+        params: { name },
+      });
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
   removePreassignment: async (passId: number, djName?: string): Promise<PassResponse> => {
     try {
       const response = await apiClient.delete<PassResponse>(

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { showsAPI } from '../../services/api';
 import SearchBar from '../promotions/SearchBar';
-import { Tooltip, EnrichedShowName, FeatureBinBadge } from '../shared';
+import { Tooltip, EnrichedShowName, FeatureBinBadge, DatePicker } from '../shared';
 import type { ShowSummary, APIError } from '../../types';
 
 const VIEW_MODE_KEY = 'kalx_staff_view_mode';
@@ -159,21 +159,19 @@ const ShowBrowser = () => {
 
         <span style={{ marginLeft: '1rem' }}>
           <label htmlFor="staff-date-from">From:</label>{' '}
-          <input
-            type="date"
+          <DatePicker
             id="staff-date-from"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={setDateFrom}
             style={{ fontSize: '0.9rem' }}
           />
         </span>
         <span style={{ marginLeft: '0.5rem' }}>
           <label htmlFor="staff-date-to">To:</label>{' '}
-          <input
-            type="date"
+          <DatePicker
             id="staff-date-to"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={setDateTo}
             style={{ fontSize: '0.9rem' }}
           />
         </span>

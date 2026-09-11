@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { showsAPI, venuesAPI, venuesMyAPI, promotersAPI } from '../../services/api';
-import { Tooltip, BandAnnotator } from '../shared';
+import { Tooltip, BandAnnotator, DatePicker } from '../shared';
 import { formatPhone } from '../../utils';
 import type {
   DescriptionAnalysis,
@@ -845,12 +845,11 @@ const ShowForm = () => {
                 <label htmlFor="show_start_date">
                   Start Date <span className="required">*</span>
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   id="show_start_date"
                   value={showStartDate}
                   max={showDate || undefined}
-                  onChange={(e) => setShowStartDate(e.target.value)}
+                  onChange={setShowStartDate}
                   disabled={submitting}
                 />
               </div>
@@ -859,12 +858,11 @@ const ShowForm = () => {
                 <label htmlFor="show_date">
                   End Date <span className="required">*</span>
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   id="show_date"
                   value={showDate}
                   min={showStartDate || undefined}
-                  onChange={(e) => setShowDate(e.target.value)}
+                  onChange={setShowDate}
                   className={errors.show_date ? 'input-error' : ''}
                   disabled={submitting}
                 />
@@ -879,11 +877,10 @@ const ShowForm = () => {
                 <label htmlFor="show_date">
                   Show Date <span className="required">*</span>
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   id="show_date"
                   value={showDate}
-                  onChange={(e) => handleShowDateChange(e.target.value)}
+                  onChange={handleShowDateChange}
                   className={errors.show_date ? 'input-error' : ''}
                   disabled={submitting}
                 />
@@ -1066,11 +1063,10 @@ const ShowForm = () => {
           <div className="form-row">
             <div className="form-group">
               <label htmlFor="planned_close_date">Close Date</label>
-              <input
-                type="date"
+              <DatePicker
                 id="planned_close_date"
                 value={plannedCloseDate}
-                onChange={(e) => setPlannedCloseDate(e.target.value)}
+                onChange={setPlannedCloseDate}
                 className={errors.planned_close_date ? 'input-error' : ''}
                 disabled={submitting}
               />

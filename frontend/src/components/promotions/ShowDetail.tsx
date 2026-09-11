@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { showsAPI, passesAPI, autocompleteAPI, lotteryAPI } from '../../services/api';
-import { Tooltip, EnrichedShowName, MarkdownContent, FeatureBinBadge } from '../shared';
-import { formatPhone } from '../../utils';
+import { showsAPI, passesAPI, autocompleteAPI, specialtyShowsAPI, lotteryAPI } from '../../services/api';
+import { Tooltip, EnrichedShowName, MarkdownContent, FeatureBinBadge, DatePicker } from '../shared';
+import { formatPhone, formatDateValue } from '../../utils';
 import { useAuth } from '../../contexts/authHooks';
 import type {
   ShowResponse,
@@ -122,6 +122,14 @@ const ShowDetail = () => {
   const [filteredDjNames, setFilteredDjNames] = useState<string[]>([]);
   const [showDjAutocomplete, setShowDjAutocomplete] = useState(false);
   const djAutocompleteRef = useRef<HTMLUListElement>(null);
+  const [specialtyShowNames, setSpecialtyShowNames] = useState<Set<string>>(new Set());
+
+  // On-air schedule check for the entered DJ/specialty show name, to restrict
+  // (and warn about) the pre-assignment date.
+  // null = unknown (name not yet checked, or the check failed); [] = checked, no matching dates.
+  const [scheduleDates, setScheduleDates] = useState<string[] | null>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [dateOverride, setDateOverride] = useState(false);
 
   const loadShow = useCallback(async () => {
     if (!id) return;
@@ -163,7 +171,31 @@ const ShowDetail = () => {
 
   useEffect(() => {
     autocompleteAPI.getDJNames().then(setDjNames).catch(() => {});
+    specialtyShowsAPI.list()
+      .then((shows) => setSpecialtyShowNames(new Set(shows.map((s) => s.name.toLowerCase()))))
+      .catch(() => {});
   }, []);
+
+  const fetchScheduleForName = async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setScheduleDates(null);
+      setDateOverride(false);
+      return;
+    }
+    setScheduleLoading(true);
+    try {
+      const dates = await passesAPI.getPreassignSchedule(trimmed);
+      setScheduleDates(dates);
+      setDateOverride(dates.length === 0);
+    } catch {
+      // Non-fatal — degrade to an unrestricted date picker with no warning.
+      setScheduleDates(null);
+      setDateOverride(false);
+    } finally {
+      setScheduleLoading(false);
+    }
+  };
 
   const handlePreassignDjChange = (value: string) => {
     setPreassignDj(value);
@@ -181,6 +213,12 @@ const ShowDetail = () => {
   const selectPreassignDj = (name: string) => {
     setPreassignDj(name);
     setShowDjAutocomplete(false);
+    fetchScheduleForName(name);
+  };
+
+  const handlePreassignDjBlur = () => {
+    setTimeout(() => setShowDjAutocomplete(false), 200);
+    fetchScheduleForName(preassignDj);
   };
 
   const handlePreassignDjKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -262,6 +300,8 @@ const ShowDetail = () => {
       setPreassignPassId(null);
       setPreassignDj('');
       setPreassignDate('');
+      setScheduleDates(null);
+      setDateOverride(false);
       await loadShow();
     } catch (err) {
       const apiError = err as APIError;
@@ -707,34 +747,71 @@ const ShowDetail = () => {
                           value={preassignDj}
                           onChange={(e) => handlePreassignDjChange(e.target.value)}
                           onKeyDown={handlePreassignDjKeyDown}
-                          onBlur={() => setTimeout(() => setShowDjAutocomplete(false), 200)}
+                          onBlur={handlePreassignDjBlur}
                           disabled={actionLoading}
                           autoComplete="off"
                         />
                         {showDjAutocomplete && (
                           <ul className="autocomplete-list" ref={djAutocompleteRef}>
-                            {filteredDjNames.map((name) => (
-                              <li
-                                key={name}
-                                onMouseDown={() => selectPreassignDj(name)}
-                                className="autocomplete-item"
-                              >
-                                {name}
-                              </li>
-                            ))}
+                            {filteredDjNames.map((name) => {
+                              const isSpecialty = specialtyShowNames.has(name.toLowerCase());
+                              return (
+                                <li
+                                  key={name}
+                                  onMouseDown={() => selectPreassignDj(name)}
+                                  className="autocomplete-item"
+                                >
+                                  <span>{name}</span>
+                                  <span className={isSpecialty ? 'specialty-show-badge' : 'dj-name-badge'}>
+                                    {isSpecialty ? 'Specialty Show' : 'DJ'}
+                                  </span>
+                                </li>
+                              );
+                            })}
                             {filteredDjNames.length === 1 && (
                               <li className="autocomplete-hint">Press Tab to complete</li>
                             )}
                           </ul>
                         )}
                       </div>
-                      <input
-                        type="date"
+                      {scheduleLoading && (
+                        <p className="field-hint">Checking on-air schedule…</p>
+                      )}
+                      {scheduleDates?.length === 0 && (
+                        <p className="field-hint">
+                          No scheduled on-air dates found for "{preassignDj.trim()}" in the next
+                          ~4 weeks. You can still pick a date below.
+                        </p>
+                      )}
+                      <DatePicker
                         value={preassignDate}
-                        onChange={(e) => setPreassignDate(e.target.value)}
+                        onChange={setPreassignDate}
                         max={show.show_date}
                         disabled={actionLoading}
+                        isDateDisabled={
+                          !dateOverride && scheduleDates && scheduleDates.length > 0
+                            ? (date) => !scheduleDates.includes(formatDateValue(date))
+                            : undefined
+                        }
                       />
+                      {scheduleDates !== null && scheduleDates.length > 0 && (
+                        <button
+                          type="button"
+                          className="date-override-toggle"
+                          onClick={() => setDateOverride((o) => !o)}
+                        >
+                          {dateOverride ? 'Only show scheduled dates' : "Date not listed? Override"}
+                        </button>
+                      )}
+                      {scheduleDates !== null &&
+                        preassignDate &&
+                        !scheduleDates.includes(preassignDate) && (
+                          <p className="field-warning">
+                            The on-air schedule doesn't show {preassignDj.trim() || 'this DJ'}{' '}
+                            scheduled on {formatDate(preassignDate)}. Only save this if you're sure
+                            that's correct.
+                          </p>
+                        )}
                       <button
                         onClick={() => handlePreassignSubmit(pass.id)}
                         className="btn-small btn-primary"
@@ -747,6 +824,8 @@ const ShowDetail = () => {
                           setPreassignPassId(null);
                           setPreassignDj('');
                           setPreassignDate('');
+                          setScheduleDates(null);
+                          setDateOverride(false);
                         }}
                         className="btn-small"
                         disabled={actionLoading}
