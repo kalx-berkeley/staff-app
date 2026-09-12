@@ -124,15 +124,21 @@ def _get_promotions_staff_by_email(db: Session, email: str) -> Staff | None:
 
 
 def get_current_user_email(
-    x_forwarded_user: str | None = Header(None, alias="X-Forwarded-User")
+    x_forwarded_user: str | None = Header(None, alias="X-Forwarded-User"),
+    db: Session = Depends(get_db),
 ) -> str | None:
     """
-    Extract user email from the X-Forwarded-User header set by Apache mod_auth_openidc.
+    Extract the current user's effective email from the X-Forwarded-User header,
+    honoring an active staging impersonation session.
 
     :param x_forwarded_user: Email from Apache mod_auth_openidc Google authentication
-    :returns: User email or None if not authenticated
+    :param db: Database session
+    :returns: The impersonated user's email if actively impersonating in staging,
+        the authenticated email otherwise, or None if not authenticated.
     """
-    return x_forwarded_user
+    if not x_forwarded_user:
+        return None
+    return resolve_effective_email(x_forwarded_user, db)
 
 
 def require_authentication(
@@ -192,9 +198,12 @@ def get_user_role_or_dj(
     users.  Any unauthenticated request that reaches this dependency has already
     passed check_apache_auth_layer, so it originates from the DJ studio network.
 
-    Role mapping is identical to get_user_role when an email is present.
+    Role mapping is identical to get_user_role when an email is present. `email`
+    is already impersonation-resolved by `get_current_user_email`, so a
+    promotions staff member impersonating another account in staging gets that
+    account's role.
 
-    :param email: User email from Apache mod_auth_openidc (optional)
+    :param email: User's effective email (optional)
     :param db: Database session
     :returns: User role: "promotions", "staff", or "dj"
     """
@@ -213,6 +222,30 @@ def get_user_role_or_dj(
         return "promotions"
 
     return "staff"
+
+
+def resolve_effective_email(email: str, db: Session) -> str:
+    """
+    Resolve *email* to the identity actually being acted as, honoring an active
+    staging impersonation session (a promotions staff member impersonating
+    another account to test their view/permissions).
+
+    :param email: The real, authenticated user's email.
+    :param db: Database session.
+    :returns: The impersonated user's email if *email* has an active
+        impersonation session in staging, else *email* unchanged.
+    """
+    if settings.environment != "staging":
+        return email
+
+    from app.models.impersonation_session import ImpersonationSession
+
+    imp = (
+        db.query(ImpersonationSession)
+        .filter(ImpersonationSession.real_email == email)
+        .first()
+    )
+    return imp.impersonated_email if imp and imp.impersonated_email else email
 
 
 def get_promotions_staff(

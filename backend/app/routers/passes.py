@@ -22,6 +22,7 @@ from app.services.spinitron_upcoming_schedule_service import (
 )
 from app.auth import (
     require_promotions_or_staff,
+    resolve_effective_email,
     get_promotions_staff,
     get_sublist_dj_staff,
     check_dj_access,
@@ -869,6 +870,11 @@ def remove_preassignment(
     - DJ studio network (IP-based, no email auth): may remove only their own
       pre-assignment; must supply dj_name query param matching preassigned_dj.
 
+    In staging, resolves any active impersonation session first, so a
+    promotions staff member impersonating a staff/DJ account is subject to
+    that account's access rules (and any resulting audit entry attributes the
+    removal to the impersonated identity) rather than their own.
+
     Args:
         pass_id: Pass ID
         dj_name: DJ name for self-unassign from the DJ studio network
@@ -889,7 +895,8 @@ def remove_preassignment(
 
     # Authenticated user path (email-based auth)
     if x_forwarded_user:
-        staff_record = db.query(Staff).filter(Staff.email == x_forwarded_user).first()
+        effective_email = resolve_effective_email(x_forwarded_user, db)
+        staff_record = db.query(Staff).filter(Staff.email == effective_email).first()
         if not staff_record or ACTIVE_STATUS not in _staff_statuses(staff_record):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -897,7 +904,7 @@ def remove_preassignment(
             )
 
         if _is_promotions_staff(staff_record):
-            actor_email = x_forwarded_user
+            actor_email = effective_email
             actor_role = "promotions"
         else:
             # Regular staff: verify their name (or dj_name) matches the preassigned DJ,
@@ -932,7 +939,7 @@ def remove_preassignment(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="You can only unassign your own pre-assigned passes",
                 )
-            actor_email = x_forwarded_user
+            actor_email = effective_email
             actor_role = "staff"
 
     # DJ studio network path (IP-based, no email auth)

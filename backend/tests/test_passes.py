@@ -352,6 +352,58 @@ def test_remove_preassignment(client, show, promotions_staff, db):
     assert data["preassigned_date"] is None
 
 
+def test_remove_preassignment_uses_impersonated_identity(
+    client, show, promotions_staff, db, monkeypatch
+):
+    """Staging: removing a pre-assignment is checked against the impersonated
+    staff member's own name/dj_name, not the real (impersonating) user's."""
+    from app import config
+    from app.models.impersonation_session import ImpersonationSession
+
+    monkeypatch.setattr(config.settings, "environment", "staging")
+
+    pass_item = (
+        db.query(Pass)
+        .filter(
+            Pass.show_id == show.id, Pass.pass_type == "pair", Pass.status == "available"
+        )
+        .first()
+    )
+    client.post(
+        f"/api/passes/{pass_item.id}/preassign",
+        json={"dj_name": "DJ Match", "assignment_date": "2024-12-30"},
+        headers={"X-Forwarded-User": promotions_staff.email},
+    )
+
+    # The real user is a plain staff member whose own name doesn't match the
+    # pre-assigned DJ — removal would be forbidden as themselves.
+    real_staff = Staff(email="real@test.com", name="Real Staff", phone="555-0005")
+    db.add(real_staff)
+    db.flush()
+    db.add(StaffStatus(staff_id=real_staff.id, status="Active"))
+
+    # The impersonated staff member's dj_name matches the pre-assigned DJ.
+    impersonated_staff = Staff(
+        email="imp@test.com", name="Imp Staff", phone="555-0006", dj_name="DJ Match"
+    )
+    db.add(impersonated_staff)
+    db.flush()
+    db.add(StaffStatus(staff_id=impersonated_staff.id, status="Active"))
+
+    db.add(
+        ImpersonationSession(real_email="real@test.com", impersonated_email="imp@test.com")
+    )
+    db.commit()
+
+    response = client.delete(
+        f"/api/passes/{pass_item.id}/preassign",
+        headers={"X-Forwarded-User": "real@test.com"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["preassigned_dj"] is None
+
+
 def test_cannot_preassign_staff_pass(client, show, promotions_staff, db):
     """Test that staff passes cannot be pre-assigned."""
     # Get a staff pass

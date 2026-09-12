@@ -619,3 +619,96 @@ def test_genre_preferences_dj_forbidden(client: TestClient):
         headers={"X-Forwarded-User": "dj@example.com"},
     )
     assert response.status_code == 403
+
+
+def test_genre_preferences_use_impersonated_identity(
+    client: TestClient, db: Session, monkeypatch
+):
+    """Staging: impersonating another staff member reads/writes their genre
+    preferences, not the impersonator's own."""
+    from app import config
+    from app.models.impersonation_session import ImpersonationSession
+
+    monkeypatch.setattr(config.settings, "environment", "staging")
+
+    promo = _make_promotions_staff(db, "promo@example.com", "Promo User", "555-1234")
+    target = _make_active_staff(db, "staff@example.com", "Staff User", "555-5678")
+    db.add(StaffGenrePreference(staff_id=promo.id, genres=["metal"]))
+    db.add(StaffGenrePreference(staff_id=target.id, genres=["jazz"]))
+    db.add(
+        ImpersonationSession(
+            real_email="promo@example.com", impersonated_email="staff@example.com"
+        )
+    )
+    db.commit()
+
+    response = client.get(
+        "/api/users/genre-preferences",
+        headers={"X-Forwarded-User": "promo@example.com"},
+    )
+    assert response.status_code == 200
+    assert response.json()["genres"] == ["jazz"]
+
+    response = client.put(
+        "/api/users/genre-preferences",
+        json={"genres": ["blues"]},
+        headers={"X-Forwarded-User": "promo@example.com"},
+    )
+    assert response.status_code == 200
+    assert response.json()["genres"] == ["blues"]
+
+    db.refresh(promo)
+    assert db.query(StaffGenrePreference).filter_by(staff_id=promo.id).first().genres == [
+        "metal"
+    ]
+    assert db.query(StaffGenrePreference).filter_by(staff_id=target.id).first().genres == [
+        "blues"
+    ]
+
+
+def test_notification_preferences_use_impersonated_identity(
+    client: TestClient, db: Session, monkeypatch
+):
+    """Staging: impersonating another staff member reads/writes their
+    notification preferences, not the impersonator's own."""
+    from app import config
+    from app.models.impersonation_session import ImpersonationSession
+
+    monkeypatch.setattr(config.settings, "environment", "staging")
+
+    promo = _make_promotions_staff(db, "promo@example.com", "Promo User", "555-1234")
+    target = _make_active_staff(db, "staff@example.com", "Staff User", "555-5678")
+    db.add(NotificationPreferences(staff_id=promo.id, email_enabled=False))
+    db.add(NotificationPreferences(staff_id=target.id, email_enabled=False))
+    db.add(
+        ImpersonationSession(
+            real_email="promo@example.com", impersonated_email="staff@example.com"
+        )
+    )
+    db.commit()
+
+    response = client.get(
+        "/api/users/notification-preferences",
+        headers={"X-Forwarded-User": "promo@example.com"},
+    )
+    assert response.status_code == 200
+    assert response.json()["email_enabled"] is False
+
+    response = client.put(
+        "/api/users/notification-preferences",
+        json={"email_enabled": True},
+        headers={"X-Forwarded-User": "promo@example.com"},
+    )
+    assert response.status_code == 200
+
+    assert (
+        db.query(NotificationPreferences).filter_by(staff_id=promo.id).first().email_enabled
+        is False
+    )
+    assert (
+        db.query(NotificationPreferences)
+        .filter_by(staff_id=target.id)
+        .first()
+        .email_enabled
+        is True
+    )

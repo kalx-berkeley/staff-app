@@ -384,6 +384,77 @@ def test_role_based_show_visibility(
     assert "Closed Show" in event_names
 
 
+def test_show_visibility_uses_impersonated_role(
+    client: TestClient, test_venue, test_promotions_staff, db: Session, monkeypatch
+):
+    """Staging: a promotions staff member impersonating a plain staff account
+    sees that account's (restricted) show visibility, not their own."""
+    from app import config
+    from app.models.impersonation_session import ImpersonationSession
+    from app.models.show import Show
+    from app.models.staff import Staff
+    from app.models.staff_status import StaffStatus
+
+    monkeypatch.setattr(config.settings, "environment", "staging")
+
+    staff = Staff(email="staff@test.com", name="Test Staff", phone="555-0200")
+    db.add(staff)
+    db.flush()
+    db.add(StaffStatus(staff_id=staff.id, status="Active"))
+    db.commit()
+
+    draft_show = Show(
+        event_name="Draft Show",
+        genre=["Rock"],
+        venue_id=test_venue.id,
+        show_date=date(2024, 12, 31),
+        show_time=time(20, 0),
+        age_restriction="all_ages",
+        wheelchair_accessible=True,
+        num_pass_pairs=2,
+        status="draft",
+    )
+    published_show = Show(
+        event_name="Published Show",
+        genre=["Jazz"],
+        venue_id=test_venue.id,
+        show_date=date(2024, 12, 30),
+        show_time=time(20, 0),
+        age_restriction="all_ages",
+        wheelchair_accessible=True,
+        num_pass_pairs=2,
+        status="published",
+    )
+    db.add_all([draft_show, published_show])
+    db.commit()
+
+    # Before impersonating, the real (promotions) identity sees both shows.
+    response = client.get(
+        "/api/shows", headers={"X-Forwarded-User": test_promotions_staff.email}
+    )
+    assert response.status_code == 200
+    assert len(response.json()) == 2
+
+    # Now impersonate the plain staff account — visibility should restrict to
+    # what that account would actually see, hiding the draft show.
+    db.add(
+        ImpersonationSession(
+            real_email=test_promotions_staff.email, impersonated_email=staff.email
+        )
+    )
+    db.commit()
+
+    response = client.get(
+        "/api/shows", headers={"X-Forwarded-User": test_promotions_staff.email}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    event_names = [show["event_name"] for show in data]
+    assert "Draft Show" not in event_names
+    assert "Published Show" in event_names
+    assert "Published Show" in event_names
+
+
 def test_closed_show_prevents_pass_operations(
     client: TestClient, test_venue, test_promotions_staff, db: Session
 ):

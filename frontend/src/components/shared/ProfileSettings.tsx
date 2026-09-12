@@ -215,6 +215,9 @@ const ProfileSettings = () => {
             pass pairs to shows in these genres.
           </p>
           <label htmlFor="genre-preferences-input">Genres</label>
+          <p className="field-hint">
+            Type a genre, then press Enter or comma to add it and start the next one.
+          </p>
           <GenreTagInput
             genres={genrePrefs}
             onChange={handleGenresChange}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface GenreTagInputProps {
   genres: string[];
@@ -24,6 +24,19 @@ const GenreTagInput = ({
   placeholder,
 }: GenreTagInputProps) => {
   const [input, setInput] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wasDisabled = useRef(disabled);
+
+  useEffect(() => {
+    // A caller (e.g. auto-save on each change) commonly disables the field
+    // for the duration of a save — a disabled input can't hold focus, so the
+    // browser blurs it out from under the user. Re-focus it once re-enabled
+    // so the cursor stays put instead of the user having to click back in.
+    if (wasDisabled.current && !disabled) {
+      inputRef.current?.focus();
+    }
+    wasDisabled.current = disabled;
+  }, [disabled]);
 
   const addGenre = (value: string) => {
     const normalized = value.trim().toLowerCase();
@@ -65,6 +78,7 @@ const GenreTagInput = ({
         </span>
       ))}
       <input
+        ref={inputRef}
         type="text"
         id={id}
         list={datalistId}
@@ -74,7 +88,9 @@ const GenreTagInput = ({
         onBlur={() => {
           if (input.trim()) addGenre(input);
         }}
-        placeholder={genres.length === 0 ? (placeholder ?? 'Type a genre and press Enter…') : ''}
+        placeholder={
+          genres.length === 0 ? (placeholder ?? 'Type a genre, then Enter or comma…') : ''
+        }
         disabled={disabled}
         className="genre-text-input"
       />

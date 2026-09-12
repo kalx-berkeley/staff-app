@@ -19,6 +19,7 @@ from app.services.user_service import UserService
 from app.services import audit_service
 from app.auth import (
     require_authentication,
+    resolve_effective_email,
     is_ip_in_network,
     _get_promotions_staff_by_email,
     _is_promotions_staff,
@@ -309,8 +310,14 @@ def _get_or_create_notification_preferences(
 def get_notification_preferences(
     email: str = Depends(require_authentication), db: Session = Depends(get_db)
 ):
-    """Get current user's notification preferences."""
-    return _get_or_create_notification_preferences(db, email)
+    """
+    Get current user's notification preferences.
+
+    In staging, resolves any active impersonation session first, so a
+    promotions staff member impersonating a staff account sees that staff
+    member's notification preferences instead of their own.
+    """
+    return _get_or_create_notification_preferences(db, resolve_effective_email(email, db))
 
 
 @router.put("/notification-preferences", response_model=NotificationPreferencesResponse)
@@ -319,16 +326,23 @@ def update_notification_preferences(
     email: str = Depends(require_authentication),
     db: Session = Depends(get_db),
 ):
-    """Update current user's notification preferences."""
-    prefs = _get_or_create_notification_preferences(db, email)
+    """
+    Update current user's notification preferences.
+
+    In staging, resolves any active impersonation session first, so a
+    promotions staff member impersonating a staff account edits that staff
+    member's notification preferences instead of their own.
+    """
+    effective_email = resolve_effective_email(email, db)
+    prefs = _get_or_create_notification_preferences(db, effective_email)
     prefs.email_enabled = updates.email_enabled
     db.commit()
     db.refresh(prefs)
     audit_service.log_event(
         db,
         event_type="notification_preferences_updated",
-        actor_email=email,
-        actor_role=determine_user_role(db, email),
+        actor_email=effective_email,
+        actor_role=determine_user_role(db, effective_email),
         entity_type="staff",
         entity_id=prefs.staff_id,
         details={"email_enabled": updates.email_enabled},
@@ -361,8 +375,14 @@ def _get_or_create_genre_preferences(db: Session, email: str) -> StaffGenrePrefe
 def get_genre_preferences(
     email: str = Depends(require_authentication), db: Session = Depends(get_db)
 ):
-    """Get current user's genre preferences."""
-    return _get_or_create_genre_preferences(db, email)
+    """
+    Get current user's genre preferences.
+
+    In staging, resolves any active impersonation session first, so a
+    promotions staff member impersonating a staff account sees that staff
+    member's genre preferences instead of their own.
+    """
+    return _get_or_create_genre_preferences(db, resolve_effective_email(email, db))
 
 
 @router.put("/genre-preferences", response_model=GenrePreferencesResponse)
@@ -371,16 +391,23 @@ def update_genre_preferences(
     email: str = Depends(require_authentication),
     db: Session = Depends(get_db),
 ):
-    """Update current user's genre preferences."""
-    prefs = _get_or_create_genre_preferences(db, email)
+    """
+    Update current user's genre preferences.
+
+    In staging, resolves any active impersonation session first, so a
+    promotions staff member impersonating a staff account edits that staff
+    member's genre preferences instead of their own.
+    """
+    effective_email = resolve_effective_email(email, db)
+    prefs = _get_or_create_genre_preferences(db, effective_email)
     prefs.genres = sorted({g.strip().lower() for g in updates.genres if g.strip()})
     db.commit()
     db.refresh(prefs)
     audit_service.log_event(
         db,
         event_type="genre_preferences_updated",
-        actor_email=email,
-        actor_role=determine_user_role(db, email),
+        actor_email=effective_email,
+        actor_role=determine_user_role(db, effective_email),
         entity_type="staff",
         entity_id=prefs.staff_id,
         details={"genres": prefs.genres},

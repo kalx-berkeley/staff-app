@@ -176,6 +176,13 @@ describe('ProfileSettings', () => {
         expect(usersAPI.updateGenrePreferences).toHaveBeenCalledWith({ genres: ['blues'] });
       });
       expect(screen.getByText('blues')).toBeInTheDocument();
+
+      // The field is briefly disabled while the save is in flight (which blurs
+      // it), and should regain focus once saved instead of leaving the user to
+      // click back in before typing the next genre.
+      await waitFor(() => {
+        expect(document.activeElement).toBe(genreInput);
+      });
     });
 
     it('should remove a genre and save the change', async () => {
