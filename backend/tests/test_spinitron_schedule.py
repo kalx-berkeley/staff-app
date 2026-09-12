@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -10,10 +11,24 @@ from app.models.job_log import JobLog
 from app.models.spinitron_playlist import SpinitronPlaylist
 from app.models.spinitron_show import SpinitronShow
 from app.models.staff import Staff
+from app.models.staff_department import StaffDepartment
+from app.models.staff_status import StaffStatus
 from app.services.spinitron_schedule_service import SpinitronScheduleService
 from app.services.spinitron_service import SpinitronShowItem
 
 DJ_STUDIO_IP = "192.168.1.100"  # within default dj_studio_network 192.168.1.0/24
+
+
+@pytest.fixture
+def test_promotions_staff(db: Session):
+    staff = Staff(email="promotions@test.com", name="Test Promotions", phone="555-0100")
+    db.add(staff)
+    db.flush()
+    db.add(StaffDepartment(staff_id=staff.id, department="Promotions"))
+    db.add(StaffStatus(staff_id=staff.id, status="Active"))
+    db.commit()
+    db.refresh(staff)
+    return staff
 
 
 def _show(
@@ -705,3 +720,68 @@ class TestOnAirEndpoint:
             "First Mistaken DJ",
             "Second Mistaken DJ",
         )
+
+
+class TestManualSyncJob:
+    def test_reports_not_configured_when_no_api_key(
+        self, client: TestClient, test_promotions_staff, monkeypatch
+    ):
+        monkeypatch.setattr(settings, "spinitron_api_key", None)
+
+        response = client.post(
+            "/api/admin/jobs/spinitron_schedule_sync/run",
+            headers={"X-Forwarded-User": test_promotions_staff.email},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert "not configured" in data["message"]
+
+    def test_runs_when_configured(
+        self, client: TestClient, test_promotions_staff, monkeypatch
+    ):
+        monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
+        now = datetime.now(timezone.utc)
+
+        async def fake_fetch_shows(end):
+            return [_show(1, now, now + timedelta(hours=1), None)]
+
+        async def fake_fetch_playlists(start, end):
+            return []
+
+        async def fake_fetch_future_playlists():
+            return []
+
+        monkeypatch.setattr(
+            "app.services.spinitron_schedule_service.SpinitronService.fetch_shows",
+            fake_fetch_shows,
+        )
+        monkeypatch.setattr(
+            "app.services.spinitron_schedule_service.SpinitronService.fetch_playlists",
+            fake_fetch_playlists,
+        )
+        monkeypatch.setattr(
+            "app.services.spinitron_schedule_service.SpinitronService.fetch_future_playlists",
+            fake_fetch_future_playlists,
+        )
+
+        response = client.post(
+            "/api/admin/jobs/spinitron_schedule_sync/run",
+            headers={"X-Forwarded-User": test_promotions_staff.email},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "1" in data["message"]
+
+    def test_appears_in_job_statuses(self, client: TestClient, test_promotions_staff):
+        response = client.get(
+            "/api/admin/job-statuses",
+            headers={"X-Forwarded-User": test_promotions_staff.email},
+        )
+
+        assert response.status_code == 200
+        job_ids = {job["id"] for job in response.json()}
+        assert "spinitron_schedule_sync" in job_ids

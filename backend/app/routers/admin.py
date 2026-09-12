@@ -139,6 +139,7 @@ _KNOWN_JOBS = [
     ("airtable_user_sync", "Sync users from Airtable"),
     ("expire_stale_dj_preassignments", "Expire stale DJ pre-assignments"),
     ("notify_unclosed_past_shows", "Notify venue owners of unclosed past shows"),
+    ("spinitron_schedule_sync", "Sync Spinitron on-air schedule"),
 ]
 
 
@@ -186,6 +187,7 @@ async def run_job(
     from app.services.user_service import UserService
     from app.services.pass_service import PassService
     from app.services.feature_bin_service import FeatureBinService
+    from app.services.spinitron_schedule_service import SpinitronScheduleService
 
     if job_id == "feature_bin_sync":
         if not FeatureBinService.is_configured():
@@ -224,6 +226,17 @@ async def run_job(
         return JobRunResult(
             success=True,
             message=f"Notified venue owners for {count} unclosed past show(s)",
+        )
+
+    if job_id == "spinitron_schedule_sync":
+        if not settings.spinitron_api_key:
+            return JobRunResult(
+                success=False,
+                message="Spinitron not configured — set SPINITRON_API_KEY",
+            )
+        count = await SpinitronScheduleService.sync_schedule(db, trigger="manual")
+        return JobRunResult(
+            success=True, message=f"Cached {count} Spinitron show(s)/playlist(s)"
         )
 
     raise HTTPException(status_code=404, detail=f"Unknown job: {job_id}")
