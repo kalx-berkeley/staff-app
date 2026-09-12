@@ -23,7 +23,10 @@ from app.services.spinitron_service import SpinitronService
 
 SCHEDULE_WINDOW_DAYS = 56
 
-_UPCOMING_SCHEDULE_CACHE_KEY = "spinitron:upcoming-schedule"
+# Bump the trailing :vN suffix whenever `_get_entries`'s producer logic or
+# output shape changes -- otherwise a stale cached payload (up to ttl_days
+# old) keeps getting served under the old key and looks like a regression.
+_UPCOMING_SCHEDULE_CACHE_KEY = "spinitron:upcoming-schedule:v2"
 _LA = ZoneInfo("America/Los_Angeles")
 
 

@@ -240,6 +240,46 @@ class TestGetDatesForName:
 
         assert dates == [day1.date().isoformat()]
 
+    async def test_playlist_evening_show_buckets_to_pacific_date_not_utc_date(
+        self, db: Session, monkeypatch
+    ):
+        """
+        A future-playlist entry airing 6-8pm Pacific must bucket to the
+        Pacific calendar date, not the later UTC date -- an 8pm PDT show is
+        already after midnight UTC. Same boundary as
+        test_buckets_by_station_local_date_not_utc_date, but sourced from a
+        playlist instead of a show.
+        """
+        # 2026-09-15T01:00:00+00:00 is 2026-09-14 18:00 PDT (6pm Pacific).
+        show_start_utc = datetime(2026, 9, 15, 1, 0, tzinfo=timezone.utc)
+        show_end_utc = datetime(2026, 9, 15, 3, 0, tzinfo=timezone.utc)
+
+        async def fake_fetch_shows(end):
+            return []
+
+        async def fake_fetch_future_playlists():
+            return [_show(1, show_start_utc, show_end_utc, 1, None)]
+
+        async def fake_resolve_dj_names(db, shows):
+            return {1: "Wolfman"}
+
+        monkeypatch.setattr(
+            "app.services.spinitron_upcoming_schedule_service.SpinitronService.fetch_shows",
+            fake_fetch_shows,
+        )
+        monkeypatch.setattr(
+            "app.services.spinitron_upcoming_schedule_service.SpinitronService.fetch_future_playlists",
+            fake_fetch_future_playlists,
+        )
+        monkeypatch.setattr(
+            "app.services.spinitron_upcoming_schedule_service.SpinitronScheduleService.resolve_dj_names",
+            fake_resolve_dj_names,
+        )
+
+        dates = await SpinitronUpcomingScheduleService.get_dates_for_name(db, "Wolfman")
+
+        assert dates == ["2026-09-14"]
+
     async def test_future_playlists_beyond_the_window_are_excluded(
         self, db: Session, monkeypatch
     ):

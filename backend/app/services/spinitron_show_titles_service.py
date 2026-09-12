@@ -20,8 +20,11 @@ from app.services.spinitron_service import SpinitronService, dedupe_by_id
 UPCOMING_WINDOW_DAYS = 14
 HISTORY_WINDOW_DAYS = 60
 
-_UPCOMING_TITLES_CACHE_KEY = "spinitron:upcoming-show-titles"
-_PAST_SHOW_HOSTS_CACHE_KEY = "spinitron:past-show-hosts"
+# Bump the trailing :vN suffix whenever a producer's logic or output shape
+# changes -- otherwise a stale cached payload (up to ttl_days old) keeps
+# getting served under the old key and looks like a regression.
+_UPCOMING_TITLES_CACHE_KEY = "spinitron:upcoming-show-titles:v2"
+_PAST_SHOW_HOSTS_CACHE_KEY = "spinitron:past-show-hosts:v2"
 
 
 class SpinitronShowTitlesService:
