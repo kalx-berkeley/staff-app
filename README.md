@@ -58,6 +58,15 @@ area:
 - **DJ pre-assignment blackout window** — a venue (or an individual show) can forbid DJs from
   reserving a pass pair within N days of the show's close date, to keep last-minute reservations
   from crowding out the giveaway.
+- **Pre-assignment date restricted to the on-air schedule.** Both the staff self-reservation flow
+  and promotions' "Pre-assign to DJ" box check the cached Spinitron schedule and restrict the date
+  picker to dates the chosen DJ (or specialty show) is actually on air, with an override for
+  exceptions and a warning when a picked date doesn't match.
+- **"Suggest" a DJ for pre-assignment.** From the "Pre-assign to DJ" box on
+  `/promotions/shows/:id`, suggest a DJ by on-air date (reversing the cached Spinitron schedule) or
+  by genre (matching Sublist DJs and their specialty shows against the show's genres, from staff's
+  own genre preferences). Accepting a suggestion with a known date auto-saves and advances to the
+  next available pass pair.
 - **Legacy paper-form import** — a self-contained, removable feature for backfilling historical
   shows (with already-decided winners and claimants) during the cutover from the old paper-based
   process.
@@ -131,13 +140,15 @@ the library, complete with the release's dot-color status and a listen link
 - Self-service pass claiming with an optional guest, including "only attend with guest" logic and
   a notification email if another staff member's claim bumps a pending guest.
 - Per-user notification preferences (email on/off), honored by every email the app sends.
+- **Genre preferences** — staff can pick the genres they like from their profile, autocompleting
+  from genres already in use on shows; used to power promotions' pre-assignment suggestions above.
 - A staff view for specialty shows the staff member belongs to.
 
 ### Admin & operations
 
-- **Job dashboards** for every scheduled task (Airtable sync, feature bin sync, stale
-  pre-assignment cleanup, unclosed-show notifications) with manual "run now" buttons, plus
-  dashboards of every pending auto-close and lottery job with live countdowns.
+- **Job dashboards** for every scheduled task (Airtable sync, feature bin sync, Spinitron on-air
+  schedule sync, stale pre-assignment cleanup, unclosed-show notifications) with manual "run now"
+  buttons, plus dashboards of every pending auto-close and lottery job with live countdowns.
 - **Audit log viewer**, paginated and filterable by event type, actor, and date range — every
   giveaway, release, upload, and email send is logged with full details.
 - **User impersonation** (staging only) — a promotions staff member can act as another user, or
