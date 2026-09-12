@@ -36,6 +36,19 @@ class SpinitronSpinItem(TypedDict):
     image: Optional[str]
 
 
+def dedupe_by_id(*item_lists: List[SpinitronShowItem]) -> List[SpinitronShowItem]:
+    """Merge any number of item lists, keeping the first occurrence of each id.
+
+    Used to combine a bounded `fetch_playlists` window with
+    `fetch_future_playlists`, whose windows can overlap near "now".
+    """
+    seen: Dict[int, SpinitronShowItem] = {}
+    for items in item_lists:
+        for item in items:
+            seen.setdefault(item["id"], item)
+    return list(seen.values())
+
+
 class SpinitronService:
     """Service for interacting with the Spinitron v2 API."""
 
@@ -263,6 +276,78 @@ class SpinitronService:
                 page += 1
 
         logger.info("Fetched %d Spinitron playlist(s)", len(playlists))
+        return playlists
+
+    @staticmethod
+    async def fetch_future_playlists() -> List[SpinitronShowItem]:
+        """
+        Fetch all pre-provisioned future Spinitron playlists.
+
+        Unlike `fetch_playlists`, which only returns entries that have
+        actually aired, this is Spinitron's `future=1` mode: it returns
+        playlists that have been pre-provisioned ahead of time for a show
+        that hasn't happened yet. There's no `start`/`end` bound to pass —
+        Spinitron returns everything it has. Fetches all pages using the
+        maximum page size of 200.
+
+        :returns: List of playlist dicts with id, start, end, persona_id, title.
+        :raises RuntimeError: If the Spinitron API returns an error.
+        """
+        if not settings.spinitron_api_key:
+            logger.warning(
+                "SPINITRON_API_KEY not configured, skipping future playlist fetch"
+            )
+            return []
+
+        url = f"{SPINITRON_API_BASE}/playlists"
+        headers = SpinitronService._request_headers()
+        params = {"future": 1, "count": 200}
+        playlists: List[SpinitronShowItem] = []
+
+        async with httpx.AsyncClient() as client:
+            page = 1
+            while True:
+                try:
+                    response = await client.get(
+                        url,
+                        headers=headers,
+                        params={**params, "page": page},
+                        timeout=30.0,
+                    )
+                    response.raise_for_status()
+                except httpx.HTTPStatusError as e:
+                    raise RuntimeError(
+                        f"Spinitron API error {e.response.status_code}: {e.response.text}"
+                    ) from e
+                except httpx.RequestError as e:
+                    raise RuntimeError(f"Spinitron API request failed: {e}") from e
+
+                data = response.json()
+                for item in data.get("items", []):
+                    playlist_id = item.get("id")
+                    start_str = item.get("start")
+                    end_str = item.get("end")
+                    if playlist_id is None or not start_str or not end_str:
+                        continue
+
+                    title = (item.get("title") or "").strip() or None
+
+                    playlists.append(
+                        SpinitronShowItem(
+                            id=int(playlist_id),
+                            start=datetime.strptime(start_str, "%Y-%m-%dT%H:%M:%S%z"),
+                            end=datetime.strptime(end_str, "%Y-%m-%dT%H:%M:%S%z"),
+                            persona_id=SpinitronService._extract_persona_id(item),
+                            title=title,
+                        )
+                    )
+
+                meta = data.get("_meta", {})
+                if page >= meta.get("pageCount", 1):
+                    break
+                page += 1
+
+        logger.info("Fetched %d future Spinitron playlist(s)", len(playlists))
         return playlists
 
     @staticmethod

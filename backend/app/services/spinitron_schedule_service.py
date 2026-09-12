@@ -1,4 +1,4 @@
-"""Syncs the upcoming Spinitron on-air schedule into the SpinitronShow cache table."""
+"""Syncs the upcoming Spinitron on-air schedule into the schedule cache tables."""
 
 import logging
 from datetime import datetime, timedelta, timezone
@@ -8,14 +8,21 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.job_log import JobLog
+from app.models.spinitron_playlist import SpinitronPlaylist
 from app.models.spinitron_show import SpinitronShow
 from app.models.staff import Staff
 from app.services import cache_service
-from app.services.spinitron_service import SpinitronService, SpinitronShowItem
+from app.services.spinitron_service import SpinitronService, SpinitronShowItem, dedupe_by_id
 
 logger = logging.getLogger(__name__)
 
 _PERSONAS_CACHE_KEY = "spinitron:personas"
+
+# How far back to look for playlists that are already airing. Generous
+# relative to any plausible show length, since a playlist that started
+# earlier than this and is still running would otherwise be missed by
+# `GET /api/dj/on-air`.
+PLAYLIST_LOOKBACK_HOURS = 24
 
 
 class SpinitronScheduleService:
@@ -26,33 +33,51 @@ class SpinitronScheduleService:
         db: Session, trigger: str = "scheduled", hours_ahead: int = 12
     ) -> int:
         """
-        Fetch the next *hours_ahead* hours of Spinitron shows and replace the cache.
+        Fetch the next *hours_ahead* hours of Spinitron shows and playlists and replace the cache.
 
-        Resolves each show's first persona to a DJ name, preferring the local
-        Staff directory (already resolved during the Airtable sync) over a
-        Spinitron persona API call. A show whose persona is a configured
-        "placeholder" (a rotating slot like "DJ Trainee" rather than a specific
-        DJ) is stored with no DJ name, same as a show with no persona at all —
-        this stops the DJ Name field from being auto-filled or flagged as
-        mismatched during that show.
+        Playlists are fetched alongside shows because Spinitron's `/shows`
+        and `/playlists` can disagree about a given timeslot — `/shows` often
+        lists a generic placeholder (e.g. "DJ Trainee") for a slot that
+        `/playlists` already has a specific DJ's pre-provisioned playlist
+        for. `GET /api/dj/on-air` prefers the cached playlist over the cached
+        show when both cover the same instant.
+
+        Resolves each show/playlist's first persona to a DJ name, preferring
+        the local Staff directory (already resolved during the Airtable
+        sync) over a Spinitron persona API call. An entry whose persona is a
+        configured "placeholder" (a rotating slot like "DJ Trainee" rather
+        than a specific DJ) is stored with no DJ name, same as an entry with
+        no persona at all — this stops the DJ Name field from being
+        auto-filled or flagged as mismatched during that show.
 
         No-ops (without logging a JobLog run) when Spinitron isn't configured.
 
         :param db: Database session.
         :param trigger: "manual" or "scheduled", recorded on the JobLog entry.
         :param hours_ahead: How far ahead of now to fetch the schedule.
-        :returns: Number of shows cached.
+        :returns: Number of shows plus playlists cached.
         """
         if not settings.spinitron_api_key:
             logger.warning("SPINITRON_API_KEY not configured, skipping schedule sync")
             return 0
 
-        end = datetime.now(timezone.utc) + timedelta(hours=hours_ahead)
+        now = datetime.now(timezone.utc)
+        end = now + timedelta(hours=hours_ahead)
+
         shows = await SpinitronService.fetch_shows(end)
+        past_playlists = await SpinitronService.fetch_playlists(
+            now - timedelta(hours=PLAYLIST_LOOKBACK_HOURS), now
+        )
+        future_playlists = await SpinitronService.fetch_future_playlists()
+        playlists = [
+            playlist
+            for playlist in dedupe_by_id(past_playlists, future_playlists)
+            if playlist["start"] <= end
+        ]
 
-        resolved = await SpinitronScheduleService.resolve_dj_names(db, shows)
+        resolved = await SpinitronScheduleService.resolve_dj_names(db, shows + playlists)
 
-        rows: list[SpinitronShow] = [
+        show_rows: list[SpinitronShow] = [
             SpinitronShow(
                 id=show["id"],
                 start=show["start"],
@@ -62,14 +87,31 @@ class SpinitronScheduleService:
             )
             for show in shows
         ]
+        playlist_rows: list[SpinitronPlaylist] = [
+            SpinitronPlaylist(
+                id=playlist["id"],
+                start=playlist["start"],
+                end=playlist["end"],
+                dj_name=resolved.get(playlist["persona_id"]),
+                persona_id=playlist["persona_id"],
+            )
+            for playlist in playlists
+        ]
 
         db.query(SpinitronShow).delete()
-        db.add_all(rows)
+        db.query(SpinitronPlaylist).delete()
+        db.add_all(show_rows)
+        db.add_all(playlist_rows)
         db.add(JobLog(job_id="spinitron_schedule_sync", trigger=trigger))
         db.commit()
 
-        logger.info("Spinitron schedule sync cached %d show(s)", len(rows))
-        return len(rows)
+        total = len(show_rows) + len(playlist_rows)
+        logger.info(
+            "Spinitron schedule sync cached %d show(s) and %d playlist(s)",
+            len(show_rows),
+            len(playlist_rows),
+        )
+        return total
 
     @staticmethod
     async def resolve_dj_names(

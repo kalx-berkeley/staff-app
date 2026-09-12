@@ -37,6 +37,25 @@ def _show(
     )
 
 
+def _patch_no_playlists(monkeypatch, module_path: str):
+    async def fake_fetch_playlists(start, end):
+        return []
+
+    async def fake_fetch_future_playlists():
+        return []
+
+    monkeypatch.setattr(
+        f"{module_path}.SpinitronService.fetch_playlists", fake_fetch_playlists
+    )
+    monkeypatch.setattr(
+        f"{module_path}.SpinitronService.fetch_future_playlists",
+        fake_fetch_future_playlists,
+    )
+
+
+_MODULE = "app.services.spinitron_show_titles_service"
+
+
 class TestGetUpcomingTitles:
     async def test_returns_distinct_sorted_titles(self, db: Session, monkeypatch):
         now = datetime.now(timezone.utc)
@@ -49,14 +68,60 @@ class TestGetUpcomingTitles:
                 _show(4, now, now + timedelta(hours=1), None, None),
             ]
 
-        monkeypatch.setattr(
-            "app.services.spinitron_show_titles_service.SpinitronService.fetch_shows",
-            fake_fetch_shows,
-        )
+        monkeypatch.setattr(f"{_MODULE}.SpinitronService.fetch_shows", fake_fetch_shows)
+        _patch_no_playlists(monkeypatch, _MODULE)
 
         titles = await SpinitronShowTitlesService.get_upcoming_titles(db)
 
         assert titles == ["Sunday Jazz Brunch", "The Howl"]
+
+    async def test_includes_titles_from_past_and_future_playlists(
+        self, db: Session, monkeypatch
+    ):
+        """
+        A specialty show that's only been pre-provisioned as a playlist (or
+        has only aired before, not yet reached /shows for its next
+        occurrence) should still surface in the autocomplete.
+        """
+        now = datetime.now(timezone.utc)
+
+        async def fake_fetch_shows(end):
+            return [_show(1, now, now + timedelta(hours=1), None, "The Howl")]
+
+        async def fake_fetch_playlists(start, end):
+            return [
+                _show(
+                    2,
+                    now - timedelta(days=5),
+                    now - timedelta(days=5),
+                    None,
+                    "Past Only Show",
+                )
+            ]
+
+        async def fake_fetch_future_playlists():
+            return [
+                _show(
+                    3,
+                    now + timedelta(days=1),
+                    now + timedelta(days=1),
+                    None,
+                    "Pre-Provisioned Show",
+                )
+            ]
+
+        monkeypatch.setattr(f"{_MODULE}.SpinitronService.fetch_shows", fake_fetch_shows)
+        monkeypatch.setattr(
+            f"{_MODULE}.SpinitronService.fetch_playlists", fake_fetch_playlists
+        )
+        monkeypatch.setattr(
+            f"{_MODULE}.SpinitronService.fetch_future_playlists",
+            fake_fetch_future_playlists,
+        )
+
+        titles = await SpinitronShowTitlesService.get_upcoming_titles(db)
+
+        assert titles == ["Past Only Show", "Pre-Provisioned Show", "The Howl"]
 
     async def test_second_call_is_served_from_cache(self, db: Session, monkeypatch):
         now = datetime.now(timezone.utc)
@@ -67,10 +132,8 @@ class TestGetUpcomingTitles:
             call_count += 1
             return [_show(1, now, now + timedelta(hours=1), 1, "The Howl")]
 
-        monkeypatch.setattr(
-            "app.services.spinitron_show_titles_service.SpinitronService.fetch_shows",
-            fake_fetch_shows,
-        )
+        monkeypatch.setattr(f"{_MODULE}.SpinitronService.fetch_shows", fake_fetch_shows)
+        _patch_no_playlists(monkeypatch, _MODULE)
 
         await SpinitronShowTitlesService.get_upcoming_titles(db)
         await SpinitronShowTitlesService.get_upcoming_titles(db)
@@ -108,15 +171,21 @@ class TestGetDjHistoryForTitle:
                 _show(4, now - timedelta(days=1), now - timedelta(days=1), 3, "The Howl"),
             ]
 
+        async def fake_fetch_future_playlists():
+            return []
+
         async def fake_resolve_dj_names(db, shows):
             return {1: "Wolfman", 2: "Nightowl", 3: "Wolfman"}
 
         monkeypatch.setattr(
-            "app.services.spinitron_show_titles_service.SpinitronService.fetch_playlists",
-            fake_fetch_playlists,
+            f"{_MODULE}.SpinitronService.fetch_playlists", fake_fetch_playlists
         )
         monkeypatch.setattr(
-            "app.services.spinitron_show_titles_service.SpinitronScheduleService.resolve_dj_names",
+            f"{_MODULE}.SpinitronService.fetch_future_playlists",
+            fake_fetch_future_playlists,
+        )
+        monkeypatch.setattr(
+            f"{_MODULE}.SpinitronScheduleService.resolve_dj_names",
             fake_resolve_dj_names,
         )
 
@@ -132,15 +201,21 @@ class TestGetDjHistoryForTitle:
         async def fake_fetch_playlists(start, end):
             return [_show(1, now, now, 1, "The Howl")]
 
+        async def fake_fetch_future_playlists():
+            return []
+
         async def fake_resolve_dj_names(db, shows):
             return {1: "Wolfman"}
 
         monkeypatch.setattr(
-            "app.services.spinitron_show_titles_service.SpinitronService.fetch_playlists",
-            fake_fetch_playlists,
+            f"{_MODULE}.SpinitronService.fetch_playlists", fake_fetch_playlists
         )
         monkeypatch.setattr(
-            "app.services.spinitron_show_titles_service.SpinitronScheduleService.resolve_dj_names",
+            f"{_MODULE}.SpinitronService.fetch_future_playlists",
+            fake_fetch_future_playlists,
+        )
+        monkeypatch.setattr(
+            f"{_MODULE}.SpinitronScheduleService.resolve_dj_names",
             fake_resolve_dj_names,
         )
 
@@ -149,6 +224,77 @@ class TestGetDjHistoryForTitle:
         )
 
         assert djs == []
+
+    async def test_includes_future_pre_provisioned_playlist(self, db: Session, monkeypatch):
+        """A DJ who hasn't hosted the title yet, but has a pre-provisioned future playlist, counts."""
+        now = datetime.now(timezone.utc)
+
+        async def fake_fetch_playlists(start, end):
+            return []
+
+        async def fake_fetch_future_playlists():
+            return [
+                _show(
+                    1,
+                    now + timedelta(days=2),
+                    now + timedelta(days=2),
+                    1,
+                    "Sunday Jazz Brunch",
+                )
+            ]
+
+        async def fake_resolve_dj_names(db, shows):
+            return {1: "Wolfman"}
+
+        monkeypatch.setattr(
+            f"{_MODULE}.SpinitronService.fetch_playlists", fake_fetch_playlists
+        )
+        monkeypatch.setattr(
+            f"{_MODULE}.SpinitronService.fetch_future_playlists",
+            fake_fetch_future_playlists,
+        )
+        monkeypatch.setattr(
+            f"{_MODULE}.SpinitronScheduleService.resolve_dj_names",
+            fake_resolve_dj_names,
+        )
+
+        djs = await SpinitronShowTitlesService.get_dj_history_for_title(
+            db, "Sunday Jazz Brunch"
+        )
+
+        assert djs == ["Wolfman"]
+
+    async def test_dedupes_overlapping_past_and_future_playlist_fetches(
+        self, db: Session, monkeypatch
+    ):
+        now = datetime.now(timezone.utc)
+
+        async def fake_fetch_playlists(start, end):
+            return [_show(1, now, now, 1, "Sunday Jazz Brunch")]
+
+        async def fake_fetch_future_playlists():
+            return [_show(1, now, now, 1, "Sunday Jazz Brunch")]
+
+        async def fake_resolve_dj_names(db, shows):
+            return {1: "Wolfman"}
+
+        monkeypatch.setattr(
+            f"{_MODULE}.SpinitronService.fetch_playlists", fake_fetch_playlists
+        )
+        monkeypatch.setattr(
+            f"{_MODULE}.SpinitronService.fetch_future_playlists",
+            fake_fetch_future_playlists,
+        )
+        monkeypatch.setattr(
+            f"{_MODULE}.SpinitronScheduleService.resolve_dj_names",
+            fake_resolve_dj_names,
+        )
+
+        djs = await SpinitronShowTitlesService.get_dj_history_for_title(
+            db, "Sunday Jazz Brunch"
+        )
+
+        assert djs == ["Wolfman"]
 
 
 class TestEndpoints:

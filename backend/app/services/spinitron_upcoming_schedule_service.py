@@ -1,8 +1,14 @@
 """Spinitron upcoming on-air schedule lookups, for DJ pass-pair reservation dates.
 
 One read-through cache (~1 day TTL, via `cache_service.fetch_cached_async`) over
-the next ~4 weeks of Spinitron shows, filtered by name on read — mirrors the
-`SpinitronShowTitlesService` pattern used for the specialty-show autocompletes.
+the next ~4 weeks of Spinitron shows and pre-provisioned future playlists,
+filtered by name on read — mirrors the `SpinitronShowTitlesService` pattern
+used for the specialty-show autocompletes.
+
+A DJ/show name is considered scheduled on a date if it matches *either*
+`/shows` or `/playlists` — a match in only one is enough, since `/shows`
+often lists a generic placeholder for a slot that `/playlists` already has
+a specific DJ's pre-provisioned playlist for.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -54,7 +60,11 @@ class SpinitronUpcomingScheduleService:
         async def producer() -> dict:
             end = datetime.now(timezone.utc) + timedelta(days=SCHEDULE_WINDOW_DAYS)
             shows = await SpinitronService.fetch_shows(end)
-            resolved = await SpinitronScheduleService.resolve_dj_names(db, shows)
+            future_playlists = await SpinitronService.fetch_future_playlists()
+            playlists = [p for p in future_playlists if p["start"] <= end]
+            resolved = await SpinitronScheduleService.resolve_dj_names(
+                db, shows + playlists
+            )
 
             entries: List[_ScheduleEntry] = [
                 {
@@ -62,13 +72,13 @@ class SpinitronUpcomingScheduleService:
                     # own (Pacific) calendar day, not UTC's — otherwise a show
                     # airing anytime after ~4-5pm Pacific gets stamped with
                     # tomorrow's UTC date instead of today's.
-                    "date": show["start"].astimezone(_LA).date().isoformat(),
+                    "date": item["start"].astimezone(_LA).date().isoformat(),
                     "dj_name": (
-                        resolved.get(show["persona_id"]) if show["persona_id"] else None
+                        resolved.get(item["persona_id"]) if item["persona_id"] else None
                     ),
-                    "title": show["title"],
+                    "title": item["title"],
                 }
-                for show in shows
+                for item in shows + playlists
             ]
             return {"entries": entries}
 

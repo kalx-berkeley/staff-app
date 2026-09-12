@@ -45,6 +45,16 @@ def _show(
     )
 
 
+def _patch_no_future_playlists(monkeypatch):
+    async def fake_fetch_future_playlists():
+        return []
+
+    monkeypatch.setattr(
+        "app.services.spinitron_upcoming_schedule_service.SpinitronService.fetch_future_playlists",
+        fake_fetch_future_playlists,
+    )
+
+
 class TestGetDatesForName:
     async def test_matches_by_dj_name_case_insensitive(self, db: Session, monkeypatch):
         now = _ANCHOR
@@ -65,6 +75,7 @@ class TestGetDatesForName:
             "app.services.spinitron_upcoming_schedule_service.SpinitronService.fetch_shows",
             fake_fetch_shows,
         )
+        _patch_no_future_playlists(monkeypatch)
         monkeypatch.setattr(
             "app.services.spinitron_upcoming_schedule_service.SpinitronScheduleService.resolve_dj_names",
             fake_resolve_dj_names,
@@ -90,6 +101,7 @@ class TestGetDatesForName:
             "app.services.spinitron_upcoming_schedule_service.SpinitronService.fetch_shows",
             fake_fetch_shows,
         )
+        _patch_no_future_playlists(monkeypatch)
         monkeypatch.setattr(
             "app.services.spinitron_upcoming_schedule_service.SpinitronScheduleService.resolve_dj_names",
             fake_resolve_dj_names,
@@ -114,6 +126,7 @@ class TestGetDatesForName:
             "app.services.spinitron_upcoming_schedule_service.SpinitronService.fetch_shows",
             fake_fetch_shows,
         )
+        _patch_no_future_playlists(monkeypatch)
         monkeypatch.setattr(
             "app.services.spinitron_upcoming_schedule_service.SpinitronScheduleService.resolve_dj_names",
             fake_resolve_dj_names,
@@ -152,6 +165,7 @@ class TestGetDatesForName:
             "app.services.spinitron_upcoming_schedule_service.SpinitronService.fetch_shows",
             fake_fetch_shows,
         )
+        _patch_no_future_playlists(monkeypatch)
         monkeypatch.setattr(
             "app.services.spinitron_upcoming_schedule_service.SpinitronScheduleService.resolve_dj_names",
             fake_resolve_dj_names,
@@ -177,6 +191,7 @@ class TestGetDatesForName:
             "app.services.spinitron_upcoming_schedule_service.SpinitronService.fetch_shows",
             fake_fetch_shows,
         )
+        _patch_no_future_playlists(monkeypatch)
         monkeypatch.setattr(
             "app.services.spinitron_upcoming_schedule_service.SpinitronScheduleService.resolve_dj_names",
             fake_resolve_dj_names,
@@ -186,6 +201,78 @@ class TestGetDatesForName:
         await SpinitronUpcomingScheduleService.get_dates_for_name(db, "Wolfman")
 
         assert call_count == 1
+
+    async def test_matches_via_future_playlist_when_shows_disagrees(
+        self, db: Session, monkeypatch
+    ):
+        """
+        The "Wolfman" scenario from the request: /shows lists a generic
+        placeholder for a slot that a pre-provisioned /playlists entry
+        already has a specific DJ for. The playlist-only match should still
+        count.
+        """
+        now = _ANCHOR
+        day1 = now + timedelta(days=4)
+
+        async def fake_fetch_shows(end):
+            return [_show(1, day1, day1 + timedelta(hours=1), 99, "DJ Trainee")]
+
+        async def fake_fetch_future_playlists():
+            return [_show(2, day1, day1 + timedelta(hours=1), 1, None)]
+
+        async def fake_resolve_dj_names(db, shows):
+            return {99: None, 1: "Wolfman"}
+
+        monkeypatch.setattr(
+            "app.services.spinitron_upcoming_schedule_service.SpinitronService.fetch_shows",
+            fake_fetch_shows,
+        )
+        monkeypatch.setattr(
+            "app.services.spinitron_upcoming_schedule_service.SpinitronService.fetch_future_playlists",
+            fake_fetch_future_playlists,
+        )
+        monkeypatch.setattr(
+            "app.services.spinitron_upcoming_schedule_service.SpinitronScheduleService.resolve_dj_names",
+            fake_resolve_dj_names,
+        )
+
+        dates = await SpinitronUpcomingScheduleService.get_dates_for_name(db, "Wolfman")
+
+        assert dates == [day1.date().isoformat()]
+
+    async def test_future_playlists_beyond_the_window_are_excluded(
+        self, db: Session, monkeypatch
+    ):
+        # The window filter is computed against the real clock (not
+        # SpinitronUpcomingScheduleService.SCHEDULE_WINDOW_DAYS), so the
+        # "far future" anchor here must be too.
+        far_future = datetime.now(timezone.utc) + timedelta(days=40)
+
+        async def fake_fetch_shows(end):
+            return []
+
+        async def fake_fetch_future_playlists():
+            return [_show(1, far_future, far_future + timedelta(hours=1), 1, None)]
+
+        async def fake_resolve_dj_names(db, shows):
+            return {1: "Wolfman"}
+
+        monkeypatch.setattr(
+            "app.services.spinitron_upcoming_schedule_service.SpinitronService.fetch_shows",
+            fake_fetch_shows,
+        )
+        monkeypatch.setattr(
+            "app.services.spinitron_upcoming_schedule_service.SpinitronService.fetch_future_playlists",
+            fake_fetch_future_playlists,
+        )
+        monkeypatch.setattr(
+            "app.services.spinitron_upcoming_schedule_service.SpinitronScheduleService.resolve_dj_names",
+            fake_resolve_dj_names,
+        )
+
+        dates = await SpinitronUpcomingScheduleService.get_dates_for_name(db, "Wolfman")
+
+        assert dates == []
 
 
 class TestPreassignScheduleEndpoint:
