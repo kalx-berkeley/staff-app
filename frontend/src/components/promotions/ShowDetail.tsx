@@ -821,7 +821,7 @@ const ShowDetail = () => {
                       {scheduleDates !== null && scheduleDates.length === 0 && (
                         <p className="field-hint">
                           No scheduled on-air dates found for "{preassignDj.trim()}" in the next
-                          ~4 weeks. You can still pick a date below.
+                          ~8 weeks. You can still pick a date below.
                         </p>
                       )}
                       {scheduleDates !== null &&

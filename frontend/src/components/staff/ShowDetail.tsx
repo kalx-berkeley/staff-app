@@ -764,7 +764,7 @@ const ShowDetail = () => {
                       )}
                       {lotteryScheduleDates !== null && lotteryScheduleDates.length === 0 && (
                         <p className="field-hint">
-                          No scheduled on-air dates found in the next ~4 weeks. You can still pick
+                          No scheduled on-air dates found in the next ~8 weeks. You can still pick
                           a date below.
                         </p>
                       )}
@@ -896,7 +896,7 @@ const ShowDetail = () => {
                               )}
                               {scheduleDates !== null && scheduleDates.length === 0 && (
                                 <p className="field-hint">
-                                  No scheduled on-air dates found in the next ~4 weeks. You can
+                                  No scheduled on-air dates found in the next ~8 weeks. You can
                                   still pick a date below.
                                 </p>
                               )}

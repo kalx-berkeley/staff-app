@@ -246,7 +246,7 @@ class TestGetDatesForName:
         # The window filter is computed against the real clock (not
         # SpinitronUpcomingScheduleService.SCHEDULE_WINDOW_DAYS), so the
         # "far future" anchor here must be too.
-        far_future = datetime.now(timezone.utc) + timedelta(days=40)
+        far_future = datetime.now(timezone.utc) + timedelta(days=70)
 
         async def fake_fetch_shows(end):
             return []

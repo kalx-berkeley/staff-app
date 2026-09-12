@@ -512,7 +512,7 @@ async def get_preassign_schedule(
     db: Session = Depends(get_db),
 ):
     """
-    List upcoming dates (next ~4 weeks) that *name* is scheduled on-air.
+    List upcoming dates (next ~8 weeks) that *name* is scheduled on-air.
 
     *name* is matched the same way the "Reserve for"/"Pre-assign to DJ"
     autocomplete conflates DJs and specialty shows: either a DJ's persona name

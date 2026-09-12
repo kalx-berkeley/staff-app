@@ -691,7 +691,7 @@ export const passesAPI = {
   },
 
   /**
-   * List upcoming dates (next ~4 weeks) that a DJ or specialty show name is scheduled on-air.
+   * List upcoming dates (next ~8 weeks) that a DJ or specialty show name is scheduled on-air.
    *
    * Used to restrict the pre-assignment date picker to dates the Spinitron
    * schedule actually backs up.

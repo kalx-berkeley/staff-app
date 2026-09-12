@@ -1,7 +1,7 @@
 """Spinitron upcoming on-air schedule lookups, for DJ pass-pair reservation dates.
 
 One read-through cache (~1 day TTL, via `cache_service.fetch_cached_async`) over
-the next ~4 weeks of Spinitron shows and pre-provisioned future playlists,
+the next ~8 weeks of Spinitron shows and pre-provisioned future playlists,
 filtered by name on read — mirrors the `SpinitronShowTitlesService` pattern
 used for the specialty-show autocompletes.
 
@@ -21,7 +21,7 @@ from app.services import cache_service
 from app.services.spinitron_schedule_service import SpinitronScheduleService
 from app.services.spinitron_service import SpinitronService
 
-SCHEDULE_WINDOW_DAYS = 28
+SCHEDULE_WINDOW_DAYS = 56
 
 _UPCOMING_SCHEDULE_CACHE_KEY = "spinitron:upcoming-schedule"
 _LA = ZoneInfo("America/Los_Angeles")
@@ -39,7 +39,7 @@ class SpinitronUpcomingScheduleService:
     @staticmethod
     async def get_dates_for_name(db: Session, name: str) -> List[str]:
         """
-        List dates (YYYY-MM-DD) in the next ~4 weeks *name* is scheduled on-air.
+        List dates (YYYY-MM-DD) in the next ~8 weeks *name* is scheduled on-air.
 
         *name* is matched the same way the "Reserve for" autocomplete conflates
         DJs and specialty shows: either a DJ persona resolving to this name
