@@ -59,6 +59,24 @@ class SpinitronUpcomingScheduleService:
         })
 
     @staticmethod
+    async def get_names_for_date(db: Session, date: str) -> List[str]:
+        """
+        List DJ/specialty-show names scheduled on-air on *date* (a YYYY-MM-DD
+        station calendar day, in the next ~8 weeks).
+
+        Reverse of `get_dates_for_name`: each entry on that date contributes
+        its resolved DJ name if it has one, else its Spinitron show title (a
+        specialty show's exact title, for an unresolved persona).
+        """
+        entries = await SpinitronUpcomingScheduleService._get_entries(db)
+        names = {
+            (entry["dj_name"] or entry["title"])
+            for entry in entries
+            if entry["date"] == date and (entry["dj_name"] or entry["title"])
+        }
+        return sorted(names)
+
+    @staticmethod
     async def _get_entries(db: Session) -> List[_ScheduleEntry]:
         async def producer() -> dict:
             end = datetime.now(timezone.utc) + timedelta(days=SCHEDULE_WINDOW_DAYS)

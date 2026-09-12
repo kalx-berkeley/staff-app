@@ -68,6 +68,14 @@ class SelfPreassignmentData(BaseModel):
     )
 
 
+class DjSuggestion(BaseModel):
+    """Schema for a suggested DJ/specialty-show name to pre-assign a pass pair to."""
+
+    name: str
+    is_specialty: bool = False
+    matched_genres: list[str] = Field(default_factory=list)
+
+
 class ClaimData(BaseModel):
     """Schema for claiming a staff pass, optionally with a +1 guest."""
 

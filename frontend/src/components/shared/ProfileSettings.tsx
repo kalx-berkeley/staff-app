@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { usersAPI } from '../../services/api';
+import { usersAPI, showsAPI } from '../../services/api';
+import GenreTagInput from './GenreTagInput';
 import type { PromotionsStaffProfile, StaffProfile, NotificationPreferences, APIError } from '../../types';
 
 const ProfileSettings = () => {
@@ -12,6 +13,13 @@ const ProfileSettings = () => {
   const [notifError, setNotifError] = useState<string | null>(null);
   const [notifSaving, setNotifSaving] = useState(false);
   const [notifSaved, setNotifSaved] = useState(false);
+
+  const [knownGenres, setKnownGenres] = useState<string[]>([]);
+  const [genrePrefs, setGenrePrefs] = useState<string[]>([]);
+  const [genrePrefsLoading, setGenrePrefsLoading] = useState(true);
+  const [genrePrefsError, setGenrePrefsError] = useState<string | null>(null);
+  const [genrePrefsSaving, setGenrePrefsSaving] = useState(false);
+  const [genrePrefsSaved, setGenrePrefsSaved] = useState(false);
 
   const loadProfile = async () => {
     try {
@@ -49,9 +57,29 @@ const ProfileSettings = () => {
     }
   };
 
+  const loadGenrePrefs = async () => {
+    try {
+      setGenrePrefsLoading(true);
+      setGenrePrefsError(null);
+      const data = await usersAPI.getGenrePreferences();
+      setGenrePrefs(data.genres);
+    } catch (err) {
+      const apiError = err as APIError;
+      setGenrePrefsError(
+        typeof apiError.detail === 'string'
+          ? apiError.detail
+          : 'Failed to load genre preferences'
+      );
+    } finally {
+      setGenrePrefsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadProfile();
     loadNotifPrefs();
+    loadGenrePrefs();
+    showsAPI.listGenres().then(setKnownGenres).catch(() => {});
   }, []);
 
   const handleEmailToggle = async (enabled: boolean) => {
@@ -73,6 +101,31 @@ const ProfileSettings = () => {
       );
     } finally {
       setNotifSaving(false);
+    }
+  };
+
+  const handleGenresChange = async (genres: string[]) => {
+    if (genrePrefsSaving) return;
+    const previous = genrePrefs;
+    setGenrePrefsSaving(true);
+    setGenrePrefsError(null);
+    setGenrePrefsSaved(false);
+    setGenrePrefs(genres);
+    try {
+      const updated = await usersAPI.updateGenrePreferences({ genres });
+      setGenrePrefs(updated.genres);
+      setGenrePrefsSaved(true);
+      setTimeout(() => setGenrePrefsSaved(false), 2000);
+    } catch (err) {
+      setGenrePrefs(previous);
+      const apiError = err as APIError;
+      setGenrePrefsError(
+        typeof apiError.detail === 'string'
+          ? apiError.detail
+          : 'Failed to save genre preferences'
+      );
+    } finally {
+      setGenrePrefsSaving(false);
     }
   };
 
@@ -146,6 +199,29 @@ const ProfileSettings = () => {
         <div className="error">
           <p>Error: {notifError || 'Could not load notification settings'}</p>
           <button onClick={loadNotifPrefs}>Retry</button>
+        </div>
+      )}
+
+      <h3>Genres You Like</h3>
+      {genrePrefsLoading ? (
+        <div className="loading">Loading genre preferences...</div>
+      ) : (
+        <div className="genre-preferences">
+          {genrePrefsError && <div className="error-message">{genrePrefsError}</div>}
+          {genrePrefsSaved && <div className="success-message">Saved.</div>}
+          <p className="field-hint">
+            Pick genres you enjoy. If you're a Sublist DJ, promotions staff use this
+            to suggest you (and specialty shows you're part of) when pre-assigning
+            pass pairs to shows in these genres.
+          </p>
+          <label htmlFor="genre-preferences-input">Genres</label>
+          <GenreTagInput
+            genres={genrePrefs}
+            onChange={handleGenresChange}
+            knownGenres={knownGenres}
+            disabled={genrePrefsSaving}
+            id="genre-preferences-input"
+          />
         </div>
       )}
     </div>

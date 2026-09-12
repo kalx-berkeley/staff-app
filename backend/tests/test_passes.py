@@ -11,6 +11,9 @@ from app.models.staff_department import StaffDepartment
 from app.models.staff_status import StaffStatus
 from app.models.show import Show
 from app.models.pass_model import Pass
+from app.models.specialty_show import SpecialtyShow
+from app.models.specialty_show_dj import SpecialtyShowDJ
+from app.models.staff_genre_preference import StaffGenrePreference
 from app.services.pass_service import PassService
 
 
@@ -807,3 +810,111 @@ def test_release_winner_no_winner(client, show, promotions_staff, db):
     )
     assert response.status_code == 400
     assert "winner" in response.json()["detail"].lower()
+
+
+# --- Suggest DJs by genre tests ---
+
+
+def _make_sublist_dj(db: Session, email: str, dj_name: str, genres: list[str]) -> Staff:
+    """Create an active Sublist DJ staff member with the given genre preferences."""
+    staff = Staff(email=email, name=dj_name, phone="555-0003", dj_name=dj_name)
+    db.add(staff)
+    db.flush()
+    db.add(StaffStatus(staff_id=staff.id, status="Active"))
+    db.add(StaffStatus(staff_id=staff.id, status="Sublist DJ"))
+    db.add(StaffGenrePreference(staff_id=staff.id, genres=genres))
+    db.commit()
+    db.refresh(staff)
+    return staff
+
+
+def test_suggest_by_genre_matches_sublist_dj_and_specialty_show(
+    client, show, promotions_staff, db
+):
+    """A sublist DJ with an overlapping genre, and a specialty show they belong to,
+    are both suggested."""
+    show.genre = ["Rock", "Blues"]
+    db.commit()
+
+    _make_sublist_dj(db, "wolfman@test.com", "Wolfman", ["rock", "hiphop"])
+
+    specialty = SpecialtyShow(name="Sunday Jazz Brunch")
+    db.add(specialty)
+    db.flush()
+    db.add(SpecialtyShowDJ(specialty_show_id=specialty.id, dj_name="Wolfman"))
+    db.commit()
+
+    response = client.get(
+        "/api/passes/preassign/suggest-by-genre",
+        params={"show_id": show.id},
+        headers={"X-Forwarded-User": promotions_staff.email},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data == [
+        {"name": "Sunday Jazz Brunch", "is_specialty": True, "matched_genres": ["rock"]},
+        {"name": "Wolfman", "is_specialty": False, "matched_genres": ["rock"]},
+    ]
+
+
+def test_suggest_by_genre_excludes_non_matching_and_non_sublist(
+    client, show, promotions_staff, db
+):
+    """A DJ with no genre overlap, and a non-Sublist-DJ staff member with a
+    matching genre, are both excluded."""
+    show.genre = ["Rock"]
+    db.commit()
+
+    _make_sublist_dj(db, "nightowl@test.com", "Nightowl", ["hiphop"])
+
+    non_sublist = Staff(
+        email="regular@test.com", name="Regular DJ", phone="555-0004", dj_name="Regular DJ"
+    )
+    db.add(non_sublist)
+    db.flush()
+    db.add(StaffStatus(staff_id=non_sublist.id, status="Active"))
+    db.add(StaffGenrePreference(staff_id=non_sublist.id, genres=["rock"]))
+    db.commit()
+
+    response = client.get(
+        "/api/passes/preassign/suggest-by-genre",
+        params={"show_id": show.id},
+        headers={"X-Forwarded-User": promotions_staff.email},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_suggest_by_genre_no_show_genres_returns_empty(client, show, promotions_staff, db):
+    """A show with no genres set yields no suggestions, even with matching DJs."""
+    show.genre = None
+    db.commit()
+
+    _make_sublist_dj(db, "wolfman@test.com", "Wolfman", ["rock"])
+
+    response = client.get(
+        "/api/passes/preassign/suggest-by-genre",
+        params={"show_id": show.id},
+        headers={"X-Forwarded-User": promotions_staff.email},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_suggest_by_genre_unknown_show_404(client, promotions_staff):
+    response = client.get(
+        "/api/passes/preassign/suggest-by-genre",
+        params={"show_id": 999999},
+        headers={"X-Forwarded-User": promotions_staff.email},
+    )
+    assert response.status_code == 404
+
+
+def test_suggest_by_genre_requires_authentication(client, show):
+    response = client.get(
+        "/api/passes/preassign/suggest-by-genre", params={"show_id": show.id}
+    )
+    assert response.status_code == 400

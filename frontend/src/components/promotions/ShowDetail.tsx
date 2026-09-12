@@ -10,7 +10,11 @@ import type {
   LotteryStatus,
   APIError,
   PromotionsStaffProfile,
+  PassResponse,
+  DjSuggestion,
 } from '../../types';
+
+type SuggestMode = 'choose' | 'date' | 'genre' | null;
 
 type ConfirmAction = 'close' | 'unpublish' | 'reopen' | null;
 
@@ -133,6 +137,13 @@ const ShowDetail = () => {
   // selecting an autocomplete suggestion (which immediately fetches) followed by
   // the input's blur (which fires right after, for the same name) only fetches once.
   const lastScheduleFetchNameRef = useRef<string | null>(null);
+
+  // "Suggest" flow for the Pre-assign to DJ box: pick a suggestion mode, then
+  // browse and accept a suggested DJ/specialty-show name.
+  const [suggestMode, setSuggestMode] = useState<SuggestMode>(null);
+  const [suggestions, setSuggestions] = useState<DjSuggestion[] | null>(null);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
 
   const loadShow = useCallback(async (silent = false) => {
     if (!id) return;
@@ -335,6 +346,132 @@ const ShowDetail = () => {
       );
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const resetPreassignForm = () => {
+    setPreassignPassId(null);
+    setPreassignDj('');
+    setPreassignDate('');
+    setScheduleDates(null);
+    lastScheduleFetchNameRef.current = null;
+    setSuggestMode(null);
+    setSuggestions(null);
+    setSuggestError(null);
+  };
+
+  const fetchSuggestionsByDate = async (dateStr: string) => {
+    setSuggestLoading(true);
+    setSuggestError(null);
+    try {
+      const results = await passesAPI.getSuggestionsByDate(dateStr);
+      setSuggestions(results);
+    } catch {
+      setSuggestions(null);
+      setSuggestError('Failed to load suggestions for that date');
+    } finally {
+      setSuggestLoading(false);
+    }
+  };
+
+  const fetchSuggestionsByGenre = async (showId: number) => {
+    setSuggestLoading(true);
+    setSuggestError(null);
+    try {
+      const results = await passesAPI.getSuggestionsByGenre(showId);
+      setSuggestions(results);
+    } catch {
+      setSuggestions(null);
+      setSuggestError('Failed to load genre-based suggestions');
+    } finally {
+      setSuggestLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (suggestMode === 'date' && preassignDate) {
+      fetchSuggestionsByDate(preassignDate);
+    }
+  }, [suggestMode, preassignDate]);
+
+  useEffect(() => {
+    if (suggestMode === 'genre' && show) {
+      fetchSuggestionsByGenre(show.id);
+    }
+    // `show` is deliberately excluded: it gets a new object identity on every
+    // pass-preassignment save (see saveSuggestionAndAdvance), and refetching
+    // then would clobber the suggestion list we just filtered down locally.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestMode]);
+
+  /**
+   * Save a suggestion's DJ/specialty-show name and date to `pass`, then open the
+   * next available (unassigned) pass pair with the same suggestion pool minus
+   * the one just used — so suggesting for several pass pairs in a row doesn't
+   * require re-opening the "Suggest" flow each time.
+   */
+  const saveSuggestionAndAdvance = async (
+    pass: PassResponse,
+    djName: string,
+    dateStr: string
+  ) => {
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const data: PreAssignmentData = { dj_name: djName, assignment_date: dateStr };
+      const updatedPass = await passesAPI.setPreassignment(pass.id, data);
+      const updatedPasses =
+        show?.passes.map((p) => (p.id === updatedPass.id ? updatedPass : p)) ?? [];
+      setShow((prev) => (prev ? { ...prev, passes: updatedPasses } : prev));
+
+      const remainingSuggestions = (suggestions ?? []).filter((s) => s.name !== djName);
+      setSuggestions(remainingSuggestions);
+
+      const pairs = updatedPasses.filter((p) => p.pass_type === 'pair');
+      const currentIndex = pairs.findIndex((p) => p.id === pass.id);
+      const next = pairs
+        .slice(currentIndex + 1)
+        .find((p) => p.status === 'available' && !p.preassigned_dj);
+
+      if (next) {
+        setPreassignPassId(next.id);
+        setPreassignDj('');
+        // Deliberately keep preassignDate and suggestMode/suggestions as-is —
+        // the same on-air date and suggestion pool usually apply to the next
+        // pass pair too, minus the DJ we just used.
+        setScheduleDates(null);
+        lastScheduleFetchNameRef.current = null;
+      } else {
+        // No more available pass pairs to suggest for — close out the form.
+        resetPreassignForm();
+      }
+    } catch (err) {
+      const apiError = err as APIError;
+      setActionError(
+        typeof apiError.detail === 'string'
+          ? apiError.detail
+          : 'Failed to set pre-assignment'
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const acceptSuggestion = (pass: PassResponse, suggestion: DjSuggestion) => {
+    if (suggestMode === 'date') {
+      // Guaranteed non-empty — suggestions for this mode only load once a date is set.
+      saveSuggestionAndAdvance(pass, suggestion.name, preassignDate);
+      return;
+    }
+
+    // Genre mode: only auto-save when a date was already chosen before suggesting.
+    if (preassignDate) {
+      saveSuggestionAndAdvance(pass, suggestion.name, preassignDate);
+    } else {
+      setPreassignDj(suggestion.name);
+      setSuggestMode(null);
+      setSuggestions(null);
+      fetchScheduleForName(suggestion.name);
     }
   };
 
@@ -781,98 +918,296 @@ const ShowDetail = () => {
                     </div>
                   ) : preassignPassId === pass.id ? (
                     <div className="preassignment-form">
-                      <div className="autocomplete-wrapper">
-                        <input
-                          type="text"
-                          placeholder="DJ Name"
-                          value={preassignDj}
-                          onChange={(e) => handlePreassignDjChange(e.target.value)}
-                          onKeyDown={handlePreassignDjKeyDown}
-                          onBlur={handlePreassignDjBlur}
-                          disabled={actionLoading}
-                          autoComplete="off"
-                        />
-                        {showDjAutocomplete && (
-                          <ul className="autocomplete-list" ref={djAutocompleteRef}>
-                            {filteredDjNames.map((name) => {
-                              const isSpecialty = specialtyShowNames.has(name.toLowerCase());
-                              return (
+                      {suggestMode === null && (
+                        <>
+                          <div className="autocomplete-wrapper">
+                            <input
+                              type="text"
+                              placeholder="DJ Name"
+                              value={preassignDj}
+                              onChange={(e) => handlePreassignDjChange(e.target.value)}
+                              onKeyDown={handlePreassignDjKeyDown}
+                              onBlur={handlePreassignDjBlur}
+                              disabled={actionLoading}
+                              autoComplete="off"
+                            />
+                            {showDjAutocomplete && (
+                              <ul className="autocomplete-list" ref={djAutocompleteRef}>
+                                {filteredDjNames.map((name) => {
+                                  const isSpecialty = specialtyShowNames.has(name.toLowerCase());
+                                  return (
+                                    <li
+                                      key={name}
+                                      onMouseDown={() => selectPreassignDj(name)}
+                                      className="autocomplete-item"
+                                    >
+                                      <span>{name}</span>
+                                      <span className={isSpecialty ? 'specialty-show-badge' : 'dj-name-badge'}>
+                                        {isSpecialty ? 'Specialty Show' : 'DJ'}
+                                      </span>
+                                    </li>
+                                  );
+                                })}
+                                {filteredDjNames.length === 1 && (
+                                  <li className="autocomplete-hint">Press Tab to complete</li>
+                                )}
+                              </ul>
+                            )}
+                          </div>
+                          {scheduleLoading && (
+                            <p className="field-hint">Checking on-air schedule…</p>
+                          )}
+                          {scheduleDates !== null && scheduleDates.length === 0 && (
+                            <p className="field-hint">
+                              No scheduled on-air dates found for "{preassignDj.trim()}" in the next
+                              ~8 weeks. You can still pick a date below.
+                            </p>
+                          )}
+                          {scheduleDates !== null &&
+                            scheduleDates.length > 0 &&
+                            scheduleDatesBeforeClose?.length === 0 && (
+                              <p className="field-hint">
+                                {preassignDj.trim() || 'This DJ'} has upcoming on-air dates, but none
+                                before this show closes on {formatDate(maxPreassignDate!)}. You can
+                                still pick a date below.
+                              </p>
+                            )}
+                          <DatePicker
+                            value={preassignDate}
+                            onChange={setPreassignDate}
+                            max={maxPreassignDate}
+                            disabled={actionLoading}
+                            isDateDisabled={
+                              scheduleDates && scheduleDates.length > 0
+                                ? (date) => !scheduleDates.includes(formatDateValue(date))
+                                : undefined
+                            }
+                          />
+                          {scheduleDates !== null &&
+                            preassignDate &&
+                            !scheduleDates.includes(preassignDate) && (
+                              <p className="field-warning">
+                                The on-air schedule doesn't show {preassignDj.trim() || 'this DJ'}{' '}
+                                scheduled on {formatDate(preassignDate)}. Only save this if you're sure
+                                that's correct.
+                              </p>
+                            )}
+                          <button
+                            onClick={() => handlePreassignSubmit(pass.id)}
+                            className="btn-small btn-primary"
+                            disabled={actionLoading}
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setSuggestMode('choose')}
+                            className="btn-small"
+                            disabled={actionLoading}
+                          >
+                            Suggest…
+                          </button>
+                          <button
+                            onClick={resetPreassignForm}
+                            className="btn-small"
+                            disabled={actionLoading}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      )}
+
+                      {suggestMode === 'choose' && (
+                        <div className="suggest-panel">
+                          <p className="field-hint">How should we suggest DJs?</p>
+                          <button
+                            onClick={() => setSuggestMode('date')}
+                            className="btn-small"
+                            disabled={actionLoading}
+                          >
+                            Suggest DJs by date
+                          </button>
+                          <button
+                            onClick={() => setSuggestMode('genre')}
+                            className="btn-small"
+                            disabled={actionLoading}
+                          >
+                            Suggest DJs by genre
+                          </button>
+                          <button
+                            onClick={() => setSuggestMode(null)}
+                            className="btn-small"
+                            disabled={actionLoading}
+                          >
+                            Back
+                          </button>
+                          <button
+                            onClick={resetPreassignForm}
+                            className="btn-small"
+                            disabled={actionLoading}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+
+                      {suggestMode === 'date' && (
+                        <div className="suggest-panel">
+                          {!preassignDate ? (
+                            <>
+                              <p className="field-hint">
+                                Pick a date to see who's on-air that day.
+                              </p>
+                              <DatePicker
+                                value={preassignDate}
+                                onChange={setPreassignDate}
+                                min={formatDateValue(new Date())}
+                                max={maxPreassignDate}
+                                disabled={actionLoading}
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <p className="field-hint">
+                                On-air {formatDate(preassignDate)}:
+                              </p>
+                              {suggestLoading && (
+                                <p className="field-hint">Loading suggestions…</p>
+                              )}
+                              {suggestError && (
+                                <div className="error-message">{suggestError}</div>
+                              )}
+                              {!suggestLoading && suggestions && suggestions.length === 0 && (
+                                <p className="field-hint">
+                                  No DJs or specialty shows scheduled on this date.
+                                </p>
+                              )}
+                              {!suggestLoading && suggestions && suggestions.length > 0 && (
+                                <ul className="autocomplete-list suggestion-list">
+                                  {suggestions.map((s) => (
+                                    <li
+                                      key={s.name}
+                                      className="autocomplete-item"
+                                      onClick={() => acceptSuggestion(pass, s)}
+                                    >
+                                      <span>{s.name}</span>
+                                      <span
+                                        className={
+                                          s.is_specialty ? 'specialty-show-badge' : 'dj-name-badge'
+                                        }
+                                      >
+                                        {s.is_specialty ? 'Specialty Show' : 'DJ'}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                              <button
+                                onClick={() => {
+                                  setPreassignDate('');
+                                  setSuggestions(null);
+                                }}
+                                className="btn-small"
+                                disabled={actionLoading}
+                              >
+                                Pick a different date
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={() => {
+                              setSuggestMode('choose');
+                              setSuggestions(null);
+                              setSuggestError(null);
+                            }}
+                            className="btn-small"
+                            disabled={actionLoading}
+                          >
+                            Back
+                          </button>
+                          <button
+                            onClick={resetPreassignForm}
+                            className="btn-small"
+                            disabled={actionLoading}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+
+                      {suggestMode === 'genre' && (
+                        <div className="suggest-panel">
+                          <p className="field-hint">
+                            Sublist DJs whose liked genres match this show
+                            {show?.genre && show.genre.length > 0
+                              ? ` (${show.genre.join(', ')})`
+                              : ''}
+                            :
+                          </p>
+                          {suggestLoading && (
+                            <p className="field-hint">Loading suggestions…</p>
+                          )}
+                          {suggestError && <div className="error-message">{suggestError}</div>}
+                          {!suggestLoading && suggestions && suggestions.length === 0 && (
+                            <p className="field-hint">
+                              {show?.genre && show.genre.length > 0
+                                ? 'No Sublist DJs have a genre match for this show.'
+                                : 'This show has no genres set, so there is nothing to match.'}
+                            </p>
+                          )}
+                          {!suggestLoading && suggestions && suggestions.length > 0 && (
+                            <ul className="autocomplete-list suggestion-list">
+                              {suggestions.map((s) => (
                                 <li
-                                  key={name}
-                                  onMouseDown={() => selectPreassignDj(name)}
+                                  key={s.name}
                                   className="autocomplete-item"
+                                  onClick={() => acceptSuggestion(pass, s)}
                                 >
-                                  <span>{name}</span>
-                                  <span className={isSpecialty ? 'specialty-show-badge' : 'dj-name-badge'}>
-                                    {isSpecialty ? 'Specialty Show' : 'DJ'}
+                                  <span>
+                                    {s.name}
+                                    {s.matched_genres.length > 0 && (
+                                      <span className="matched-genres">
+                                        {' '}
+                                        ({s.matched_genres.join(', ')})
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span
+                                    className={
+                                      s.is_specialty ? 'specialty-show-badge' : 'dj-name-badge'
+                                    }
+                                  >
+                                    {s.is_specialty ? 'Specialty Show' : 'DJ'}
                                   </span>
                                 </li>
-                              );
-                            })}
-                            {filteredDjNames.length === 1 && (
-                              <li className="autocomplete-hint">Press Tab to complete</li>
-                            )}
-                          </ul>
-                        )}
-                      </div>
-                      {scheduleLoading && (
-                        <p className="field-hint">Checking on-air schedule…</p>
+                              ))}
+                            </ul>
+                          )}
+                          {!preassignDate && suggestions && suggestions.length > 0 && (
+                            <p className="field-hint">
+                              No date set yet — picking a suggestion fills in the name; you'll
+                              still need to pick a date and save.
+                            </p>
+                          )}
+                          <button
+                            onClick={() => {
+                              setSuggestMode('choose');
+                              setSuggestions(null);
+                              setSuggestError(null);
+                            }}
+                            className="btn-small"
+                            disabled={actionLoading}
+                          >
+                            Back
+                          </button>
+                          <button
+                            onClick={resetPreassignForm}
+                            className="btn-small"
+                            disabled={actionLoading}
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       )}
-                      {scheduleDates !== null && scheduleDates.length === 0 && (
-                        <p className="field-hint">
-                          No scheduled on-air dates found for "{preassignDj.trim()}" in the next
-                          ~8 weeks. You can still pick a date below.
-                        </p>
-                      )}
-                      {scheduleDates !== null &&
-                        scheduleDates.length > 0 &&
-                        scheduleDatesBeforeClose?.length === 0 && (
-                          <p className="field-hint">
-                            {preassignDj.trim() || 'This DJ'} has upcoming on-air dates, but none
-                            before this show closes on {formatDate(maxPreassignDate!)}. You can
-                            still pick a date below.
-                          </p>
-                        )}
-                      <DatePicker
-                        value={preassignDate}
-                        onChange={setPreassignDate}
-                        max={maxPreassignDate}
-                        disabled={actionLoading}
-                        isDateDisabled={
-                          scheduleDates && scheduleDates.length > 0
-                            ? (date) => !scheduleDates.includes(formatDateValue(date))
-                            : undefined
-                        }
-                      />
-                      {scheduleDates !== null &&
-                        preassignDate &&
-                        !scheduleDates.includes(preassignDate) && (
-                          <p className="field-warning">
-                            The on-air schedule doesn't show {preassignDj.trim() || 'this DJ'}{' '}
-                            scheduled on {formatDate(preassignDate)}. Only save this if you're sure
-                            that's correct.
-                          </p>
-                        )}
-                      <button
-                        onClick={() => handlePreassignSubmit(pass.id)}
-                        className="btn-small btn-primary"
-                        disabled={actionLoading}
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => {
-                          setPreassignPassId(null);
-                          setPreassignDj('');
-                          setPreassignDate('');
-                          setScheduleDates(null);
-                          lastScheduleFetchNameRef.current = null;
-                        }}
-                        className="btn-small"
-                        disabled={actionLoading}
-                      >
-                        Cancel
-                      </button>
                     </div>
                   ) : (
                     <button

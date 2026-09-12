@@ -1188,6 +1188,26 @@ fieldset.radio-group legend {
   background-color: #f3e5f5;
 }
 
+/* "Suggest DJs by date/genre" panel inside the Pre-assign to DJ box. */
+.suggest-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.suggestion-list {
+  position: static;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  box-shadow: none;
+  max-height: 220px;
+}
+
+.matched-genres {
+  color: #6c757d;
+  font-size: 0.8em;
+}
+
 /* Date picker: a real, typeable <input type="date"> plus a calendar popover
    for mouse users who'd rather browse. Both drive the same value. */
 .date-picker-wrapper {

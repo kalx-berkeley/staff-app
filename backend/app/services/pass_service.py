@@ -405,6 +405,84 @@ class PassService:
         return sorted(staff_names | winner_names | specialty_names)
 
     @staticmethod
+    def suggest_djs_by_genre(db: Session, show: Show) -> list[dict]:
+        """
+        Suggest active Sublist DJs (and specialty shows they belong to) whose genre
+        preferences overlap *show*'s genres, for the "Suggest DJs by genre" pre-assignment
+        flow.
+
+        A DJ's `Staff.dj_name` can be a comma-joined list of stage names (same
+        convention as `get_dj_names_for_autocomplete`/self pre-assignment); each
+        name is suggested individually. A specialty show is suggested once, with
+        the union of its member DJs' matched genres, when at least one member has
+        a genre match.
+
+        :param db: Database session.
+        :param show: Show to match genres against.
+        :returns: List of dicts shaped like `DjSuggestion`, sorted by name.
+        """
+        from app.auth import _is_sublist_dj
+        from app.models.staff_genre_preference import StaffGenrePreference
+        from app.models.specialty_show_dj import (
+            SpecialtyShowDJ,
+        )  # noqa: F401 (via SpecialtyShow.dj_names)
+
+        show_genres = {g.lower() for g in show.genre or []}
+        if not show_genres:
+            return []
+
+        rows = (
+            db.query(Staff, StaffGenrePreference)
+            .join(StaffGenrePreference, StaffGenrePreference.staff_id == Staff.id)
+            .filter(Staff.dj_name.isnot(None))
+            .all()
+        )
+
+        # Lowercase individual DJ name -> (display name, matched genres).
+        dj_matches: dict[str, tuple[str, set[str]]] = {}
+        for staff, prefs in rows:
+            if not _is_sublist_dj(staff):
+                continue
+            matched = {g.lower() for g in prefs.genres or []} & show_genres
+            if not matched:
+                continue
+            for name in staff.dj_name.split(","):
+                name = name.strip()
+                if not name:
+                    continue
+                key = name.lower()
+                if key in dj_matches:
+                    dj_matches[key][1].update(matched)
+                else:
+                    dj_matches[key] = (name, set(matched))
+
+        suggestions = [
+            {"name": name, "is_specialty": False, "matched_genres": sorted(genres)}
+            for name, genres in dj_matches.values()
+        ]
+
+        specialty_shows = (
+            db.query(SpecialtyShow)
+            .filter(SpecialtyShow.deleted == False)
+            .all()  # noqa: E712
+        )
+        for specialty_show in specialty_shows:
+            matched_genres: set[str] = set()
+            for member_name in specialty_show.dj_names:
+                entry = dj_matches.get(member_name.strip().lower())
+                if entry:
+                    matched_genres.update(entry[1])
+            if matched_genres:
+                suggestions.append({
+                    "name": specialty_show.name,
+                    "is_specialty": True,
+                    "matched_genres": sorted(matched_genres),
+                })
+
+        suggestions.sort(key=lambda s: s["name"].lower())
+        return suggestions
+
+    @staticmethod
     def _validate_staff_pass_claimable(db: Session, pass_item: Pass) -> Show:
         """Shared validation for claiming a staff pass. Returns the show."""
         if pass_item.pass_type != "staff":

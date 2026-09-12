@@ -47,6 +47,8 @@ import type {
   ImpersonateRequest,
   UserListItem,
   NotificationPreferences,
+  GenrePreferences,
+  DjSuggestion,
   AuditLogItem,
   AuditLogFilters,
   AutoCloseScheduleItem,
@@ -710,6 +712,44 @@ export const passesAPI = {
     }
   },
 
+  /**
+   * Suggest DJs/specialty shows scheduled on-air on a given date, for the
+   * "Suggest DJs by date" pre-assignment flow.
+   *
+   * @param date - Date to check, as a YYYY-MM-DD string
+   * @returns Promise resolving to an array of suggestions
+   */
+  getSuggestionsByDate: async (date: string): Promise<DjSuggestion[]> => {
+    try {
+      const response = await apiClient.get<DjSuggestion[]>(
+        '/passes/preassign/suggest-by-date',
+        { params: { date } }
+      );
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * Suggest Sublist DJs (and their specialty shows) whose genre preferences
+   * overlap a show's genres, for the "Suggest DJs by genre" pre-assignment flow.
+   *
+   * @param showId - Show ID
+   * @returns Promise resolving to an array of suggestions
+   */
+  getSuggestionsByGenre: async (showId: number): Promise<DjSuggestion[]> => {
+    try {
+      const response = await apiClient.get<DjSuggestion[]>(
+        '/passes/preassign/suggest-by-genre',
+        { params: { show_id: showId } }
+      );
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
   removePreassignment: async (passId: number, djName?: string): Promise<PassResponse> => {
     try {
       const response = await apiClient.delete<PassResponse>(
@@ -859,6 +899,39 @@ export const usersAPI = {
     try {
       const response = await apiClient.put<NotificationPreferences>(
         '/users/notification-preferences',
+        prefs
+      );
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * Get current user's genre preferences.
+   * Creates a default (empty) list if none exist yet.
+   *
+   * @returns Promise resolving to genre preferences
+   */
+  getGenrePreferences: async (): Promise<GenrePreferences> => {
+    try {
+      const response = await apiClient.get<GenrePreferences>('/users/genre-preferences');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * Update current user's genre preferences.
+   *
+   * @param prefs - Updated genre preferences
+   * @returns Promise resolving to updated genre preferences
+   */
+  updateGenrePreferences: async (prefs: GenrePreferences): Promise<GenrePreferences> => {
+    try {
+      const response = await apiClient.put<GenrePreferences>(
+        '/users/genre-preferences',
         prefs
       );
       return response.data;

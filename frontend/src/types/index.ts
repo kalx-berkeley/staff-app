@@ -582,6 +582,18 @@ export interface NotificationPreferences {
   email_enabled: boolean;
 }
 
+// Genre preferences
+export interface GenrePreferences {
+  genres: string[];
+}
+
+// DJ pre-assignment suggestions
+export interface DjSuggestion {
+  name: string;
+  is_specialty: boolean;
+  matched_genres: string[];
+}
+
 // Impersonation
 export interface ImpersonateRequest {
   email: string | null;

@@ -19,6 +19,7 @@ from .on_air_winner import OnAirWinner
 from .job_log import JobLog
 from .impersonation_session import ImpersonationSession
 from .notification_preferences import NotificationPreferences
+from .staff_genre_preference import StaffGenrePreference
 from .specialty_show import SpecialtyShow
 from .specialty_show_owner import SpecialtyShowOwner
 from .specialty_show_dj import SpecialtyShowDJ
@@ -49,6 +50,7 @@ __all__ = [
     "JobLog",
     "ImpersonationSession",
     "NotificationPreferences",
+    "StaffGenrePreference",
     "SpecialtyShow",
     "SpecialtyShowOwner",
     "SpecialtyShowDJ",

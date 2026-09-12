@@ -1,12 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import ProfileSettings from './ProfileSettings';
-import { usersAPI } from '../../services/api';
+import { usersAPI, showsAPI } from '../../services/api';
 import type { PromotionsStaffProfile, StaffProfile } from '../../types';
 
 vi.mock('../../services/api', () => ({
   usersAPI: {
     getProfile: vi.fn(),
+    getNotificationPreferences: vi.fn().mockResolvedValue({ email_enabled: true }),
+    updateNotificationPreferences: vi.fn(),
+    getGenrePreferences: vi.fn().mockResolvedValue({ genres: [] }),
+    updateGenrePreferences: vi.fn(),
+  },
+  showsAPI: {
+    listGenres: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -76,7 +83,7 @@ describe('ProfileSettings', () => {
     expect(screen.getByText(/managed in Airtable/i)).toBeInTheDocument();
   });
 
-  it('should not render any editable inputs or save button', async () => {
+  it('should not render any editable inputs or save button in the read-only profile info section', async () => {
     vi.mocked(usersAPI.getProfile).mockResolvedValue(mockPromotionsProfile);
 
     render(<ProfileSettings />);
@@ -85,8 +92,10 @@ describe('ProfileSettings', () => {
       expect(screen.queryByText('Loading profile...')).not.toBeInTheDocument();
     });
 
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /save/i })).not.toBeInTheDocument();
+    const profileInfo = document.querySelector('.profile-info') as HTMLElement;
+    expect(profileInfo).not.toBeNull();
+    expect(within(profileInfo).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(within(profileInfo).queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('should show error state with retry button when load fails', async () => {
@@ -130,5 +139,60 @@ describe('ProfileSettings', () => {
     });
 
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
+  });
+
+  describe('genre preferences', () => {
+    beforeEach(() => {
+      vi.mocked(usersAPI.getProfile).mockResolvedValue(mockPromotionsProfile);
+    });
+
+    it('should display existing genre preferences as tags', async () => {
+      vi.mocked(usersAPI.getGenrePreferences).mockResolvedValue({ genres: ['rock', 'jazz'] });
+
+      render(<ProfileSettings />);
+
+      await waitFor(() => {
+        expect(screen.getByText('rock')).toBeInTheDocument();
+        expect(screen.getByText('jazz')).toBeInTheDocument();
+      });
+    });
+
+    it('should add a genre and save it', async () => {
+      vi.mocked(usersAPI.getGenrePreferences).mockResolvedValue({ genres: [] });
+      vi.mocked(usersAPI.updateGenrePreferences).mockResolvedValue({ genres: ['blues'] });
+      vi.mocked(showsAPI.listGenres).mockResolvedValue(['blues', 'rock']);
+
+      render(<ProfileSettings />);
+
+      await waitFor(() => {
+        expect(screen.queryByText('Loading genre preferences...')).not.toBeInTheDocument();
+      });
+
+      const genreInput = screen.getByLabelText('Genres');
+      fireEvent.change(genreInput, { target: { value: 'Blues' } });
+      fireEvent.keyDown(genreInput, { key: 'Enter' });
+
+      await waitFor(() => {
+        expect(usersAPI.updateGenrePreferences).toHaveBeenCalledWith({ genres: ['blues'] });
+      });
+      expect(screen.getByText('blues')).toBeInTheDocument();
+    });
+
+    it('should remove a genre and save the change', async () => {
+      vi.mocked(usersAPI.getGenrePreferences).mockResolvedValue({ genres: ['rock'] });
+      vi.mocked(usersAPI.updateGenrePreferences).mockResolvedValue({ genres: [] });
+
+      render(<ProfileSettings />);
+
+      await waitFor(() => {
+        expect(screen.getByText('rock')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove rock' }));
+
+      await waitFor(() => {
+        expect(usersAPI.updateGenrePreferences).toHaveBeenCalledWith({ genres: [] });
+      });
+    });
   });
 });

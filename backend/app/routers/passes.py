@@ -1,11 +1,14 @@
 """Pass API endpoints."""
 
+from datetime import date as date_type
+
 from fastapi import APIRouter, Depends, HTTPException, Header, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.schemas.pass_schema import (
     ClaimData,
+    DjSuggestion,
     GiveawayData,
     PreassignmentData,
     SelfPreassignmentData,
@@ -35,6 +38,7 @@ from app.models.on_air_winner import OnAirWinner
 from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.venue import Venue
+from app.models.specialty_show import SpecialtyShow
 
 router = APIRouter(prefix="/api", tags=["passes"])
 
@@ -521,6 +525,50 @@ async def get_preassign_schedule(
     only sees dates the schedule actually backs up.
     """
     return await SpinitronUpcomingScheduleService.get_dates_for_name(db, name)
+
+
+@router.get("/passes/preassign/suggest-by-date", response_model=list[DjSuggestion])
+async def suggest_preassign_by_date(
+    date: date_type = Query(...),
+    role_and_staff: tuple = Depends(require_promotions_or_staff),
+    db: Session = Depends(get_db),
+):
+    """
+    Suggest DJs/specialty shows scheduled on-air on *date*, for the "Suggest DJs by
+    date" pre-assignment flow.
+
+    Backed by the same cached Spinitron schedule as `/passes/preassign/schedule`,
+    read in the opposite direction (date -> names instead of name -> dates).
+    """
+    names = await SpinitronUpcomingScheduleService.get_names_for_date(db, date.isoformat())
+    specialty_names = {
+        row[0].lower()
+        for row in (
+            db.query(SpecialtyShow.name)
+            .filter(SpecialtyShow.deleted == False)  # noqa: E712
+            .all()
+        )
+    }
+    return [
+        DjSuggestion(name=name, is_specialty=name.lower() in specialty_names)
+        for name in names
+    ]
+
+
+@router.get("/passes/preassign/suggest-by-genre", response_model=list[DjSuggestion])
+def suggest_preassign_by_genre(
+    show_id: int = Query(...),
+    role_and_staff: tuple = Depends(require_promotions_or_staff),
+    db: Session = Depends(get_db),
+):
+    """
+    Suggest active Sublist DJs (and their specialty shows) whose genre preferences
+    overlap *show_id*'s genres, for the "Suggest DJs by genre" pre-assignment flow.
+    """
+    show = db.query(Show).filter(Show.id == show_id).first()
+    if not show:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Show not found")
+    return PassService.suggest_djs_by_genre(db, show)
 
 
 @router.post("/passes/{pass_id}/preassign", response_model=PassResponse)

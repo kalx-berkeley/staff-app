@@ -12,6 +12,8 @@ from app.schemas.user import (
     SyncResult,
     NotificationPreferencesResponse,
     NotificationPreferencesUpdate,
+    GenrePreferencesResponse,
+    GenrePreferencesUpdate,
 )
 from app.services.user_service import UserService
 from app.services import audit_service
@@ -28,6 +30,7 @@ from app.config import settings
 from app.models.staff import Staff
 from app.models.impersonation_session import ImpersonationSession
 from app.models.notification_preferences import NotificationPreferences
+from app.models.staff_genre_preference import StaffGenrePreference
 from app.services.notification_service import send_email
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -329,6 +332,58 @@ def update_notification_preferences(
         entity_type="staff",
         entity_id=prefs.staff_id,
         details={"email_enabled": updates.email_enabled},
+    )
+    return prefs
+
+
+def _get_or_create_genre_preferences(db: Session, email: str) -> StaffGenrePreference:
+    """Return existing genre preferences for a staff member, creating defaults if absent."""
+    staff = db.query(Staff).filter(Staff.email == email).first()
+    if not staff:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Genre preferences are only available to staff members",
+        )
+    prefs = (
+        db.query(StaffGenrePreference)
+        .filter(StaffGenrePreference.staff_id == staff.id)
+        .first()
+    )
+    if prefs is None:
+        prefs = StaffGenrePreference(staff_id=staff.id, genres=[])
+        db.add(prefs)
+        db.commit()
+        db.refresh(prefs)
+    return prefs
+
+
+@router.get("/genre-preferences", response_model=GenrePreferencesResponse)
+def get_genre_preferences(
+    email: str = Depends(require_authentication), db: Session = Depends(get_db)
+):
+    """Get current user's genre preferences."""
+    return _get_or_create_genre_preferences(db, email)
+
+
+@router.put("/genre-preferences", response_model=GenrePreferencesResponse)
+def update_genre_preferences(
+    updates: GenrePreferencesUpdate,
+    email: str = Depends(require_authentication),
+    db: Session = Depends(get_db),
+):
+    """Update current user's genre preferences."""
+    prefs = _get_or_create_genre_preferences(db, email)
+    prefs.genres = sorted({g.strip().lower() for g in updates.genres if g.strip()})
+    db.commit()
+    db.refresh(prefs)
+    audit_service.log_event(
+        db,
+        event_type="genre_preferences_updated",
+        actor_email=email,
+        actor_role=determine_user_role(db, email),
+        entity_type="staff",
+        entity_id=prefs.staff_id,
+        details={"genres": prefs.genres},
     )
     return prefs
 

@@ -315,6 +315,109 @@ class TestGetDatesForName:
         assert dates == []
 
 
+class TestGetNamesForDate:
+    async def test_returns_names_scheduled_on_date(self, db: Session, monkeypatch):
+        now = _ANCHOR
+        day1 = now + timedelta(days=3)
+        day2 = now + timedelta(days=10)
+
+        async def fake_fetch_shows(end):
+            return [
+                _show(1, day1, day1 + timedelta(hours=1), 1, "The Howl"),
+                _show(2, day1, day1 + timedelta(hours=2), None, "Sunday Jazz Brunch"),
+                _show(3, day2, day2 + timedelta(hours=1), 2, "The Hoot"),
+            ]
+
+        async def fake_resolve_dj_names(db, shows):
+            return {1: "Wolfman", 2: "Nightowl"}
+
+        monkeypatch.setattr(
+            "app.services.spinitron_upcoming_schedule_service.SpinitronService.fetch_shows",
+            fake_fetch_shows,
+        )
+        _patch_no_future_playlists(monkeypatch)
+        monkeypatch.setattr(
+            "app.services.spinitron_upcoming_schedule_service.SpinitronScheduleService.resolve_dj_names",
+            fake_resolve_dj_names,
+        )
+
+        names = await SpinitronUpcomingScheduleService.get_names_for_date(
+            db, day1.date().isoformat()
+        )
+
+        assert names == ["Sunday Jazz Brunch", "Wolfman"]
+
+    async def test_no_shows_on_date_returns_empty(self, db: Session, monkeypatch):
+        now = _ANCHOR
+
+        async def fake_fetch_shows(end):
+            return [_show(1, now, now + timedelta(hours=1), 1, "The Howl")]
+
+        async def fake_resolve_dj_names(db, shows):
+            return {1: "Wolfman"}
+
+        monkeypatch.setattr(
+            "app.services.spinitron_upcoming_schedule_service.SpinitronService.fetch_shows",
+            fake_fetch_shows,
+        )
+        _patch_no_future_playlists(monkeypatch)
+        monkeypatch.setattr(
+            "app.services.spinitron_upcoming_schedule_service.SpinitronScheduleService.resolve_dj_names",
+            fake_resolve_dj_names,
+        )
+
+        names = await SpinitronUpcomingScheduleService.get_names_for_date(
+            db, (now + timedelta(days=30)).date().isoformat()
+        )
+
+        assert names == []
+
+
+class TestSuggestByDateEndpoint:
+    def test_returns_matching_names_with_specialty_flag(
+        self, client: TestClient, staff_member: Staff, db: Session, monkeypatch
+    ):
+        from datetime import datetime as _dt, timezone as _tz
+        from app.models.specialty_show import SpecialtyShow
+
+        specialty = SpecialtyShow(
+            name="Sunday Jazz Brunch",
+            created_at=_dt.now(_tz.utc),
+            updated_at=_dt.now(_tz.utc),
+        )
+        db.add(specialty)
+        db.commit()
+
+        async def fake_get_names_for_date(db, date):
+            assert date == "2026-09-20"
+            return ["Sunday Jazz Brunch", "Wolfman"]
+
+        monkeypatch.setattr(
+            "app.routers.passes.SpinitronUpcomingScheduleService.get_names_for_date",
+            fake_get_names_for_date,
+        )
+
+        response = client.get(
+            "/api/passes/preassign/suggest-by-date",
+            params={"date": "2026-09-20"},
+            headers={"X-Forwarded-User": staff_member.email},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data == [
+            {"name": "Sunday Jazz Brunch", "is_specialty": True, "matched_genres": []},
+            {"name": "Wolfman", "is_specialty": False, "matched_genres": []},
+        ]
+
+    def test_requires_authentication(self, client: TestClient):
+        response = client.get(
+            "/api/passes/preassign/suggest-by-date", params={"date": "2026-09-20"}
+        )
+
+        assert response.status_code == 400
+
+
 class TestPreassignScheduleEndpoint:
     def test_returns_matching_dates(
         self, client: TestClient, staff_member: Staff, monkeypatch

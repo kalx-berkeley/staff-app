@@ -8,6 +8,7 @@ from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
 from app.models.staff_status import StaffStatus
 from app.models.notification_preferences import NotificationPreferences
+from app.models.staff_genre_preference import StaffGenrePreference
 
 
 def _make_promotions_staff(db: Session, email: str, name: str, phone: str) -> Staff:
@@ -532,6 +533,89 @@ def test_notification_preferences_dj_forbidden(client: TestClient):
     """DJs (authenticated but no staff record) get 403 for notification preferences."""
     response = client.get(
         "/api/users/notification-preferences",
+        headers={"X-Forwarded-User": "dj@example.com"},
+    )
+    assert response.status_code == 403
+
+
+# --- Genre preferences tests ---
+
+
+def test_get_genre_preferences_creates_defaults(client: TestClient, db: Session):
+    """GET genre-preferences creates and returns an empty list when none exist."""
+    _make_active_staff(db, "staff@example.com", "Staff User", "555-5678")
+
+    response = client.get(
+        "/api/users/genre-preferences",
+        headers={"X-Forwarded-User": "staff@example.com"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["genres"] == []
+
+
+def test_get_genre_preferences_returns_existing(client: TestClient, db: Session):
+    """GET genre-preferences returns stored value when a row already exists."""
+    staff = Staff(email="staff@example.com", name="Staff User", phone="555-5678")
+    db.add(staff)
+    db.flush()
+    db.add(StaffStatus(staff_id=staff.id, status="Active"))
+    db.add(StaffGenrePreference(staff_id=staff.id, genres=["rock", "jazz"]))
+    db.commit()
+
+    response = client.get(
+        "/api/users/genre-preferences",
+        headers={"X-Forwarded-User": "staff@example.com"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["genres"] == ["rock", "jazz"]
+
+
+def test_update_genre_preferences_normalizes_and_persists(client: TestClient, db: Session):
+    """PUT genre-preferences trims, lowercases, dedupes, and sorts the genres."""
+    _make_active_staff(db, "staff@example.com", "Staff User", "555-5678")
+    staff = db.query(Staff).filter_by(email="staff@example.com").first()
+
+    response = client.put(
+        "/api/users/genre-preferences",
+        json={"genres": [" Rock ", "Jazz", "rock", ""]},
+        headers={"X-Forwarded-User": "staff@example.com"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["genres"] == ["jazz", "rock"]
+
+    prefs = db.query(StaffGenrePreference).filter_by(staff_id=staff.id).first()
+    assert prefs is not None
+    assert prefs.genres == ["jazz", "rock"]
+
+
+def test_genre_preferences_promotions_staff(client: TestClient, db: Session):
+    """Promotions staff can also get and update genre preferences."""
+    _make_promotions_staff(db, "promo@example.com", "Promo User", "555-1234")
+
+    response = client.get(
+        "/api/users/genre-preferences",
+        headers={"X-Forwarded-User": "promo@example.com"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["genres"] == []
+
+
+def test_genre_preferences_requires_authentication(client: TestClient):
+    """Genre preferences endpoints with no identity are rejected at the auth layer."""
+    assert client.get("/api/users/genre-preferences").status_code == 400
+    assert (
+        client.put("/api/users/genre-preferences", json={"genres": []}).status_code == 400
+    )
+
+
+def test_genre_preferences_dj_forbidden(client: TestClient):
+    """DJs (authenticated but no staff record) get 403 for genre preferences."""
+    response = client.get(
+        "/api/users/genre-preferences",
         headers={"X-Forwarded-User": "dj@example.com"},
     )
     assert response.status_code == 403

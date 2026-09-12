@@ -10,3 +10,4 @@ export { default as EnrichedShowName } from './EnrichedShowName';
 export { default as FeatureBinBadge } from './FeatureBinBadge';
 export { default as MarkdownContent } from './MarkdownContent';
 export { default as ProfileSettings } from './ProfileSettings';
+export { default as GenreTagInput } from './GenreTagInput';
