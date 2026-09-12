@@ -223,7 +223,6 @@ def test_get_current_user_impersonating_dj_network_only(
     monkeypatch.setattr(config.settings, "environment", "staging")
 
     _make_promotions_staff(db, "promo@example.com", "Promo User", "555-1234")
-    staff = db.query(Staff).filter_by(email="promo@example.com").first()
     db.add(
         ImpersonationSession(
             real_email="promo@example.com",

@@ -205,31 +205,14 @@ class SpinitronService:
         return shows
 
     @staticmethod
-    async def fetch_playlists(start: datetime, end: datetime) -> List[SpinitronShowItem]:
+    async def _fetch_playlists_pages(params: Dict[str, object]) -> List[SpinitronShowItem]:
+        """Page through `/playlists` with the given query params and parse the items.
+
+        Shared by `fetch_playlists` and `fetch_future_playlists`, which only
+        differ in which query params select the window of playlists returned.
         """
-        Fetch aired Spinitron playlists (historical on-air log entries) between *start* and *end*.
-
-        Unlike `fetch_shows` (a live/near-term schedule grid), `/playlists`
-        is Spinitron's log of what actually aired, so it accepts an
-        arbitrary lookback window. Fetches all pages using the maximum page
-        size of 200.
-
-        :param start: Lower bound of the lookback window.
-        :param end: Upper bound of the lookback window.
-        :returns: List of playlist dicts with id, start, end, persona_id, title.
-        :raises RuntimeError: If the Spinitron API returns an error.
-        """
-        if not settings.spinitron_api_key:
-            logger.warning("SPINITRON_API_KEY not configured, skipping playlist fetch")
-            return []
-
         url = f"{SPINITRON_API_BASE}/playlists"
         headers = SpinitronService._request_headers()
-        params = {
-            "start": start.strftime("%Y-%m-%dT%H:%M:%S%z"),
-            "end": end.strftime("%Y-%m-%dT%H:%M:%S%z"),
-            "count": 200,
-        }
         playlists: List[SpinitronShowItem] = []
 
         async with httpx.AsyncClient() as client:
@@ -275,6 +258,33 @@ class SpinitronService:
                     break
                 page += 1
 
+        return playlists
+
+    @staticmethod
+    async def fetch_playlists(start: datetime, end: datetime) -> List[SpinitronShowItem]:
+        """
+        Fetch aired Spinitron playlists (historical on-air log entries) between *start* and *end*.
+
+        Unlike `fetch_shows` (a live/near-term schedule grid), `/playlists`
+        is Spinitron's log of what actually aired, so it accepts an
+        arbitrary lookback window. Fetches all pages using the maximum page
+        size of 200.
+
+        :param start: Lower bound of the lookback window.
+        :param end: Upper bound of the lookback window.
+        :returns: List of playlist dicts with id, start, end, persona_id, title.
+        :raises RuntimeError: If the Spinitron API returns an error.
+        """
+        if not settings.spinitron_api_key:
+            logger.warning("SPINITRON_API_KEY not configured, skipping playlist fetch")
+            return []
+
+        params = {
+            "start": start.strftime("%Y-%m-%dT%H:%M:%S%z"),
+            "end": end.strftime("%Y-%m-%dT%H:%M:%S%z"),
+            "count": 200,
+        }
+        playlists = await SpinitronService._fetch_playlists_pages(params)
         logger.info("Fetched %d Spinitron playlist(s)", len(playlists))
         return playlists
 
@@ -299,54 +309,8 @@ class SpinitronService:
             )
             return []
 
-        url = f"{SPINITRON_API_BASE}/playlists"
-        headers = SpinitronService._request_headers()
         params = {"future": 1, "count": 200}
-        playlists: List[SpinitronShowItem] = []
-
-        async with httpx.AsyncClient() as client:
-            page = 1
-            while True:
-                try:
-                    response = await client.get(
-                        url,
-                        headers=headers,
-                        params={**params, "page": page},
-                        timeout=30.0,
-                    )
-                    response.raise_for_status()
-                except httpx.HTTPStatusError as e:
-                    raise RuntimeError(
-                        f"Spinitron API error {e.response.status_code}: {e.response.text}"
-                    ) from e
-                except httpx.RequestError as e:
-                    raise RuntimeError(f"Spinitron API request failed: {e}") from e
-
-                data = response.json()
-                for item in data.get("items", []):
-                    playlist_id = item.get("id")
-                    start_str = item.get("start")
-                    end_str = item.get("end")
-                    if playlist_id is None or not start_str or not end_str:
-                        continue
-
-                    title = (item.get("title") or "").strip() or None
-
-                    playlists.append(
-                        SpinitronShowItem(
-                            id=int(playlist_id),
-                            start=datetime.strptime(start_str, "%Y-%m-%dT%H:%M:%S%z"),
-                            end=datetime.strptime(end_str, "%Y-%m-%dT%H:%M:%S%z"),
-                            persona_id=SpinitronService._extract_persona_id(item),
-                            title=title,
-                        )
-                    )
-
-                meta = data.get("_meta", {})
-                if page >= meta.get("pageCount", 1):
-                    break
-                page += 1
-
+        playlists = await SpinitronService._fetch_playlists_pages(params)
         logger.info("Fetched %d future Spinitron playlist(s)", len(playlists))
         return playlists
 

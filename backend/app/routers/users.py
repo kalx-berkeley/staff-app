@@ -239,7 +239,7 @@ def get_user_profile(
     role = determine_user_role(db, email)
 
     if role == "promotions":
-        profile = UserService.get_or_create_promotions_profile(db, email)
+        profile = UserService.get_or_create_profile(db, email)
         return PromotionsStaffResponse(
             id=profile.id,
             email=profile.email,
@@ -248,7 +248,7 @@ def get_user_profile(
             is_sublist_dj=SUBLIST_DJ_STATUS in _staff_statuses(profile),
         )
     elif role == "staff":
-        profile = UserService.get_or_create_staff_profile(db, email)
+        profile = UserService.get_or_create_profile(db, email)
         return StaffResponse(
             id=profile.id,
             email=profile.email,

@@ -60,24 +60,36 @@ const SpecialtyShowDetail = () => {
     setTimeout(() => setSuccessMessage(null), 3000);
   };
 
-  const handleRename = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!show || !newName.trim()) return;
+  const runMutation = async (
+    action: () => Promise<unknown>,
+    successMessage: string,
+    errorFallback: string,
+    onSuccess?: () => void
+  ) => {
     setSaving(true);
     setFormError(null);
     try {
-      await specialtyShowsAPI.update(show.id, { name: newName.trim() });
-      setEditingName(false);
-      showEphemeralSuccess('Show renamed.');
+      await action();
+      onSuccess?.();
+      showEphemeralSuccess(successMessage);
       await loadShow();
     } catch (err) {
       const apiError = err as APIError;
-      setFormError(
-        typeof apiError.detail === 'string' ? apiError.detail : 'Failed to rename show'
-      );
+      setFormError(typeof apiError.detail === 'string' ? apiError.detail : errorFallback);
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleRename = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!show || !newName.trim()) return;
+    await runMutation(
+      () => specialtyShowsAPI.update(show.id, { name: newName.trim() }),
+      'Show renamed.',
+      'Failed to rename show',
+      () => setEditingName(false)
+    );
   };
 
   const handleAddOwner = async () => {
@@ -87,43 +99,24 @@ const SpecialtyShowDetail = () => {
       setFormError('That email is already an owner.');
       return;
     }
-    setSaving(true);
-    setFormError(null);
-    try {
-      await specialtyShowsAPI.update(show.id, {
-        owner_emails: [...show.owner_emails, email],
-      });
-      setOwnerInput('');
-      showEphemeralSuccess('Owner added.');
-      await loadShow();
-    } catch (err) {
-      const apiError = err as APIError;
-      setFormError(
-        typeof apiError.detail === 'string' ? apiError.detail : 'Failed to add owner'
-      );
-    } finally {
-      setSaving(false);
-    }
+    await runMutation(
+      () => specialtyShowsAPI.update(show.id, { owner_emails: [...show.owner_emails, email] }),
+      'Owner added.',
+      'Failed to add owner',
+      () => setOwnerInput('')
+    );
   };
 
   const handleRemoveOwner = async (email: string) => {
     if (!show) return;
-    setSaving(true);
-    setFormError(null);
-    try {
-      await specialtyShowsAPI.update(show.id, {
-        owner_emails: show.owner_emails.filter((e) => e !== email),
-      });
-      showEphemeralSuccess('Owner removed.');
-      await loadShow();
-    } catch (err) {
-      const apiError = err as APIError;
-      setFormError(
-        typeof apiError.detail === 'string' ? apiError.detail : 'Failed to remove owner'
-      );
-    } finally {
-      setSaving(false);
-    }
+    await runMutation(
+      () =>
+        specialtyShowsAPI.update(show.id, {
+          owner_emails: show.owner_emails.filter((e) => e !== email),
+        }),
+      'Owner removed.',
+      'Failed to remove owner'
+    );
   };
 
   const handleDJInputChange = (value: string) => {
@@ -146,44 +139,25 @@ const SpecialtyShowDetail = () => {
       setFormError('That DJ is already in this show.');
       return;
     }
-    setSaving(true);
-    setFormError(null);
     setShowDJSuggestions(false);
     setDjInput('');
-    try {
-      await specialtyShowsAPI.update(show.id, {
-        dj_names: [...show.dj_names, djName],
-      });
-      showEphemeralSuccess('DJ added.');
-      await loadShow();
-    } catch (err) {
-      const apiError = err as APIError;
-      setFormError(
-        typeof apiError.detail === 'string' ? apiError.detail : 'Failed to add DJ'
-      );
-    } finally {
-      setSaving(false);
-    }
+    await runMutation(
+      () => specialtyShowsAPI.update(show.id, { dj_names: [...show.dj_names, djName] }),
+      'DJ added.',
+      'Failed to add DJ'
+    );
   };
 
   const handleRemoveDJ = async (djName: string) => {
     if (!show) return;
-    setSaving(true);
-    setFormError(null);
-    try {
-      await specialtyShowsAPI.update(show.id, {
-        dj_names: show.dj_names.filter((n) => n !== djName),
-      });
-      showEphemeralSuccess('DJ removed.');
-      await loadShow();
-    } catch (err) {
-      const apiError = err as APIError;
-      setFormError(
-        typeof apiError.detail === 'string' ? apiError.detail : 'Failed to remove DJ'
-      );
-    } finally {
-      setSaving(false);
-    }
+    await runMutation(
+      () =>
+        specialtyShowsAPI.update(show.id, {
+          dj_names: show.dj_names.filter((n) => n !== djName),
+        }),
+      'DJ removed.',
+      'Failed to remove DJ'
+    );
   };
 
   const isOwner = show && user?.email

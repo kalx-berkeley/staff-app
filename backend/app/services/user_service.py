@@ -328,44 +328,12 @@ class UserService:
         return result
 
     @staticmethod
-    def get_or_create_promotions_profile(db: Session, email: str) -> Staff:
+    def get_or_create_profile(db: Session, email: str) -> Staff:
         """
-        Get or create a staff profile for a promotions department member.
+        Get or create a staff profile by email.
 
-        Args:
-            db: Database session
-            email: User email from authentication
-
-        Returns:
-            Staff profile
-
-        Raises:
-            HTTPException: If database error occurs
-        """
-        try:
-            staff = db.query(Staff).filter(Staff.email == email).first()
-            if staff:
-                return staff
-
-            staff = Staff(email=email, name="", phone="")
-            db.add(staff)
-            db.commit()
-            db.refresh(staff)
-            return staff
-        except SQLAlchemyError as e:
-            db.rollback()
-            logger.error(
-                f"Database error getting/creating promotions profile for {email}: {str(e)}"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database error occurred while accessing profile",
-            )
-
-    @staticmethod
-    def get_or_create_staff_profile(db: Session, email: str) -> Staff:
-        """
-        Get or create a staff member profile.
+        Used for both promotions-department members and general staff — the
+        underlying `Staff` row is identical either way.
 
         Args:
             db: Database session
@@ -379,7 +347,6 @@ class UserService:
         """
         try:
             profile = db.query(Staff).filter(Staff.email == email).first()
-
             if profile:
                 return profile
 
@@ -390,9 +357,7 @@ class UserService:
             return profile
         except SQLAlchemyError as e:
             db.rollback()
-            logger.error(
-                f"Database error getting/creating staff profile for {email}: {str(e)}"
-            )
+            logger.error(f"Database error getting/creating profile for {email}: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database error occurred while accessing profile",
