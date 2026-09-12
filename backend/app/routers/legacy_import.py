@@ -65,7 +65,7 @@ def import_legacy_show(
 
     if len(data.on_air_winners) > data.num_pass_pairs:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=(
                 f"on_air_winners count ({len(data.on_air_winners)}) exceeds"
                 f" num_pass_pairs ({data.num_pass_pairs})"
@@ -78,7 +78,7 @@ def import_legacy_show(
     )
     if staff_slots_needed > data.num_pass_pairs:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=(
                 f"Staff passes requested ({staff_slots_needed} slots) exceed"
                 f" num_pass_pairs ({data.num_pass_pairs})"

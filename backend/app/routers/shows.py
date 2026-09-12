@@ -759,7 +759,7 @@ def update_show(
             )
         ):
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="planned close date/time must be before the show date/time",
             )
 

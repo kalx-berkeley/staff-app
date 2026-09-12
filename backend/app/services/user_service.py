@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
-import httpx
+import httpx2 as httpx
 
 from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment

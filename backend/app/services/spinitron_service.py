@@ -5,7 +5,7 @@ import re
 from datetime import datetime
 from typing import Dict, List, Optional, TypedDict
 
-import httpx
+import httpx2 as httpx
 
 from app.config import settings
 

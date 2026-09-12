@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Awaitable, Callable
 
-import httpx
+import httpx2 as httpx
 from sqlalchemy.orm import Session
 
 from app.models.external_api_cache import ExternalApiCache

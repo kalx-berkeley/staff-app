@@ -325,7 +325,7 @@ def seed_test_data(
     )
     if not promotions_staff:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=(
                 "No promotions staff found. Run the Airtable sync before loading test data."
             ),

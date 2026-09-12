@@ -480,7 +480,7 @@ def release_winner(
     else:
         if not release_data.releasing_name or not release_data.releasing_email:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=(
                     "releasing_name and releasing_email are required when not authenticated"
                     " via Google"
@@ -893,7 +893,7 @@ def remove_preassignment(
         if is_ip_in_network(client_ip, settings.dj_studio_network):
             if not dj_name:
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail=(
                         "dj_name query parameter is required for DJ studio network access"
                     ),

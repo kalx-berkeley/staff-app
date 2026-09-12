@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
-import httpx
+import httpx2 as httpx
 from rapidfuzz import fuzz, process
 from rapidfuzz.utils import default_process
 from sqlalchemy import func

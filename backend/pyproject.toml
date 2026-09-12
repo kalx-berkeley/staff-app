@@ -16,6 +16,12 @@ asyncio_mode = "auto"
 filterwarnings = [
     "ignore:.*Unclosed.*MemoryObjectSendStream.*:ResourceWarning",
     "ignore:.*Unclosed.*MemoryObjectReceiveStream.*:ResourceWarning",
+    # Upstream-only warnings with no fix available on our side: starlette's own
+    # testclient.py still references the deprecated anyio.abc.BlockingPortal alias,
+    # and vaderSentiment's bundled lexicon loader still calls codecs.open(). Both
+    # packages are already pinned to their latest release.
+    "ignore:The anyio.abc.BlockingPortal alias is deprecated.*:DeprecationWarning:starlette.testclient",
+    "ignore:codecs.open\\(\\) is deprecated.*:DeprecationWarning:vaderSentiment.vaderSentiment",
 ]
 
 [tool.coverage.run]
