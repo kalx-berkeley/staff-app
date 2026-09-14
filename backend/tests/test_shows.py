@@ -63,6 +63,40 @@ def test_create_show(client: TestClient, test_venue, test_promotions_staff):
     assert data["promotions_contacts"] == []
 
 
+def test_create_show_with_band_missing_musicbrainz_id(
+    client: TestClient, test_venue, test_promotions_staff
+):
+    """An artist tagged without a MusicBrainz match stores/returns musicbrainz_id: null."""
+    show_data = {
+        "event_name": "Local Band Night",
+        "venue_id": test_venue.id,
+        "show_date": "2024-12-31",
+        "show_time": "20:00:00",
+        "age_restriction": "all_ages",
+        "wheelchair_accessible": True,
+        "num_pass_pairs": 2,
+        "bands": [{
+            "musicbrainz_id": None,
+            "band_name": "Local Band",
+            "start_pos": 0,
+            "end_pos": 10,
+        }],
+    }
+
+    response = client.post(
+        "/api/shows",
+        json=show_data,
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert len(data["bands"]) == 1
+    band = data["bands"][0]
+    assert band["musicbrainz_id"] is None
+    assert band["band_name"] == "Local Band"
+
+
 def test_create_show_requires_auth(client: TestClient, test_venue):
     """Test that creating a show requires authentication."""
     show_data = {

@@ -76,6 +76,44 @@ def featured_show(db: Session, test_venue):
 
 
 @pytest.fixture
+def featured_show_no_mb(db: Session, test_venue):
+    """A published show tagged with a band that has no MusicBrainz entry."""
+    db.add(
+        FeatureBinRelease(
+            artist="Mighty Mighty Bosstones",
+            album="Live and Direct",
+            added_date="3/14",
+            dot="RED",
+            media_url="https://example.com/album",
+        )
+    )
+    show = Show(
+        event_name="Bosstones show 2",
+        venue_id=test_venue.id,
+        show_date=date(2024, 12, 29),
+        show_time=time(20, 0),
+        age_restriction="all_ages",
+        wheelchair_accessible=True,
+        num_pass_pairs=2,
+        status="published",
+    )
+    db.add(show)
+    db.flush()
+    db.add(
+        ShowBand(
+            show_id=show.id,
+            musicbrainz_id=None,
+            band_name="Mighty Mighty Bosstones",
+            start_pos=0,
+            end_pos=10,
+        )
+    )
+    db.commit()
+    db.refresh(show)
+    return show
+
+
+@pytest.fixture
 def unfeatured_show(db: Session, test_venue):
     show = Show(
         event_name="Some Other Show",
@@ -128,6 +166,21 @@ def test_get_show_flags_matched_show(
     data = response.json()
     assert data["in_feature_bin"] is True
     assert data["feature_bin_releases"][0]["artist"] == "Mighty Mighty Bosstones"
+
+
+def test_show_flags_matched_show_without_musicbrainz_id(
+    client: TestClient, test_promotions_staff, featured_show_no_mb
+):
+    """Matching keys off band_name, so a band with no MusicBrainz entry still matches."""
+    response = client.get(
+        f"/api/shows/{featured_show_no_mb.id}",
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["in_feature_bin"] is True
+    assert data["feature_bin_releases"][0]["artist"] == "Mighty Mighty Bosstones"
+    assert data["bands"][0]["musicbrainz_id"] is None
 
 
 def test_manual_sync_reports_not_configured_when_sheet_unset(

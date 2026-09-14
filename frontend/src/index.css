@@ -3181,6 +3181,47 @@ fieldset.radio-group legend {
   text-decoration: underline;
 }
 
+.band-search-panel__no-match {
+  border-top: 1px solid #eee;
+  padding-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.band-search-panel__no-match-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.8rem;
+  color: #0070c0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.band-search-panel__no-match-toggle:hover {
+  text-decoration: underline;
+}
+
+.band-search-panel__no-match-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #555;
+}
+
+.band-search-panel__no-match-row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.band-search-panel__no-match-input {
+  flex: 1;
+  font-size: 0.82rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
 /* Tagged band chips in annotator */
 .band-annotator-list {
   display: flex;
@@ -3332,6 +3373,13 @@ fieldset.radio-group legend {
 
 .band-popup__mb-link:hover {
   text-decoration: underline;
+}
+
+.band-popup__no-match {
+  font-size: 0.82rem;
+  color: #888;
+  font-style: italic;
+  margin-top: 0.15rem;
 }
 
 /* Feature bin popup */

@@ -170,7 +170,7 @@ export interface MusicBrainzArtist {
 }
 
 export interface ShowBandCreate {
-  musicbrainz_id: string;
+  musicbrainz_id: string | null;
   band_name: string;
   start_pos: number;
   end_pos: number;

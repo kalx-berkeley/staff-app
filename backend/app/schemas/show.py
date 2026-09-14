@@ -12,7 +12,12 @@ from app.schemas.lottery import LotteryEntryResponse
 class ShowBandCreate(BaseModel):
     """Schema for creating or updating a band annotation on a show."""
 
-    musicbrainz_id: str = Field(..., description="MusicBrainz Artist MBID (UUID)")
+    musicbrainz_id: str | None = Field(
+        None,
+        description=(
+            "MusicBrainz Artist MBID (UUID), or null if the artist has no MusicBrainz entry"
+        ),
+    )
     band_name: str = Field(
         ..., min_length=1, max_length=300, description="Canonical artist name"
     )
@@ -31,7 +36,7 @@ class ShowBandResponse(BaseModel):
 
     id: int
     show_id: int
-    musicbrainz_id: str
+    musicbrainz_id: str | None
     band_name: str
     start_pos: int
     end_pos: int

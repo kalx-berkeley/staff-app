@@ -120,14 +120,18 @@ function BandPopup({ band, onClose, anchorRect, onGenreClick }: BandPopupProps) 
           )}
         </div>
       )}
-      <a
-        href={`https://musicbrainz.org/artist/${band.musicbrainz_id}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="band-popup__mb-link"
-      >
-        View on MusicBrainz ↗
-      </a>
+      {band.musicbrainz_id ? (
+        <a
+          href={`https://musicbrainz.org/artist/${band.musicbrainz_id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="band-popup__mb-link"
+        >
+          View on MusicBrainz ↗
+        </a>
+      ) : (
+        <div className="band-popup__no-match">No MusicBrainz match — tagged manually</div>
+      )}
     </div>
   );
 }

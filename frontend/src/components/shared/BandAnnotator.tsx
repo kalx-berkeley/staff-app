@@ -132,6 +132,8 @@ export default function BandAnnotator({
   const [results, setResults] = useState<MusicBrainzArtist[]>([]);
   const [pasteUrl, setPasteUrl] = useState('');
   const [pasteError, setPasteError] = useState('');
+  const [showNoMbInput, setShowNoMbInput] = useState(false);
+  const [noMbName, setNoMbName] = useState('');
   const editableRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const isComposingRef = useRef(false);
@@ -163,6 +165,8 @@ export default function BandAnnotator({
         setResults([]);
         setPasteUrl('');
         setPasteError('');
+        setShowNoMbInput(false);
+        setNoMbName('');
       }
     };
     document.addEventListener('mousedown', handleClick);
@@ -219,6 +223,8 @@ export default function BandAnnotator({
     setResults([]);
     setPasteUrl('');
     setPasteError('');
+    setShowNoMbInput(false);
+    setNoMbName('');
 
     setSearching(true);
     try {
@@ -251,6 +257,34 @@ export default function BandAnnotator({
     setResults([]);
     setPasteUrl('');
     setPasteError('');
+    setShowNoMbInput(false);
+    setNoMbName('');
+    window.getSelection()?.removeAllRanges();
+  };
+
+  const addManualBand = () => {
+    if (!selection) return;
+    const trimmedName = noMbName.trim();
+    if (!trimmedName) return;
+    const newBand: ShowBand = {
+      id: -(Date.now()),
+      show_id: 0,
+      musicbrainz_id: null,
+      band_name: trimmedName,
+      start_pos: selection.start,
+      end_pos: selection.end,
+      artist_type: null,
+      artist_country: null,
+      artist_disambiguation: null,
+      artist_tags: null,
+    };
+    onChange([...bands, newBand]);
+    setSelection(null);
+    setResults([]);
+    setPasteUrl('');
+    setPasteError('');
+    setShowNoMbInput(false);
+    setNoMbName('');
     window.getSelection()?.removeAllRanges();
   };
 
@@ -430,6 +464,42 @@ export default function BandAnnotator({
               Search "{selection.text}" on MusicBrainz ↗
             </a>
           </div>
+
+          <div className="band-search-panel__no-match">
+            {!showNoMbInput ? (
+              <button
+                type="button"
+                className="band-search-panel__no-match-toggle"
+                onClick={() => { setShowNoMbInput(true); setNoMbName(selection.text); }}
+              >
+                Can't find this artist on MusicBrainz? Tag it without a MusicBrainz match
+              </button>
+            ) : (
+              <>
+                <label className="band-search-panel__no-match-label" htmlFor="no-mb-name">
+                  Artist name:
+                </label>
+                <div className="band-search-panel__no-match-row">
+                  <input
+                    id="no-mb-name"
+                    type="text"
+                    value={noMbName}
+                    onChange={(e) => setNoMbName(e.target.value)}
+                    className="band-search-panel__no-match-input"
+                    onKeyDown={(e) => { if (e.key === 'Enter') addManualBand(); }}
+                  />
+                  <button
+                    type="button"
+                    className="btn-primary btn-small"
+                    onClick={addManualBand}
+                    disabled={!noMbName.trim()}
+                  >
+                    Tag artist
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -438,15 +508,21 @@ export default function BandAnnotator({
         <div className="band-annotator-list">
           <span className="band-annotator-list__label">Tagged artists:</span>
           {bands.map((band) => (
-            <span key={band.musicbrainz_id + band.start_pos} className="band-chip">
-              <a
-                href={`https://musicbrainz.org/artist/${band.musicbrainz_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="band-chip__name"
-              >
-                {band.band_name}
-              </a>
+            <span key={`${band.musicbrainz_id ?? 'no-mb'}-${band.start_pos}`} className="band-chip">
+              {band.musicbrainz_id ? (
+                <a
+                  href={`https://musicbrainz.org/artist/${band.musicbrainz_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="band-chip__name"
+                >
+                  {band.band_name}
+                </a>
+              ) : (
+                <span className="band-chip__name" title="No MusicBrainz match">
+                  {band.band_name}
+                </span>
+              )}
               {!disabled && (
                 <button
                   type="button"
