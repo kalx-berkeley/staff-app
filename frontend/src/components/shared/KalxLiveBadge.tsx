@@ -18,7 +18,14 @@ function formatAppearance(appearance: KalxLiveAppearance): string {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const verb = eventDate >= today ? 'Performing' : 'Performed';
-  return `${verb} ${formatted}`;
+  const dayCount = Math.round((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const relative =
+    dayCount === 0
+      ? 'today'
+      : dayCount > 0
+        ? `in ${dayCount} day${dayCount === 1 ? '' : 's'}`
+        : `${-dayCount} day${dayCount === -1 ? '' : 's'} ago`;
+  return `${verb} ${formatted} (${relative})`;
 }
 
 interface KalxLivePopupProps {
