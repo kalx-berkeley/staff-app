@@ -15,14 +15,16 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 import httpx2 as httpx
-from rapidfuzz import fuzz, process
-from rapidfuzz.utils import default_process
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.feature_bin_release import FeatureBinRelease
 from app.models.job_log import JobLog
+from app.services.fuzzy_artist_match import (
+    is_band_name_match,
+    match_names_against_event_name,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,50 +35,6 @@ _SHEET_EXPORT_URL = (
 # How old feature-bin data can get before a fresh sync is considered overdue
 # (used by the startup bootstrap check, not the nightly schedule itself).
 _STALE_AFTER = timedelta(days=1)
-
-# A tagged artist (from ShowBand) is already an isolated, normalized name, so
-# the only slop expected is casing/punctuation — a high threshold avoids false
-# positives. An event_name fuzzy fallback needs more slack since it often has
-# supporting-act text or venue framing around the headliner.
-_BAND_MATCH_THRESHOLD = 90
-_EVENT_NAME_MATCH_THRESHOLD = 85
-
-# Single-word artists skip the token_set_ratio fallback above (see its
-# comment) and instead get compared word-for-word. The safety here comes
-# mainly from comparing individual words rather than whole-string subset
-# detection, plus the length floor and event-name word cap below — so
-# this reuses the same high bar already trusted for tagged-band identity
-# matching (_BAND_MATCH_THRESHOLD) rather than something even stricter,
-# which would reject plausible single-letter typos on real short names
-# (e.g. "Trough"/"Trogh" scores 91) while still rejecting genuinely
-# different short words (e.g. "Cat"/"Bat" scores 67, "Live"/"Life" 75).
-_SINGLE_WORD_EVENT_NAME_MATCH_THRESHOLD = _BAND_MATCH_THRESHOLD
-# Below this length there's too little information in a single word for a
-# match to mean anything, no matter how exact — a short, common word is
-# too likely to collide by chance.
-_MIN_SINGLE_WORD_LENGTH = 4
-# Only attempt a single-word match when the artist's word makes up a
-# meaningful share of the event name. This is what actually fixes the
-# original false positive from this fallback (artist "Solomon" matching
-# the 5-word event name "Elori Saxl and Henry Solomon"): a coincidental
-# shared word explains little of a long event name, so it isn't
-# trustworthy evidence no matter how exactly it matches. It does NOT (and
-# can't, from text alone) resolve two distinct real artists that happen
-# to share a word within a short event name — e.g. artist "Nothing"
-# against a show titled "Wild Nothing" (an unrelated, differently-named
-# band). That's an identity question, not a string-matching one, and it's
-# exactly what tagging the artist on the show resolves unambiguously —
-# which is why the tagged-band path above is always preferred over this
-# fallback.
-_MAX_EVENT_NAME_WORDS_FOR_SINGLE_WORD_MATCH = 3
-
-_WORD_RE = re.compile(r"[A-Za-z0-9']+")
-
-
-def _event_name_words(event_name: str) -> list[str]:
-    """Split an event name into individual words, for single-word artist matching."""
-    return _WORD_RE.findall(event_name)
-
 
 # Maps the sheet's column names (second header row) to FeatureBinRelease fields.
 _COLUMN_MAP = {
@@ -252,8 +210,7 @@ class FeatureBinService:
                 for release in index.releases:
                     if release.id in matched_ids:
                         continue
-                    score = fuzz.ratio(band_name, release.artist, processor=default_process)
-                    if score >= _BAND_MATCH_THRESHOLD:
+                    if is_band_name_match(band_name, release.artist):
                         matched.append(release)
                         matched_ids.add(release.id)
             return matched
@@ -261,54 +218,6 @@ class FeatureBinService:
         if not show.event_name:
             return []
 
-        matched_ids: set[int] = set()
-
-        # token_set_ratio scores 100 whenever one side's tokens are a full
-        # subset of the other's — exactly what we want for "Burnham, Aaron &
-        # The Brushfires" matching an event name with extra supporting-act
-        # text, but it also means any single-word artist name that happens to
-        # appear anywhere in the event name would score 100 too, even for an
-        # unrelated artist. Multi-word names carry enough of their own
-        # content that a coincidental full-token-subset match is far less
-        # likely, so only they are eligible for this path; single-word names
-        # are handled separately below.
-        multi_word_choices = {
-            release.id: release.artist
-            for release in index.releases
-            if len(release.artist.split()) > 1
-        }
-        if multi_word_choices:
-            results = process.extract(
-                show.event_name,
-                multi_word_choices,
-                # token_set_ratio (not token_sort_ratio) since event names typically
-                # have extra words around the artist name — supporting acts, "w/",
-                # venue framing — that token_sort_ratio's full-string comparison
-                # would otherwise penalize heavily.
-                scorer=fuzz.token_set_ratio,
-                processor=default_process,
-                score_cutoff=_EVENT_NAME_MATCH_THRESHOLD,
-                limit=None,
-            )
-            matched_ids.update(release_id for _artist, _score, release_id in results)
-
-        # Single-word names: see the constants above for why this is a
-        # separate, stricter path (near-exact per-word comparison, a
-        # minimum length, and a cap on how much longer the event name can
-        # be) rather than just lowering token_set_ratio's threshold.
-        event_words = _event_name_words(show.event_name)
-        if event_words and len(event_words) <= _MAX_EVENT_NAME_WORDS_FOR_SINGLE_WORD_MATCH:
-            for release in index.releases:
-                if release.id in matched_ids:
-                    continue
-                artist = release.artist
-                if len(artist.split()) != 1 or len(artist) < _MIN_SINGLE_WORD_LENGTH:
-                    continue
-                if any(
-                    fuzz.ratio(artist, word, processor=default_process)
-                    >= _SINGLE_WORD_EVENT_NAME_MATCH_THRESHOLD
-                    for word in event_words
-                ):
-                    matched_ids.add(release.id)
-
+        candidates = {release.id: release.artist for release in index.releases}
+        matched_ids = match_names_against_event_name(show.event_name, candidates)
         return [r for r in index.releases if r.id in matched_ids]

@@ -262,6 +262,63 @@ class TestCheckForMatches:
 
         assert await SpinMatchService.check_for_matches(db) == []
 
+    async def test_multi_word_artist_matches_via_event_name_fallback(
+        self, db: Session, monkeypatch, test_venue
+    ):
+        """An untagged show falls back to fuzzy-matching event_name, same as
+        feature_bin_service and kalx_live_service."""
+        monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
+        show = _show_with_available_pair(db, test_venue, "Ana Tijoux w/ openers")
+
+        async def fake_fetch_spins(start):
+            return [_spin(101, "Ana Tijoux")]
+
+        monkeypatch.setattr(
+            "app.services.spin_match_service.SpinitronService.fetch_spins", fake_fetch_spins
+        )
+
+        matches = await SpinMatchService.check_for_matches(db)
+        assert len(matches) == 1
+        assert matches[0].show.id == show.id
+
+    async def test_single_word_artist_matches_short_event_name(
+        self, db: Session, monkeypatch, test_venue
+    ):
+        """Single-word artists get the same event-name fallback added for
+        feature-bin/KALX Live in 53be60b — previously this was skipped
+        entirely for Spinitron spins."""
+        monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
+        show = _show_with_available_pair(db, test_venue, "Trough w/ openers")
+
+        async def fake_fetch_spins(start):
+            return [_spin(101, "Trough")]
+
+        monkeypatch.setattr(
+            "app.services.spin_match_service.SpinitronService.fetch_spins", fake_fetch_spins
+        )
+
+        matches = await SpinMatchService.check_for_matches(db)
+        assert len(matches) == 1
+        assert matches[0].show.id == show.id
+
+    async def test_single_word_artist_does_not_match_coincidental_surname(
+        self, db: Session, monkeypatch, test_venue
+    ):
+        """A single-word artist ("Solomon") shouldn't match a long event name
+        that happens to contain that word as part of an unrelated name —
+        same guard as feature_bin_service/kalx_live_service."""
+        monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
+        _show_with_available_pair(db, test_venue, "Elori Saxl and Henry Solomon")
+
+        async def fake_fetch_spins(start):
+            return [_spin(101, "Solomon")]
+
+        monkeypatch.setattr(
+            "app.services.spin_match_service.SpinitronService.fetch_spins", fake_fetch_spins
+        )
+
+        assert await SpinMatchService.check_for_matches(db) == []
+
 
 class TestSpinMatchesEndpoint:
     def test_requires_dj_access(self, client: TestClient):

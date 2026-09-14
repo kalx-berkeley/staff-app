@@ -11,18 +11,17 @@ break. Two throttles keep this from hammering the Spinitron API:
   effect of something calling `check_for_matches`, so no Spinitron calls
   happen at all while no DJ view is open to ask.
 
-Matching reuses the same rapidfuzz approach as feature_bin_service (tagged
-show artists first, event-name fallback for multi-word names), just in the
+Matching shares its rapidfuzz rules and thresholds with feature_bin_service
+and kalx_live_service (tagged show artists first, event-name fallback with a
+stricter path for single-word names) via fuzzy_artist_match, just in the
 opposite direction: one spin artist against many candidate shows instead of
-many feature-bin artists against one show.
+many artists against one show.
 """
 
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from rapidfuzz import fuzz
-from rapidfuzz.utils import default_process
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
@@ -31,6 +30,10 @@ from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.spinitron_spin_cache import SpinitronSpinCache
 from app.models.surfaced_spin_match import SurfacedSpinMatch
+from app.services.fuzzy_artist_match import (
+    is_band_name_match,
+    match_event_names_against_name,
+)
 from app.services.spinitron_service import SpinitronService
 
 logger = logging.getLogger(__name__)
@@ -46,13 +49,6 @@ _LOOKBACK = timedelta(minutes=15)
 # Only needs to outlast _LOOKBACK, since a spin older than that can never be
 # fetched from Spinitron again.
 _SURFACED_RETENTION = timedelta(hours=1)
-
-# Same thresholds as feature_bin_service, for the same reasons: a tagged
-# artist name is already normalized so a high bar avoids false positives,
-# while the event_name fallback needs more slack for supporting-act/venue
-# text around the headliner.
-_BAND_MATCH_THRESHOLD = 90
-_EVENT_NAME_MATCH_THRESHOLD = 85
 
 _CACHE_ROW_ID = 1
 
@@ -131,26 +127,23 @@ class SpinMatchService:
     def _matching_shows(artist_name: str, shows: list[Show]) -> list[Show]:
         """Return candidate shows whose tagged artists (or event name) match *artist_name*."""
         matched: list[Show] = []
+        event_name_candidates: dict[int, str] = {}
         for show in shows:
             band_names = [b.band_name for b in show.bands or [] if b.band_name]
             if band_names:
                 if any(
-                    fuzz.ratio(artist_name, band_name, processor=default_process)
-                    >= _BAND_MATCH_THRESHOLD
-                    for band_name in band_names
+                    is_band_name_match(artist_name, band_name) for band_name in band_names
                 ):
                     matched.append(show)
                 continue
 
-            # Same single-word guard as feature_bin_service: a short artist
-            # name is too likely to coincidentally appear as a token inside
-            # an unrelated event name for token_set_ratio to be trustworthy.
-            if show.event_name and len(artist_name.split()) > 1:
-                score = fuzz.token_set_ratio(
-                    artist_name, show.event_name, processor=default_process
-                )
-                if score >= _EVENT_NAME_MATCH_THRESHOLD:
-                    matched.append(show)
+            if show.event_name:
+                event_name_candidates[show.id] = show.event_name
+
+        if event_name_candidates:
+            matched_ids = match_event_names_against_name(artist_name, event_name_candidates)
+            matched.extend(show for show in shows if show.id in matched_ids)
+
         return matched
 
     @staticmethod
