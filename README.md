@@ -116,7 +116,7 @@ the library, complete with the release's dot-color status and a listen link
 KALX Live! — the station's weekly in-studio live band performance — is scheduled on a public
 Google Calendar. The app syncs it nightly as an ICS export and fuzzy-matches KALX Live! bands
 against tagged show artists (or, failing that, the event name itself), so a show gets a
-**▶ KALX Live!** badge when a performer recently was, or will be, on KALX Live! (within a
+**🤘🏽 KALX Live!** badge when a performer recently was, or will be, on KALX Live! (within a
 two-month lookback, with no limit on future dates), complete with the performance date(s)
 (`backend/app/services/kalx_live_service.py`).
 

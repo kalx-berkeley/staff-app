@@ -43,6 +43,39 @@ _STALE_AFTER = timedelta(days=1)
 _BAND_MATCH_THRESHOLD = 90
 _EVENT_NAME_MATCH_THRESHOLD = 85
 
+# Single-word band names skip the token_set_ratio fallback above (see
+# find_matches) and instead get compared word-for-word. The safety here
+# comes mainly from comparing individual words rather than whole-string
+# subset detection, plus the length floor and event-name word cap below
+# — so this reuses the same high bar already trusted for tagged-band
+# identity matching (_BAND_MATCH_THRESHOLD) rather than something even
+# stricter, which would reject plausible single-letter typos on real
+# short names (e.g. "Trough"/"Trogh" scores 91) while still rejecting
+# genuinely different short words (e.g. "Cat"/"Bat" scores 67,
+# "Live"/"Life" 75).
+_SINGLE_WORD_EVENT_NAME_MATCH_THRESHOLD = _BAND_MATCH_THRESHOLD
+# Below this length there's too little information in a single word for a
+# match to mean anything, no matter how exact — a short, common word is
+# too likely to collide by chance.
+_MIN_SINGLE_WORD_LENGTH = 4
+# Only attempt a single-word match when the band's word makes up a
+# meaningful share of the event name — a coincidental shared word
+# explains little of a long event name, so it isn't trustworthy evidence
+# no matter how exactly it matches (see feature_bin_service's identical
+# constant for the full rationale, including the residual ambiguity this
+# doesn't resolve: two distinct real bands sharing a word within a short
+# event name, which is exactly what tagging the artist on the show
+# resolves unambiguously).
+_MAX_EVENT_NAME_WORDS_FOR_SINGLE_WORD_MATCH = 3
+
+_WORD_RE = re.compile(r"[A-Za-z0-9']+")
+
+
+def _event_name_words(event_name: str) -> list[str]:
+    """Split an event name into individual words, for single-word band matching."""
+    return _WORD_RE.findall(event_name)
+
+
 # How far in the past a KALX Live! appearance can be and still count as
 # "recent" for flagging purposes. There's no upper bound on future dates.
 _PAST_WINDOW = timedelta(days=60)
@@ -203,27 +236,49 @@ class KalxLiveService:
 
         if not show.event_name:
             return []
+
+        matched_ids: set[int] = set()
+
         # token_set_ratio (not token_sort_ratio) since event names typically
         # have extra words around the artist name — supporting acts, "w/",
         # venue framing — that token_sort_ratio's full-string comparison
         # would otherwise penalize heavily. Restricted to multi-word band
         # names, same as feature bin, so a single-word band name doesn't
         # coincidentally match an unrelated event name that happens to
-        # contain that word.
-        choices = {
+        # contain that word; single-word names are handled separately below.
+        multi_word_choices = {
             appearance.id: appearance.band_name
             for appearance in candidates
             if len(appearance.band_name.split()) > 1
         }
-        if not choices:
-            return []
-        results = process.extract(
-            show.event_name,
-            choices,
-            scorer=fuzz.token_set_ratio,
-            processor=default_process,
-            score_cutoff=_EVENT_NAME_MATCH_THRESHOLD,
-            limit=None,
-        )
-        matched_ids = {appearance_id for _name, _score, appearance_id in results}
+        if multi_word_choices:
+            results = process.extract(
+                show.event_name,
+                multi_word_choices,
+                scorer=fuzz.token_set_ratio,
+                processor=default_process,
+                score_cutoff=_EVENT_NAME_MATCH_THRESHOLD,
+                limit=None,
+            )
+            matched_ids.update(appearance_id for _name, _score, appearance_id in results)
+
+        # Single-word band names: see the constants above for why this is a
+        # separate, stricter path (near-exact per-word comparison, a
+        # minimum length, and a cap on how much longer the event name can
+        # be) rather than just lowering token_set_ratio's threshold.
+        event_words = _event_name_words(show.event_name)
+        if event_words and len(event_words) <= _MAX_EVENT_NAME_WORDS_FOR_SINGLE_WORD_MATCH:
+            for appearance in candidates:
+                if appearance.id in matched_ids:
+                    continue
+                band_name = appearance.band_name
+                if len(band_name.split()) != 1 or len(band_name) < _MIN_SINGLE_WORD_LENGTH:
+                    continue
+                if any(
+                    fuzz.ratio(band_name, word, processor=default_process)
+                    >= _SINGLE_WORD_EVENT_NAME_MATCH_THRESHOLD
+                    for word in event_words
+                ):
+                    matched_ids.add(appearance.id)
+
         return [a for a in candidates if a.id in matched_ids]

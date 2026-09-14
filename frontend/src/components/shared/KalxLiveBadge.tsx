@@ -75,6 +75,7 @@ function KalxLivePopup({ appearances, onClose, anchorRect }: KalxLivePopupProps)
       </div>
       {appearances.map((appearance, i) => (
         <div className="kalx-live-appearance" key={i}>
+          <strong className="kalx-live-appearance__band">{appearance.band_name}</strong>
           <div className="band-popup__meta">{formatAppearance(appearance)}</div>
         </div>
       ))}
@@ -99,7 +100,7 @@ export default function KalxLiveBadge({ appearances }: KalxLiveBadgeProps) {
         onClick={handleClick}
         title="This show has an artist who was recently on, or will be on, KALX Live! — click for details"
       >
-        ▶ KALX Live!
+        🤘🏽 KALX Live!
       </button>
       {open && (
         <KalxLivePopup

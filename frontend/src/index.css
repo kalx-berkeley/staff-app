@@ -3390,6 +3390,10 @@ fieldset.radio-group legend {
   border-top: none;
 }
 
+.kalx-live-appearance__band {
+  display: block;
+}
+
 /* Lottery UI */
 .lottery-banner {
   background: #fff8e1;
