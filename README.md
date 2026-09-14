@@ -339,7 +339,6 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 - `SMTP2GO_API_KEY` (optional — falls back to the server's local SMTP relay if absent)
 - `FEATURE_BIN_SHEET_ID` (not public data — see the maintainers for the value; feature bin sync is disabled if unset)
 - `FEATURE_BIN_SHEET_GID` (not public data — see the maintainers for the value; the sheet's "Current Active A-Z" tab)
-- `KALX_LIVE_CALENDAR_ID` (not public data — see the maintainers for the value; KALX Live! sync is disabled if unset)
 
 **Variables:**
 - `SITE_DOMAIN`
@@ -347,6 +346,7 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 - `NETBIRD_HOSTNAME` (the bare Netbird peer hostname, not the FQDN)
 - `EMAIL_FROM_ADDRESS` (optional — defaults to `noreply@kalx.berkeley.edu`)
 - `WEBMASTER_EMAIL` (optional — in-app feedback is disabled if unset; in staging, this is the only address that receives real email)
+- `KALX_LIVE_CALENDAR_ID` (not secret, just not worth hardcoding in a public repo — see the maintainers for the value; KALX Live! sync is disabled if unset)
 
 ## Project Structure
 
