@@ -75,6 +75,12 @@ class Settings(BaseSettings):
     feature_bin_sheet_id: Optional[str] = None
     feature_bin_sheet_gid: Optional[str] = None
 
+    # KALX Live! (weekly in-studio live band performances) public Google
+    # Calendar, fetched nightly as an ICS export. Not given a default here
+    # since this repo is public — set via the KALX_LIVE_CALENDAR_ID env var.
+    # KalxLiveService treats the feature as disabled when unset.
+    kalx_live_calendar_id: Optional[str] = None
+
 
 # Global settings instance
 settings = Settings()

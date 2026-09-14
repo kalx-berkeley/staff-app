@@ -744,6 +744,20 @@ fieldset.radio-group legend {
   outline: none;
 }
 
+.status-kalx-live {
+  background-color: #d1f2eb;
+  color: #0b5345;
+  border: 1px solid #a3e4d7;
+  cursor: pointer;
+  font: inherit;
+}
+
+.status-kalx-live:hover,
+.status-kalx-live:focus {
+  background-color: #a3e4d7;
+  outline: none;
+}
+
 /* Grids */
 .venue-grid,
 .show-grid {
@@ -3363,6 +3377,17 @@ fieldset.radio-group legend {
 .feature-bin-dot-g2r {
   background-color: #dc3545;
   border: 2px solid #28a745;
+}
+
+/* KALX Live popup */
+.kalx-live-appearance {
+  padding-top: 0.4rem;
+  border-top: 1px solid #eee;
+}
+
+.kalx-live-appearance:first-of-type {
+  padding-top: 0;
+  border-top: none;
 }
 
 /* Lottery UI */

@@ -25,6 +25,7 @@ from .specialty_show_owner import SpecialtyShowOwner
 from .specialty_show_dj import SpecialtyShowDJ
 from .external_api_cache import ExternalApiCache
 from .feature_bin_release import FeatureBinRelease
+from .kalx_live_appearance import KalxLiveAppearance
 from .spinitron_show import SpinitronShow
 from .spinitron_playlist import SpinitronPlaylist
 from .spinitron_spin_cache import SpinitronSpinCache
@@ -56,6 +57,7 @@ __all__ = [
     "SpecialtyShowDJ",
     "ExternalApiCache",
     "FeatureBinRelease",
+    "KalxLiveAppearance",
     "SpinitronShow",
     "SpinitronPlaylist",
     "SpinitronSpinCache",

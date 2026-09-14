@@ -108,6 +108,26 @@ async def sync_feature_bin():
         db.close()
 
 
+async def sync_kalx_live():
+    """
+    Scheduled task to sync the KALX Live! calendar from the public Google Calendar.
+    Runs daily at 1:30 AM.
+    """
+    from app.database import SessionLocal
+    from app.services.kalx_live_service import KalxLiveService
+
+    logger.info("Starting scheduled KALX Live sync")
+
+    db = SessionLocal()
+    try:
+        count = KalxLiveService.sync_kalx_live(db, trigger="scheduled")
+        logger.info(f"Scheduled KALX Live sync completed: {count} appearance(s) stored")
+    except Exception as e:
+        logger.error(f"Scheduled KALX Live sync failed: {str(e)}", exc_info=True)
+    finally:
+        db.close()
+
+
 async def sync_spinitron_schedule():
     """
     Scheduled task to sync the upcoming Spinitron on-air schedule.
@@ -186,6 +206,36 @@ async def bootstrap_feature_bin_if_stale():
             await sync_feature_bin()
         else:
             logger.info("Feature bin data present and fresh on startup - skipping sync")
+    finally:
+        db.close()
+
+
+async def bootstrap_kalx_live_if_stale():
+    """
+    On startup, sync the KALX Live! calendar if there's no local data yet or
+    the existing data is more than a day old. Handles both a freshly
+    deployed instance and a long period of scheduler downtime leaving it
+    stale.
+    """
+    if os.getenv("TESTING") == "1":
+        return
+
+    from app.database import SessionLocal
+    from app.services.kalx_live_service import KalxLiveService
+
+    if not KalxLiveService.is_configured():
+        logger.info("KALX Live calendar not configured - skipping startup sync check")
+        return
+
+    db = SessionLocal()
+    try:
+        if KalxLiveService.needs_sync(db):
+            logger.info(
+                "KALX Live data missing or stale on startup - performing initial sync"
+            )
+            await sync_kalx_live()
+        else:
+            logger.info("KALX Live data present and fresh on startup - skipping sync")
     finally:
         db.close()
 
@@ -445,6 +495,15 @@ def start_scheduler():
         replace_existing=True,
     )
 
+    # Add daily KALX Live sync job at 1:30 AM Pacific, right after feature bin
+    scheduler.add_job(
+        sync_kalx_live,
+        trigger=CronTrigger(hour=1, minute=30, timezone=_PT),
+        id="kalx_live_sync",
+        name="Sync KALX Live calendar",
+        replace_existing=True,
+    )
+
     # Add daily sync job at 2 AM Pacific
     scheduler.add_job(
         sync_users_from_airtable,
@@ -484,9 +543,9 @@ def start_scheduler():
 
     scheduler.start()
     logger.info(
-        "Scheduler started - Feature bin sync at 1 AM PT, Airtable sync at 2 AM PT, stale"
-        " preassignment expiry at 3 AM PT, unclosed past show notifications at 4 AM PT,"
-        " Spinitron schedule sync every 6 hours"
+        "Scheduler started - Feature bin sync at 1 AM PT, KALX Live sync at 1:30 AM PT,"
+        " Airtable sync at 2 AM PT, stale preassignment expiry at 3 AM PT, unclosed past"
+        " show notifications at 4 AM PT, Spinitron schedule sync every 6 hours"
     )
     _reschedule_pending_auto_close_jobs()
     _reschedule_pending_lottery_jobs()

@@ -54,6 +54,8 @@ const makeShow = (overrides: Partial<ShowSummary> = {}): ShowSummary => ({
   is_mine: false,
   in_feature_bin: false,
   feature_bin_releases: [],
+  on_kalx_live: false,
+  kalx_live_appearances: [],
   ...overrides,
 });
 

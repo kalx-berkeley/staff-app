@@ -22,6 +22,7 @@ from app.schemas.show import (
 from app.services.language_analysis_service import analyze_description
 from app.services.show_service import ShowService
 from app.services.feature_bin_service import FeatureBinService, FeatureBinIndex
+from app.services.kalx_live_service import KalxLiveService, KalxLiveIndex
 from app.auth import (
     get_user_role,
     get_user_role_or_dj,
@@ -122,22 +123,39 @@ def _feature_bin_release_dicts(index: FeatureBinIndex | None, show) -> list[dict
     ]
 
 
+def _kalx_live_appearance_dicts(index: KalxLiveIndex | None, show) -> list[dict]:
+    """Return KALX Live! matches for a show as response dicts."""
+    if index is None:
+        return []
+    return [
+        {"band_name": a.band_name, "event_date": a.event_date}
+        for a in KalxLiveService.find_matches(index, show)
+    ]
+
+
 def _build_show_response(
     show,
     pass_adjustment=None,
     is_mine: bool = False,
     feature_bin_index: FeatureBinIndex | None = None,
+    kalx_live_index: KalxLiveIndex | None = None,
 ) -> dict:
     """
     Build show response with nested venue info and promotions contacts.
     Includes all pass details and attempt history.
     """
-    if feature_bin_index is None:
+    if feature_bin_index is None or kalx_live_index is None:
         from sqlalchemy.orm import object_session
 
         db = object_session(show)
-        feature_bin_index = FeatureBinService.build_index(db) if db is not None else None
+        if feature_bin_index is None:
+            feature_bin_index = (
+                FeatureBinService.build_index(db) if db is not None else None
+            )
+        if kalx_live_index is None:
+            kalx_live_index = KalxLiveService.build_index(db) if db is not None else None
     feature_bin_releases = _feature_bin_release_dicts(feature_bin_index, show)
+    kalx_live_appearances = _kalx_live_appearance_dicts(kalx_live_index, show)
     available_pair_count = sum(
         1 for t in show.passes if t.pass_type == "pair" and t.status == "available"
     )
@@ -257,6 +275,8 @@ def _build_show_response(
         ],
         "in_feature_bin": bool(feature_bin_releases),
         "feature_bin_releases": feature_bin_releases,
+        "on_kalx_live": bool(kalx_live_appearances),
+        "kalx_live_appearances": kalx_live_appearances,
     }
 
 
@@ -306,9 +326,11 @@ def _build_show_summary(
     guest_hold_count: int = 0,
     is_mine: bool = False,
     feature_bin_index: FeatureBinIndex | None = None,
+    kalx_live_index: KalxLiveIndex | None = None,
 ) -> dict:
     """Build lean show dict for list endpoints — no passes or attempts."""
     feature_bin_releases = _feature_bin_release_dicts(feature_bin_index, show)
+    kalx_live_appearances = _kalx_live_appearance_dicts(kalx_live_index, show)
     return {
         "id": show.id,
         "event_name": show.event_name,
@@ -345,6 +367,8 @@ def _build_show_summary(
         "is_mine": is_mine,
         "in_feature_bin": bool(feature_bin_releases),
         "feature_bin_releases": feature_bin_releases,
+        "on_kalx_live": bool(kalx_live_appearances),
+        "kalx_live_appearances": kalx_live_appearances,
     }
 
 
@@ -400,6 +424,7 @@ def list_shows(
     shows = ShowService.list_shows(db, user_role, date_from=date_from, date_to=date_to)
     counts = _precompute_pass_counts(db, [s.id for s in shows])
     feature_bin_index = FeatureBinService.build_index(db)
+    kalx_live_index = KalxLiveService.build_index(db)
     staff = _get_promotions_staff_by_email(db, email) if email else None
     if staff:
         owned_venue_ids, owned_promoter_ids, via_promoter_venue_ids = _compute_mine_set(
@@ -415,6 +440,7 @@ def list_shows(
                     show, owned_venue_ids, owned_promoter_ids, via_promoter_venue_ids
                 ),
                 feature_bin_index=feature_bin_index,
+                kalx_live_index=kalx_live_index,
             )
             for show in shows
         ]
@@ -425,6 +451,7 @@ def list_shows(
             staff_count=counts.get(show.id, [0, 0, 0])[1],
             guest_hold_count=counts.get(show.id, [0, 0, 0])[2],
             feature_bin_index=feature_bin_index,
+            kalx_live_index=kalx_live_index,
         )
         for show in shows
     ]
@@ -454,6 +481,7 @@ def search_shows(
     )
     counts = _precompute_pass_counts(db, [s.id for s in shows])
     feature_bin_index = FeatureBinService.build_index(db)
+    kalx_live_index = KalxLiveService.build_index(db)
     return [
         _build_show_summary(
             show,
@@ -461,6 +489,7 @@ def search_shows(
             staff_count=counts.get(show.id, [0, 0, 0])[1],
             guest_hold_count=counts.get(show.id, [0, 0, 0])[2],
             feature_bin_index=feature_bin_index,
+            kalx_live_index=kalx_live_index,
         )
         for show in shows
     ]
@@ -531,8 +560,12 @@ def list_deleted_shows(
     """List all soft-deleted shows (promotions staff only)."""
     shows = ShowService.list_deleted_shows(db)
     feature_bin_index = FeatureBinService.build_index(db)
+    kalx_live_index = KalxLiveService.build_index(db)
     return [
-        _build_show_response(show, feature_bin_index=feature_bin_index) for show in shows
+        _build_show_response(
+            show, feature_bin_index=feature_bin_index, kalx_live_index=kalx_live_index
+        )
+        for show in shows
     ]
 
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { showsAPI, passesAPI, lotteryAPI, specialtyShowsAPI } from '../../services/api';
-import { Tooltip, EnrichedShowName, MarkdownContent, FeatureBinBadge, DatePicker } from '../shared';
+import { Tooltip, EnrichedShowName, MarkdownContent, FeatureBinBadge, KalxLiveBadge, DatePicker } from '../shared';
 import { formatPhone, formatDateValue } from '../../utils';
 import { useAuth } from '../../contexts/authHooks';
 import type { ShowResponse, StaffProfile, APIError, ClaimData, LotteryStatus, SpecialtyShowResponse } from '../../types';
@@ -549,6 +549,11 @@ const ShowDetail = () => {
         {show.in_feature_bin && (
           <div style={{ marginTop: '0.25rem' }}>
             <FeatureBinBadge releases={show.feature_bin_releases} />
+          </div>
+        )}
+        {show.on_kalx_live && (
+          <div style={{ marginTop: '0.25rem' }}>
+            <KalxLiveBadge appearances={show.kalx_live_appearances} />
           </div>
         )}
       </div>

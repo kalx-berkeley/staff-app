@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { showsAPI, passesAPI } from '../../services/api';
 import SearchBar from '../promotions/SearchBar';
-import { Tooltip, DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, DatePicker } from '../shared';
+import { Tooltip, DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker } from '../shared';
 import type { ShowSummary, PassResponse, APIError } from '../../types';
 
 const VIEW_MODE_KEY = 'kalx_dj_view_mode';
@@ -338,6 +338,11 @@ const ShowBrowser = () => {
                           <FeatureBinBadge releases={show.feature_bin_releases} />
                         </span>
                       )}
+                      {show.on_kalx_live && (
+                        <span style={{ marginLeft: '0.5rem' }}>
+                          <KalxLiveBadge appearances={show.kalx_live_appearances} />
+                        </span>
+                      )}
                     </td>
                     <td>{show.venue.name}</td>
                     <td>{show.show_start_date ? formatDateRange(show.show_start_date, show.show_date) : formatDateShort(show.show_date)}</td>
@@ -372,6 +377,7 @@ const ShowBrowser = () => {
                       <span className="co-announce-badge">📢 Co-Announce</span>
                     )}
                     {show.in_feature_bin && <FeatureBinBadge releases={show.feature_bin_releases} />}
+                    {show.on_kalx_live && <KalxLiveBadge appearances={show.kalx_live_appearances} />}
                   </div>
                   <span className="show-genre-list">
                     {(show.genre ?? []).map((g) => (

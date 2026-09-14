@@ -8,6 +8,7 @@ export { useOnAirDj } from './useOnAirDj';
 export { default as BandAnnotator } from './BandAnnotator';
 export { default as EnrichedShowName } from './EnrichedShowName';
 export { default as FeatureBinBadge } from './FeatureBinBadge';
+export { default as KalxLiveBadge } from './KalxLiveBadge';
 export { default as MarkdownContent } from './MarkdownContent';
 export { default as ProfileSettings } from './ProfileSettings';
 export { default as GenreTagInput } from './GenreTagInput';

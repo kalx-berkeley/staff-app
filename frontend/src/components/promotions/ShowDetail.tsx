@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { showsAPI, passesAPI, autocompleteAPI, specialtyShowsAPI, lotteryAPI } from '../../services/api';
-import { Tooltip, EnrichedShowName, MarkdownContent, FeatureBinBadge, DatePicker } from '../shared';
+import { Tooltip, EnrichedShowName, MarkdownContent, FeatureBinBadge, KalxLiveBadge, DatePicker } from '../shared';
 import { formatPhone, formatDateValue } from '../../utils';
 import { useAuth } from '../../contexts/authHooks';
 import type {
@@ -681,6 +681,7 @@ const ShowDetail = () => {
             <span className={getStatusBadgeClass(show.status)}>{show.status}</span>
             {show.co_announce && <span className="co-announce-badge">📢 Co-Announce</span>}
             {show.in_feature_bin && <FeatureBinBadge releases={show.feature_bin_releases} />}
+            {show.on_kalx_live && <KalxLiveBadge appearances={show.kalx_live_appearances} />}
           </div>
         </div>
         <div className="header-actions">

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { showsAPI } from '../../services/api';
-import { DjNameInput, DJ_NAME_KEY, EnrichedShowName, MarkdownContent, FeatureBinBadge } from '../shared';
+import { DjNameInput, DJ_NAME_KEY, EnrichedShowName, MarkdownContent, FeatureBinBadge, KalxLiveBadge } from '../shared';
 import { formatPhone } from '../../utils';
 import type { ShowResponse, PassResponse, APIError } from '../../types';
 
@@ -135,6 +135,11 @@ const ShowDetail = () => {
           {show.in_feature_bin && (
             <span style={{ marginLeft: '0.75rem', fontSize: '0.65em', verticalAlign: 'middle' }}>
               <FeatureBinBadge releases={show.feature_bin_releases} />
+            </span>
+          )}
+          {show.on_kalx_live && (
+            <span style={{ marginLeft: '0.75rem', fontSize: '0.65em', verticalAlign: 'middle' }}>
+              <KalxLiveBadge appearances={show.kalx_live_appearances} />
             </span>
           )}
         </h1>

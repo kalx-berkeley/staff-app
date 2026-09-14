@@ -225,6 +225,7 @@ jobs:
         LEGACY_IMPORT_ENABLED=${{ vars.LEGACY_IMPORT_ENABLED || 'false' }}
         FEATURE_BIN_SHEET_ID=${{ secrets.FEATURE_BIN_SHEET_ID }}
         FEATURE_BIN_SHEET_GID=${{ secrets.FEATURE_BIN_SHEET_GID }}
+        KALX_LIVE_CALENDAR_ID=${{ secrets.KALX_LIVE_CALENDAR_ID }}
         EOF
 
         # Install/update Python dependencies

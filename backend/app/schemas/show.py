@@ -284,6 +284,15 @@ class FeatureBinMatchResponse(BaseModel):
     media_url: str | None
 
 
+class KalxLiveAppearanceResponse(BaseModel):
+    """A KALX Live! appearance matched to a show's artist(s), for the KALX Live badge."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    band_name: str
+    event_date: date
+
+
 class PromotionsContact(BaseModel):
     """Contact info for a promotions staff owner of the venue."""
 
@@ -348,6 +357,13 @@ class ShowResponse(BaseModel):
     feature_bin_releases: list[FeatureBinMatchResponse] = Field(
         default_factory=list, description="Matched feature bin releases"
     )
+    on_kalx_live: bool = Field(
+        default=False,
+        description="Whether a performing artist recently was, or will be, on KALX Live!",
+    )
+    kalx_live_appearances: list[KalxLiveAppearanceResponse] = Field(
+        default_factory=list, description="Matched KALX Live! appearances"
+    )
 
 
 class VenueShowSummary(BaseModel):
@@ -385,6 +401,8 @@ class ShowSummary(BaseModel):
     is_mine: bool = False
     in_feature_bin: bool = False
     feature_bin_releases: list[FeatureBinMatchResponse] = Field(default_factory=list)
+    on_kalx_live: bool = False
+    kalx_live_appearances: list[KalxLiveAppearanceResponse] = Field(default_factory=list)
 
 
 # Import PassResponse and VenueResponse after ShowResponse to avoid circular import

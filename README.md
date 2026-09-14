@@ -111,6 +111,15 @@ event name itself) so a show gets a **★ Feature Bin** badge when a performer h
 the library, complete with the release's dot-color status and a listen link
 (`backend/app/services/feature_bin_service.py`).
 
+### KALX Live! matching
+
+KALX Live! — the station's weekly in-studio live band performance — is scheduled on a public
+Google Calendar. The app syncs it nightly as an ICS export and fuzzy-matches KALX Live! bands
+against tagged show artists (or, failing that, the event name itself), so a show gets a
+**▶ KALX Live!** badge when a performer recently was, or will be, on KALX Live! (within a
+two-month lookback, with no limit on future dates), complete with the performance date(s)
+(`backend/app/services/kalx_live_service.py`).
+
 ### DJ on-air tools
 
 - **On-air giveaways** with a one-pair-per-DJ-per-4-hours guard so a single shift can't sweep the
@@ -146,9 +155,10 @@ the library, complete with the release's dot-color status and a listen link
 
 ### Admin & operations
 
-- **Job dashboards** for every scheduled task (Airtable sync, feature bin sync, Spinitron on-air
-  schedule sync, stale pre-assignment cleanup, unclosed-show notifications) with manual "run now"
-  buttons, plus dashboards of every pending auto-close and lottery job with live countdowns.
+- **Job dashboards** for every scheduled task (Airtable sync, feature bin sync, KALX Live! calendar
+  sync, Spinitron on-air schedule sync, stale pre-assignment cleanup, unclosed-show notifications)
+  with manual "run now" buttons, plus dashboards of every pending auto-close and lottery job with
+  live countdowns.
 - **Audit log viewer**, paginated and filterable by event type, actor, and date range — every
   giveaway, release, upload, and email send is logged with full details.
 - **User impersonation** (staging only) — a promotions staff member can act as another user, or
@@ -165,8 +175,9 @@ the library, complete with the release's dot-color status and a listen link
   department, with two separate trusted-network bypasses (the DJ studio and the station office)
   so those locations don't need Google logins, backed by a defense-in-depth check that rejects any
   request Apache didn't actually authenticate.
-- Nightly syncs from **Airtable** (staff directory), **Google Sheets** (feature bin), and on-demand
-  lookups against **MusicBrainz**, **Wikipedia**, and **Spinitron** (on-air DJ personas).
+- Nightly syncs from **Airtable** (staff directory), **Google Sheets** (feature bin), a **Google
+  Calendar** (KALX Live!), and on-demand lookups against **MusicBrainz**, **Wikipedia**, and
+  **Spinitron** (on-air DJ personas).
 - Dual-path email delivery (smtp2go or local SMTP relay) that never silently drops a message, with
   staging mail suppressed except to the webmaster so feedback still works during testing.
 
@@ -297,6 +308,7 @@ Client
 | `WEBMASTER_EMAIL` | Recipient for in-app feedback and bug reports | — |
 | `FEATURE_BIN_SHEET_ID` | Google Sheet ID for the KALX feature bin (new-arrivals) list | — (feature bin sync is disabled if unset) |
 | `FEATURE_BIN_SHEET_GID` | Worksheet `gid` of the sheet's "Current Active A-Z" tab | — (feature bin sync is disabled if unset) |
+| `KALX_LIVE_CALENDAR_ID` | Google Calendar ID for the KALX Live! performance schedule | — (KALX Live! sync is disabled if unset) |
 
 Note: CORS is same-origin in production (frontend and API are both on `staff.kalx.berkeley.edu`), so `CORS_ORIGINS` only matters for local development.
 
@@ -327,6 +339,7 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 - `SMTP2GO_API_KEY` (optional — falls back to the server's local SMTP relay if absent)
 - `FEATURE_BIN_SHEET_ID` (not public data — see the maintainers for the value; feature bin sync is disabled if unset)
 - `FEATURE_BIN_SHEET_GID` (not public data — see the maintainers for the value; the sheet's "Current Active A-Z" tab)
+- `KALX_LIVE_CALENDAR_ID` (not public data — see the maintainers for the value; KALX Live! sync is disabled if unset)
 
 **Variables:**
 - `SITE_DOMAIN`

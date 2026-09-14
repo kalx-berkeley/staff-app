@@ -196,6 +196,12 @@ export interface FeatureBinMatch {
   media_url: string | null;
 }
 
+// KALX Live! (weekly in-studio live band performance) types
+export interface KalxLiveAppearance {
+  band_name: string;
+  event_date: string;
+}
+
 // Show types
 export type AgeRestriction = 'all_ages' | '18+' | '21+';
 export type ShowStatus = 'draft' | 'published' | 'closed' | 'deleted';
@@ -383,6 +389,8 @@ export interface ShowResponse {
   is_mine: boolean;
   in_feature_bin: boolean;
   feature_bin_releases: FeatureBinMatch[];
+  on_kalx_live: boolean;
+  kalx_live_appearances: KalxLiveAppearance[];
 }
 
 export interface VenueShowSummary {
@@ -412,6 +420,8 @@ export interface ShowSummary {
   is_mine: boolean;
   in_feature_bin: boolean;
   feature_bin_releases: FeatureBinMatch[];
+  on_kalx_live: boolean;
+  kalx_live_appearances: KalxLiveAppearance[];
 }
 
 // Pass types

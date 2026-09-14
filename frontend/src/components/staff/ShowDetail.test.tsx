@@ -119,6 +119,8 @@ describe('Staff ShowDetail', () => {
       is_mine: false,
       in_feature_bin: false,
       feature_bin_releases: [],
+      on_kalx_live: false,
+      kalx_live_appearances: [],
   };
 
   beforeEach(() => {

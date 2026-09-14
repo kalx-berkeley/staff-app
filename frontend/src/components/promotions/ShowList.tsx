@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { showsAPI } from '../../services/api';
 import type { ShowSummary, ShowStatus, APIError } from '../../types';
 import SearchBar from './SearchBar';
-import { Tooltip, EnrichedShowName, FeatureBinBadge, DatePicker } from '../shared';
+import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker } from '../shared';
 
 type SortBy = 'date' | 'band' | 'venue' | 'published';
 
@@ -268,6 +268,11 @@ const ShowList = () => {
                         <FeatureBinBadge releases={show.feature_bin_releases} />
                       </span>
                     )}
+                    {show.on_kalx_live && (
+                      <span style={{ marginLeft: '0.5rem' }}>
+                        <KalxLiveBadge appearances={show.kalx_live_appearances} />
+                      </span>
+                    )}
                   </td>
                   <td>{show.venue.name}</td>
                   <td>{show.show_start_date ? formatDateRange(show.show_start_date, show.show_date) : formatDateShort(show.show_date)}</td>
@@ -300,6 +305,7 @@ const ShowList = () => {
                     {show.status}
                   </span>
                   {show.in_feature_bin && <FeatureBinBadge releases={show.feature_bin_releases} />}
+                  {show.on_kalx_live && <KalxLiveBadge appearances={show.kalx_live_appearances} />}
                 </div>
               </div>
               <div className="show-card-body">
