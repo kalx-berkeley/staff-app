@@ -542,6 +542,7 @@ export interface ValidationError {
 export interface SyncResult {
   promotions_upserted: string[];
   staff_upserted: string[];
+  deactivated: string[];
   errors: string[];
 }
 

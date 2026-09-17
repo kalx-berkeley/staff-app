@@ -216,8 +216,11 @@ async def run_job(
         result = await UserService.sync_from_airtable(db, trigger="manual")
         n_promo = len(result["promotions_upserted"])
         n_staff = len(result["staff_upserted"])
+        n_deactivated = len(result["deactivated"])
         n_err = len(result["errors"])
         msg = f"Synced {n_promo} promotions, {n_staff} staff"
+        if n_deactivated:
+            msg += f", {n_deactivated} deactivated"
         if n_err:
             msg += f", {n_err} error(s)"
         return JobRunResult(success=True, message=msg)

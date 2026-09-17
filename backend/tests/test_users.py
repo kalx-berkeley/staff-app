@@ -9,6 +9,7 @@ from app.models.staff_department import StaffDepartment
 from app.models.staff_status import StaffStatus
 from app.models.notification_preferences import NotificationPreferences
 from app.models.staff_genre_preference import StaffGenrePreference
+from app.models.audit_log import AuditLog
 
 
 def _make_promotions_staff(db: Session, email: str, name: str, phone: str) -> Staff:
@@ -342,6 +343,13 @@ async def test_sync_populates_promotions_from_airtable(client: TestClient, db: S
     _make_promotions_staff(db, "admin@example.com", "Admin", "555-0000")
 
     airtable_records = [
+        # admin@example.com is included so the account triggering the sync
+        # isn't itself deactivated for being "missing" from Airtable.
+        {
+            "Email address": "admin@example.com",
+            "Department": ["Promotions"],
+            "Status": ["Active"],
+        },
         {
             "Email address": "promouser@example.com",
             "Department": ["Promotions"],
@@ -402,6 +410,13 @@ async def test_sync_paid_staff_gets_promotions_role(client: TestClient, db: Sess
     _make_promotions_staff(db, "admin@example.com", "Admin", "555-0000")
 
     airtable_records = [
+        # admin@example.com is included so the account triggering the sync
+        # isn't itself deactivated for being "missing" from Airtable.
+        {
+            "Email address": "admin@example.com",
+            "Department": ["Promotions"],
+            "Status": ["Active"],
+        },
         {
             "Email address": "paidstaff@example.com",
             "Department": ["Music"],
@@ -431,6 +446,13 @@ async def test_sync_idempotent(client: TestClient, db: Session):
     _make_promotions_staff(db, "admin@example.com", "Admin", "555-0000")
 
     airtable_records = [
+        # admin@example.com is included so the account triggering the sync
+        # isn't itself deactivated for being "missing" from Airtable.
+        {
+            "Email address": "admin@example.com",
+            "Department": ["Promotions"],
+            "Status": ["Active"],
+        },
         {
             "Email address": "user@example.com",
             "Department": ["Library"],
@@ -448,6 +470,108 @@ async def test_sync_idempotent(client: TestClient, db: Session):
 
     assert db.query(Staff).filter_by(email="user@example.com").count() == 1
     assert db.query(StaffStatus).filter_by(status="Active").count() >= 1
+
+
+@pytest.mark.asyncio
+async def test_sync_deactivates_staff_missing_from_airtable(
+    client: TestClient, db: Session
+):
+    """Sync removes 'Active' status (only) for staff no longer present in Airtable,
+    but leaves their Staff row and other departments/statuses in place."""
+    from unittest.mock import patch, AsyncMock
+
+    _make_promotions_staff(db, "admin@example.com", "Admin", "555-0000")
+    gone = _make_promotions_staff(db, "gone@example.com", "Gone User", "555-1111")
+    db.add(StaffStatus(staff_id=gone.id, status="Sublist DJ"))
+    db.commit()
+
+    # Neither gone@example.com nor its removal is mentioned — it has simply
+    # stopped appearing in the Airtable export, same as if the row were
+    # deleted there.
+    airtable_records = [
+        {
+            "Email address": "admin@example.com",
+            "Department": ["Promotions"],
+            "Status": ["Active"],
+        },
+    ]
+
+    with patch(
+        "app.services.user_service.UserService.fetch_airtable_records",
+        new_callable=AsyncMock,
+        return_value=airtable_records,
+    ):
+        response = client.post(
+            "/api/users/sync", headers={"X-Forwarded-User": "admin@example.com"}
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["deactivated"] == ["gone@example.com"]
+    assert data["errors"] == []
+
+    # Staff row and non-Active data survive.
+    still_there = db.query(Staff).filter_by(email="gone@example.com").first()
+    assert still_there is not None
+    assert (
+        db.query(StaffDepartment)
+        .filter_by(staff_id=still_there.id, department="Promotions")
+        .first()
+        is not None
+    )
+    assert (
+        db.query(StaffStatus)
+        .filter_by(staff_id=still_there.id, status="Sublist DJ")
+        .first()
+        is not None
+    )
+    # Only "Active" is gone.
+    assert (
+        db.query(StaffStatus).filter_by(staff_id=still_there.id, status="Active").first()
+        is None
+    )
+
+    # Locked out of promotions/staff access as a result (a Google-authenticated
+    # user off the DJ network with no "Active" status is "unauthorized", not
+    # "dj" — see get_current_user()).
+    me_response = client.get(
+        "/api/users/me", headers={"X-Forwarded-User": "gone@example.com"}
+    )
+    assert me_response.json()["role"] == "unauthorized"
+
+    audit_row = db.query(AuditLog).filter_by(event_type="airtable_sync_deactivated").first()
+    assert audit_row is not None
+    assert audit_row.details["email"] == "gone@example.com"
+
+
+@pytest.mark.asyncio
+async def test_sync_skips_deactivation_when_airtable_returns_empty(
+    client: TestClient, db: Session
+):
+    """Sync never deactivates anyone if Airtable returns no records at all
+    (e.g. misconfigured credentials) — that would otherwise deactivate the
+    entire directory rather than the handful of people actually removed."""
+    from unittest.mock import patch, AsyncMock
+
+    _make_promotions_staff(db, "admin@example.com", "Admin", "555-0000")
+
+    with patch(
+        "app.services.user_service.UserService.fetch_airtable_records",
+        new_callable=AsyncMock,
+        return_value=[],
+    ):
+        response = client.post(
+            "/api/users/sync", headers={"X-Forwarded-User": "admin@example.com"}
+        )
+
+    assert response.status_code == 200
+    assert response.json()["deactivated"] == []
+
+    admin = db.query(Staff).filter_by(email="admin@example.com").first()
+    assert (
+        db.query(StaffStatus).filter_by(staff_id=admin.id, status="Active").first()
+        is not None
+    )
 
 
 # --- Notification preferences tests ---

@@ -67,6 +67,13 @@ class SyncResult(BaseModel):
     staff_upserted: list[str] = Field(
         default_factory=list, description="Staff member emails synced"
     )
+    deactivated: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Staff emails whose 'Active' status was removed because "
+            "they no longer appear in Airtable"
+        ),
+    )
     errors: list[str] = Field(
         default_factory=list, description="Errors encountered during sync"
     )

@@ -8,6 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
 import httpx2 as httpx
 
+from app.auth import ACTIVE_STATUS
 from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
 from app.models.staff_status import StaffStatus
@@ -119,13 +120,23 @@ class UserService:
         staff.dj_name.
 
         Existing DB records not present in Airtable are left in place so that
-        historical show/pass associations are preserved.
+        historical show/pass associations are preserved. The one exception is
+        the "Active" status: a staff member who no longer appears in Airtable
+        at all has their "Active" status removed (see the deactivation step
+        below), since access-control checks (`_is_promotions_staff`,
+        `get_staff_member`) treat "Active" as a gate. Everything else about
+        the record — the Staff row itself, other statuses, departments, venue/
+        promoter/specialty-show ownership, passes, lottery entries — is left
+        untouched, both because it may still be needed for historical
+        display and because none of those foreign keys cascade on delete.
 
-        :returns: Dict with promotions_upserted, staff_upserted, and errors lists
+        :returns: Dict with promotions_upserted, staff_upserted, deactivated,
+            and errors lists
         """
         result: Dict[str, Any] = {
             "promotions_upserted": [],
             "staff_upserted": [],
+            "deactivated": [],
             "errors": [],
             "_trigger": trigger,
         }
@@ -286,6 +297,58 @@ class UserService:
                 logger.error(error_msg)
                 result["errors"].append(error_msg)
 
+        # Deactivate staff who no longer appear in Airtable at all. The loop
+        # above only reconciles departments/statuses for emails Airtable
+        # actually returned, so someone removed from the table entirely would
+        # otherwise keep whatever access they already had, indefinitely.
+        # Guarded on a non-empty `seen_emails`: if Airtable returned nothing
+        # (e.g. credentials misconfigured — see fetch_airtable_records), an
+        # empty set here would otherwise match every "Active" staff member
+        # and deactivate the entire directory.
+        seen_emails = {
+            (
+                fields.get("Email address")
+                or fields.get("email")
+                or fields.get("Email")
+                or ""
+            )
+            .strip()
+            .lower()
+            for fields in records
+        }
+        seen_emails.discard("")
+        if seen_emails:
+            vanished = (
+                db.query(Staff)
+                .join(StaffStatus, Staff.id == StaffStatus.staff_id)
+                .filter(StaffStatus.status == ACTIVE_STATUS, ~Staff.email.in_(seen_emails))
+                .all()
+            )
+            for staff_record in vanished:
+                try:
+                    db.query(StaffStatus).filter(
+                        StaffStatus.staff_id == staff_record.id,
+                        StaffStatus.status == ACTIVE_STATUS,
+                    ).delete()
+                    db.commit()
+                    result["deactivated"].append(staff_record.email)
+                    log_event(
+                        db,
+                        event_type="airtable_sync_deactivated",
+                        actor_role="system",
+                        entity_type="staff",
+                        entity_id=staff_record.id,
+                        details={
+                            "email": staff_record.email,
+                            "reason": "no longer present in Airtable",
+                        },
+                    )
+                except SQLAlchemyError as e:
+                    db.rollback()
+                    error_msg = f"DB error deactivating {staff_record.email}: {str(e)}"
+                    logger.error(error_msg)
+                    result["errors"].append(error_msg)
+
         # Phase 2: Resolve DJ names from Spinitron API
         if settings.spinitron_api_key and result["staff_upserted"]:
             from app.services.spinitron_service import SpinitronService
@@ -323,7 +386,8 @@ class UserService:
 
         logger.info(
             f"Sync completed: {len(result['promotions_upserted'])} promotions, "
-            f"{len(result['staff_upserted'])} staff, {len(result['errors'])} errors"
+            f"{len(result['staff_upserted'])} staff, {len(result['deactivated'])} "
+            f"deactivated, {len(result['errors'])} errors"
         )
         return result
 
