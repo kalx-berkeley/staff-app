@@ -263,7 +263,7 @@ const ShowDetail = () => {
 
     try {
       await showsAPI.publish(parseInt(id));
-      await loadShow();
+      await Promise.all([loadShow(), loadLotteryStatus()]);
     } catch (err) {
       const apiError = err as APIError;
       setActionError(
@@ -291,7 +291,7 @@ const ShowDetail = () => {
       } else if (confirmAction === 'reopen') {
         await showsAPI.reopen(parseInt(id));
       }
-      await loadShow();
+      await Promise.all([loadShow(), loadLotteryStatus()]);
     } catch (err) {
       const apiError = err as APIError;
       setActionError(
