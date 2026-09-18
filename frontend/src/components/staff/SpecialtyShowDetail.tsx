@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { specialtyShowsAPI, autocompleteAPI } from '../../services/api';
 import { useAuth } from '../../contexts/authHooks';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import type { SpecialtyShowResponse, SpecialtyShowOwnerInfo, APIError } from '../../types';
 
 const SpecialtyShowDetail = () => {
@@ -10,6 +11,7 @@ const SpecialtyShowDetail = () => {
   const { user } = useAuth();
 
   const [show, setShow] = useState<SpecialtyShowResponse | null>(null);
+  usePageTitle(`${show?.name ?? 'Specialty Show'} · Staff`);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);

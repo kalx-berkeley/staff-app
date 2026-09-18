@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { promotersAPI } from '../../services/api';
 import type { PromoterResponse, APIError } from '../../types';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const PromoterList = () => {
+  usePageTitle('Promoters · Promotions');
   const navigate = useNavigate();
   const [promoters, setPromoters] = useState<PromoterResponse[]>([]);
   const [filter, setFilter] = useState('');

@@ -3,12 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { showsAPI } from '../../services/api';
 import PassGiveawayForm from './PassGiveawayForm';
 import { DjNameInput, DJ_NAME_KEY, EnrichedShowName, MarkdownContent, FeatureBinBadge, KalxLiveBadge } from '../shared';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import type { ShowResponse, PassResponse, APIError } from '../../types';
 
 const GiveawayPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [show, setShow] = useState<ShowResponse | null>(null);
+  usePageTitle(`Pass Giveaway${show ? `: ${show.event_name}` : ''} · DJ`);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [djName, setDjName] = useState(localStorage.getItem(DJ_NAME_KEY) || '');

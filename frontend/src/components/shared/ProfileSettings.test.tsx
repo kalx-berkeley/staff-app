@@ -40,7 +40,7 @@ describe('ProfileSettings', () => {
       () => new Promise(() => {})
     );
 
-    render(<ProfileSettings />);
+    render(<ProfileSettings section="Promotions" />);
 
     expect(screen.getByText('Loading profile...')).toBeInTheDocument();
   });
@@ -48,7 +48,7 @@ describe('ProfileSettings', () => {
   it('should display profile name and phone for a promotions profile', async () => {
     vi.mocked(usersAPI.getProfile).mockResolvedValue(mockPromotionsProfile);
 
-    render(<ProfileSettings />);
+    render(<ProfileSettings section="Promotions" />);
 
     await waitFor(() => {
       expect(screen.queryByText('Loading profile...')).not.toBeInTheDocument();
@@ -61,7 +61,7 @@ describe('ProfileSettings', () => {
   it('should display profile name and phone for a staff profile', async () => {
     vi.mocked(usersAPI.getProfile).mockResolvedValue(mockStaffProfile);
 
-    render(<ProfileSettings />);
+    render(<ProfileSettings section="Promotions" />);
 
     await waitFor(() => {
       expect(screen.queryByText('Loading profile...')).not.toBeInTheDocument();
@@ -74,7 +74,7 @@ describe('ProfileSettings', () => {
   it('should display the Airtable notice', async () => {
     vi.mocked(usersAPI.getProfile).mockResolvedValue(mockPromotionsProfile);
 
-    render(<ProfileSettings />);
+    render(<ProfileSettings section="Promotions" />);
 
     await waitFor(() => {
       expect(screen.queryByText('Loading profile...')).not.toBeInTheDocument();
@@ -86,7 +86,7 @@ describe('ProfileSettings', () => {
   it('should not render any editable inputs or save button in the read-only profile info section', async () => {
     vi.mocked(usersAPI.getProfile).mockResolvedValue(mockPromotionsProfile);
 
-    render(<ProfileSettings />);
+    render(<ProfileSettings section="Promotions" />);
 
     await waitFor(() => {
       expect(screen.queryByText('Loading profile...')).not.toBeInTheDocument();
@@ -103,7 +103,7 @@ describe('ProfileSettings', () => {
       detail: 'Failed to load profile',
     });
 
-    render(<ProfileSettings />);
+    render(<ProfileSettings section="Promotions" />);
 
     await waitFor(() => {
       expect(screen.getByText(/error:/i)).toBeInTheDocument();
@@ -116,7 +116,7 @@ describe('ProfileSettings', () => {
       .mockRejectedValueOnce({ detail: 'Failed to load profile' })
       .mockResolvedValueOnce(mockPromotionsProfile);
 
-    render(<ProfileSettings />);
+    render(<ProfileSettings section="Promotions" />);
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
@@ -132,7 +132,7 @@ describe('ProfileSettings', () => {
   it('should display em-dash for missing name or phone', async () => {
     vi.mocked(usersAPI.getProfile).mockResolvedValue({ name: '', phone: '', is_sublist_dj: false });
 
-    render(<ProfileSettings />);
+    render(<ProfileSettings section="Promotions" />);
 
     await waitFor(() => {
       expect(screen.queryByText('Loading profile...')).not.toBeInTheDocument();
@@ -149,7 +149,7 @@ describe('ProfileSettings', () => {
     it('should display existing genre preferences as tags', async () => {
       vi.mocked(usersAPI.getGenrePreferences).mockResolvedValue({ genres: ['rock', 'jazz'] });
 
-      render(<ProfileSettings />);
+      render(<ProfileSettings section="Promotions" />);
 
       await waitFor(() => {
         expect(screen.getByText('rock')).toBeInTheDocument();
@@ -162,7 +162,7 @@ describe('ProfileSettings', () => {
       vi.mocked(usersAPI.updateGenrePreferences).mockResolvedValue({ genres: ['blues'] });
       vi.mocked(showsAPI.listGenres).mockResolvedValue(['blues', 'rock']);
 
-      render(<ProfileSettings />);
+      render(<ProfileSettings section="Promotions" />);
 
       await waitFor(() => {
         expect(screen.queryByText('Loading genre preferences...')).not.toBeInTheDocument();
@@ -189,7 +189,7 @@ describe('ProfileSettings', () => {
       vi.mocked(usersAPI.getGenrePreferences).mockResolvedValue({ genres: ['rock'] });
       vi.mocked(usersAPI.updateGenrePreferences).mockResolvedValue({ genres: [] });
 
-      render(<ProfileSettings />);
+      render(<ProfileSettings section="Promotions" />);
 
       await waitFor(() => {
         expect(screen.getByText('rock')).toBeInTheDocument();

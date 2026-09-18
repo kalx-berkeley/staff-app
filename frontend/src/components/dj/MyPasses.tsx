@@ -4,10 +4,12 @@ import { passesAPI, autocompleteAPI } from '../../services/api';
 import { useOnAirDj } from '../shared';
 import type { PassResponse, APIError } from '../../types';
 import { formatPhone } from '../../utils';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const DJ_NAME_KEY = 'kalx_dj_name';
 
 const MyPasses = () => {
+  usePageTitle('My Passes · DJ');
   const [djName, setDjName] = useState(localStorage.getItem(DJ_NAME_KEY) || '');
   const [passes, setPasses] = useState<PassResponse[]>([]);
   const [loading, setLoading] = useState(false);

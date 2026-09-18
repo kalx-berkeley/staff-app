@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { showsAPI, venuesAPI, venuesMyAPI, promotersAPI } from '../../services/api';
 import { Tooltip, BandAnnotator, DatePicker } from '../shared';
 import { formatPhone } from '../../utils';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import type {
   DescriptionAnalysis,
   DescriptionFindingCategory,
@@ -196,6 +197,7 @@ const ShowForm = () => {
 
   // Form fields
   const [eventName, setEventName] = useState('');
+  usePageTitle(`${isEditing ? `Edit ${eventName || 'Show'}` : 'New Show'} · Promotions`);
   const [genres, setGenres] = useState<string[]>([]);
   const [genreInput, setGenreInput] = useState('');
   const [venueId, setVenueId] = useState<number | ''>('');

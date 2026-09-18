@@ -3,12 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { showsAPI } from '../../services/api';
 import { DjNameInput, DJ_NAME_KEY, EnrichedShowName, MarkdownContent, FeatureBinBadge, KalxLiveBadge } from '../shared';
 import { formatPhone } from '../../utils';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import type { ShowResponse, PassResponse, APIError } from '../../types';
 
 const ShowDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [show, setShow] = useState<ShowResponse | null>(null);
+  usePageTitle(`${show?.event_name ?? 'Show'} · DJ`);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [djName, setDjName] = useState(localStorage.getItem(DJ_NAME_KEY) || '');

@@ -4,6 +4,7 @@ import { showsAPI, passesAPI, lotteryAPI, specialtyShowsAPI } from '../../servic
 import { Tooltip, EnrichedShowName, MarkdownContent, FeatureBinBadge, KalxLiveBadge, DatePicker } from '../shared';
 import { formatPhone, formatDateValue } from '../../utils';
 import { useAuth } from '../../contexts/authHooks';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import type { ShowResponse, StaffProfile, APIError, ClaimData, LotteryStatus, SpecialtyShowResponse } from '../../types';
 
 const ShowDetail = () => {
@@ -11,6 +12,7 @@ const ShowDetail = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [show, setShow] = useState<ShowResponse | null>(null);
+  usePageTitle(`${show?.event_name ?? 'Show'} · Staff`);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [passActionId, setPassActionId] = useState<number | null>(null);

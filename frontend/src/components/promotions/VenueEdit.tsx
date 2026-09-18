@@ -3,11 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { venuesAPI } from '../../services/api';
 import type { VenueResponse, APIError } from '../../types';
 import VenueForm from './VenueForm';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const VenueEdit = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [venue, setVenue] = useState<VenueResponse | null>(null);
+  usePageTitle(`Edit ${venue?.name ?? 'Venue'} · Promotions`);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

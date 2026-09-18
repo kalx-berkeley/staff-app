@@ -4,6 +4,7 @@ import { showsAPI } from '../../services/api';
 import type { ShowSummary, ShowStatus, APIError } from '../../types';
 import SearchBar from './SearchBar';
 import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker } from '../shared';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 type SortBy = 'date' | 'band' | 'venue' | 'published';
 
@@ -16,6 +17,8 @@ const getDefaultDateFrom = (): string => {
 };
 
 const ShowList = () => {
+  usePageTitle('Shows · Promotions');
+
   const [allShows, setAllShows] = useState<ShowSummary[]>([]);
   const [searchResults, setSearchResults] = useState<ShowSummary[]>([]);
   const [showMineOnly, setShowMineOnly] = useState(true);

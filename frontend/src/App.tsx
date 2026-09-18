@@ -262,7 +262,7 @@ function App() {
           <Route path="promoters/new" element={<PromoterNew />} />
           <Route path="promoters/:id/edit" element={<PromoterEdit />} />
           <Route path="promoters" element={<PromoterList />} />
-          <Route path="profile" element={<ProfileSettings />} />
+          <Route path="profile" element={<ProfileSettings section="Promotions" />} />
           <Route path="admin" element={<Admin />} />
           <Route path="legacy-import" element={<LegacyImport />} />
         </Route>
@@ -282,7 +282,7 @@ function App() {
           <Route path="my-passes" element={<StaffMyPasses />} />
           <Route path="specialty-shows" element={<StaffSpecialtyShowList />} />
           <Route path="specialty-shows/:id" element={<StaffSpecialtyShowDetail />} />
-          <Route path="profile" element={<ProfileSettings />} />
+          <Route path="profile" element={<ProfileSettings section="Staff" />} />
         </Route>
 
         {/* DJ routes - accessible from DJ studio network or as promotions staff */}

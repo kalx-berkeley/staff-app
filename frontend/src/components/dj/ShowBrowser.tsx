@@ -4,6 +4,7 @@ import { showsAPI, passesAPI } from '../../services/api';
 import SearchBar from '../promotions/SearchBar';
 import { Tooltip, DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker } from '../shared';
 import type { ShowSummary, PassResponse, APIError } from '../../types';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const VIEW_MODE_KEY = 'kalx_dj_view_mode';
 
@@ -14,6 +15,7 @@ const getDefaultDateFrom = (): string => {
 };
 
 const ShowBrowser = () => {
+  usePageTitle('Shows · DJ');
   const [rawShows, setRawShows] = useState<ShowSummary[]>([]);
   const [allShows, setAllShows] = useState<ShowSummary[]>([]);
   const [filteredShows, setFilteredShows] = useState<ShowSummary[]>([]);

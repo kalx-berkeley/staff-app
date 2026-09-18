@@ -15,6 +15,7 @@ import type {
 } from '../../types';
 import { useAuth } from '../../contexts/authHooks';
 import { DatePicker } from '../shared';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const AUDIT_PAGE_SIZE = 50;
 
@@ -56,6 +57,7 @@ const formatFutureTime = (isoString: string | null): string => {
 };
 
 const Admin = () => {
+  usePageTitle('Admin · Promotions');
   const { user } = useAuth();
   const isStaging = user?.is_staging ?? false;
   const isImpersonating =

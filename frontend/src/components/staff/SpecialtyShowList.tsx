@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { specialtyShowsAPI } from '../../services/api';
 import { useAuth } from '../../contexts/authHooks';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import type { SpecialtyShowResponse, APIError } from '../../types';
 
 const SpecialtyShowList = () => {
+  usePageTitle('Specialty Shows · Staff');
   const navigate = useNavigate();
   const { user } = useAuth();
   const isPromotions = user?.role === 'promotions';

@@ -4,8 +4,10 @@ import { passesAPI } from '../../services/api';
 import type { PassResponse, APIError } from '../../types';
 import { formatPhone } from '../../utils';
 import { useAuth } from '../../contexts/authHooks';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const MyPasses = () => {
+  usePageTitle('My Passes · Staff');
   const { user } = useAuth();
   const [passes, setPasses] = useState<PassResponse[]>([]);
   const [loading, setLoading] = useState(false);

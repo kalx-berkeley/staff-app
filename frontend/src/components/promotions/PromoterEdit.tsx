@@ -3,11 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { promotersAPI } from '../../services/api';
 import type { PromoterResponse, APIError } from '../../types';
 import PromoterForm from './PromoterForm';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const PromoterEdit = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [promoter, setPromoter] = useState<PromoterResponse | null>(null);
+  usePageTitle(`Edit ${promoter?.name ?? 'Promoter'} · Promotions`);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

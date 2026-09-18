@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { venuesAPI, venuesMyAPI } from '../../services/api';
 import type { VenueResponse, APIError } from '../../types';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const VIEW_MODE_KEY = 'kalx_venue_view_mode';
 
 const VenueList = () => {
+  usePageTitle('Venues · Promotions');
   const navigate = useNavigate();
   const [venues, setVenues] = useState<VenueResponse[]>([]);
   const [venueFilter, setVenueFilter] = useState('');

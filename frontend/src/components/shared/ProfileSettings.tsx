@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { usersAPI, showsAPI, specialtyShowsAPI } from '../../services/api';
 import GenreTagInput from './GenreTagInput';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import type {
   PromotionsStaffProfile,
   StaffProfile,
@@ -10,7 +11,10 @@ import type {
   APIError,
 } from '../../types';
 
-const ProfileSettings = () => {
+// Rendered at both /promotions/profile and /staff/profile; the caller says
+// which section it's mounted under so the page title can name it.
+const ProfileSettings = ({ section }: { section: 'Promotions' | 'Staff' }) => {
+  usePageTitle(`Profile · ${section}`);
   const [profile, setProfile] = useState<PromotionsStaffProfile | StaffProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

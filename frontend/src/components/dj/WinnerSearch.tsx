@@ -4,6 +4,7 @@ import { passesAPI } from '../../services/api';
 import { Tooltip } from '../shared';
 import { formatPhone } from '../../utils';
 import { useAuth } from '../../contexts/authHooks';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import type { PassResponse, WinnerReleaseData, APIError } from '../../types';
 
 interface ReleaseFormState {
@@ -231,6 +232,7 @@ const PassResult = ({ pass, isAuthenticated, onReleased }: PassResultProps) => {
 };
 
 const WinnerSearch = () => {
+  usePageTitle('Winner Search · DJ');
   const { user } = useAuth();
   const isAuthenticated = !!user?.email;
 

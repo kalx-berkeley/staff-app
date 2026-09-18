@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import { useAuth } from '../contexts/authHooks';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export default function UnauthorizedPage() {
+  usePageTitle('Access Not Available');
   const { user } = useAuth();
 
   return (

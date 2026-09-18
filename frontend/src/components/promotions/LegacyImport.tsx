@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { legacyImportAPI, venuesAPI, showsAPI } from '../../services/api';
 import type { VenueResponse, AgeRestriction } from '../../types';
 import { DatePicker } from '../shared';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 interface StaffMember {
   id: number;
@@ -37,6 +38,7 @@ const emptyStaffClaim = (): StaffClaimRow => ({
 });
 
 const LegacyImport = () => {
+  usePageTitle('Legacy Import · Promotions');
   const navigate = useNavigate();
 
   const [enabled, setEnabled] = useState<boolean | null>(null);
