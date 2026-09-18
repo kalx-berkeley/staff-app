@@ -53,6 +53,18 @@ def staff_member(db: Session):
 
 
 @pytest.fixture
+def staff_member2(db: Session):
+    """Create a second test staff member."""
+    staff = Staff(email="staff2@test.com", name="Test Staff Two", phone="555-0003")
+    db.add(staff)
+    db.flush()
+    db.add(StaffStatus(staff_id=staff.id, status="Active"))
+    db.commit()
+    db.refresh(staff)
+    return staff
+
+
+@pytest.fixture
 def show(db: Session, venue, promotions_staff):
     """Create a test show with passes."""
     show = Show(
@@ -970,3 +982,117 @@ def test_suggest_by_genre_requires_authentication(client, show):
         "/api/passes/preassign/suggest-by-genre", params={"show_id": show.id}
     )
     assert response.status_code == 400
+
+
+def test_claim_does_not_bump_guest_when_another_pass_is_available(
+    client, show, staff_member, staff_member2, db
+):
+    """
+    Reproduces the reported bug: with 3 staff passes, if staff #1 claims one
+    with a +1 guest (using 2 of 3) and staff #2 then claims a pass, the
+    genuinely free 3rd pass should be used — staff #1's guest hold must not
+    be bumped, since there's no actual shortage.
+    """
+    # Give this show a 3rd staff pass so one pass remains truly available
+    # after a claim-with-guest.
+    db.add(Pass(show_id=show.id, pass_type="staff", status="available"))
+    db.commit()
+
+    staff_passes = (
+        db.query(Pass).filter(Pass.show_id == show.id, Pass.pass_type == "staff").all()
+    )
+    assert len(staff_passes) == 3
+
+    # Staff #1 claims a pass with a +1 guest.
+    response = client.post(
+        f"/api/passes/{staff_passes[0].id}/claim",
+        json={"has_guest": True, "guest_name": "Guest One"},
+        headers={"X-Forwarded-User": staff_member.email},
+    )
+    assert response.status_code == 200
+    primary = response.json()
+    assert primary["has_guest"] is True
+
+    guest_hold = db.query(Pass).filter(Pass.guest_of_pass_id == primary["id"]).first()
+    assert guest_hold is not None
+
+    # Staff #2 claims a pass — even if they click on the card representing
+    # the guest-hold pass, the truly available 3rd pass should be used
+    # instead, since claiming it doesn't require bumping anyone.
+    response = client.post(
+        f"/api/passes/{guest_hold.id}/claim",
+        headers={"X-Forwarded-User": staff_member2.email},
+    )
+    assert response.status_code == 200
+    claimed = response.json()
+    # The claim should have been redirected to the still-available 3rd pass,
+    # not the guest hold pass staff #2 clicked on.
+    assert claimed["id"] != guest_hold.id
+    assert claimed["status"] == "claimed"
+    assert claimed["staff_id"] == staff_member2.id
+
+    db.refresh(guest_hold)
+    db.expire_all()
+    primary_pass = db.query(Pass).filter(Pass.id == primary["id"]).first()
+    assert primary_pass.has_guest is True
+    assert primary_pass.guest_name == "Guest One"
+    assert guest_hold.status == "claimed"
+    assert guest_hold.guest_of_pass_id == primary["id"]
+
+
+def test_claim_bumps_guest_when_no_other_pass_available(
+    client, show, staff_member, staff_member2, db
+):
+    """When a guest hold really is the last pass, claiming it still displaces
+    the guest (existing, intended behavior)."""
+    staff_passes = (
+        db.query(Pass).filter(Pass.show_id == show.id, Pass.pass_type == "staff").all()
+    )
+    assert len(staff_passes) == 2
+
+    response = client.post(
+        f"/api/passes/{staff_passes[0].id}/claim",
+        json={"has_guest": True, "guest_name": "Guest One"},
+        headers={"X-Forwarded-User": staff_member.email},
+    )
+    assert response.status_code == 200
+    primary_id = response.json()["id"]
+
+    guest_hold = db.query(Pass).filter(Pass.guest_of_pass_id == primary_id).first()
+    assert guest_hold is not None
+
+    response = client.post(
+        f"/api/passes/{guest_hold.id}/claim",
+        headers={"X-Forwarded-User": staff_member2.email},
+    )
+    assert response.status_code == 200
+    claimed = response.json()
+    assert claimed["id"] == guest_hold.id
+    assert claimed["staff_id"] == staff_member2.id
+
+    db.expire_all()
+    primary_pass = db.query(Pass).filter(Pass.id == primary_id).first()
+    assert primary_pass.has_guest is False
+    assert primary_pass.guest_name is None
+
+
+def test_staff_member_cannot_claim_multiple_staff_passes(client, show, staff_member, db):
+    """A staff member should not be able to hold more than one staff pass
+    for the same show."""
+    staff_passes = (
+        db.query(Pass).filter(Pass.show_id == show.id, Pass.pass_type == "staff").all()
+    )
+    assert len(staff_passes) == 2
+
+    response = client.post(
+        f"/api/passes/{staff_passes[0].id}/claim",
+        headers={"X-Forwarded-User": staff_member.email},
+    )
+    assert response.status_code == 200
+
+    response = client.post(
+        f"/api/passes/{staff_passes[1].id}/claim",
+        headers={"X-Forwarded-User": staff_member.email},
+    )
+    assert response.status_code == 400
+    assert "already claimed" in response.json()["detail"].lower()

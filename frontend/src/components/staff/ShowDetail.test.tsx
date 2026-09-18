@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import ShowDetail from './ShowDetail';
 import { showsAPI, passesAPI } from '../../services/api';
-import type { ShowResponse, PassResponse } from '../../types';
+import type { ShowResponse, PassResponse, UserResponse } from '../../types';
 
 // Mock the API
 vi.mock('../../services/api', () => ({
@@ -17,8 +17,11 @@ vi.mock('../../services/api', () => ({
   },
 }));
 
+const mockUseAuth = vi.fn<() => { user: UserResponse | null; loading: boolean; error: string | null; refetchUser: () => Promise<void> }>(
+  () => ({ user: null, loading: false, error: null, refetchUser: vi.fn() })
+);
 vi.mock('../../contexts/authHooks', () => ({
-  useAuth: () => ({ user: null, loading: false, error: null, refetchUser: vi.fn() }),
+  useAuth: () => mockUseAuth(),
 }));
 
 // Mock useParams
@@ -125,6 +128,7 @@ describe('Staff ShowDetail', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    mockUseAuth.mockReturnValue({ user: null, loading: false, error: null, refetchUser: vi.fn() });
   });
 
   describe('Show Information Display', () => {
@@ -329,6 +333,64 @@ describe('Staff ShowDetail', () => {
 
       await waitFor(() => {
         expect(showsAPI.get).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
+  describe('One pass per staff member', () => {
+    it('disables Claim on other passes once the current user already has one', async () => {
+      const secondAvailablePass: PassResponse = {
+        ...availablePass,
+        id: 3,
+      };
+      const myClaimedPass: PassResponse = {
+        ...claimedPass,
+        id: 4,
+        staff_email: 'me@example.com',
+      };
+      const showWithMyClaim = {
+        ...mockShow,
+        passes: [secondAvailablePass, myClaimedPass],
+      };
+      mockUseAuth.mockReturnValue({
+        user: { email: 'me@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { name: 'Me', phone: '555-0000', dj_name: null, is_sublist_dj: false } },
+        loading: false,
+        error: null,
+        refetchUser: vi.fn(),
+      });
+      vi.mocked(showsAPI.get).mockResolvedValue(showWithMyClaim);
+
+      render(
+        <BrowserRouter>
+          <ShowDetail />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /^claim$/i })).toBeDisabled();
+      });
+      expect(
+        screen.getByText(/you already have a staff pass for this show/i)
+      ).toBeInTheDocument();
+    });
+
+    it('leaves Claim enabled for a user with no existing pass on this show', async () => {
+      mockUseAuth.mockReturnValue({
+        user: { email: 'someone-else@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { name: 'Someone Else', phone: '555-0000', dj_name: null, is_sublist_dj: false } },
+        loading: false,
+        error: null,
+        refetchUser: vi.fn(),
+      });
+      vi.mocked(showsAPI.get).mockResolvedValue(mockShow);
+
+      render(
+        <BrowserRouter>
+          <ShowDetail />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /^claim$/i })).not.toBeDisabled();
       });
     });
   });

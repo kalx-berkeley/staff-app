@@ -624,6 +624,24 @@ class PassService:
                         detail=f"Staff member with id {staff_id} not found",
                     )
 
+                # A staff member may hold at most one staff pass per show.
+                existing_claim = (
+                    db.query(Pass)
+                    .filter(
+                        Pass.show_id == pass_item.show_id,
+                        Pass.pass_type == "staff",
+                        Pass.staff_id == staff_id,
+                        Pass.status == "claimed",
+                        Pass.guest_of_pass_id.is_(None),
+                    )
+                    .first()
+                )
+                if existing_claim and existing_claim.id != pass_item.id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="You have already claimed a staff pass for this show",
+                    )
+
             # Determine if the target pass is available or a guest hold (overridable).
             is_guest_hold = (
                 pass_item.status == "claimed" and pass_item.guest_of_pass_id is not None
@@ -634,6 +652,25 @@ class PassService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Pass is not available (current status: {pass_item.status})",
                 )
+
+            if is_guest_hold:
+                # The requested pass is only tentatively held for someone else's
+                # guest. A plain claim shouldn't displace that guest while a
+                # genuinely available staff pass still exists for this show —
+                # prefer that one instead, and only fall back to bumping the
+                # guest hold below when there's truly nothing else left.
+                alternative = (
+                    db.query(Pass)
+                    .filter(
+                        Pass.show_id == pass_item.show_id,
+                        Pass.pass_type == "staff",
+                        Pass.status == "available",
+                    )
+                    .first()
+                )
+                if alternative:
+                    pass_item = alternative
+                    is_guest_hold = False
 
             now = datetime.now(timezone.utc)
 

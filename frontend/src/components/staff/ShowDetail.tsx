@@ -473,6 +473,14 @@ const ShowDetail = () => {
   const guestHoldPassCount = staffPasses.filter((p) => p.status === 'claimed' && p.guest_of_pass_id !== null).length;
   const displayAvailableCount = availableStaffCount + guestHoldPassCount;
   const canClaimWithGuest = availableStaffCount >= 2;
+  const myEmail = user?.email?.toLowerCase() ?? null;
+  // A staff member may hold at most one staff pass per show (enforced
+  // server-side too) — used to disable claiming a second one from the UI.
+  const alreadyHasStaffPass = myEmail
+    ? staffPasses.some(
+        (p) => p.status === 'claimed' && p.staff_email?.toLowerCase() === myEmail
+      )
+    : false;
   const myName = user?.profile?.name ?? null;
   const mySpecialtyShowIds = new Set(myDJSpecialtyShows.map((s) => s.id));
   const myPreassignedPasses = myName
@@ -992,6 +1000,12 @@ const ShowDetail = () => {
             <Tooltip text="Claim a staff pass to attend this show. Each pass admits 1 person. You can also reserve a +1 guest slot if two passes are available. You can release your claim if your plans change (while the show is still open)." />
           </h3>
 
+          {alreadyHasStaffPass && (
+            <p className="field-hint">
+              You already have a staff pass for this show — release it before claiming another.
+            </p>
+          )}
+
           {lotteryActive && lotteryDeadline && (
             <div className="lottery-banner">
               <strong>Lottery mode is active.</strong> Claiming a pass during this window enters
@@ -1165,7 +1179,8 @@ const ShowDetail = () => {
                           <button
                             onClick={() => handleClaimPass(pass.id)}
                             className="btn-small btn-primary"
-                            disabled={passActionId === pass.id}
+                            disabled={passActionId === pass.id || alreadyHasStaffPass}
+                            title={alreadyHasStaffPass ? 'You already have a staff pass for this show.' : undefined}
                           >
                             {passActionId === pass.id ? 'Claiming...' : 'Claim'}
                           </button>
@@ -1249,8 +1264,8 @@ const ShowDetail = () => {
                             <button
                               onClick={() => handleClaimPass(pass.id)}
                               className="btn-small btn-primary"
-                              disabled={passActionId === pass.id}
-                              title="Claim this staff pass to attend the show (1 person)."
+                              disabled={passActionId === pass.id || alreadyHasStaffPass}
+                              title={alreadyHasStaffPass ? 'You already have a staff pass for this show.' : 'Claim this staff pass to attend the show (1 person).'}
                             >
                               {passActionId === pass.id ? 'Claiming...' : 'Claim'}
                             </button>
@@ -1258,8 +1273,8 @@ const ShowDetail = () => {
                               <button
                                 onClick={() => { setGuestClaimPassId(pass.id); setGuestName(''); setOnlyWithGuest(false); }}
                                 className="btn-small"
-                                disabled={passActionId === pass.id}
-                                title="Claim this pass and reserve a second pass for a +1 guest. Guest spot is tentative until show closes."
+                                disabled={passActionId === pass.id || alreadyHasStaffPass}
+                                title={alreadyHasStaffPass ? 'You already have a staff pass for this show.' : 'Claim this pass and reserve a second pass for a +1 guest. Guest spot is tentative until show closes.'}
                               >
                                 Claim with +1 Guest
                               </button>
