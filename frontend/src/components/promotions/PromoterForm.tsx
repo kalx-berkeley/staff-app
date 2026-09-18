@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { promotersAPI, adminAPI } from '../../services/api';
+import { promotersAPI, venuesAPI } from '../../services/api';
+import { PersonAutocomplete, extractPersonEmail } from '../shared';
 import type {
   PromoterResponse,
   PromoterCreate,
@@ -7,6 +8,7 @@ import type {
   PromoterContactCreate,
   APIError,
   ValidationError,
+  PromotionsStaffOption,
 } from '../../types';
 
 interface PromoterFormProps {
@@ -31,7 +33,8 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
   const [requiresEmailAddress, setRequiresEmailAddress] = useState(false);
   const [staffGuestRequiresName, setStaffGuestRequiresName] = useState(false);
   const [ownerEmails, setOwnerEmails] = useState<string[]>([]);
-  const [newOwnerEmail, setNewOwnerEmail] = useState('');
+  const [newOwnerInput, setNewOwnerInput] = useState('');
+  const [promotionsStaff, setPromotionsStaff] = useState<PromotionsStaffOption[]>([]);
   const [emailToName, setEmailToName] = useState<Record<string, string>>({});
   const [contacts, setContacts] = useState<PromoterContactCreate[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -62,9 +65,10 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
   }, [promoter]);
 
   useEffect(() => {
-    adminAPI.listUsers().then((users) => {
+    venuesAPI.listPromotionsStaff().then((staff) => {
+      setPromotionsStaff(staff);
       const map: Record<string, string> = {};
-      users.forEach((u) => { map[u.email] = u.name; });
+      staff.forEach((s) => { map[s.email] = s.name; });
       setEmailToName(map);
     }).catch(() => {});
   }, []);
@@ -76,12 +80,12 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleAddOwner = () => {
-    const email = newOwnerEmail.trim();
+  const handleAddOwner = (rawInput: string) => {
+    const email = extractPersonEmail(rawInput);
     if (email && !ownerEmails.includes(email)) {
       setOwnerEmails([...ownerEmails, email]);
-      setNewOwnerEmail('');
     }
+    setNewOwnerInput('');
   };
 
   const handleRemoveOwner = (email: string) => {
@@ -289,43 +293,46 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
         <legend>Owners</legend>
         <p className="field-hint">
           Promotions staff members who own the relationship with this promoter and receive pass
-          winner notifications for their shows.
+          winner notifications for their shows. Type a name or email address.
         </p>
-        {ownerEmails.map((email) => (
-          <div key={email} className="owner-row">
-            <span className="owner-email">
-              {emailToName[email] ? `${emailToName[email]} (${email})` : email}
-            </span>
-            <button
-              type="button"
-              onClick={() => handleRemoveOwner(email)}
-              className="btn-secondary btn-small"
-              disabled={submitting}
-            >
-              Remove
-            </button>
-          </div>
-        ))}
-        <div className="owner-add-row">
-          <input
-            type="email"
-            placeholder="Add owner by email"
-            value={newOwnerEmail}
-            onChange={(e) => setNewOwnerEmail(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); handleAddOwner(); }
-            }}
+        <div className="tag-input-row">
+          <PersonAutocomplete
+            value={newOwnerInput}
+            onChange={setNewOwnerInput}
+            onSubmit={handleAddOwner}
+            options={promotionsStaff}
+            placeholder="Add owner by name or email..."
             disabled={submitting}
+            style={{ flex: 1 }}
           />
           <button
             type="button"
-            onClick={handleAddOwner}
+            onClick={() => handleAddOwner(newOwnerInput)}
             className="btn-secondary btn-small"
-            disabled={submitting || !newOwnerEmail.trim()}
+            disabled={submitting || !newOwnerInput.trim()}
           >
             Add
           </button>
         </div>
+        {ownerEmails.length > 0 && (
+          <ul className="tag-list">
+            {ownerEmails.map((email) => (
+              <li key={email} className="tag-item">
+                <span>
+                  {emailToName[email] ? `${emailToName[email]} (${email})` : email}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveOwner(email)}
+                  className="tag-remove"
+                  disabled={submitting}
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </fieldset>
 
       <fieldset className="form-fieldset">

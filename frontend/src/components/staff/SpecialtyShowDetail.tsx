@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { specialtyShowsAPI, autocompleteAPI } from '../../services/api';
 import { useAuth } from '../../contexts/authHooks';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { PersonAutocomplete, extractPersonEmail } from '../shared';
 import type { SpecialtyShowResponse, SpecialtyShowOwnerInfo, APIError } from '../../types';
 
 const SpecialtyShowDetail = () => {
@@ -25,8 +26,6 @@ const SpecialtyShowDetail = () => {
   // Owners state
   const [ownerInput, setOwnerInput] = useState('');
   const [staffOptions, setStaffOptions] = useState<SpecialtyShowOwnerInfo[]>([]);
-  const [ownerSuggestions, setOwnerSuggestions] = useState<SpecialtyShowOwnerInfo[]>([]);
-  const [showOwnerSuggestions, setShowOwnerSuggestions] = useState(false);
 
   // DJs state
   const [djInput, setDjInput] = useState('');
@@ -98,30 +97,14 @@ const SpecialtyShowDetail = () => {
     );
   };
 
-  const handleOwnerInputChange = (value: string) => {
-    setOwnerInput(value);
-    const query = value.trim().toLowerCase();
-    if (query) {
-      const filtered = staffOptions.filter(
-        (s) => s.name?.toLowerCase().includes(query) || s.email.toLowerCase().includes(query)
-      );
-      setOwnerSuggestions(filtered);
-      setShowOwnerSuggestions(filtered.length > 0);
-    } else {
-      setOwnerSuggestions([]);
-      setShowOwnerSuggestions(false);
-    }
-  };
-
-  const handleAddOwner = async (rawEmail?: string) => {
+  const handleAddOwner = async (rawEmail: string) => {
     if (!show) return;
-    const email = (rawEmail ?? ownerInput).trim().toLowerCase();
+    const email = extractPersonEmail(rawEmail);
     if (!email) return;
     if (show.owner_emails.includes(email)) {
       setFormError('That email is already an owner.');
       return;
     }
-    setShowOwnerSuggestions(false);
     await runMutation(
       () => specialtyShowsAPI.update(show.id, { owner_emails: [...show.owner_emails, email] }),
       'Owner added.',
@@ -207,7 +190,7 @@ const SpecialtyShowDetail = () => {
   return (
     <div className="show-detail">
       <div className="page-header">
-        <button onClick={() => navigate('/staff/specialty-shows')} className="btn-back">
+        <button onClick={() => navigate('/staff/specialty-shows')} className="btn-secondary">
           ← Back to Specialty Shows
         </button>
         <h2>
@@ -224,7 +207,7 @@ const SpecialtyShowDetail = () => {
               <button type="submit" className="btn-small btn-primary" disabled={saving || !newName.trim()}>
                 {saving ? 'Saving…' : 'Save'}
               </button>
-              <button type="button" className="btn-small" onClick={() => setEditingName(false)} disabled={saving}>
+              <button type="button" className="btn-small btn-secondary" onClick={() => setEditingName(false)} disabled={saving}>
                 Cancel
               </button>
             </form>
@@ -233,7 +216,7 @@ const SpecialtyShowDetail = () => {
               {show.name}{' '}
               {canEdit && (
                 <button
-                  className="btn-small"
+                  className="btn-small btn-primary"
                   onClick={() => { setNewName(show.name); setEditingName(true); setFormError(null); }}
                   style={{ fontSize: '0.75rem', verticalAlign: 'middle' }}
                 >
@@ -277,47 +260,17 @@ const SpecialtyShowDetail = () => {
           </ul>
           {canEdit && (
             <div className="add-item-form">
-              <div className="autocomplete-wrapper">
-                <input
-                  type="text"
-                  value={ownerInput}
-                  onChange={(e) => handleOwnerInputChange(e.target.value)}
-                  onFocus={() => { if (ownerInput.trim()) setShowOwnerSuggestions(true); }}
-                  onBlur={() => setTimeout(() => setShowOwnerSuggestions(false), 200)}
-                  placeholder="Staff name or email address"
-                  className="input-text"
-                  disabled={saving}
-                  autoComplete="off"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') { e.preventDefault(); handleAddOwner(); }
-                    else if (e.key === 'Escape') { setShowOwnerSuggestions(false); }
-                    else if (e.key === 'Tab' && ownerSuggestions.length === 1) {
-                      e.preventDefault();
-                      setOwnerInput(ownerSuggestions[0].email);
-                      setShowOwnerSuggestions(false);
-                    }
-                  }}
-                />
-                {showOwnerSuggestions && ownerSuggestions.length > 0 && (
-                  <ul className="autocomplete-list">
-                    {ownerSuggestions.map((s) => (
-                      <li
-                        key={s.email}
-                        onMouseDown={() => handleAddOwner(s.email)}
-                        className="autocomplete-item"
-                      >
-                        {s.name ? `${s.name} (${s.email})` : s.email}
-                      </li>
-                    ))}
-                    {ownerSuggestions.length === 1 && (
-                      <li className="autocomplete-hint">Press Tab to complete</li>
-                    )}
-                  </ul>
-                )}
-              </div>
+              <PersonAutocomplete
+                value={ownerInput}
+                onChange={setOwnerInput}
+                onSubmit={handleAddOwner}
+                options={staffOptions}
+                placeholder="Staff name or email address"
+                disabled={saving}
+              />
               <button
                 className="btn-small btn-primary"
-                onClick={() => handleAddOwner()}
+                onClick={() => handleAddOwner(ownerInput)}
                 disabled={saving || !ownerInput.trim()}
               >
                 Add Owner

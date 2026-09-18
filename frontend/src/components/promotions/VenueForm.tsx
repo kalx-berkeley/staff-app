@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { venuesAPI, promotersAPI } from '../../services/api';
-import { Tooltip } from '../shared';
+import { Tooltip, PersonAutocomplete, extractPersonEmail } from '../shared';
 import type {
   VenueResponse,
   VenueCreate,
@@ -12,13 +12,6 @@ import type {
   PromoterResponse,
   PromotionsStaffOption,
 } from '../../types';
-
-/** Pulls the email out of "Name (email@example.com)", or returns the input as-is. */
-const extractOwnerEmail = (input: string): string => {
-  const trimmed = input.trim();
-  const match = trimmed.match(/\(([^()]+)\)\s*$/);
-  return (match ? match[1] : trimmed).trim();
-};
 
 const venueLogoUrl = (id: number) => `/pass-giveaway/api/venues/${id}/logo`;
 
@@ -59,8 +52,6 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   const [newOwnerInput, setNewOwnerInput] = useState('');
   const [promotionsStaff, setPromotionsStaff] = useState<PromotionsStaffOption[]>([]);
   const [emailToName, setEmailToName] = useState<Record<string, string>>({});
-  const [ownerSuggestions, setOwnerSuggestions] = useState<PromotionsStaffOption[]>([]);
-  const [showOwnerAutocomplete, setShowOwnerAutocomplete] = useState(false);
   const [contacts, setContacts] = useState<VenueContactCreate[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -147,31 +138,16 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleAddOwner = (rawInput?: string) => {
-    const email = extractOwnerEmail(rawInput ?? newOwnerInput);
+  const handleAddOwner = (rawInput: string) => {
+    const email = extractPersonEmail(rawInput);
     if (email && !ownerEmails.includes(email)) {
       setOwnerEmails([...ownerEmails, email]);
     }
     setNewOwnerInput('');
-    setShowOwnerAutocomplete(false);
   };
 
   const handleRemoveOwner = (email: string) => {
     setOwnerEmails(ownerEmails.filter((e) => e !== email));
-  };
-
-  const handleOwnerInputChange = (value: string) => {
-    setNewOwnerInput(value);
-    const query = value.trim().toLowerCase();
-    if (query) {
-      const filtered = promotionsStaff.filter(
-        (s) => s.name.toLowerCase().includes(query) || s.email.toLowerCase().includes(query)
-      );
-      setOwnerSuggestions(filtered);
-      setShowOwnerAutocomplete(filtered.length > 0);
-    } else {
-      setShowOwnerAutocomplete(false);
-    }
   };
 
   const handleAddContact = () => {
@@ -704,41 +680,18 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
               Promotions staff with access to manage this venue. Type a name or email address.
             </p>
             <div className="tag-input-row">
-              <div className="autocomplete-wrapper" style={{ flex: 1 }}>
-                <input
-                  type="text"
-                  value={newOwnerInput}
-                  onChange={(e) => handleOwnerInputChange(e.target.value)}
-                  placeholder="Add owner by name or email..."
-                  disabled={submitting}
-                  autoComplete="off"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddOwner();
-                    } else if (e.key === 'Escape') {
-                      setShowOwnerAutocomplete(false);
-                    }
-                  }}
-                  onBlur={() => setTimeout(() => setShowOwnerAutocomplete(false), 200)}
-                />
-                {showOwnerAutocomplete && (
-                  <ul className="autocomplete-list">
-                    {ownerSuggestions.map((s) => (
-                      <li
-                        key={s.id}
-                        onMouseDown={() => handleAddOwner(s.email)}
-                        className="autocomplete-item"
-                      >
-                        {s.name} ({s.email})
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              <PersonAutocomplete
+                value={newOwnerInput}
+                onChange={setNewOwnerInput}
+                onSubmit={handleAddOwner}
+                options={promotionsStaff}
+                placeholder="Add owner by name or email..."
+                disabled={submitting}
+                style={{ flex: 1 }}
+              />
               <button
                 type="button"
-                onClick={() => handleAddOwner()}
+                onClick={() => handleAddOwner(newOwnerInput)}
                 className="btn-secondary btn-small"
                 disabled={submitting || !newOwnerInput.trim()}
               >

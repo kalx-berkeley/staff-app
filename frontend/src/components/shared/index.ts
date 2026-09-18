@@ -15,3 +15,6 @@ export { default as KalxLiveBadge } from './KalxLiveBadge';
 export { default as MarkdownContent } from './MarkdownContent';
 export { default as ProfileSettings } from './ProfileSettings';
 export { default as GenreTagInput } from './GenreTagInput';
+export { default as PersonAutocomplete } from './PersonAutocomplete';
+export type { PersonOption } from './PersonAutocomplete';
+export { extractPersonEmail } from './personUtils';
