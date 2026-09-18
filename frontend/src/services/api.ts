@@ -13,6 +13,7 @@ import type {
   SpecialtyShowCreate,
   SpecialtyShowUpdate,
   SpecialtyShowResponse,
+  MySpecialtyShowResponse,
   SelfPreAssignmentData,
   PromoterCreate,
   PromoterUpdate,
@@ -1199,6 +1200,15 @@ export const specialtyShowsAPI = {
   listMy: async (): Promise<SpecialtyShowResponse[]> => {
     try {
       const response = await apiClient.get<SpecialtyShowResponse[]>('/specialty-shows/my');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  listMine: async (): Promise<MySpecialtyShowResponse[]> => {
+    try {
+      const response = await apiClient.get<MySpecialtyShowResponse[]>('/specialty-shows/mine');
       return response.data;
     } catch (error) {
       return handleAPIError(error);

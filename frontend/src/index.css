@@ -1197,6 +1197,32 @@ fieldset.radio-group legend {
   background-color: #e3f2fd;
 }
 
+.profile-specialty-shows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.profile-specialty-show-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.profile-specialty-show-roles {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
 .specialty-show-badge {
   color: #6a1b9a;
   background-color: #f3e5f5;

@@ -20,6 +20,11 @@ export interface SpecialtyShowResponse {
   dj_names: string[];
 }
 
+export interface MySpecialtyShowResponse extends SpecialtyShowResponse {
+  is_owner: boolean;
+  is_dj: boolean;
+}
+
 // Promoter types
 export interface PromoterContactCreate {
   name?: string | null;

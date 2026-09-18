@@ -42,3 +42,10 @@ class SpecialtyShowResponse(BaseModel):
     deleted: bool = False
     owner_emails: list[str] = Field(default_factory=list)
     dj_names: list[str] = Field(default_factory=list)
+
+
+class MySpecialtyShowResponse(SpecialtyShowResponse):
+    """Schema for a specialty show in the current user's own list, with their role(s)."""
+
+    is_owner: bool = False
+    is_dj: bool = False

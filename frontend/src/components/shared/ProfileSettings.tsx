@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react';
-import { usersAPI, showsAPI } from '../../services/api';
+import { Link } from 'react-router-dom';
+import { usersAPI, showsAPI, specialtyShowsAPI } from '../../services/api';
 import GenreTagInput from './GenreTagInput';
-import type { PromotionsStaffProfile, StaffProfile, NotificationPreferences, APIError } from '../../types';
+import type {
+  PromotionsStaffProfile,
+  StaffProfile,
+  NotificationPreferences,
+  MySpecialtyShowResponse,
+  APIError,
+} from '../../types';
 
 const ProfileSettings = () => {
   const [profile, setProfile] = useState<PromotionsStaffProfile | StaffProfile | null>(null);
@@ -20,6 +27,10 @@ const ProfileSettings = () => {
   const [genrePrefsError, setGenrePrefsError] = useState<string | null>(null);
   const [genrePrefsSaving, setGenrePrefsSaving] = useState(false);
   const [genrePrefsSaved, setGenrePrefsSaved] = useState(false);
+
+  const [specialtyShows, setSpecialtyShows] = useState<MySpecialtyShowResponse[]>([]);
+  const [specialtyShowsLoading, setSpecialtyShowsLoading] = useState(true);
+  const [specialtyShowsError, setSpecialtyShowsError] = useState<string | null>(null);
 
   const loadProfile = async () => {
     try {
@@ -75,10 +86,29 @@ const ProfileSettings = () => {
     }
   };
 
+  const loadSpecialtyShows = async () => {
+    try {
+      setSpecialtyShowsLoading(true);
+      setSpecialtyShowsError(null);
+      const data = await specialtyShowsAPI.listMine();
+      setSpecialtyShows(data);
+    } catch (err) {
+      const apiError = err as APIError;
+      setSpecialtyShowsError(
+        typeof apiError.detail === 'string'
+          ? apiError.detail
+          : 'Failed to load specialty shows'
+      );
+    } finally {
+      setSpecialtyShowsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadProfile();
     loadNotifPrefs();
     loadGenrePrefs();
+    loadSpecialtyShows();
     showsAPI.listGenres().then(setKnownGenres).catch(() => {});
   }, []);
 
@@ -226,6 +256,32 @@ const ProfileSettings = () => {
             id="genre-preferences-input"
           />
         </div>
+      )}
+
+      <h3>Specialty Shows</h3>
+      {specialtyShowsLoading ? (
+        <div className="loading">Loading specialty shows...</div>
+      ) : specialtyShowsError ? (
+        <div className="error">
+          <p>Error: {specialtyShowsError}</p>
+          <button onClick={loadSpecialtyShows}>Retry</button>
+        </div>
+      ) : specialtyShows.length === 0 ? (
+        <p className="field-hint">
+          You're not an owner or DJ on any specialty shows.
+        </p>
+      ) : (
+        <ul className="profile-specialty-shows">
+          {specialtyShows.map((show) => (
+            <li key={show.id} className="profile-specialty-show-item">
+              <Link to={`/staff/specialty-shows/${show.id}`}>{show.name}</Link>
+              <span className="profile-specialty-show-roles">
+                {show.is_owner && <span className="specialty-show-badge">Owner</span>}
+                {show.is_dj && <span className="dj-name-badge">DJ</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

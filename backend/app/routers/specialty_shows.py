@@ -9,6 +9,7 @@ from app.schemas.specialty_show import (
     SpecialtyShowCreate,
     SpecialtyShowUpdate,
     SpecialtyShowResponse,
+    MySpecialtyShowResponse,
 )
 from app.services import audit_service
 from app.services.spinitron_show_titles_service import SpinitronShowTitlesService
@@ -91,6 +92,59 @@ def list_my_specialty_shows(
         .order_by(SpecialtyShow.name)
         .all()
     )
+
+
+@router.get("/mine", response_model=list[MySpecialtyShowResponse])
+def list_mine_specialty_shows(
+    staff: Staff = Depends(get_staff_member),
+    db: Session = Depends(get_db),
+):
+    """List specialty shows where the current user is an owner and/or a DJ member.
+
+    Unlike `/my` (owner only), this also matches the user's `dj_name` against
+    each show's DJ roster, since a user can hold either or both roles on a show.
+    """
+    owner_show_ids = {
+        show_id
+        for (show_id,) in db.query(SpecialtyShowOwner.specialty_show_id).filter(
+            SpecialtyShowOwner.staff_id == staff.id
+        )
+    }
+
+    dj_name_parts = [n.strip() for n in (staff.dj_name or "").split(",") if n.strip()]
+    dj_show_ids = set()
+    if dj_name_parts:
+        dj_show_ids = {
+            show_id
+            for (show_id,) in db.query(SpecialtyShowDJ.specialty_show_id).filter(
+                SpecialtyShowDJ.dj_name.in_(dj_name_parts)
+            )
+        }
+
+    show_ids = owner_show_ids | dj_show_ids
+    if not show_ids:
+        return []
+
+    shows = (
+        db.query(SpecialtyShow)
+        .filter(
+            SpecialtyShow.id.in_(show_ids), SpecialtyShow.deleted == False
+        )  # noqa: E712
+        .order_by(SpecialtyShow.name)
+        .all()
+    )
+    return [
+        MySpecialtyShowResponse(
+            id=show.id,
+            name=show.name,
+            deleted=show.deleted,
+            owner_emails=show.owner_emails,
+            dj_names=show.dj_names,
+            is_owner=show.id in owner_show_ids,
+            is_dj=show.id in dj_show_ids,
+        )
+        for show in shows
+    ]
 
 
 @router.get("/upcoming-titles", response_model=list[str])
