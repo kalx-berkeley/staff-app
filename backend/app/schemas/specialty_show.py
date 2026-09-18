@@ -32,6 +32,15 @@ class SpecialtyShowUpdate(BaseModel):
     )
 
 
+class SpecialtyShowOwnerInfo(BaseModel):
+    """A specialty show owner's email and staff name, for display."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    email: str
+    name: str | None = None
+
+
 class SpecialtyShowResponse(BaseModel):
     """Schema for specialty show response."""
 
@@ -41,6 +50,7 @@ class SpecialtyShowResponse(BaseModel):
     name: str
     deleted: bool = False
     owner_emails: list[str] = Field(default_factory=list)
+    owner_details: list[SpecialtyShowOwnerInfo] = Field(default_factory=list)
     dj_names: list[str] = Field(default_factory=list)
 
 

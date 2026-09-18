@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { specialtyShowsAPI, autocompleteAPI } from '../../services/api';
 import { useAuth } from '../../contexts/authHooks';
-import type { SpecialtyShowResponse, APIError } from '../../types';
+import type { SpecialtyShowResponse, SpecialtyShowOwnerInfo, APIError } from '../../types';
 
 const SpecialtyShowDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +22,9 @@ const SpecialtyShowDetail = () => {
 
   // Owners state
   const [ownerInput, setOwnerInput] = useState('');
+  const [staffOptions, setStaffOptions] = useState<SpecialtyShowOwnerInfo[]>([]);
+  const [ownerSuggestions, setOwnerSuggestions] = useState<SpecialtyShowOwnerInfo[]>([]);
+  const [showOwnerSuggestions, setShowOwnerSuggestions] = useState(false);
 
   // DJs state
   const [djInput, setDjInput] = useState('');
@@ -50,6 +53,7 @@ const SpecialtyShowDetail = () => {
   useEffect(() => {
     loadShow();
     autocompleteAPI.getDJNames().then(setAllDJNames).catch(() => {});
+    specialtyShowsAPI.listStaffEmails().then(setStaffOptions).catch(() => {});
     if (id) {
       specialtyShowsAPI.getDjHistory(parseInt(id)).then(setDjHistory).catch(() => {});
     }
@@ -92,13 +96,30 @@ const SpecialtyShowDetail = () => {
     );
   };
 
-  const handleAddOwner = async () => {
-    if (!show || !ownerInput.trim()) return;
-    const email = ownerInput.trim().toLowerCase();
+  const handleOwnerInputChange = (value: string) => {
+    setOwnerInput(value);
+    const query = value.trim().toLowerCase();
+    if (query) {
+      const filtered = staffOptions.filter(
+        (s) => s.name?.toLowerCase().includes(query) || s.email.toLowerCase().includes(query)
+      );
+      setOwnerSuggestions(filtered);
+      setShowOwnerSuggestions(filtered.length > 0);
+    } else {
+      setOwnerSuggestions([]);
+      setShowOwnerSuggestions(false);
+    }
+  };
+
+  const handleAddOwner = async (rawEmail?: string) => {
+    if (!show) return;
+    const email = (rawEmail ?? ownerInput).trim().toLowerCase();
+    if (!email) return;
     if (show.owner_emails.includes(email)) {
       setFormError('That email is already an owner.');
       return;
     }
+    setShowOwnerSuggestions(false);
     await runMutation(
       () => specialtyShowsAPI.update(show.id, { owner_emails: [...show.owner_emails, email] }),
       'Owner added.',
@@ -164,6 +185,8 @@ const SpecialtyShowDetail = () => {
     ? show.owner_emails.includes(user.email)
     : false;
 
+  const canEdit = isOwner || user?.role === 'promotions';
+
   const suggestedHosts = show ? djHistory.filter((name) => !show.dj_names.includes(name)) : [];
 
   if (loading) return <div className="loading">Loading...</div>;
@@ -179,17 +202,6 @@ const SpecialtyShowDetail = () => {
     );
   }
 
-  if (!isOwner && user?.role !== 'promotions') {
-    return (
-      <div className="error">
-        <p>You are not an owner of this specialty show.</p>
-        <button onClick={() => navigate('/staff/specialty-shows')} className="btn-secondary">
-          Back
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="show-detail">
       <div className="page-header">
@@ -197,7 +209,7 @@ const SpecialtyShowDetail = () => {
           ← Back to Specialty Shows
         </button>
         <h2>
-          {editingName ? (
+          {canEdit && editingName ? (
             <form onSubmit={handleRename} style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center' }}>
               <input
                 type="text"
@@ -217,17 +229,23 @@ const SpecialtyShowDetail = () => {
           ) : (
             <>
               {show.name}{' '}
-              <button
-                className="btn-small"
-                onClick={() => { setNewName(show.name); setEditingName(true); setFormError(null); }}
-                style={{ fontSize: '0.75rem', verticalAlign: 'middle' }}
-              >
-                Rename
-              </button>
+              {canEdit && (
+                <button
+                  className="btn-small"
+                  onClick={() => { setNewName(show.name); setEditingName(true); setFormError(null); }}
+                  style={{ fontSize: '0.75rem', verticalAlign: 'middle' }}
+                >
+                  Rename
+                </button>
+              )}
             </>
           )}
         </h2>
       </div>
+
+      {!canEdit && (
+        <p className="field-hint">You're viewing this specialty show. Only its owners or promotions staff can make changes.</p>
+      )}
 
       {successMessage && <div className="success-message">{successMessage}</div>}
       {formError && <div className="error-message">{formError}</div>}
@@ -240,37 +258,70 @@ const SpecialtyShowDetail = () => {
             Owners can rename this show and manage its owners and DJs.
           </p>
           <ul className="item-list">
-            {show.owner_emails.map((email) => (
+            {show.owner_details.map(({ email, name }) => (
               <li key={email} className="item-list-row">
-                <span>{email}</span>
-                <button
-                  className="btn-small btn-danger"
-                  onClick={() => handleRemoveOwner(email)}
-                  disabled={saving}
-                >
-                  Remove
-                </button>
+                <span>{name ? `${name} (${email})` : email}</span>
+                {canEdit && (
+                  <button
+                    className="btn-small btn-danger"
+                    onClick={() => handleRemoveOwner(email)}
+                    disabled={saving}
+                  >
+                    Remove
+                  </button>
+                )}
               </li>
             ))}
           </ul>
-          <div className="add-item-form">
-            <input
-              type="email"
-              value={ownerInput}
-              onChange={(e) => setOwnerInput(e.target.value)}
-              placeholder="Staff email address"
-              className="input-text"
-              disabled={saving}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddOwner(); } }}
-            />
-            <button
-              className="btn-small btn-primary"
-              onClick={handleAddOwner}
-              disabled={saving || !ownerInput.trim()}
-            >
-              Add Owner
-            </button>
-          </div>
+          {canEdit && (
+            <div className="add-item-form">
+              <div className="autocomplete-wrapper">
+                <input
+                  type="text"
+                  value={ownerInput}
+                  onChange={(e) => handleOwnerInputChange(e.target.value)}
+                  onFocus={() => { if (ownerInput.trim()) setShowOwnerSuggestions(true); }}
+                  onBlur={() => setTimeout(() => setShowOwnerSuggestions(false), 200)}
+                  placeholder="Staff name or email address"
+                  className="input-text"
+                  disabled={saving}
+                  autoComplete="off"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); handleAddOwner(); }
+                    else if (e.key === 'Escape') { setShowOwnerSuggestions(false); }
+                    else if (e.key === 'Tab' && ownerSuggestions.length === 1) {
+                      e.preventDefault();
+                      setOwnerInput(ownerSuggestions[0].email);
+                      setShowOwnerSuggestions(false);
+                    }
+                  }}
+                />
+                {showOwnerSuggestions && ownerSuggestions.length > 0 && (
+                  <ul className="autocomplete-list">
+                    {ownerSuggestions.map((s) => (
+                      <li
+                        key={s.email}
+                        onMouseDown={() => handleAddOwner(s.email)}
+                        className="autocomplete-item"
+                      >
+                        {s.name ? `${s.name} (${s.email})` : s.email}
+                      </li>
+                    ))}
+                    {ownerSuggestions.length === 1 && (
+                      <li className="autocomplete-hint">Press Tab to complete</li>
+                    )}
+                  </ul>
+                )}
+              </div>
+              <button
+                className="btn-small btn-primary"
+                onClick={() => handleAddOwner()}
+                disabled={saving || !ownerInput.trim()}
+              >
+                Add Owner
+              </button>
+            </div>
+          )}
         </div>
 
         {/* DJs section */}
@@ -283,20 +334,22 @@ const SpecialtyShowDetail = () => {
             {show.dj_names.map((name) => (
               <li key={name} className="item-list-row">
                 <span>{name}</span>
-                <button
-                  className="btn-small btn-danger"
-                  onClick={() => handleRemoveDJ(name)}
-                  disabled={saving}
-                >
-                  Remove
-                </button>
+                {canEdit && (
+                  <button
+                    className="btn-small btn-danger"
+                    onClick={() => handleRemoveDJ(name)}
+                    disabled={saving}
+                  >
+                    Remove
+                  </button>
+                )}
               </li>
             ))}
             {show.dj_names.length === 0 && (
               <li className="item-list-empty">No DJs yet.</li>
             )}
           </ul>
-          {suggestedHosts.length > 0 && (
+          {canEdit && suggestedHosts.length > 0 && (
             <div className="field-hint" style={{ marginBottom: '0.5rem' }}>
               Hosted this show recently:{' '}
               {suggestedHosts.map((name) => (
@@ -313,53 +366,55 @@ const SpecialtyShowDetail = () => {
               ))}
             </div>
           )}
-          <div className="add-item-form">
-            <div className="autocomplete-wrapper">
-              <input
-                type="text"
-                value={djInput}
-                onChange={(e) => handleDJInputChange(e.target.value)}
-                onFocus={() => { if (djInput.trim()) setShowDJSuggestions(true); }}
-                onBlur={() => setTimeout(() => setShowDJSuggestions(false), 200)}
-                placeholder="DJ name"
-                className="input-text"
-                disabled={saving}
-                autoComplete="off"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') { e.preventDefault(); handleAddDJ(); }
-                  else if (e.key === 'Escape') { setShowDJSuggestions(false); }
-                  else if (e.key === 'Tab' && djSuggestions.length === 1) {
-                    e.preventDefault();
-                    setDjInput(djSuggestions[0]);
-                    setShowDJSuggestions(false);
-                  }
-                }}
-              />
-              {showDJSuggestions && djSuggestions.length > 0 && (
-                <ul className="autocomplete-list">
-                  {djSuggestions.map((name) => (
-                    <li
-                      key={name}
-                      onMouseDown={() => handleAddDJ(name)}
-                      className="autocomplete-item"
-                    >
-                      {name}
-                    </li>
-                  ))}
-                  {djSuggestions.length === 1 && (
-                    <li className="autocomplete-hint">Press Tab to complete</li>
-                  )}
-                </ul>
-              )}
+          {canEdit && (
+            <div className="add-item-form">
+              <div className="autocomplete-wrapper">
+                <input
+                  type="text"
+                  value={djInput}
+                  onChange={(e) => handleDJInputChange(e.target.value)}
+                  onFocus={() => { if (djInput.trim()) setShowDJSuggestions(true); }}
+                  onBlur={() => setTimeout(() => setShowDJSuggestions(false), 200)}
+                  placeholder="DJ name"
+                  className="input-text"
+                  disabled={saving}
+                  autoComplete="off"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); handleAddDJ(); }
+                    else if (e.key === 'Escape') { setShowDJSuggestions(false); }
+                    else if (e.key === 'Tab' && djSuggestions.length === 1) {
+                      e.preventDefault();
+                      setDjInput(djSuggestions[0]);
+                      setShowDJSuggestions(false);
+                    }
+                  }}
+                />
+                {showDJSuggestions && djSuggestions.length > 0 && (
+                  <ul className="autocomplete-list">
+                    {djSuggestions.map((name) => (
+                      <li
+                        key={name}
+                        onMouseDown={() => handleAddDJ(name)}
+                        className="autocomplete-item"
+                      >
+                        {name}
+                      </li>
+                    ))}
+                    {djSuggestions.length === 1 && (
+                      <li className="autocomplete-hint">Press Tab to complete</li>
+                    )}
+                  </ul>
+                )}
+              </div>
+              <button
+                className="btn-small btn-primary"
+                onClick={() => handleAddDJ()}
+                disabled={saving || !djInput.trim()}
+              >
+                Add DJ
+              </button>
             </div>
-            <button
-              className="btn-small btn-primary"
-              onClick={() => handleAddDJ()}
-              disabled={saving || !djInput.trim()}
-            >
-              Add DJ
-            </button>
-          </div>
+          )}
         </div>
       </div>
     </div>

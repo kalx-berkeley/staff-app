@@ -21,6 +21,7 @@ const SpecialtyShowList = () => {
   const [upcomingTitles, setUpcomingTitles] = useState<string[]>([]);
   const [titleSuggestions, setTitleSuggestions] = useState<string[]>([]);
   const [showTitleSuggestions, setShowTitleSuggestions] = useState(false);
+  const [myDjShowIds, setMyDjShowIds] = useState<Set<number>>(new Set());
 
   const loadShows = useCallback(async () => {
     try {
@@ -39,12 +40,18 @@ const SpecialtyShowList = () => {
   useEffect(() => {
     loadShows();
     specialtyShowsAPI.getUpcomingTitles().then(setUpcomingTitles).catch(() => {});
+    specialtyShowsAPI
+      .listMine()
+      .then((mine) => setMyDjShowIds(new Set(mine.filter((s) => s.is_dj).map((s) => s.id))))
+      .catch(() => {});
   }, [loadShows]);
 
   const isOwner = (show: SpecialtyShowResponse) =>
     user?.email ? show.owner_emails.includes(user.email) : false;
 
   const canManage = (show: SpecialtyShowResponse) => isPromotions || isOwner(show);
+
+  const isMyDjShow = (show: SpecialtyShowResponse) => myDjShowIds.has(show.id);
 
   const handleNameInputChange = (value: string) => {
     setNewName(value);
@@ -176,7 +183,10 @@ const SpecialtyShowList = () => {
           {shows.map((show) => (
             <div key={show.id} className="venue-card">
               <h3>{show.name}</h3>
-              {canManage(show) && (
+              {isMyDjShow(show) && (
+                <span className="status-badge status-dj">You're a DJ for this show</span>
+              )}
+              {canManage(show) ? (
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                   <Link to={`/staff/specialty-shows/${show.id}`} className="btn-primary btn-small">
                     Manage
@@ -189,6 +199,12 @@ const SpecialtyShowList = () => {
                       Delete
                     </button>
                   )}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                  <Link to={`/staff/specialty-shows/${show.id}`} className="btn-secondary btn-small">
+                    View
+                  </Link>
                 </div>
               )}
             </div>

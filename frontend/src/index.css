@@ -730,6 +730,13 @@ fieldset.radio-group legend {
   color: white;
 }
 
+.status-dj {
+  background-color: #cfe2ff;
+  color: #084298;
+  border: 1px solid #b6d4fe;
+  margin-top: 0.4rem;
+}
+
 .status-feature-bin {
   background-color: #fff3cd;
   color: #664d03;

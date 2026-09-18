@@ -36,5 +36,13 @@ class SpecialtyShow(Base):
         return [o.staff_email for o in self.owners if o.staff_email]
 
     @property
+    def owner_details(self) -> list[dict]:
+        return [
+            {"email": o.staff_email, "name": o.staff.name if o.staff else None}
+            for o in self.owners
+            if o.staff_email
+        ]
+
+    @property
     def dj_names(self) -> list[str]:
         return [d.dj_name for d in self.djs]

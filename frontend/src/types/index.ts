@@ -12,11 +12,17 @@ export interface SpecialtyShowUpdate {
   dj_names?: string[] | null;
 }
 
+export interface SpecialtyShowOwnerInfo {
+  email: string;
+  name: string | null;
+}
+
 export interface SpecialtyShowResponse {
   id: number;
   name: string;
   deleted: boolean;
   owner_emails: string[];
+  owner_details: SpecialtyShowOwnerInfo[];
   dj_names: string[];
 }
 

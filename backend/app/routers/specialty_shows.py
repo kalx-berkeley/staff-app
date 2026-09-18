@@ -9,6 +9,7 @@ from app.schemas.specialty_show import (
     SpecialtyShowCreate,
     SpecialtyShowUpdate,
     SpecialtyShowResponse,
+    SpecialtyShowOwnerInfo,
     MySpecialtyShowResponse,
 )
 from app.services import audit_service
@@ -139,6 +140,7 @@ def list_mine_specialty_shows(
             name=show.name,
             deleted=show.deleted,
             owner_emails=show.owner_emails,
+            owner_details=show.owner_details,
             dj_names=show.dj_names,
             is_owner=show.id in owner_show_ids,
             is_dj=show.id in dj_show_ids,
@@ -154,6 +156,24 @@ async def list_upcoming_spinitron_titles(db: Session = Depends(get_db)):
     Declared before `/{show_id}` so it isn't swallowed by that route.
     """
     return await SpinitronShowTitlesService.get_upcoming_titles(db)
+
+
+@router.get("/staff-emails", response_model=list[SpecialtyShowOwnerInfo])
+def list_staff_emails(
+    staff: Staff = Depends(get_staff_member),
+    db: Session = Depends(get_db),
+):
+    """List active staff members' names and emails, for owner-email autocomplete.
+
+    Declared before `/{show_id}` so it isn't swallowed by that route.
+    """
+    return (
+        db.query(Staff)
+        .join(StaffStatus, Staff.id == StaffStatus.staff_id)
+        .filter(StaffStatus.status == ACTIVE_STATUS)
+        .order_by(Staff.name)
+        .all()
+    )
 
 
 @router.post("", response_model=SpecialtyShowResponse, status_code=status.HTTP_201_CREATED)

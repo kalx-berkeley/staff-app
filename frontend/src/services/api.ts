@@ -13,6 +13,7 @@ import type {
   SpecialtyShowCreate,
   SpecialtyShowUpdate,
   SpecialtyShowResponse,
+  SpecialtyShowOwnerInfo,
   MySpecialtyShowResponse,
   SelfPreAssignmentData,
   PromoterCreate,
@@ -1262,6 +1263,15 @@ export const specialtyShowsAPI = {
   getDjHistory: async (id: number): Promise<string[]> => {
     try {
       const response = await apiClient.get<string[]>(`/specialty-shows/${id}/dj-history`);
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  listStaffEmails: async (): Promise<SpecialtyShowOwnerInfo[]> => {
+    try {
+      const response = await apiClient.get<SpecialtyShowOwnerInfo[]>('/specialty-shows/staff-emails');
       return response.data;
     } catch (error) {
       return handleAPIError(error);
