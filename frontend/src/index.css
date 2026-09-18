@@ -2505,6 +2505,11 @@ fieldset.radio-group legend {
   border-color: #93c4f7;
 }
 
+/* Show card for pre-assigned passes whose airdate isn't today (assigned shows section) */
+.show-card-assigned-inactive {
+  opacity: 0.5;
+}
+
 /* Show card in search results with pre-assigned passes for current DJ */
 .show-card-has-assignment {
   background: #edf7ee;

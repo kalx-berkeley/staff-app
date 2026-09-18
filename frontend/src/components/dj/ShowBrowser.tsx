@@ -14,6 +14,14 @@ const getDefaultDateFrom = (): string => {
   return d.toISOString().split('T')[0];
 };
 
+const getLocalTodayStr = (): string => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 const ShowBrowser = () => {
   usePageTitle('Shows · DJ');
   const [rawShows, setRawShows] = useState<ShowSummary[]>([]);
@@ -228,26 +236,31 @@ const ShowBrowser = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {myAssignedPasses.map((pass) => (
-                      <tr key={pass.id} className="has-assignment">
-                        <td>{pass.show_event_name || '—'}</td>
-                        <td>{pass.show_venue_name || '—'}</td>
-                        <td>{pass.show_date ? formatDateShort(pass.show_date) : '—'}</td>
-                        <td>{pass.preassigned_date ? formatDateShort(pass.preassigned_date) : '—'}</td>
-                        <td>
-                          <Link to={`/dj/shows/${pass.show_id}`} className="btn-primary btn-sm">
-                            Give Away Passes
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
+                    {myAssignedPasses.map((pass) => {
+                      const isAirdateToday = pass.preassigned_date === getLocalTodayStr();
+                      return (
+                        <tr key={pass.id} className={isAirdateToday ? 'has-assignment' : 'show-dimmed'}>
+                          <td>{pass.show_event_name || '—'}</td>
+                          <td>{pass.show_venue_name || '—'}</td>
+                          <td>{pass.show_date ? formatDateShort(pass.show_date) : '—'}</td>
+                          <td>{pass.preassigned_date ? formatDateShort(pass.preassigned_date) : '—'}</td>
+                          <td>
+                            <Link to={`/dj/shows/${pass.show_id}`} className="btn-primary btn-sm">
+                              Give Away Passes
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             ) : (
               <div className="shows-grid">
-                {myAssignedPasses.map((pass) => (
-                  <div key={pass.id} className="show-card show-card-assigned">
+                {myAssignedPasses.map((pass) => {
+                  const isAirdateToday = pass.preassigned_date === getLocalTodayStr();
+                  return (
+                  <div key={pass.id} className={`show-card${isAirdateToday ? ' show-card-assigned' : ' show-card-assigned-inactive'}`}>
                     <div className="show-card-header">
                       <h3>{pass.show_event_name || 'Show'}</h3>
                       <span className="pass-status pass-status-preassigned">Pre-assigned</span>
@@ -282,7 +295,8 @@ const ShowBrowser = () => {
                       </Link>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )
           )}
