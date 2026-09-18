@@ -132,6 +132,7 @@ def get_current_user(
     effective_is_dj = is_dj
     effective_is_station_office = is_station_office
     imp_session = None
+    real_name = None
     if is_staging:
         imp_session = (
             db.query(ImpersonationSession)
@@ -139,6 +140,8 @@ def get_current_user(
             .first()
         )
         if imp_session:
+            real_staff = db.query(Staff).filter(Staff.email == x_forwarded_user).first()
+            real_name = real_staff.name if real_staff else None
             impersonating_email = imp_session.impersonated_email
             is_impersonating_dj_network = imp_session.impersonate_dj_network
             is_impersonating_station_office_network = (
@@ -159,6 +162,7 @@ def get_current_user(
                         is_station_office_network=True,
                         is_staging=is_staging,
                         real_email=x_forwarded_user,
+                        real_name=real_name,
                         is_impersonating_dj_network=True,
                     )
             if is_impersonating_station_office_network:
@@ -173,6 +177,7 @@ def get_current_user(
                         is_station_office_network=True,
                         is_staging=is_staging,
                         real_email=x_forwarded_user,
+                        real_name=real_name,
                         is_impersonating_station_office_network=True,
                     )
 
@@ -210,6 +215,7 @@ def get_current_user(
     return UserInfo(
         email=effective_email,
         real_email=x_forwarded_user if imp_session else None,
+        real_name=real_name if imp_session else None,
         role=role,
         is_dj_network=effective_is_dj,
         is_station_office_network=effective_is_station_office,

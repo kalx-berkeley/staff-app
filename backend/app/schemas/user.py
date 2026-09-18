@@ -48,6 +48,7 @@ class UserInfo(BaseModel):
 
     email: str | None = None
     real_email: str | None = None
+    real_name: str | None = None
     role: str  # "promotions", "staff", or "dj"
     is_dj_network: bool = False
     is_station_office_network: bool = False

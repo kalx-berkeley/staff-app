@@ -245,7 +245,7 @@ const SpecialtyShowDetail = () => {
           <ul className="item-list">
             {show.owner_details.map(({ email, name }) => (
               <li key={email} className="item-list-row">
-                <span>{name ? `${name} (${email})` : email}</span>
+                <span><a href={`mailto:${email}`}>{name || email}</a></span>
                 {canEdit && (
                   <button
                     className="btn-small btn-danger"

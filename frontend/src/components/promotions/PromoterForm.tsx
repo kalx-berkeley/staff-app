@@ -319,7 +319,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
             {ownerEmails.map((email) => (
               <li key={email} className="tag-item">
                 <span>
-                  {emailToName[email] ? `${emailToName[email]} (${email})` : email}
+                  <a href={`mailto:${email}`}>{emailToName[email] || email}</a>
                 </span>
                 <button
                   type="button"

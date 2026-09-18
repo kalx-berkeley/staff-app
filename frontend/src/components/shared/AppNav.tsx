@@ -101,6 +101,7 @@ const AppNav = ({ showGoogleLogout = false }: AppNavProps) => {
     user?.is_dj_network === true;
 
   const email = user?.email ?? 'DJ Guest';
+  const displayName = user?.profile?.name || email;
   const roleLabel = (user?.role && ROLE_LABELS[user.role]) ?? 'Guest';
 
   const isImpersonating =
@@ -124,7 +125,7 @@ const AppNav = ({ showGoogleLogout = false }: AppNavProps) => {
               </button>
             </div>
             <div className="impersonation-real" title={user?.real_email ?? undefined}>
-              {user?.real_email}
+              {user?.real_name || user?.real_email}
             </div>
             {user?.impersonating_email && (
               <div className="impersonation-target" title={user.impersonating_email}>
@@ -143,7 +144,7 @@ const AppNav = ({ showGoogleLogout = false }: AppNavProps) => {
             )}
           </div>
         ) : (
-          <span className="user-email" title={email}>{email}</span>
+          <span className="user-email" title={email}>{displayName}</span>
         )}
         {showGoogleLogout && user?.is_dj_network && user?.email && (
           <button

@@ -514,6 +514,7 @@ export type UserRole = 'promotions' | 'staff' | 'dj' | 'unauthorized';
 export interface UserResponse {
   email: string | null;
   real_email?: string | null;
+  real_name?: string | null;
   role: UserRole;
   is_dj_network: boolean;
   is_station_office_network: boolean;

@@ -622,7 +622,7 @@ const Admin = () => {
                   <option value="">— Select a user —</option>
                   {userList.map((u) => (
                     <option key={u.email} value={u.email}>
-                      {u.name} ({u.role}) — {u.email}
+                      {u.name} ({u.role})
                     </option>
                   ))}
                 </select>
