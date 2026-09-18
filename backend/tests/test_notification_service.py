@@ -32,6 +32,37 @@ def test_send_email_staging_logs_not_sends(caplog):
 
     assert any("suppressed" in r.message for r in caplog.records)
     assert any("user@example.com" in r.message for r in caplog.records)
+    assert any("[STAGING] Test Subject" in r.message for r in caplog.records)
+
+
+def test_send_email_staging_tags_subject_and_body_for_webmaster():
+    """In staging, even a delivered (webmaster) email gets a [STAGING] subject and body notice."""
+    mock_client = MagicMock()
+    mock_client.send.return_value = MagicMock(success=True)
+
+    with (
+        patch("app.services.notification_service.settings") as mock_settings,
+        patch("app.services.notification_service.Smtp2goClient", return_value=mock_client),
+    ):
+        mock_settings.environment = "staging"
+        mock_settings.smtp2go_api_key = "fake-key"
+        mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
+        mock_settings.webmaster_email = "webmaster@kalx.berkeley.edu"
+
+        from app.services.notification_service import send_email
+
+        send_email(
+            "webmaster@kalx.berkeley.edu",
+            "Test Subject",
+            "Test body",
+            body_html="<p>Test body</p>",
+        )
+
+    call_kwargs = mock_client.send.call_args.kwargs
+    assert call_kwargs["subject"] == "[STAGING] Test Subject"
+    assert "Test body" in call_kwargs["text"]
+    assert "STAGING environment email" in call_kwargs["text"]
+    assert "STAGING environment email" in call_kwargs["html"]
 
 
 def test_send_email_no_api_key_uses_local_smtp():

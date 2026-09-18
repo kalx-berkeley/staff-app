@@ -56,8 +56,11 @@ class Settings(BaseSettings):
     # Venue logo storage directory (must be writable)
     venue_logo_dir: str = "./data/venue-logos"
 
-    # Base URL for frontend links included in emails
-    frontend_base_url: str = "https://kalx.berkeley.edu"
+    # Base URL for frontend links included in emails. Must be set per-environment
+    # (deploy.yml derives this from SITE_DOMAIN: https://staff.<SITE_DOMAIN> in
+    # production, https://staff.stage.<SITE_DOMAIN> in staging) — otherwise emails
+    # sent from staging link back to production, or vice versa.
+    frontend_base_url: str = "https://staff.kalx.berkeley.edu"
 
     # Webmaster email address for receiving user feedback
     webmaster_email: Optional[str] = None

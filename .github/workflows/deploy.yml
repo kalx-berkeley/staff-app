@@ -66,6 +66,7 @@ jobs:
       SERVICE_NAME: ${{ github.event_name == 'release' && 'promotions-app-backend-production' || 'promotions-app-backend-staging' }}
       BACKEND_PORT: ${{ github.event_name == 'release' && '8420' || '8421' }}
       SITE_DOMAIN: ${{ vars.SITE_DOMAIN }}
+      FRONTEND_BASE_URL: ${{ github.event_name == 'release' && format('https://staff.{0}', vars.SITE_DOMAIN) || format('https://staff.stage.{0}', vars.SITE_DOMAIN) }}
       DJ_STUDIO_NETWORK: ${{ vars.DJ_STUDIO_NETWORK }}
       STATION_OFFICE_NETWORK: ${{ vars.STATION_OFFICE_NETWORK }}
 
@@ -218,6 +219,7 @@ jobs:
         AIRTABLE_BASE_ID=${{ secrets.AIRTABLE_BASE_ID }}
         SPINITRON_API_KEY=${{ secrets.SPINITRON_API_KEY }}
         CORS_ORIGINS=https://${{ env.SITE_DOMAIN }}
+        FRONTEND_BASE_URL=${{ env.FRONTEND_BASE_URL }}
         ENVIRONMENT=${{ env.ENV_NAME }}
         SMTP2GO_API_KEY=${{ secrets.SMTP2GO_API_KEY }}
         EMAIL_FROM_ADDRESS=${{ vars.EMAIL_FROM_ADDRESS }}

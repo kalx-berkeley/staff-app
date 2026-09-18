@@ -37,8 +37,20 @@ def send_email(
         failure) is audit-logged, including response/error details.
 
     Uses smtp2go when SMTP2GO_API_KEY is set; falls back to the local mail server otherwise.
-    In staging mode, suppresses delivery to non-webmaster recipients.
+    In staging mode, suppresses delivery to non-webmaster recipients, and tags any email
+    that is sent (or logged) with a "[STAGING]" subject prefix and an in-body notice, so
+    recipients can't mistake it for a production notification.
     """
+    if settings.environment == "staging":
+        subject = f"[STAGING] {subject}"
+        staging_notice = (
+            "This is a STAGING environment email — it was not sent by the production "
+            "KALX staff-app."
+        )
+        body_text = f"{body_text}\n\n---\n{staging_notice}\n"
+        if body_html is not None:
+            body_html = f"{body_html}<hr><p><strong>{staging_notice}</strong></p>"
+
     is_webmaster = settings.webmaster_email and to_email == settings.webmaster_email
     if settings.environment == "staging" and not is_webmaster:
         preview = body_text[:200].replace("\n", " ")
