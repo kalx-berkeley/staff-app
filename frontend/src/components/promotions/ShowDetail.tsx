@@ -740,7 +740,9 @@ const ShowDetail = () => {
         </div>
       </div>
 
-      {actionError && <div className="error-message">{actionError}</div>}
+      {actionError && preassignPassId === null && (
+        <div className="error-message">{actionError}</div>
+      )}
 
       {show.status === 'closed' && (
         <div className="guest-list-summary">
@@ -921,6 +923,9 @@ const ShowDetail = () => {
                     </div>
                   ) : preassignPassId === pass.id ? (
                     <div className="preassignment-form">
+                      {actionError && (
+                        <div className="error-message">{actionError}</div>
+                      )}
                       {suggestMode === null && (
                         <>
                           <div className="autocomplete-wrapper">
