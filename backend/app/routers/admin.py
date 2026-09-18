@@ -14,9 +14,10 @@ from app.schemas.types import UtcDatetime
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.auth import get_promotions_staff
+from app.auth import get_promotions_staff, ACTIVE_STATUS
 from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
+from app.models.staff_status import StaffStatus
 from app.models.venue import Venue
 from app.models.venue_owner import VenueOwner
 from app.models.show import Show
@@ -109,7 +110,7 @@ def list_all_users(
     promotions: Staff = Depends(get_promotions_staff),
     db: Session = Depends(get_db),
 ) -> list[UserListItem]:
-    """List all known users (promotions staff + staff) for the impersonation UI."""
+    """List all known active users (promotions staff + staff) for the impersonation UI."""
     _require_staging()
 
     result: list[UserListItem] = []
@@ -119,7 +120,11 @@ def list_all_users(
     for s in (
         db.query(Staff)
         .join(StaffDepartment, Staff.id == StaffDepartment.staff_id)
-        .filter(StaffDepartment.department == "Promotions")
+        .join(StaffStatus, Staff.id == StaffStatus.staff_id)
+        .filter(
+            StaffDepartment.department == "Promotions",
+            StaffStatus.status == ACTIVE_STATUS,
+        )
         .order_by(Staff.name)
         .all()
     ):
@@ -127,7 +132,13 @@ def list_all_users(
         result.append(UserListItem(email=s.email, name=s.name, role="promotions"))
 
     # Non-promotions staff
-    for s in db.query(Staff).order_by(Staff.name).all():
+    for s in (
+        db.query(Staff)
+        .join(StaffStatus, Staff.id == StaffStatus.staff_id)
+        .filter(StaffStatus.status == ACTIVE_STATUS)
+        .order_by(Staff.name)
+        .all()
+    ):
         if s.id not in promo_staff_ids:
             result.append(UserListItem(email=s.email, name=s.name, role="staff"))
 

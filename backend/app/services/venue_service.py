@@ -9,8 +9,10 @@ import logging
 from app.models.venue import Venue
 from app.models.venue_owner import VenueOwner
 from app.models.venue_contact import VenueContact
+from app.auth import ACTIVE_STATUS
 from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
+from app.models.staff_status import StaffStatus
 from app.models.show import Show
 from app.schemas.venue import VenueCreate, VenueUpdate
 
@@ -18,11 +20,16 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_promotions_staff_id(db: Session, email: str) -> int | None:
-    """Return the Staff.id for a promotions department member with the given email, or None."""
+    """Return the Staff.id for an active promotions department member with the given email, or None."""
     staff = (
         db.query(Staff)
         .join(StaffDepartment, Staff.id == StaffDepartment.staff_id)
-        .filter(Staff.email == email, StaffDepartment.department == "Promotions")
+        .join(StaffStatus, Staff.id == StaffStatus.staff_id)
+        .filter(
+            Staff.email == email,
+            StaffDepartment.department == "Promotions",
+            StaffStatus.status == ACTIVE_STATUS,
+        )
         .first()
     )
     return staff.id if staff else None
@@ -33,11 +40,15 @@ class VenueService:
 
     @staticmethod
     def list_promotions_staff(db: Session) -> list[Staff]:
-        """List all promotions department staff, ordered by name (for owner pickers)."""
+        """List active promotions department staff, ordered by name (for owner pickers)."""
         return (
             db.query(Staff)
             .join(StaffDepartment, Staff.id == StaffDepartment.staff_id)
-            .filter(StaffDepartment.department == "Promotions")
+            .join(StaffStatus, Staff.id == StaffStatus.staff_id)
+            .filter(
+                StaffDepartment.department == "Promotions",
+                StaffStatus.status == ACTIVE_STATUS,
+            )
             .order_by(Staff.name)
             .all()
         )

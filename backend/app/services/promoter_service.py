@@ -6,22 +6,29 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from fastapi import HTTPException, status
 import logging
 
+from app.auth import ACTIVE_STATUS
 from app.models.promoter import Promoter
 from app.models.promoter_owner import PromoterOwner
 from app.models.promoter_contact import PromoterContact
 from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
+from app.models.staff_status import StaffStatus
 from app.schemas.promoter import PromoterCreate, PromoterUpdate
 
 logger = logging.getLogger(__name__)
 
 
 def _resolve_promotions_staff_id(db: Session, email: str) -> int | None:
-    """Return the Staff.id for a promotions department member with the given email, or None."""
+    """Return the Staff.id for an active promotions department member with the given email, or None."""
     staff = (
         db.query(Staff)
         .join(StaffDepartment, Staff.id == StaffDepartment.staff_id)
-        .filter(Staff.email == email, StaffDepartment.department == "Promotions")
+        .join(StaffStatus, Staff.id == StaffStatus.staff_id)
+        .filter(
+            Staff.email == email,
+            StaffDepartment.department == "Promotions",
+            StaffStatus.status == ACTIVE_STATUS,
+        )
         .first()
     )
     return staff.id if staff else None

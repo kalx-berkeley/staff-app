@@ -18,11 +18,12 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.schemas.legacy_import import LegacyImportResult, LegacyShowImport
-from app.auth import get_promotions_staff
+from app.auth import get_promotions_staff, ACTIVE_STATUS
 from app.models.on_air_winner import OnAirWinner
 from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.staff import Staff
+from app.models.staff_status import StaffStatus
 from app.models.venue import Venue
 from app.services.pass_service import normalize_phone
 
@@ -208,5 +209,11 @@ def list_staff(
     db: Session = Depends(get_db),
 ):
     """List all active staff members for the staff claimant picker."""
-    staff_members = db.query(Staff).order_by(Staff.name).all()
+    staff_members = (
+        db.query(Staff)
+        .join(StaffStatus, Staff.id == StaffStatus.staff_id)
+        .filter(StaffStatus.status == ACTIVE_STATUS)
+        .order_by(Staff.name)
+        .all()
+    )
     return [{"id": s.id, "name": s.name, "email": s.email} for s in staff_members]
