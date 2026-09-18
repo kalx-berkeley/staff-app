@@ -544,7 +544,7 @@ const ShowDetail = () => {
   return (
     <div className="show-detail">
       <div className="page-header">
-        <button onClick={() => navigate('/staff/shows')} className="btn-back">
+        <button onClick={() => navigate('/staff/shows')} className="btn-secondary">
           ← Back to Shows
         </button>
         <h2><EnrichedShowName eventName={show.event_name} bands={show.bands ?? []} /></h2>
@@ -662,7 +662,7 @@ const ShowDetail = () => {
                     )}
                     <button
                       onClick={() => handleUnassignSelf(pass.id)}
-                      className="btn-small"
+                      className="btn-small btn-danger"
                       disabled={unassignLoading === pass.id}
                       title="Remove this pre-assignment so the pass becomes available to any DJ."
                     >
@@ -726,7 +726,7 @@ const ShowDetail = () => {
                   )}
                   <button
                     onClick={handleWithdrawDJLottery}
-                    className="btn-small"
+                    className="btn-small btn-danger"
                     disabled={lotteryActionLoading}
                   >
                     {lotteryActionLoading ? 'Withdrawing…' : 'Withdraw Entry'}
@@ -812,7 +812,7 @@ const ShowDetail = () => {
                       </button>
                       <button
                         onClick={() => { setShowDJLotteryForm(false); setLotteryDJDate(''); setLotteryDJReserveFor(''); }}
-                        className="btn-small"
+                        className="btn-small btn-secondary"
                         disabled={lotteryActionLoading}
                       >
                         Cancel
@@ -857,7 +857,7 @@ const ShowDetail = () => {
                             )}
                             <button
                               onClick={() => handleUnassignSelf(pass.id)}
-                              className="btn-small"
+                              className="btn-small btn-danger"
                               disabled={unassignLoading === pass.id}
                             >
                               {unassignLoading === pass.id ? 'Removing…' : 'Release Reservation'}
@@ -949,7 +949,7 @@ const ShowDetail = () => {
                                   setPreassignSelfDate('');
                                   setPreassignSelfReserveFor('');
                                 }}
-                                className="btn-small"
+                                className="btn-small btn-secondary"
                                 disabled={preassignSelfLoading}
                               >
                                 Cancel
@@ -1017,7 +1017,7 @@ const ShowDetail = () => {
                 )}
                 <button
                   onClick={handleWithdrawStaffLottery}
-                  className="btn-small"
+                  className="btn-small btn-danger"
                   disabled={lotteryActionLoading}
                 >
                   {lotteryActionLoading ? 'Withdrawing…' : 'Withdraw Entry'}
@@ -1097,7 +1097,7 @@ const ShowDetail = () => {
                   </button>
                   <button
                     onClick={() => { setShowStaffLotteryForm(false); setLotteryHasGuest(false); setLotteryGuestName(''); setLotteryOnlyWithGuest(false); }}
-                    className="btn-small"
+                    className="btn-small btn-secondary"
                     disabled={lotteryActionLoading}
                   >
                     Cancel
@@ -1237,7 +1237,7 @@ const ShowDetail = () => {
                               </button>
                               <button
                                 onClick={() => { setGuestClaimPassId(null); setGuestName(''); setOnlyWithGuest(false); setPassActionError(null); }}
-                                className="btn-small"
+                                className="btn-small btn-secondary"
                                 disabled={passActionId === pass.id}
                               >
                                 Cancel

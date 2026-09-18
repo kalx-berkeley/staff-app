@@ -231,7 +231,7 @@ const ShowList = () => {
       {error ? (
         <div className="error">
           <p>Error: {error}</p>
-          <button onClick={loadShows}>Retry</button>
+          <button onClick={loadShows} className="btn-primary">Retry</button>
         </div>
       ) : loading ? (
         <div className="loading">Loading shows...</div>

@@ -40,7 +40,7 @@ const PromoterList = () => {
     return (
       <div className="error">
         <p>Error: {error}</p>
-        <button onClick={loadPromoters}>Retry</button>
+        <button onClick={loadPromoters} className="btn-primary">Retry</button>
       </div>
     );
   }
@@ -91,7 +91,7 @@ const PromoterList = () => {
               )}
               <button
                 onClick={() => navigate(`/promotions/promoters/${promoter.id}/edit`)}
-                className="btn-secondary"
+                className="btn-primary"
               >
                 Edit
               </button>

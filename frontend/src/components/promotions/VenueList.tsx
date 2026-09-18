@@ -61,7 +61,7 @@ const VenueList = () => {
     return (
       <div className="error">
         <p>Error: {error}</p>
-        <button onClick={loadVenues}>Retry</button>
+        <button onClick={loadVenues} className="btn-primary">Retry</button>
       </div>
     );
   }
@@ -154,7 +154,7 @@ const VenueList = () => {
                   <td>
                     <button
                       onClick={() => handleEditClick(venue)}
-                      className="btn-secondary btn-sm"
+                      className="btn-primary btn-sm"
                     >
                       Edit
                     </button>
@@ -172,7 +172,7 @@ const VenueList = () => {
               <p className="venue-address">{venue.address}</p>
               <button
                 onClick={() => handleEditClick(venue)}
-                className="btn-secondary"
+                className="btn-primary"
               >
                 Edit
               </button>

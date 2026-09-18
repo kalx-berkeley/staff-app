@@ -171,7 +171,7 @@ const ProfileSettings = ({ section }: { section: 'Promotions' | 'Staff' }) => {
     return (
       <div className="error">
         <p>Error: {error || 'Profile not found'}</p>
-        <button onClick={loadProfile}>Retry</button>
+        <button onClick={loadProfile} className="btn-primary">Retry</button>
       </div>
     );
   }
@@ -232,7 +232,7 @@ const ProfileSettings = ({ section }: { section: 'Promotions' | 'Staff' }) => {
       ) : (
         <div className="error">
           <p>Error: {notifError || 'Could not load notification settings'}</p>
-          <button onClick={loadNotifPrefs}>Retry</button>
+          <button onClick={loadNotifPrefs} className="btn-primary">Retry</button>
         </div>
       )}
 
@@ -268,7 +268,7 @@ const ProfileSettings = ({ section }: { section: 'Promotions' | 'Staff' }) => {
       ) : specialtyShowsError ? (
         <div className="error">
           <p>Error: {specialtyShowsError}</p>
-          <button onClick={loadSpecialtyShows}>Retry</button>
+          <button onClick={loadSpecialtyShows} className="btn-primary">Retry</button>
         </div>
       ) : specialtyShows.length === 0 ? (
         <p className="field-hint">

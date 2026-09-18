@@ -669,7 +669,7 @@ const ShowDetail = () => {
     return (
       <div className="error">
         <p>Error: {error || 'Show not found'}</p>
-        <button onClick={() => loadShow()}>Retry</button>
+        <button onClick={() => loadShow()} className="btn-primary">Retry</button>
       </div>
     );
   }
@@ -917,7 +917,7 @@ const ShowDetail = () => {
                       </p>
                       <button
                         onClick={() => handleRemovePreassignment(pass.id)}
-                        className="btn-small"
+                        className="btn-small btn-danger"
                         disabled={actionLoading}
                       >
                         Remove Pre-assignment
@@ -1018,7 +1018,7 @@ const ShowDetail = () => {
                           </button>
                           <button
                             onClick={resetPreassignForm}
-                            className="btn-small"
+                            className="btn-small btn-secondary"
                             disabled={actionLoading}
                           >
                             Cancel
@@ -1052,7 +1052,7 @@ const ShowDetail = () => {
                           </button>
                           <button
                             onClick={resetPreassignForm}
-                            className="btn-small"
+                            className="btn-small btn-secondary"
                             disabled={actionLoading}
                           >
                             Cancel
@@ -1136,7 +1136,7 @@ const ShowDetail = () => {
                           </button>
                           <button
                             onClick={resetPreassignForm}
-                            className="btn-small"
+                            className="btn-small btn-secondary"
                             disabled={actionLoading}
                           >
                             Cancel
@@ -1211,7 +1211,7 @@ const ShowDetail = () => {
                           </button>
                           <button
                             onClick={resetPreassignForm}
-                            className="btn-small"
+                            className="btn-small btn-secondary"
                             disabled={actionLoading}
                           >
                             Cancel
