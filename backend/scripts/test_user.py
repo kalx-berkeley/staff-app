@@ -5,15 +5,22 @@ removed by the next Airtable sync (sync_from_airtable only upserts records
 present in Airtable; see app/services/user_service.py). Delete it yourself
 with the `delete` subcommand when you're done testing.
 
+--role sets which department/status combination the row gets: "staff"
+(Active status only) or "promotions" (Active status + Promotions
+department). Add --sublist-dj to either role to also grant Sublist DJ
+status.
+
 Run from the backend/ directory with the virtualenv activated:
 
     python scripts/test_user.py create
     python scripts/test_user.py create --email jane@example.com --role staff
+    python scripts/test_user.py create --email subdj@example.com --role staff --sublist-dj
     python scripts/test_user.py delete --email jane@example.com
 
-Re-running `create` for an existing email updates its name/phone/role in
-place (including removing departments/statuses that don't belong to the
-new --role), so it also works to change an existing test user's role.
+Re-running `create` for an existing email updates its name/phone/role/
+--sublist-dj in place (including removing departments/statuses that don't
+belong to the new settings), so it also works to change an existing test
+user's role.
 
 Refuses to run unless ENVIRONMENT=staging (as set in backend/.env) so it
 can't be pointed at production by accident. Pass --force to override.
@@ -27,6 +34,7 @@ from sqlalchemy.orm import Session
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from app.auth import SUBLIST_DJ_STATUS
 from app.config import settings
 from app.database import SessionLocal
 from app.models.pass_model import Pass
@@ -43,7 +51,6 @@ DEFAULT_PHONE = "555-0100"
 ROLE_DEPARTMENTS_STATUSES: dict[str, tuple[list[str], list[str]]] = {
     "promotions": (["Promotions"], ["Active"]),
     "staff": ([], ["Active"]),
-    "dj": ([], []),
 }
 
 
@@ -60,7 +67,9 @@ def _require_staging(force: bool) -> None:
         )
 
 
-def create_user(db: Session, email: str, name: str, phone: str, role: str) -> Staff:
+def create_user(
+    db: Session, email: str, name: str, phone: str, role: str, sublist_dj: bool = False
+) -> Staff:
     """Create or update a staff row so its departments/statuses match `role`.
 
     :param db: Active database session.
@@ -71,8 +80,10 @@ def create_user(db: Session, email: str, name: str, phone: str, role: str) -> St
     :type name: str
     :param phone: Phone number (required, non-null column).
     :type phone: str
-    :param role: One of "promotions", "staff", "dj".
+    :param role: One of "promotions", "staff".
     :type role: str
+    :param sublist_dj: Also grant the "Sublist DJ" status, on top of `role`.
+    :type sublist_dj: bool
     :returns: The created or updated staff row.
     :rtype: Staff
     """
@@ -85,7 +96,8 @@ def create_user(db: Session, email: str, name: str, phone: str, role: str) -> St
         staff.name = name
         staff.phone = phone
 
-    target_departments, target_statuses = ROLE_DEPARTMENTS_STATUSES[role]
+    target_departments, role_statuses = ROLE_DEPARTMENTS_STATUSES[role]
+    target_statuses = role_statuses + [SUBLIST_DJ_STATUS] if sublist_dj else role_statuses
 
     existing_departments = {d.department: d for d in staff.departments}
     for department in target_departments:
@@ -161,6 +173,11 @@ def main() -> None:
     create_parser.add_argument(
         "--role", choices=sorted(ROLE_DEPARTMENTS_STATUSES), default="promotions"
     )
+    create_parser.add_argument(
+        "--sublist-dj",
+        action="store_true",
+        help='Also grant "Sublist DJ" status, on top of --role',
+    )
 
     delete_parser = subparsers.add_parser("delete", help="Delete a test user")
     delete_parser.add_argument("--email", required=True)
@@ -171,7 +188,9 @@ def main() -> None:
     db = SessionLocal()
     try:
         if args.action == "create":
-            staff = create_user(db, args.email, args.name, args.phone, args.role)
+            staff = create_user(
+                db, args.email, args.name, args.phone, args.role, args.sublist_dj
+            )
             print(
                 f"id={staff.id} email={staff.email} role={args.role} "
                 f"departments={[d.department for d in staff.departments]} "
