@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from typing import Optional, Union
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.auth import check_dj_access
@@ -83,14 +83,15 @@ async def get_spin_matches(
     dj_access: bool = Depends(check_dj_access),
     db: Session = Depends(get_db),
 ):
-    """Return not-yet-surfaced spins that match a show with passes to give away.
+    """Return current spins that match a show with passes to give away.
 
-    Meant to be polled roughly once a minute from the DJ view. Each match is
-    returned at most once ever (see SpinMatchService/SurfacedSpinMatch) so
-    the caller can pop up a notification for it without tracking its own
-    dedup state.
+    Meant to be polled roughly once a minute from the DJ view. Every current
+    match is returned on every call — including to every other open DJ tab —
+    until the caller dismisses it (or clicks through) via
+    POST /spin-matches/{spin_id}/dismiss, so the DJ view is responsible for
+    not re-displaying a match it's already shown.
     """
-    matches = await SpinMatchService.check_for_matches(db)
+    matches = await SpinMatchService.get_current_matches(db)
     return [
         SpinMatchSchema(
             spin_id=m.spin_id,
@@ -106,3 +107,21 @@ async def get_spin_matches(
         )
         for m in matches
     ]
+
+
+@router.post("/spin-matches/{spin_id}/dismiss", status_code=status.HTTP_204_NO_CONTENT)
+def dismiss_spin_match(
+    spin_id: int,
+    show_id: int,
+    dj_access: bool = Depends(check_dj_access),
+    db: Session = Depends(get_db),
+):
+    """Mark one spin/show match as dismissed so it stops being returned.
+
+    Called when a DJ dismisses a spin-match toast or clicks through to the
+    show. Takes effect for every open DJ tab, not just the caller's, as soon
+    as each tab's next GET /spin-matches poll runs. A spin_id that matched
+    multiple shows needs one call per show_id — dismissing one leaves the
+    others showing.
+    """
+    SpinMatchService.dismiss(db, spin_id=spin_id, show_id=show_id)

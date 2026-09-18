@@ -8,8 +8,17 @@ break. Two throttles keep this from hammering the Spinitron API:
   once it's older than `_CACHE_TTL` — repeated polling from one or many DJ
   tabs reuses the same cached fetch in between.
 - The fetch itself is entirely demand-driven: it only happens as a side
-  effect of something calling `check_for_matches`, so no Spinitron calls
+  effect of something calling `get_current_matches`, so no Spinitron calls
   happen at all while no DJ view is open to ask.
+
+Every current match is returned on every poll — nothing is remembered as
+"already shown" just because it was computed. A match only stops being
+returned once something explicitly calls `dismiss` for that exact
+(spin_id, show_id) pair (see DismissedSpinMatch), which the DJ view does
+when a toast is dismissed or clicked through. That keeps dismissal tied to
+an actual DJ seeing the notification, rather than the first poll after a
+match exists — and since dismissal is server-side, it clears the match from
+every open DJ tab on their next poll, not just the tab that dismissed it.
 
 Matching shares its rapidfuzz rules and thresholds with feature_bin_service
 and kalx_live_service (tagged show artists first, event-name fallback with a
@@ -26,10 +35,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.config import settings
+from app.models.dismissed_spin_match import DismissedSpinMatch
 from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.spinitron_spin_cache import SpinitronSpinCache
-from app.models.surfaced_spin_match import SurfacedSpinMatch
 from app.services.fuzzy_artist_match import (
     is_band_name_match,
     match_event_names_against_name,
@@ -45,17 +54,17 @@ _CACHE_TTL = timedelta(seconds=60)
 # generous relative to the cache TTL so a slow poller never misses a spin.
 _LOOKBACK = timedelta(minutes=15)
 
-# How long a spin_id is remembered as "already surfaced" before it's pruned.
-# Only needs to outlast _LOOKBACK, since a spin older than that can never be
-# fetched from Spinitron again.
-_SURFACED_RETENTION = timedelta(hours=1)
+# How long a dismissed (spin_id, show_id) pair is remembered before it's
+# pruned. Only needs to outlast _LOOKBACK, since a spin older than that can
+# never be fetched from Spinitron again, so its match can never resurface.
+_DISMISSED_RETENTION = timedelta(hours=1)
 
 _CACHE_ROW_ID = 1
 
 
 @dataclass
 class SpinMatch:
-    """One newly-surfaced spin/show match, ready to hand to the API layer."""
+    """One current spin/show match, ready to hand to the API layer."""
 
     spin_id: int
     artist: str
@@ -147,18 +156,29 @@ class SpinMatchService:
         return matched
 
     @staticmethod
-    def _prune_surfaced(db: Session, now: datetime) -> None:
-        db.query(SurfacedSpinMatch).filter(
-            SurfacedSpinMatch.surfaced_at < now - _SURFACED_RETENTION
+    def _dismissed_pairs(db: Session, spin_ids: list[int]) -> set[tuple[int, int]]:
+        """Which (spin_id, show_id) pairs among *spin_ids* have already been dismissed."""
+        rows = (
+            db.query(DismissedSpinMatch.spin_id, DismissedSpinMatch.show_id)
+            .filter(DismissedSpinMatch.spin_id.in_(spin_ids))
+            .all()
+        )
+        return {(spin_id, show_id) for spin_id, show_id in rows}
+
+    @staticmethod
+    def _prune_dismissed(db: Session, now: datetime) -> None:
+        db.query(DismissedSpinMatch).filter(
+            DismissedSpinMatch.dismissed_at < now - _DISMISSED_RETENTION
         ).delete()
 
     @staticmethod
-    async def check_for_matches(db: Session) -> list[SpinMatch]:
-        """Return spin/show matches not already surfaced to a DJ view.
+    async def get_current_matches(db: Session) -> list[SpinMatch]:
+        """Return every current spin/show match that hasn't been dismissed.
 
-        Every returned match is recorded in SurfacedSpinMatch before this
-        returns, so calling it again — from this poll or any other DJ tab —
-        will never return the same spin_id twice.
+        Returned again on every call — including from every other open DJ
+        tab — until `dismiss` is called for that exact (spin_id, show_id)
+        pair. A spin matching two different shows yields two independent
+        matches, each dismissible on its own.
         """
         if not SpinMatchService.is_configured():
             return []
@@ -169,29 +189,19 @@ class SpinMatchService:
 
         now = datetime.now(timezone.utc)
         spin_ids = [s["id"] for s in spins]
-        already_surfaced = {
-            row[0]
-            for row in (
-                db.query(SurfacedSpinMatch.spin_id)
-                .filter(SurfacedSpinMatch.spin_id.in_(spin_ids))
-                .all()
-            )
-        }
-
-        pending_spins = [s for s in spins if s["id"] not in already_surfaced]
-        if not pending_spins:
-            return []
+        dismissed = SpinMatchService._dismissed_pairs(db, spin_ids)
 
         candidate_shows = SpinMatchService._candidate_shows(db)
         matches: list[SpinMatch] = []
-        new_rows: list[SurfacedSpinMatch] = []
 
         if candidate_shows:
-            for spin in pending_spins:
+            for spin in spins:
                 matched_shows = SpinMatchService._matching_shows(
                     spin["artist"], candidate_shows
                 )
                 for show in matched_shows:
+                    if (spin["id"], show.id) in dismissed:
+                        continue
                     matches.append(
                         SpinMatch(
                             spin_id=spin["id"],
@@ -201,16 +211,24 @@ class SpinMatchService:
                             show=show,
                         )
                     )
-                if matched_shows:
-                    new_rows.append(
-                        SurfacedSpinMatch(
-                            spin_id=spin["id"], show_id=matched_shows[0].id, surfaced_at=now
-                        )
-                    )
 
-        if new_rows:
-            db.add_all(new_rows)
-        SpinMatchService._prune_surfaced(db, now)
+        SpinMatchService._prune_dismissed(db, now)
         db.commit()
 
         return matches
+
+    @staticmethod
+    def dismiss(db: Session, spin_id: int, show_id: int) -> None:
+        """Record that a spin/show match has been dismissed or clicked through.
+
+        Idempotent, so a retried request never errors on the duplicate row.
+        """
+        if db.get(DismissedSpinMatch, (spin_id, show_id)) is None:
+            db.add(
+                DismissedSpinMatch(
+                    spin_id=spin_id,
+                    show_id=show_id,
+                    dismissed_at=datetime.now(timezone.utc),
+                )
+            )
+            db.commit()

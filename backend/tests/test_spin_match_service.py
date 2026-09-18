@@ -1,4 +1,4 @@
-"""Tests for SpinMatchService and the GET /api/dj/spin-matches endpoint."""
+"""Tests for SpinMatchService and the GET/POST /api/dj/spin-matches endpoints."""
 
 from datetime import date, datetime, time, timedelta, timezone
 
@@ -7,11 +7,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.models.dismissed_spin_match import DismissedSpinMatch
 from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.show_band import ShowBand
 from app.models.spinitron_spin_cache import SpinitronSpinCache
-from app.models.surfaced_spin_match import SurfacedSpinMatch
 from app.models.venue import Venue
 from app.services.spin_match_service import SpinMatchService
 from app.services.spinitron_service import SpinitronSpinItem
@@ -153,14 +153,12 @@ class TestGetCachedSpins:
         }]
 
 
-class TestCheckForMatches:
+class TestGetCurrentMatches:
     async def test_no_ops_when_not_configured(self, db: Session, monkeypatch):
         monkeypatch.setattr(settings, "spinitron_api_key", None)
-        assert await SpinMatchService.check_for_matches(db) == []
+        assert await SpinMatchService.get_current_matches(db) == []
 
-    async def test_matches_tagged_band_and_records_surfaced(
-        self, db: Session, monkeypatch, test_venue
-    ):
+    async def test_matches_tagged_band(self, db: Session, monkeypatch, test_venue):
         monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
         show = _show_with_available_pair(db, test_venue, "Some Show", band_name="Murcof")
 
@@ -171,7 +169,7 @@ class TestCheckForMatches:
             "app.services.spin_match_service.SpinitronService.fetch_spins", fake_fetch_spins
         )
 
-        matches = await SpinMatchService.check_for_matches(db)
+        matches = await SpinMatchService.get_current_matches(db)
 
         assert len(matches) == 1
         assert matches[0].spin_id == 101
@@ -180,12 +178,10 @@ class TestCheckForMatches:
         assert matches[0].image == "http://example.com/x.jpg"
         assert matches[0].show.id == show.id
         assert matches[0].show.venue.name == "Test Venue"
-        assert (
-            db.query(SurfacedSpinMatch).filter(SurfacedSpinMatch.spin_id == 101).count()
-            == 1
-        )
+        # Nothing is recorded just from computing the match.
+        assert db.query(DismissedSpinMatch).count() == 0
 
-    async def test_same_spin_never_surfaced_twice(
+    async def test_same_spin_match_returned_again_until_dismissed(
         self, db: Session, monkeypatch, test_venue
     ):
         monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
@@ -198,7 +194,7 @@ class TestCheckForMatches:
             "app.services.spin_match_service.SpinitronService.fetch_spins", fake_fetch_spins
         )
 
-        first = await SpinMatchService.check_for_matches(db)
+        first = await SpinMatchService.get_current_matches(db)
         assert len(first) == 1
 
         # Force a cache refresh so the same spin is fetched from Spinitron
@@ -207,8 +203,62 @@ class TestCheckForMatches:
         cache_row.fetched_at = datetime.now(timezone.utc) - timedelta(minutes=5)
         db.commit()
 
-        second = await SpinMatchService.check_for_matches(db)
+        second = await SpinMatchService.get_current_matches(db)
+        assert len(second) == 1
+        assert second[0].spin_id == 101
+
+    async def test_dismissed_match_stops_being_returned(
+        self, db: Session, monkeypatch, test_venue
+    ):
+        monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
+        show = _show_with_available_pair(db, test_venue, "Some Show", band_name="Murcof")
+
+        async def fake_fetch_spins(start):
+            return [_spin(101, "Murcof")]
+
+        monkeypatch.setattr(
+            "app.services.spin_match_service.SpinitronService.fetch_spins", fake_fetch_spins
+        )
+
+        first = await SpinMatchService.get_current_matches(db)
+        assert len(first) == 1
+
+        SpinMatchService.dismiss(db, spin_id=101, show_id=show.id)
+
+        # Force a cache refresh so the spin is fetched again, same as above.
+        cache_row = db.query(SpinitronSpinCache).one()
+        cache_row.fetched_at = datetime.now(timezone.utc) - timedelta(minutes=5)
+        db.commit()
+
+        second = await SpinMatchService.get_current_matches(db)
         assert second == []
+
+    async def test_dismissing_one_matched_show_leaves_other_showing(
+        self, db: Session, monkeypatch, test_venue
+    ):
+        monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
+        show_a = _show_with_available_pair(db, test_venue, "Show A", band_name="Murcof")
+        show_b = _show_with_available_pair(db, test_venue, "Show B", band_name="Murcof")
+
+        async def fake_fetch_spins(start):
+            return [_spin(101, "Murcof")]
+
+        monkeypatch.setattr(
+            "app.services.spin_match_service.SpinitronService.fetch_spins", fake_fetch_spins
+        )
+
+        first = await SpinMatchService.get_current_matches(db)
+        assert {m.show.id for m in first} == {show_a.id, show_b.id}
+
+        SpinMatchService.dismiss(db, spin_id=101, show_id=show_a.id)
+
+        cache_row = db.query(SpinitronSpinCache).one()
+        cache_row.fetched_at = datetime.now(timezone.utc) - timedelta(minutes=5)
+        db.commit()
+
+        second = await SpinMatchService.get_current_matches(db)
+        assert len(second) == 1
+        assert second[0].show.id == show_b.id
 
     async def test_no_match_when_no_show_has_available_pairs(
         self, db: Session, monkeypatch, test_venue
@@ -245,7 +295,7 @@ class TestCheckForMatches:
             "app.services.spin_match_service.SpinitronService.fetch_spins", fake_fetch_spins
         )
 
-        assert await SpinMatchService.check_for_matches(db) == []
+        assert await SpinMatchService.get_current_matches(db) == []
 
     async def test_unrelated_artist_does_not_match(
         self, db: Session, monkeypatch, test_venue
@@ -260,7 +310,7 @@ class TestCheckForMatches:
             "app.services.spin_match_service.SpinitronService.fetch_spins", fake_fetch_spins
         )
 
-        assert await SpinMatchService.check_for_matches(db) == []
+        assert await SpinMatchService.get_current_matches(db) == []
 
     async def test_multi_word_artist_matches_via_event_name_fallback(
         self, db: Session, monkeypatch, test_venue
@@ -277,7 +327,7 @@ class TestCheckForMatches:
             "app.services.spin_match_service.SpinitronService.fetch_spins", fake_fetch_spins
         )
 
-        matches = await SpinMatchService.check_for_matches(db)
+        matches = await SpinMatchService.get_current_matches(db)
         assert len(matches) == 1
         assert matches[0].show.id == show.id
 
@@ -297,7 +347,7 @@ class TestCheckForMatches:
             "app.services.spin_match_service.SpinitronService.fetch_spins", fake_fetch_spins
         )
 
-        matches = await SpinMatchService.check_for_matches(db)
+        matches = await SpinMatchService.get_current_matches(db)
         assert len(matches) == 1
         assert matches[0].show.id == show.id
 
@@ -317,7 +367,17 @@ class TestCheckForMatches:
             "app.services.spin_match_service.SpinitronService.fetch_spins", fake_fetch_spins
         )
 
-        assert await SpinMatchService.check_for_matches(db) == []
+        assert await SpinMatchService.get_current_matches(db) == []
+
+
+class TestDismiss:
+    def test_is_idempotent(self, db: Session, test_venue):
+        show = _show_with_available_pair(db, test_venue, "Some Show", band_name="Murcof")
+
+        SpinMatchService.dismiss(db, spin_id=101, show_id=show.id)
+        SpinMatchService.dismiss(db, spin_id=101, show_id=show.id)
+
+        assert db.query(DismissedSpinMatch).count() == 1
 
 
 class TestSpinMatchesEndpoint:
@@ -351,3 +411,47 @@ class TestSpinMatchesEndpoint:
         assert body[0]["show"]["id"] == show.id
         assert body[0]["show"]["venue_name"] == "Test Venue"
         assert body[0]["show"]["event_name"] == "Some Show"
+
+
+class TestDismissSpinMatchEndpoint:
+    def test_requires_dj_access(self, client: TestClient):
+        response = client.post(
+            "/api/dj/spin-matches/101/dismiss",
+            params={"show_id": 1},
+            headers={"X-Forwarded-For": "8.8.8.8"},
+        )
+        assert response.status_code == 400
+
+    def test_dismiss_clears_match_from_next_poll(
+        self, db: Session, client: TestClient, monkeypatch, test_venue
+    ):
+        monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
+        show = _show_with_available_pair(db, test_venue, "Some Show", band_name="Murcof")
+
+        async def fake_fetch_spins(start):
+            return [_spin(101, "Murcof")]
+
+        monkeypatch.setattr(
+            "app.services.spin_match_service.SpinitronService.fetch_spins", fake_fetch_spins
+        )
+
+        first = client.get(
+            "/api/dj/spin-matches", headers={"X-Forwarded-For": DJ_STUDIO_IP}
+        )
+        assert len(first.json()) == 1
+
+        dismiss_response = client.post(
+            f"/api/dj/spin-matches/101/dismiss",
+            params={"show_id": show.id},
+            headers={"X-Forwarded-For": DJ_STUDIO_IP},
+        )
+        assert dismiss_response.status_code == 204
+
+        cache_row = db.query(SpinitronSpinCache).one()
+        cache_row.fetched_at = datetime.now(timezone.utc) - timedelta(minutes=5)
+        db.commit()
+
+        second = client.get(
+            "/api/dj/spin-matches", headers={"X-Forwarded-For": DJ_STUDIO_IP}
+        )
+        assert second.json() == []

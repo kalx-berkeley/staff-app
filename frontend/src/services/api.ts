@@ -982,14 +982,34 @@ export const onAirAPI = {
   },
 
   /**
-   * Get spins matching a show with passes to give away, not yet surfaced to this DJ view.
+   * Get spins currently matching a show with passes to give away.
    *
-   * @returns Promise resolving to the list of new matches (usually empty)
+   * Returns every current match on every call, including ones already
+   * returned by a previous poll or to another open tab — see dismissSpinMatch.
+   *
+   * @returns Promise resolving to the list of current matches (usually empty)
    */
   getSpinMatches: async (): Promise<SpinMatch[]> => {
     try {
       const response = await apiClient.get<SpinMatch[]>('/dj/spin-matches');
       return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * Mark one spin/show match as dismissed so it stops being returned by
+   * getSpinMatches, including to any other open DJ tab (as of its next poll).
+   *
+   * @param spinId - The Spinitron spin ID from the match
+   * @param showId - The show ID from the match
+   */
+  dismissSpinMatch: async (spinId: number, showId: number): Promise<void> => {
+    try {
+      await apiClient.post(`/dj/spin-matches/${spinId}/dismiss`, null, {
+        params: { show_id: showId },
+      });
     } catch (error) {
       return handleAPIError(error);
     }

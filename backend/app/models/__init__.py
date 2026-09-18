@@ -29,7 +29,7 @@ from .kalx_live_appearance import KalxLiveAppearance
 from .spinitron_show import SpinitronShow
 from .spinitron_playlist import SpinitronPlaylist
 from .spinitron_spin_cache import SpinitronSpinCache
-from .surfaced_spin_match import SurfacedSpinMatch
+from .dismissed_spin_match import DismissedSpinMatch
 
 __all__ = [
     "AuditLog",
@@ -61,5 +61,5 @@ __all__ = [
     "SpinitronShow",
     "SpinitronPlaylist",
     "SpinitronSpinCache",
-    "SurfacedSpinMatch",
+    "DismissedSpinMatch",
 ]
