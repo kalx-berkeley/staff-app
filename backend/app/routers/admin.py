@@ -552,9 +552,16 @@ def get_auto_close_schedules(
             job_id = f"auto_close_show_{show.id}"
             try:
                 job = scheduler.get_job(job_id)
-                sched_status = "scheduled" if job and close_dt > now else "past"
+                if job:
+                    sched_status = "scheduled"
+                elif close_dt > now:
+                    # No job currently registered, but the close time hasn't
+                    # passed — still pending, not "past".
+                    sched_status = "scheduled"
+                else:
+                    sched_status = "past"
             except Exception:
-                sched_status = "past"
+                sched_status = "past" if close_dt <= now else "scheduled"
 
         result.append(
             AutoCloseScheduleItem(
@@ -617,7 +624,10 @@ def get_lottery_schedules(
             if job:
                 sched_status = "scheduled"
             elif deadline > now:
-                sched_status = "past"
+                # No job currently registered, but the deadline hasn't passed —
+                # still open, not "past". (Can happen transiently right after a
+                # publish/reschedule before the job is registered.)
+                sched_status = "scheduled"
             else:
                 # Deadline passed — check if any pending entries remain
                 has_pending = (

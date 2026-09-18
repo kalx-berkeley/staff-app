@@ -426,7 +426,6 @@ def _reschedule_pending_lottery_jobs() -> None:
 
     from app.database import SessionLocal
     from app.models.show import Show
-    from app.models.lottery_entry import LotteryEntry
     from app.services.lottery_service import LotteryService
     from datetime import timedelta, timezone
 
@@ -442,18 +441,9 @@ def _reschedule_pending_lottery_jobs() -> None:
             .all()
         )
         for show in pending:
-            has_pending_entries = (
-                db.query(LotteryEntry)
-                .filter(
-                    LotteryEntry.show_id == show.id,
-                    LotteryEntry.status == "pending",
-                )
-                .first()
-                is not None
-            )
-            if not has_pending_entries:
-                continue
-
+            # Reschedule regardless of whether anyone has entered yet — a show with
+            # zero entries still needs its draw job restored so the window closes
+            # (and reports its status correctly) at the right time.
             published = show.published_at
             if published.tzinfo is None:
                 published = published.replace(tzinfo=timezone.utc)
