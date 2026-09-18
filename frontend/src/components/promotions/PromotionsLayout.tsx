@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, Outlet } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 import { AppNav, BuildInfo, ViewBadge } from '../shared';
 import { legacyImportAPI } from '../../services/api';
 
@@ -51,23 +51,23 @@ const PromotionsLayout = () => {
         <div className="nav-section-label nav-section-label-promotions">Promotions</div>
         <ul className="nav-links nav-sub-links" onClick={() => setNavOpen(false)}>
           <li>
-            <Link to="/promotions/shows">Shows</Link>
+            <NavLink to="/promotions/shows">Shows</NavLink>
           </li>
           <li>
-            <Link to="/promotions/venues">Venues</Link>
+            <NavLink to="/promotions/venues">Venues</NavLink>
           </li>
           <li>
-            <Link to="/promotions/promoters">Promoters</Link>
+            <NavLink to="/promotions/promoters">Promoters</NavLink>
           </li>
           <li>
-            <Link to="/promotions/profile">Profile</Link>
+            <NavLink to="/promotions/profile">Profile</NavLink>
           </li>
           <li>
-            <Link to="/promotions/admin">Admin</Link>
+            <NavLink to="/promotions/admin">Admin</NavLink>
           </li>
           {legacyImportEnabled && (
             <li>
-              <Link to="/promotions/legacy-import">Legacy Import</Link>
+              <NavLink to="/promotions/legacy-import">Legacy Import</NavLink>
             </li>
           )}
         </ul>

@@ -101,6 +101,7 @@ body {
 
 /* Elements that identify one of the three role views share a --view-color /
    --view-bg pair, so the rules below can stay view-agnostic. */
+.promotions-nav,
 .nav-section-label-promotions,
 .app-nav-view-promotions,
 .view-badge-promotions {
@@ -108,6 +109,7 @@ body {
   --view-bg: var(--view-promotions-bg);
 }
 
+.staff-nav,
 .nav-section-label-staff,
 .app-nav-view-staff,
 .view-badge-staff {
@@ -115,6 +117,7 @@ body {
   --view-bg: var(--view-staff-bg);
 }
 
+.dj-nav,
 .nav-section-label-dj,
 .app-nav-view-dj,
 .view-badge-dj {
@@ -132,6 +135,21 @@ body {
 .nav-sub-links a {
   padding-left: 1.25rem;
   font-size: 0.875rem;
+}
+
+/* The page the user currently has open within this role section. Mirrors the
+   accent-bar treatment used for the current role view in AppNav, so the two
+   "you are here" cues read as one system. NavLink applies "active" itself. */
+.nav-sub-links a.active {
+  background-color: var(--view-bg);
+  font-weight: 600;
+  border-left: 3px solid var(--view-color);
+  padding-left: calc(1.25rem - 3px);
+}
+
+.nav-sub-links a.active:hover {
+  background-color: var(--view-bg);
+  filter: brightness(1.25);
 }
 
 /* Pinned to the bottom of the nav column (a full-height flex column) rather

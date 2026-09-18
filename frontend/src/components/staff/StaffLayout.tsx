@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, Outlet } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 import { AppNav, BuildInfo, ViewBadge } from '../shared';
 import { useAuth } from '../../contexts/authHooks';
 import { specialtyShowsAPI } from '../../services/api';
@@ -58,20 +58,20 @@ const StaffLayout = () => {
         <div className="nav-section-label nav-section-label-staff">Staff</div>
         <ul className="nav-links nav-sub-links" onClick={() => setNavOpen(false)}>
           <li>
-            <Link to="/staff/shows">Shows</Link>
+            <NavLink to="/staff/shows">Shows</NavLink>
           </li>
           {isSublistDj && (
             <li>
-              <Link to="/staff/my-passes">My Passes</Link>
+              <NavLink to="/staff/my-passes">My Passes</NavLink>
             </li>
           )}
           {(user?.role === 'promotions' || mySpecialtyShows.length > 0) && (
             <li>
-              <Link to="/staff/specialty-shows">Specialty Shows</Link>
+              <NavLink to="/staff/specialty-shows">Specialty Shows</NavLink>
             </li>
           )}
           <li>
-            <Link to="/staff/profile">Profile</Link>
+            <NavLink to="/staff/profile">Profile</NavLink>
           </li>
         </ul>
 

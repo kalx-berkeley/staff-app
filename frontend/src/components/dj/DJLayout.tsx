@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, Outlet } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 import { AppNav, BuildInfo, ViewBadge } from '../shared';
 import SpinMatchNotifier from './SpinMatchNotifier';
 
@@ -46,13 +46,13 @@ const DJLayout = () => {
         <div className="nav-section-label nav-section-label-dj">DJ</div>
         <ul className="nav-links nav-sub-links" onClick={() => setNavOpen(false)}>
           <li>
-            <Link to="/dj/shows">Shows</Link>
+            <NavLink to="/dj/shows">Shows</NavLink>
           </li>
           <li>
-            <Link to="/dj/my-passes">My Passes</Link>
+            <NavLink to="/dj/my-passes">My Passes</NavLink>
           </li>
           <li>
-            <Link to="/dj/winner-search">Winner Search</Link>
+            <NavLink to="/dj/winner-search">Winner Search</NavLink>
           </li>
         </ul>
 
