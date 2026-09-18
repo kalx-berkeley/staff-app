@@ -1,6 +1,9 @@
 export { default as AppNav } from './AppNav';
 export { default as BuildInfo } from './BuildInfo';
 export { default as StagingBanner } from './StagingBanner';
+export { default as ViewBadge } from './ViewBadge';
+export { useCurrentView, VIEW_LABELS } from './currentView';
+export type { AppView } from './currentView';
 export { default as Tooltip } from './Tooltip';
 export { default as DjNameInput, DJ_NAME_KEY } from './DjNameInput';
 export { default as DatePicker } from './DatePicker';

@@ -308,6 +308,57 @@ describe('App - Role-Based UI Elements', () => {
     });
   });
 
+  describe('Current View Indicator', () => {
+    const promotionsUser: UserResponse = {
+      email: 'promotions-current-view@example.com',
+      role: 'promotions',
+      is_dj_network: true,
+      is_station_office_network: true,
+      profile: null,
+    };
+
+    it('should mark the view matching the current URL as current', async () => {
+      window.history.pushState({}, '', '/pass-giveaway/promotions/shows');
+
+      await renderAppWithUser(promotionsUser);
+
+      await waitFor(() => {
+        expect(screen.getByRole('link', { name: /^Promotions$/i })).toHaveAttribute(
+          'aria-current',
+          'page'
+        );
+      });
+      expect(screen.getByRole('link', { name: /^Staff$/i })).not.toHaveAttribute('aria-current');
+      expect(screen.getByRole('link', { name: /^DJ$/i })).not.toHaveAttribute('aria-current');
+    });
+
+    it('should move the indicator when the user switches to another view', async () => {
+      window.history.pushState({}, '', '/pass-giveaway/staff/shows');
+
+      await renderAppWithUser(promotionsUser);
+
+      await waitFor(() => {
+        expect(screen.getByRole('link', { name: /^Staff$/i })).toHaveAttribute(
+          'aria-current',
+          'page'
+        );
+      });
+      expect(screen.getByRole('link', { name: /^Promotions$/i })).not.toHaveAttribute(
+        'aria-current'
+      );
+    });
+
+    it('should name the current view in the mobile top bar badge', async () => {
+      window.history.pushState({}, '', '/pass-giveaway/dj/shows');
+
+      await renderAppWithUser(promotionsUser);
+
+      await waitFor(() => {
+        expect(screen.getByTitle('The view you are currently in')).toHaveTextContent('DJ');
+      });
+    });
+  });
+
   describe('User Email Display', () => {
     it('should display email for promotions staff', async () => {
       const user: UserResponse = {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, Outlet } from 'react-router-dom';
-import { AppNav, BuildInfo } from '../shared';
+import { AppNav, BuildInfo, ViewBadge } from '../shared';
 import { legacyImportAPI } from '../../services/api';
 
 const PromotionsLayout = () => {
@@ -36,6 +36,7 @@ const PromotionsLayout = () => {
           <span className="hamburger-icon" />
         </button>
         <span className="mobile-title">Radio Pass Giveaway</span>
+        <ViewBadge />
       </div>
 
       {navOpen && (
@@ -47,7 +48,7 @@ const PromotionsLayout = () => {
           <h1>Radio Pass Giveaway</h1>
           <AppNav />
         </div>
-        <div className="nav-section-label">Promotions</div>
+        <div className="nav-section-label nav-section-label-promotions">Promotions</div>
         <ul className="nav-links nav-sub-links" onClick={() => setNavOpen(false)}>
           <li>
             <Link to="/promotions/shows">Shows</Link>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, Outlet } from 'react-router-dom';
-import { AppNav, BuildInfo } from '../shared';
+import { AppNav, BuildInfo, ViewBadge } from '../shared';
 import { useAuth } from '../../contexts/authHooks';
 import { specialtyShowsAPI } from '../../services/api';
 import type { SpecialtyShowResponse } from '../../types';
@@ -43,6 +43,7 @@ const StaffLayout = () => {
           <span className="hamburger-icon" />
         </button>
         <span className="mobile-title">Radio Pass Giveaway</span>
+        <ViewBadge />
       </div>
 
       {navOpen && (
@@ -54,7 +55,7 @@ const StaffLayout = () => {
           <h1>Radio Pass Giveaway</h1>
           <AppNav />
         </div>
-        <div className="nav-section-label">Staff</div>
+        <div className="nav-section-label nav-section-label-staff">Staff</div>
         <ul className="nav-links nav-sub-links" onClick={() => setNavOpen(false)}>
           <li>
             <Link to="/staff/shows">Shows</Link>

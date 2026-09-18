@@ -11,6 +11,15 @@
   --light-bg: #f8f9fa;
   --border-color: #dee2e6;
 
+  /* Accent colours identifying the three role views (Promotions / Staff / DJ).
+     Tinted light enough to read against the dark #2c3e50 navigation. */
+  --view-promotions-color: #6ba8e8;
+  --view-promotions-bg: rgba(74, 144, 226, 0.35);
+  --view-staff-color: #5ecf9e;
+  --view-staff-bg: rgba(46, 179, 126, 0.35);
+  --view-dj-color: #c39bf0;
+  --view-dj-bg: rgba(160, 110, 225, 0.35);
+
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -88,6 +97,36 @@ body {
   color: rgba(255, 255, 255, 0.45);
   padding: 0.75rem 0.75rem 0.2rem;
   cursor: default;
+}
+
+/* Elements that identify one of the three role views share a --view-color /
+   --view-bg pair, so the rules below can stay view-agnostic. */
+.nav-section-label-promotions,
+.app-nav-view-promotions,
+.view-badge-promotions {
+  --view-color: var(--view-promotions-color);
+  --view-bg: var(--view-promotions-bg);
+}
+
+.nav-section-label-staff,
+.app-nav-view-staff,
+.view-badge-staff {
+  --view-color: var(--view-staff-color);
+  --view-bg: var(--view-staff-bg);
+}
+
+.nav-section-label-dj,
+.app-nav-view-dj,
+.view-badge-dj {
+  --view-color: var(--view-dj-color);
+  --view-bg: var(--view-dj-bg);
+}
+
+.nav-section-label-promotions,
+.nav-section-label-staff,
+.nav-section-label-dj {
+  color: var(--view-color);
+  font-weight: 600;
 }
 
 .nav-sub-links a {
@@ -319,6 +358,55 @@ body.staging-active .dj-layout {
 .app-nav-view-link:hover {
   background: rgba(255, 255, 255, 0.2);
   color: white;
+}
+
+/* The view the user is currently operating in. Colour alone isn't the cue —
+   the accent bar, weight and "Current" tag all mark it as well. */
+.app-nav-view-current {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  background: var(--view-bg);
+  color: white;
+  font-weight: 600;
+  border-left: 3px solid var(--view-color);
+  padding-left: calc(0.5rem - 3px);
+}
+
+.app-nav-view-current:hover {
+  background: var(--view-bg);
+  filter: brightness(1.25);
+}
+
+.app-nav-view-current-tag {
+  flex-shrink: 0;
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--view-color);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.05rem 0.3rem;
+  border-radius: 8px;
+}
+
+/* Current-view chip in the mobile top bar (see ViewBadge.tsx). Lives inside
+   .mobile-topbar, which is display: none above 768px, so it is mobile-only. */
+.view-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  padding: 0.12rem 0.45rem;
+  border-radius: 10px;
+  color: var(--view-color);
+  background: var(--view-bg);
+  border: 1px solid var(--view-color);
+  /* Pushed to the far end of the bar so it never crowds the title on a
+     narrow screen. */
+  margin-left: auto;
 }
 
 /* Locked view row — tooltip-wrapper override for full-width flex row */

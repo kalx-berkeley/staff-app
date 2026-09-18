@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, Outlet } from 'react-router-dom';
-import { AppNav, BuildInfo } from '../shared';
+import { AppNav, BuildInfo, ViewBadge } from '../shared';
 import SpinMatchNotifier from './SpinMatchNotifier';
 
 const DJLayout = () => {
@@ -31,6 +31,7 @@ const DJLayout = () => {
           <span className="hamburger-icon" />
         </button>
         <span className="mobile-title">Radio Pass Giveaway</span>
+        <ViewBadge />
       </div>
 
       {navOpen && (
@@ -42,7 +43,7 @@ const DJLayout = () => {
           <h1>Radio Pass Giveaway</h1>
           <AppNav showGoogleLogout />
         </div>
-        <div className="nav-section-label">DJ</div>
+        <div className="nav-section-label nav-section-label-dj">DJ</div>
         <ul className="nav-links nav-sub-links" onClick={() => setNavOpen(false)}>
           <li>
             <Link to="/dj/shows">Shows</Link>

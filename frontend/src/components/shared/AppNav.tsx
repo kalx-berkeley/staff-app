@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/authHooks';
 import { adminAPI } from '../../services/api';
 import FeedbackModal from './FeedbackModal';
+import { useCurrentView, VIEW_LABELS } from './currentView';
+import type { AppView } from './currentView';
 
 const ROLE_LABELS: Record<string, string> = {
   promotions: 'Promotions Staff',
@@ -23,6 +25,29 @@ const LockIcon = () => (
     <rect x="1" y="5" width="8" height="7" rx="1" stroke="currentColor" strokeWidth="1.5" />
     <path d="M2.5 5V3.5a2.5 2.5 0 015 0V5" stroke="currentColor" strokeWidth="1.5" />
   </svg>
+);
+
+interface ViewLinkProps {
+  view: AppView;
+  to: string;
+  isCurrent: boolean;
+}
+
+// One row of the view switcher. The view the user is currently operating in is
+// called out with the view's accent colour and a "Current" tag, so the cue
+// doesn't rest on colour alone. The tag is hidden from assistive tech, which
+// gets the same information from aria-current.
+const ViewLink = ({ view, to, isCurrent }: ViewLinkProps) => (
+  <Link
+    to={to}
+    className={`app-nav-view-link app-nav-view-${view}${isCurrent ? ' app-nav-view-current' : ''}`}
+    aria-current={isCurrent ? 'page' : undefined}
+  >
+    <span>{VIEW_LABELS[view]}</span>
+    {isCurrent && (
+      <span className="app-nav-view-current-tag" aria-hidden="true">Current</span>
+    )}
+  </Link>
 );
 
 interface LockedViewProps {
@@ -48,6 +73,7 @@ interface AppNavProps {
 
 const AppNav = ({ showGoogleLogout = false }: AppNavProps) => {
   const { user, refetchUser } = useAuth();
+  const currentView = useCurrentView();
   const [showFeedback, setShowFeedback] = useState(false);
 
   const handleEndImpersonation = async () => {
@@ -133,21 +159,21 @@ const AppNav = ({ showGoogleLogout = false }: AppNavProps) => {
       <ul className="app-nav-views">
         <li>
           {canAccessPromotions ? (
-            <Link to="/promotions/shows" className="app-nav-view-link">Promotions</Link>
+            <ViewLink view="promotions" to="/promotions/shows" isCurrent={currentView === 'promotions'} />
           ) : (
             <LockedView label="Promotions" tooltip="Only accessible to users with the Promotions Staff role." />
           )}
         </li>
         <li>
           {canAccessStaff ? (
-            <Link to="/staff/shows" className="app-nav-view-link">Staff</Link>
+            <ViewLink view="staff" to="/staff/shows" isCurrent={currentView === 'staff'} />
           ) : (
             <LockedView label="Staff" tooltip="Only accessible to users with the Staff or Promotions Staff role." />
           )}
         </li>
         <li>
           {canAccessDJ ? (
-            <Link to="/dj/shows" className="app-nav-view-link">DJ</Link>
+            <ViewLink view="dj" to="/dj/shows" isCurrent={currentView === 'dj'} />
           ) : (
             <LockedView label="DJ" tooltip="Only accessible to users with the DJ role or when connected from the KALX studio network." />
           )}
