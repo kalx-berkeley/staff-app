@@ -8,19 +8,23 @@ with the `delete` subcommand when you're done testing.
 --role sets which department/status combination the row gets: "staff"
 (Active status only) or "promotions" (Active status + Promotions
 department). Add --sublist-dj to either role to also grant Sublist DJ
-status.
+status. --dj-name sets Staff.dj_name directly as plain text — normally
+that field is only populated by the Airtable sync's Spinitron-resolution
+step, so pass it explicitly here if a Sublist DJ test user needs one (e.g.
+to see DJ-only UI that keys off dj_name).
 
 Run from the backend/ directory with the virtualenv activated:
 
     python scripts/test_user.py create
     python scripts/test_user.py create --email jane@example.com --role staff
-    python scripts/test_user.py create --email subdj@example.com --role staff --sublist-dj
+    python scripts/test_user.py create --email subdj@example.com --role staff \
+        --sublist-dj --dj-name "Danny DJ"
     python scripts/test_user.py delete --email jane@example.com
 
 Re-running `create` for an existing email updates its name/phone/role/
---sublist-dj in place (including removing departments/statuses that don't
-belong to the new settings), so it also works to change an existing test
-user's role.
+--sublist-dj/--dj-name in place (including removing departments/statuses
+that don't belong to the new settings), so it also works to change an
+existing test user's role.
 
 Refuses to run unless ENVIRONMENT=staging (as set in backend/.env) so it
 can't be pointed at production by accident. Pass --force to override.
@@ -68,7 +72,13 @@ def _require_staging(force: bool) -> None:
 
 
 def create_user(
-    db: Session, email: str, name: str, phone: str, role: str, sublist_dj: bool = False
+    db: Session,
+    email: str,
+    name: str,
+    phone: str,
+    role: str,
+    sublist_dj: bool = False,
+    dj_name: str | None = None,
 ) -> Staff:
     """Create or update a staff row so its departments/statuses match `role`.
 
@@ -84,17 +94,20 @@ def create_user(
     :type role: str
     :param sublist_dj: Also grant the "Sublist DJ" status, on top of `role`.
     :type sublist_dj: bool
+    :param dj_name: Plain-text value for Staff.dj_name, or None to clear it.
+    :type dj_name: str | None
     :returns: The created or updated staff row.
     :rtype: Staff
     """
     staff = db.query(Staff).filter(Staff.email == email).first()
     if not staff:
-        staff = Staff(email=email, name=name, phone=phone)
+        staff = Staff(email=email, name=name, phone=phone, dj_name=dj_name)
         db.add(staff)
         db.flush()
     else:
         staff.name = name
         staff.phone = phone
+        staff.dj_name = dj_name
 
     target_departments, role_statuses = ROLE_DEPARTMENTS_STATUSES[role]
     target_statuses = role_statuses + [SUBLIST_DJ_STATUS] if sublist_dj else role_statuses
@@ -178,6 +191,11 @@ def main() -> None:
         action="store_true",
         help='Also grant "Sublist DJ" status, on top of --role',
     )
+    create_parser.add_argument(
+        "--dj-name",
+        default=None,
+        help="Plain-text Staff.dj_name (normally set by the Airtable/Spinitron sync)",
+    )
 
     delete_parser = subparsers.add_parser("delete", help="Delete a test user")
     delete_parser.add_argument("--email", required=True)
@@ -189,10 +207,17 @@ def main() -> None:
     try:
         if args.action == "create":
             staff = create_user(
-                db, args.email, args.name, args.phone, args.role, args.sublist_dj
+                db,
+                args.email,
+                args.name,
+                args.phone,
+                args.role,
+                args.sublist_dj,
+                args.dj_name,
             )
             print(
                 f"id={staff.id} email={staff.email} role={args.role} "
+                f"dj_name={staff.dj_name!r} "
                 f"departments={[d.department for d in staff.departments]} "
                 f"statuses={[s.status for s in staff.statuses]}"
             )
