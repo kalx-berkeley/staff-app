@@ -626,6 +626,7 @@ const ShowDetail = () => {
   const introLine = show
     ? `Here are the pass winners for ${show.event_name} on ${show.show_start_date ? formatDateRange(show.show_start_date, show.show_date) : formatShowDateTime(show.show_date, show.show_time!)}. These guests won their passes through KALX radio's on-air giveaway and we'd love to have them attend the show!`
     : '';
+  const emptyGuestListLine = show ? `No passes were claimed or given away for ${show.event_name}.` : '';
 
   const emailGreeting = show ? `Hi ${show.venue.name} team,` : '';
   const emailClosing = 'Thank you so much for partnering with KALX — we really appreciate it!\n\nBest,\nKALX Promotions';
@@ -636,8 +637,7 @@ const ShowDetail = () => {
     const lines = [
       emailGreeting,
       '',
-      introLine,
-      ...guestListLines,
+      ...(guestListLines.length > 0 ? [introLine, ...guestListLines] : [emptyGuestListLine]),
       ...(failedAttempts.length > 0
         ? [
             '',
@@ -753,11 +753,13 @@ const ShowDetail = () => {
             )}
           </div>
           <p className="guest-list-greeting">{emailGreeting}</p>
-          <p className="guest-list-intro">{introLine}</p>
           {guestListLines.length > 0 ? (
-            <pre className="guest-list-text">{guestListLines.join('\n')}</pre>
+            <>
+              <p className="guest-list-intro">{introLine}</p>
+              <pre className="guest-list-text">{guestListLines.join('\n')}</pre>
+            </>
           ) : (
-            <p className="guest-list-empty">No passes were given away for this show.</p>
+            <p className="guest-list-empty">{emptyGuestListLine}</p>
           )}
           {failedAttempts.length > 0 && (
             <div className="guest-list-attempts">
@@ -1210,6 +1212,8 @@ const ShowDetail = () => {
                         </div>
                       )}
                     </div>
+                  ) : show.status === 'closed' ? (
+                    <p className="pass-unavailable-note">Show is closed</p>
                   ) : (
                     <button
                       onClick={() => setPreassignPassId(pass.id)}
@@ -1353,7 +1357,7 @@ const ShowDetail = () => {
 
               {pass.status === 'available' && (
                 <div className="pass-details">
-                  <p>Available for staff to claim</p>
+                  <p>{show.status === 'closed' ? 'Unavailable' : 'Available for staff to claim'}</p>
                 </div>
               )}
             </div>

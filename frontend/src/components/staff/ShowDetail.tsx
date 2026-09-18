@@ -673,7 +673,7 @@ const ShowDetail = () => {
           </div>
         )}
 
-        {isSublistDj && myDjName && isVenueOwner && (
+        {isSublistDj && myDjName && isVenueOwner && show.status !== 'closed' && (
           <div className="pass-claim-section">
             <h3>Reserve Pass Pair for On-Air Giveaway</h3>
             <p className="pass-unavailable-note">
@@ -682,7 +682,7 @@ const ShowDetail = () => {
           </div>
         )}
 
-        {isSublistDj && myDjName && !isVenueOwner && (
+        {isSublistDj && myDjName && !isVenueOwner && show.status !== 'closed' && (
           <div className="pass-claim-section">
             <h3>
               Reserve Pass Pair for On-Air Giveaway
@@ -1155,7 +1155,9 @@ const ShowDetail = () => {
                 return (
                   <div key={pass.id} className="pass-card">
                     <div className="pass-details">
-                      <p className="pass-available-note">Available</p>
+                      <p className={show.status === 'closed' ? 'pass-unavailable-note' : 'pass-available-note'}>
+                        {show.status === 'closed' ? 'Unavailable' : 'Available'}
+                      </p>
                       {show.status !== 'closed' && (
                         <div className="claim-buttons">
                           <button

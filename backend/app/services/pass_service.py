@@ -766,6 +766,11 @@ class PassService:
             )
 
         show = db.query(Show).filter(Show.id == pass_item.show_id).first()
+        if show and show.status == "closed":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot pre-assign passes for closed shows",
+            )
         if show and show.planned_close_date and assignment_date > show.planned_close_date:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

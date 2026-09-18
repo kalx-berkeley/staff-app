@@ -2246,7 +2246,14 @@ fieldset.radio-group legend {
   color: var(--secondary-color);
   font-style: italic;
   margin: 0;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
+}
+
+.guest-list-greeting,
+.guest-list-closing {
+  font-size: 0.9rem;
+  margin: 0 0 0.5rem;
+  color: var(--text-color);
 }
 
 .field-hint {
@@ -2336,7 +2343,7 @@ fieldset.radio-group legend {
 
 .guest-list-attempts {
   margin-top: 0.75rem;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
 }
 
 .guest-list-attempts p {
