@@ -15,16 +15,20 @@ a   { color: #1a6fb0; }
 <h1>KALX Staff Authentication Endpoint</h1>
 <p>This site handles Google OAuth2 callbacks for the KALX staff portal. It is
 not intended to be visited directly.</p>
-<p>If you are trying to reach the staff portal, go to
-<a id="staff-link" href="https://staff.kalx.berkeley.edu/">staff.kalx.berkeley.edu</a>.</p>
+<p>Taking you to <a id="staff-link" href="https://staff.kalx.berkeley.edu/">staff.kalx.berkeley.edu</a>&hellip;</p>
 <script>
 // This page is served at auth.<suffix>; the staff portal is always at
 // staff.<suffix> on the same suffix, so derive the link from the hostname
 // instead of hardcoding a domain suffix that differs between environments.
+//
+// Reached after logout (mod_auth_openidc only allows ?logout= targets on
+// this same host). Auto-forwarding puts a fresh request in front of the
+// staff vhost, which is what triggers Google's account chooser.
 var staffHost = location.hostname.replace(/^auth\./, "staff.");
 var link = document.getElementById("staff-link");
 link.href = "https://" + staffHost + "/";
 link.textContent = staffHost;
+location.replace(link.href);
 </script>
 </body>
 </html>

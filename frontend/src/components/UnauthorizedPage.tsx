@@ -82,8 +82,8 @@ export default function UnauthorizedPage() {
               <a href={`https://${window.location.hostname.replace(/^staff\./, 'auth.')}/redirect_uri?logout=https://${window.location.hostname.replace(/^staff\./, 'auth.')}/`}>
                 Log out of the KALX Staff Site
               </a>
-              {' '}— this clears your current session and takes you to Google's
-              account page
+              {' '}— this clears your current session and takes you back to
+              this site, where Google will ask you to choose an account
             </li>
             <li>
               Click your profile picture or initial in the top-right corner of
