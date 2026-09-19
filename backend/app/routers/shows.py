@@ -510,16 +510,8 @@ def create_show(
         db.commit()
         db.refresh(show)
 
-    if show.auto_close and show.planned_close_date and show.planned_close_time:
-        from datetime import datetime
-        from zoneinfo import ZoneInfo
-
-        _LA = ZoneInfo("America/Los_Angeles")
-        close_dt = datetime.combine(
-            show.planned_close_date, show.planned_close_time, tzinfo=_LA
-        )
-        if close_dt > datetime.now(_LA):
-            schedule_auto_close_job(show.id, close_dt)
+    # New shows are always created in draft status, so there is nothing to
+    # schedule yet — the auto-close job is scheduled when the show is published.
     audit_service.log_event(
         db,
         event_type="show_created",
@@ -856,7 +848,12 @@ def update_show(
         details={"event_name": show.event_name, "changed_fields": changed_fields},
     )
 
-    if show.auto_close and show.planned_close_date and show.planned_close_time:
+    if (
+        show.status == "published"
+        and show.auto_close
+        and show.planned_close_date
+        and show.planned_close_time
+    ):
         from datetime import datetime
         from zoneinfo import ZoneInfo
 
@@ -869,6 +866,8 @@ def update_show(
         else:
             unschedule_auto_close_job(show.id)
     else:
+        # Draft/closed shows (or auto_close disabled) should never have a
+        # live scheduler job.
         unschedule_auto_close_job(show.id)
     return _build_show_response(show, pass_adjustment=pass_adjustment)
 
@@ -893,6 +892,17 @@ def publish_show(
     if show.lottery_enabled:
         lottery_deadline = show.published_at + timedelta(hours=show.lottery_window_hours)
         schedule_lottery_job(show.id, lottery_deadline)
+
+    # Schedule auto-close job now that the show is published
+    if show.auto_close and show.planned_close_date and show.planned_close_time:
+        from zoneinfo import ZoneInfo
+
+        _LA = ZoneInfo("America/Los_Angeles")
+        close_dt = datetime.combine(
+            show.planned_close_date, show.planned_close_time, tzinfo=_LA
+        )
+        if close_dt > datetime.now(_LA):
+            schedule_auto_close_job(show.id, close_dt)
 
     audit_service.log_event(
         db,
