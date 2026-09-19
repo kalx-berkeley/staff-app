@@ -94,6 +94,7 @@ const Admin = () => {
   const [autoCloseSchedules, setAutoCloseSchedules] = useState<AutoCloseScheduleItem[]>([]);
   const [autoCloseLoading, setAutoCloseLoading] = useState(true);
   const [autoCloseError, setAutoCloseError] = useState<string | null>(null);
+  const [hideClosedAutoClose, setHideClosedAutoClose] = useState(true);
 
   const [lotterySchedules, setLotterySchedules] = useState<LotteryScheduleItem[]>([]);
   const [lotterySchedulesLoading, setLotterySchedulesLoading] = useState(true);
@@ -377,13 +378,27 @@ const Admin = () => {
         <p className="field-hint">
           Shows with auto-close enabled and their scheduled close times (Pacific Time).
         </p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', marginBottom: '0.75rem' }}>
+          <input
+            type="checkbox"
+            checked={hideClosedAutoClose}
+            onChange={(e) => setHideClosedAutoClose(e.target.checked)}
+          />
+          Hide already closed shows
+        </label>
         {autoCloseLoading ? (
           <p>Loading…</p>
         ) : autoCloseError ? (
           <div className="error-message">{autoCloseError}</div>
         ) : autoCloseSchedules.length === 0 ? (
           <p className="field-hint">No auto-close schedules configured.</p>
-        ) : (
+        ) : (() => {
+          const visibleAutoCloseSchedules = hideClosedAutoClose
+            ? autoCloseSchedules.filter((item) => item.show_status !== 'closed')
+            : autoCloseSchedules;
+          return visibleAutoCloseSchedules.length === 0 ? (
+            <p className="field-hint">No auto-close schedules to show.</p>
+          ) : (
           <div className="scrollable-table-wrapper">
             <table className="audit-log-table">
               <thead>
@@ -396,7 +411,7 @@ const Admin = () => {
                 </tr>
               </thead>
               <tbody>
-                {autoCloseSchedules.map((item) => (
+                {visibleAutoCloseSchedules.map((item) => (
                   <tr key={item.show_id}>
                     <td>
                       <a href={`/pass-giveaway/promotions/shows/${item.show_id}`}>
@@ -430,7 +445,8 @@ const Admin = () => {
               </tbody>
             </table>
           </div>
-        )}
+          );
+        })()}
       </section>
 
       <section className="admin-section">
