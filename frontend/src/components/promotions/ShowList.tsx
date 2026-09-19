@@ -158,7 +158,7 @@ const ShowList = () => {
           </button>
         </div>
         <Link to="/promotions/shows/new" className="btn-primary">
-          Create New Show
+          New Show
         </Link>
       </div>
 

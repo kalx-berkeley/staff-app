@@ -521,6 +521,9 @@ body.staging-active .dj-layout {
   cursor: pointer;
   font-size: 0.9rem;
   transition: background-color 0.2s;
+  /* Keep labels on a single line: a button that can't fit should stay whole and
+     let its container wrap, rather than breaking its own text across lines. */
+  white-space: nowrap;
 }
 
 .btn-primary {
@@ -548,11 +551,6 @@ body.staging-active .dj-layout {
 
 .btn-danger:hover:not(:disabled) {
   background-color: #b02a37;
-}
-
-.btn-small {
-  padding: 0.2rem 0.5rem;
-  font-size: 0.8rem;
 }
 
 button:disabled {
@@ -986,6 +984,8 @@ fieldset.radio-group legend {
 .show-detail-header,
 .show-form-header {
   display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1rem;
@@ -993,6 +993,7 @@ fieldset.radio-group legend {
 
 .header-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
@@ -1081,6 +1082,7 @@ fieldset.radio-group legend {
 .status-filter {
   margin-bottom: 1rem;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.9rem;
@@ -2079,6 +2081,7 @@ fieldset.radio-group legend {
 /* Sort controls */
 .sort-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
@@ -2377,11 +2380,6 @@ fieldset.radio-group legend {
 
 .admin-section--disabled {
   opacity: 0.5;
-}
-
-.btn-sm {
-  padding: 0.2rem 0.5rem;
-  font-size: 0.8rem;
 }
 
 .text-success {
@@ -2694,10 +2692,10 @@ fieldset.radio-group legend {
   font-size: 0.85rem;
 }
 
-/* Small button variant for table cells */
-.btn-sm {
-  padding: 0.25rem 0.6rem !important;
-  font-size: 0.8rem !important;
+/* Small button variant (table cells, compact rows) */
+.btn-small {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
 }
 
 /* Promotions compact view row link */
@@ -3046,13 +3044,30 @@ fieldset.radio-group legend {
     grid-template-columns: 1fr;
   }
 
-  /* Sort controls: allow wrapping, reset inline margins */
-  .sort-controls {
-    flex-wrap: wrap;
+  /* Detail/list/form headers: stack the title and its buttons/badges into
+     separate full-width rows instead of keeping them side-by-side. Side-by-side
+     relies on each side shrinking to fit, and a wide badge row or button group
+     can push past the viewport edge before that shrinking kicks in. */
+  .show-list-header,
+  .show-detail-header,
+  .show-form-header {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  .sort-controls label {
+  /* Filter/sort controls wrap at every width (see base rules); on mobile also
+     drop the inline margins that separate the groups on a single line. */
+  .sort-controls label,
+  .sort-controls > span,
+  .status-filter label,
+  .status-filter > span {
     margin-left: 0 !important;
+  }
+
+  /* The view toggle is right-aligned on one line; once wrapped it starts the row. */
+  .sort-controls .view-toggle,
+  .status-filter .view-toggle {
+    margin-left: 0;
   }
 
   /* Tooltip: larger touch target */

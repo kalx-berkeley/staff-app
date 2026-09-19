@@ -93,7 +93,7 @@ const VenueList = () => {
           </button>
         </div>
         <button onClick={handleCreateClick} className="btn-primary">
-          Create New Venue
+          New Venue
         </button>
       </div>
 
@@ -154,7 +154,7 @@ const VenueList = () => {
                   <td>
                     <button
                       onClick={() => handleEditClick(venue)}
-                      className="btn-primary btn-sm"
+                      className="btn-primary btn-small"
                     >
                       Edit
                     </button>

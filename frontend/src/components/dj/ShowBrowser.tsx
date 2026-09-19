@@ -245,7 +245,7 @@ const ShowBrowser = () => {
                           <td>{pass.show_date ? formatDateShort(pass.show_date) : '—'}</td>
                           <td>{pass.preassigned_date ? formatDateShort(pass.preassigned_date) : '—'}</td>
                           <td>
-                            <Link to={`/dj/shows/${pass.show_id}`} className="btn-primary btn-sm">
+                            <Link to={`/dj/shows/${pass.show_id}`} className="btn-primary btn-small">
                               Give Away Passes
                             </Link>
                           </td>
@@ -365,7 +365,7 @@ const ShowBrowser = () => {
                     <td>{show.show_start_date ? '—' : formatTime(show.show_time!)}</td>
                     <td>{show.available_pair_count}</td>
                     <td>
-                      <Link to={`/dj/shows/${show.id}`} className="btn-primary btn-sm">
+                      <Link to={`/dj/shows/${show.id}`} className="btn-primary btn-small">
                         Give Away
                       </Link>
                     </td>

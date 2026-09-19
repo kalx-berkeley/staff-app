@@ -258,8 +258,8 @@ const ShowBrowser = () => {
                     <td>{show.show_start_date ? '—' : formatTime(show.show_time!)}</td>
                     <td>{passCountDisplay}</td>
                     <td>
-                      <Link to={`/staff/shows/${show.id}`} className="btn-primary btn-sm">
-                        View Details
+                      <Link to={`/staff/shows/${show.id}`} className="btn-primary btn-small">
+                        View
                       </Link>
                     </td>
                   </tr>
@@ -348,7 +348,7 @@ const ShowBrowser = () => {
 
                 <div className="show-card-footer">
                   <Link to={`/staff/shows/${show.id}`} className="btn-primary">
-                    View Details
+                    View
                   </Link>
                 </div>
               </div>

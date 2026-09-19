@@ -54,7 +54,7 @@ const PromoterList = () => {
       <div className="venue-list-header">
         <h2>Promoters</h2>
         <button onClick={() => navigate('/promotions/promoters/new')} className="btn-primary">
-          Create New Promoter
+          New Promoter
         </button>
       </div>
 

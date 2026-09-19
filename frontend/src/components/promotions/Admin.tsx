@@ -348,7 +348,7 @@ const Admin = () => {
                   <td className="audit-log-time">{formatFutureTime(job.next_run_at)}</td>
                   <td>
                     <button
-                      className="btn-primary btn-sm"
+                      className="btn-primary btn-small"
                       onClick={() => handleRunJob(job.id)}
                       disabled={!!jobRunning[job.id]}
                     >
@@ -500,7 +500,7 @@ const Admin = () => {
                   <td>
                     {item.schedule_status === 'scheduled' && (
                       <button
-                        className="btn-primary btn-sm"
+                        className="btn-primary btn-small"
                         onClick={() => handleRunLottery(item.show_id)}
                         disabled={!!lotteryRunning[item.show_id]}
                       >
