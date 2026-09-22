@@ -17,7 +17,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas.legacy_import import LegacyImportResult, LegacyShowImport
+from app.schemas.legacy_import import (
+    LegacyImportResult,
+    LegacyShowImport,
+    LegacyShowMerge,
+    OnAirWinnerImport,
+    StaffPassImport,
+)
 from app.auth import get_promotions_staff, ACTIVE_STATUS
 from app.models.on_air_winner import OnAirWinner
 from app.models.pass_model import Pass
@@ -30,6 +36,69 @@ from app.services.pass_service import normalize_phone
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/legacy-import", tags=["legacy-import"])
+
+
+def _assign_winners_and_claims(
+    db: Session,
+    show: Show,
+    pair_pool: list[Pass],
+    staff_pool: list[Pass],
+    on_air_winners: list[OnAirWinnerImport],
+    staff_passes: list[StaffPassImport],
+    claimants: list[Staff],
+    now: datetime,
+) -> tuple[int, int]:
+    """Assign on-air winners and staff claims onto pools of available passes.
+
+    Mutates the given pool passes (already persisted rows, either freshly
+    created or pre-existing) in place and creates OnAirWinner rows for each
+    winner. Returns (on_air_winners_created, staff_passes_claimed).
+    """
+    on_air_winners_created = 0
+    for i, winner_data in enumerate(on_air_winners):
+        pair_pass = pair_pool[i]
+        pair_pass.status = "given_away"
+        pair_pass.given_away_by_dj = winner_data.given_away_by_dj or "Unknown"
+        pair_pass.given_away_at = now
+        pair_pass.updated_at = now
+
+        winner = OnAirWinner(
+            pass_id=pair_pass.id,
+            venue_id=show.venue_id,
+            show_id=show.id,
+            recipient_name=winner_data.recipient_name,
+            recipient_phone=normalize_phone(winner_data.recipient_phone),
+            recipient_email=winner_data.recipient_email,
+            given_away_by_dj=winner_data.given_away_by_dj or "Unknown",
+            created_at=now,
+        )
+        db.add(winner)
+        on_air_winners_created += 1
+
+    # Claim staff passes, creating guest holds. Each staff claimant with a
+    # guest consumes two pool slots: their own pass plus a guest hold.
+    pool_idx = 0
+    for i, sp_data in enumerate(staff_passes):
+        primary = staff_pool[pool_idx]
+        pool_idx += 1
+
+        primary.status = "claimed"
+        primary.staff_id = claimants[i].id
+        primary.claimed_at = now
+        primary.has_guest = sp_data.has_guest
+        primary.guest_name = sp_data.guest_name if sp_data.has_guest else None
+        primary.updated_at = now
+
+        if sp_data.has_guest:
+            guest_hold = staff_pool[pool_idx]
+            pool_idx += 1
+            guest_hold.status = "claimed"
+            guest_hold.staff_id = claimants[i].id
+            guest_hold.claimed_at = now
+            guest_hold.guest_of_pass_id = primary.id
+            guest_hold.updated_at = now
+
+    return on_air_winners_created, len(staff_passes)
 
 
 @router.get("/enabled")
@@ -117,9 +186,10 @@ def import_legacy_show(
     db.add(show)
     db.flush()
 
-    # Create pair passes and record on-air winners.
-    on_air_winners_created = 0
-    for i in range(data.num_pass_pairs):
+    # Pre-create the show's pair and staff pass pools, then assign winners
+    # and claims onto them.
+    pair_pool: list[Pass] = []
+    for _ in range(data.num_pass_pairs):
         pair_pass = Pass(
             show_id=show.id,
             pass_type="pair",
@@ -127,31 +197,9 @@ def import_legacy_show(
             created_at=now,
             updated_at=now,
         )
-        if i < len(data.on_air_winners):
-            winner_data = data.on_air_winners[i]
-            pair_pass.status = "given_away"
-            pair_pass.given_away_by_dj = winner_data.given_away_by_dj or "Unknown"
-            pair_pass.given_away_at = now
         db.add(pair_pass)
-        db.flush()
+        pair_pool.append(pair_pass)
 
-        if i < len(data.on_air_winners):
-            winner_data = data.on_air_winners[i]
-            winner = OnAirWinner(
-                pass_id=pair_pass.id,
-                venue_id=data.venue_id,
-                show_id=show.id,
-                recipient_name=winner_data.recipient_name,
-                recipient_phone=normalize_phone(winner_data.recipient_phone),
-                recipient_email=winner_data.recipient_email,
-                given_away_by_dj=winner_data.given_away_by_dj or "Unknown",
-                created_at=now,
-            )
-            db.add(winner)
-            on_air_winners_created += 1
-
-    # Create staff passes, claiming them as needed and creating guest holds.
-    # We pre-create all num_pass_pairs passes as a pool, then assign them.
     staff_pool: list[Pass] = []
     for _ in range(data.num_pass_pairs):
         sp = Pass(
@@ -165,26 +213,16 @@ def import_legacy_show(
         staff_pool.append(sp)
     db.flush()
 
-    pool_idx = 0
-    for i, sp_data in enumerate(data.staff_passes):
-        primary = staff_pool[pool_idx]
-        pool_idx += 1
-
-        primary.status = "claimed"
-        primary.staff_id = claimants[i].id
-        primary.claimed_at = now
-        primary.has_guest = sp_data.has_guest
-        primary.guest_name = sp_data.guest_name if sp_data.has_guest else None
-        primary.updated_at = now
-
-        if sp_data.has_guest:
-            guest_hold = staff_pool[pool_idx]
-            pool_idx += 1
-            guest_hold.status = "claimed"
-            guest_hold.staff_id = claimants[i].id
-            guest_hold.claimed_at = now
-            guest_hold.guest_of_pass_id = primary.id
-            guest_hold.updated_at = now
+    on_air_winners_created, staff_passes_claimed = _assign_winners_and_claims(
+        db,
+        show,
+        pair_pool,
+        staff_pool,
+        data.on_air_winners,
+        data.staff_passes,
+        claimants,
+        now,
+    )
 
     db.commit()
 
@@ -200,6 +238,121 @@ def import_legacy_show(
         show_id=show.id,
         on_air_winners_created=on_air_winners_created,
         staff_passes_claimed=len(data.staff_passes),
+    )
+
+
+@router.post("/shows/{show_id}/merge", response_model=LegacyImportResult)
+def merge_legacy_show(
+    show_id: int,
+    data: LegacyShowMerge,
+    promotions: Staff = Depends(get_promotions_staff),
+    db: Session = Depends(get_db),
+):
+    """Backfill on-air winners and staff claims onto an existing show.
+
+    For promotions staff who already created a show in staff-app before the
+    paper-to-app cutover and now want to record paper-form winners/claims
+    against it, instead of creating a duplicate show. Assigns onto the
+    show's existing available passes rather than creating new ones. Drafts
+    are published as part of the merge so the show works normally afterward.
+
+    Requires promotions staff authentication.
+    """
+    show = db.query(Show).filter(Show.id == show_id).first()
+    if not show:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Show with id {show_id} not found",
+        )
+
+    if show.status not in ("draft", "published"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Cannot merge into a show with status '{show.status}'",
+        )
+
+    pair_pool = (
+        db.query(Pass)
+        .filter(
+            Pass.show_id == show.id, Pass.pass_type == "pair", Pass.status == "available"
+        )
+        .order_by(Pass.id)
+        .all()
+    )
+    staff_pool = (
+        db.query(Pass)
+        .filter(
+            Pass.show_id == show.id, Pass.pass_type == "staff", Pass.status == "available"
+        )
+        .order_by(Pass.id)
+        .all()
+    )
+
+    if len(data.on_air_winners) > len(pair_pool):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                f"on_air_winners count ({len(data.on_air_winners)}) exceeds"
+                f" available pair passes ({len(pair_pool)})"
+            ),
+        )
+
+    # Each staff claimant with a guest consumes two passes.
+    staff_slots_needed = len(data.staff_passes) + sum(
+        1 for p in data.staff_passes if p.has_guest
+    )
+    if staff_slots_needed > len(staff_pool):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                f"Staff passes requested ({staff_slots_needed} slots) exceed"
+                f" available staff passes ({len(staff_pool)})"
+            ),
+        )
+
+    claimants: list[Staff] = []
+    for sp in data.staff_passes:
+        staff_member = db.query(Staff).filter(Staff.id == sp.staff_id).first()
+        if not staff_member:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Staff member with id {sp.staff_id} not found",
+            )
+        claimants.append(staff_member)
+
+    now = datetime.now(timezone.utc)
+
+    was_draft = show.status == "draft"
+    if was_draft:
+        show.status = "published"
+        show.published_at = now
+
+    on_air_winners_created, staff_passes_claimed = _assign_winners_and_claims(
+        db,
+        show,
+        pair_pool,
+        staff_pool,
+        data.on_air_winners,
+        data.staff_passes,
+        claimants,
+        now,
+    )
+
+    db.commit()
+
+    logger.info(
+        "Legacy import: show %d merged by %s (%d on-air winners, %d staff claims%s)",
+        show.id,
+        promotions.email,
+        on_air_winners_created,
+        staff_passes_claimed,
+        ", published from draft" if was_draft else "",
+    )
+
+    return LegacyImportResult(
+        show_id=show.id,
+        on_air_winners_created=on_air_winners_created,
+        staff_passes_claimed=staff_passes_claimed,
     )
 
 

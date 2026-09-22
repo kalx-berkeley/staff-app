@@ -8,12 +8,20 @@ link in the promotions nav.
 
 What the form does
 
-- Accepts all standard show fields (event name, venue, date/time, description, age restriction, etc.)
-- Shows N rows for on-air winners (one per pass pair) — name, phone, email, and DJ name
-- Shows N dropdowns for staff claimants — pick which staff member claimed each staff pass
-- Blank winner/claimant rows are skipped (partial entry is fine)
-- Creates the show immediately in "closed" status — no notifications, no publish/close lifecycle
-- After a successful import, the form resets so the next show can be entered without navigating away
+It has two modes, toggled at the top of the page:
+
+- **New Show** — accepts all standard show fields (event name, venue, date/time,
+  description, age restriction, etc.), shows N rows for on-air winners (one per
+  pass pair) and N dropdowns for staff claimants. Blank winner/claimant rows are
+  skipped (partial entry is fine). Creates the show immediately in "published"
+  status — no notifications, no publish/close lifecycle. After a successful
+  import, the form resets so the next show can be entered without navigating
+  away.
+- **Add to Existing Show** — for shows promotions staff already entered in
+  staff-app (via the normal show form) before the paper-to-app cutover. Lets
+  them search for that show and record on-air winners / staff claims against
+  its existing passes, instead of duplicating it. A draft show is published as
+  part of the merge.
 
 How to remove it later
 

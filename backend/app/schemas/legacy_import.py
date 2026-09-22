@@ -47,6 +47,13 @@ class LegacyShowImport(BaseModel):
         return [g.lower() for g in v]
 
 
+class LegacyShowMerge(BaseModel):
+    """On-air winners and staff claims to merge into an existing show."""
+
+    on_air_winners: list[OnAirWinnerImport] = Field(default_factory=list)
+    staff_passes: list[StaffPassImport] = Field(default_factory=list)
+
+
 class LegacyImportResult(BaseModel):
     """Result of a legacy show import."""
 

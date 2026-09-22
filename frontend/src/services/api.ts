@@ -1347,6 +1347,25 @@ export const lotteryAPI = {
 /**
  * Legacy paper-form import API — only functional when LEGACY_IMPORT_ENABLED=true on the backend.
  */
+export interface LegacyOnAirWinnerPayload {
+  recipient_name: string;
+  recipient_phone: string;
+  recipient_email: string | null;
+  given_away_by_dj: string | null;
+}
+
+export interface LegacyStaffPassPayload {
+  staff_id: number;
+  has_guest: boolean;
+  guest_name: string | null;
+}
+
+export interface LegacyImportResult {
+  show_id: number;
+  on_air_winners_created: number;
+  staff_passes_claimed: number;
+}
+
 export const legacyImportAPI = {
   checkEnabled: async (): Promise<boolean> => {
     try {
@@ -1379,11 +1398,26 @@ export const legacyImportAPI = {
     wheelchair_accessible: boolean;
     num_pass_pairs: number;
     co_announce: boolean;
-    on_air_winners: { recipient_name: string; recipient_phone: string; recipient_email: string | null; given_away_by_dj: string | null }[];
-    staff_passes: { staff_id: number; has_guest: boolean; guest_name: string | null }[];
-  }): Promise<{ show_id: number; on_air_winners_created: number; staff_passes_claimed: number }> => {
+    on_air_winners: LegacyOnAirWinnerPayload[];
+    staff_passes: LegacyStaffPassPayload[];
+  }): Promise<LegacyImportResult> => {
     try {
       const response = await apiClient.post('/legacy-import/shows', data);
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  mergeShow: async (
+    showId: number,
+    data: {
+      on_air_winners: LegacyOnAirWinnerPayload[];
+      staff_passes: LegacyStaffPassPayload[];
+    }
+  ): Promise<LegacyImportResult> => {
+    try {
+      const response = await apiClient.post(`/legacy-import/shows/${showId}/merge`, data);
       return response.data;
     } catch (error) {
       return handleAPIError(error);
