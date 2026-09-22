@@ -313,7 +313,10 @@ def check_dj_access(
 
     DJ access is granted if:
     1. Request is from DJ studio network (no authentication required), OR
-    2. User is authenticated and has the promotions role (for testing/support)
+    2. User is authenticated and has the promotions role (for testing/support), OR
+    3. In staging, user is an authenticated staff member with active Sublist DJ
+       status (lets Sublist DJ staff test the DJ view remotely before this is
+       rolled out to production)
 
     :param x_forwarded_user: Email from Apache mod_auth_openidc Google authentication (optional)
     :param x_forwarded_for: IP address from proxy
@@ -329,6 +332,11 @@ def check_dj_access(
     if x_forwarded_user:
         if _get_promotions_staff_by_email(db, x_forwarded_user):
             return True
+
+        if settings.environment == "staging":
+            staff = db.query(Staff).filter(Staff.email == x_forwarded_user).first()
+            if staff and _is_sublist_dj(staff):
+                return True
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

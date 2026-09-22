@@ -33,7 +33,7 @@ import {
 } from './components/dj';
 import { useAuth } from './contexts/authHooks';
 import { AUTH_DIAG_KEY } from './services/api';
-import { isStagingEnvironment } from './utils';
+import { isStagingEnvironment, isStagingSublistDjStaff } from './utils';
 import StagingBanner from './components/shared/StagingBanner';
 import ProfileSettings from './components/shared/ProfileSettings';
 
@@ -187,7 +187,8 @@ function DJAccessDenied() {
 }
 
 // DJ route wrapper — allows unauthenticated DJ-network or station-office-network
-// users, authenticated promotions staff, and authenticated staff on either network.
+// users, authenticated promotions staff, authenticated staff on either network,
+// and (in staging only) staff with Sublist DJ status.
 // Individual child routes that need DJ-network-only access use DJNetworkOnlyRoute.
 function DJProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -198,7 +199,8 @@ function DJProtectedRoute({ children }: { children: React.ReactNode }) {
   const canAccess =
     (user.role === 'dj' && (user.is_dj_network || user.is_station_office_network)) ||
     user.role === 'promotions' ||
-    (user.role === 'staff' && (user.is_dj_network || user.is_station_office_network));
+    (user.role === 'staff' && (user.is_dj_network || user.is_station_office_network)) ||
+    isStagingSublistDjStaff(user);
 
   if (!canAccess) return <DJAccessDenied />;
 
@@ -215,7 +217,8 @@ function DJNetworkOnlyRoute({ children }: { children: React.ReactNode }) {
   const canAccess =
     (user.role === 'dj' && user.is_dj_network) ||
     user.role === 'promotions' ||
-    (user.role === 'staff' && user.is_dj_network);
+    (user.role === 'staff' && user.is_dj_network) ||
+    isStagingSublistDjStaff(user);
 
   if (!canAccess) return <DJAccessDenied />;
 

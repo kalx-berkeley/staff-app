@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/authHooks';
 import { adminAPI } from '../../services/api';
+import { isStagingSublistDjStaff } from '../../utils';
 import FeedbackModal from './FeedbackModal';
 import { useCurrentView, VIEW_LABELS } from './currentView';
 import type { AppView } from './currentView';
@@ -98,7 +99,8 @@ const AppNav = ({ showGoogleLogout = false }: AppNavProps) => {
   const canAccessDJ =
     user?.role === 'dj' ||
     user?.role === 'promotions' ||
-    user?.is_dj_network === true;
+    user?.is_dj_network === true ||
+    isStagingSublistDjStaff(user);
 
   const email = user?.email ?? 'DJ Guest';
   const displayName = user?.profile?.name || email;

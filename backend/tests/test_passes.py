@@ -721,6 +721,67 @@ def test_search_by_phone_dj_network_access(client, show, given_away_pass):
     assert len(response.json()) == 1
 
 
+def test_dj_autocomplete_sublist_dj_staff_staging_access(client, db, monkeypatch):
+    """Staging: an active Sublist DJ staff member can reach a DJ-gated endpoint
+    without DJ studio network access, so they can test the DJ view remotely."""
+    from app import config
+
+    monkeypatch.setattr(config.settings, "environment", "staging")
+
+    dj_staff = Staff(email="sublistdj@test.com", name="Sublist Staffer", phone="555-0006")
+    db.add(dj_staff)
+    db.flush()
+    db.add(StaffStatus(staff_id=dj_staff.id, status="Active"))
+    db.add(StaffStatus(staff_id=dj_staff.id, status="Sublist DJ"))
+    db.commit()
+
+    response = client.get(
+        "/api/autocomplete/djs",
+        headers={"X-Forwarded-User": dj_staff.email},
+    )
+    assert response.status_code == 200
+
+
+def test_dj_autocomplete_sublist_dj_staff_denied_outside_staging(client, db, monkeypatch):
+    """Outside staging, an active Sublist DJ staff member does not get DJ
+    access purely from their Sublist DJ status."""
+    from app import config
+
+    monkeypatch.setattr(config.settings, "environment", "production")
+
+    dj_staff = Staff(email="sublistdj2@test.com", name="Sublist Staffer", phone="555-0007")
+    db.add(dj_staff)
+    db.flush()
+    db.add(StaffStatus(staff_id=dj_staff.id, status="Active"))
+    db.add(StaffStatus(staff_id=dj_staff.id, status="Sublist DJ"))
+    db.commit()
+
+    response = client.get(
+        "/api/autocomplete/djs",
+        headers={"X-Forwarded-User": dj_staff.email},
+    )
+    assert response.status_code == 401
+
+
+def test_dj_autocomplete_plain_staff_denied_in_staging(client, db, monkeypatch):
+    """Staging: a staff member without Sublist DJ status still has no DJ access."""
+    from app import config
+
+    monkeypatch.setattr(config.settings, "environment", "staging")
+
+    plain_staff = Staff(email="plainstaff@test.com", name="Plain Staffer", phone="555-0008")
+    db.add(plain_staff)
+    db.flush()
+    db.add(StaffStatus(staff_id=plain_staff.id, status="Active"))
+    db.commit()
+
+    response = client.get(
+        "/api/autocomplete/djs",
+        headers={"X-Forwarded-User": plain_staff.email},
+    )
+    assert response.status_code == 401
+
+
 def test_search_by_phone_rate_limited(client, show, promotions_staff):
     """Exceeding the per-IP request rate returns 429 with retry_after."""
     from app.main import app
