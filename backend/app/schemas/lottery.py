@@ -51,6 +51,15 @@ class LotteryEntryResponse(BaseModel):
     entered_at: UtcDatetime
 
 
+class MyLotteryEntryResponse(LotteryEntryResponse):
+    """Response schema for one of the current user's lottery entries, with show details."""
+
+    show_event_name: str | None = None
+    show_date: date | None = None
+    show_venue_name: str | None = None
+    specialty_show_name: str | None = None
+
+
 class LotteryStatusResponse(BaseModel):
     """Response schema for the lottery status of a show."""
 

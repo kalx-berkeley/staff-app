@@ -359,6 +359,24 @@ def get_staff_my_giveaways(
     return [PassResponse.model_validate(p) for p in passes]
 
 
+@router.get("/passes/staff/my-claims", response_model=list[PassResponse])
+def get_staff_my_claims(
+    user_info: tuple = Depends(require_promotions_or_staff),
+    db: Session = Depends(get_db),
+):
+    """
+    Get the current staff member's currently claimed staff passes, across all shows.
+
+    Available to any staff member or promotions staff (not limited to Sublist DJs).
+
+    Returns:
+        List of staff passes claimed by the authenticated staff member
+    """
+    _, staff = user_info
+    passes = PassService.get_staff_claims(db, staff.id)
+    return [PassResponse.model_validate(p) for p in passes]
+
+
 @router.get("/passes/my-giveaways", response_model=list[PassResponse])
 def get_my_giveaways(
     dj_name: str,

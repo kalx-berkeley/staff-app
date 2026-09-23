@@ -50,3 +50,19 @@ class LotteryEntry(Base):
     @property
     def staff_name(self) -> str | None:
         return self.staff.name if self.staff else None
+
+    @property
+    def show_event_name(self) -> str | None:
+        return self.show.event_name if self.show else None
+
+    @property
+    def show_date(self):
+        return self.show.show_date if self.show else None
+
+    @property
+    def show_venue_name(self) -> str | None:
+        return self.show.venue.name if self.show and self.show.venue else None
+
+    @property
+    def specialty_show_name(self) -> str | None:
+        return self.specialty_show.name if self.specialty_show else None

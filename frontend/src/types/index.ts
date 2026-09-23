@@ -333,6 +333,13 @@ export interface LotteryStatus {
   all_dj_entries?: LotteryEntryResponse[] | null;
 }
 
+export interface MyLotteryEntryResponse extends LotteryEntryResponse {
+  show_event_name: string | null;
+  show_date: string | null; // ISO date string
+  show_venue_name: string | null;
+  specialty_show_name: string | null;
+}
+
 export interface LotteryScheduleItem {
   show_id: number;
   event_name: string;

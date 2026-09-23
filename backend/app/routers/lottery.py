@@ -15,6 +15,7 @@ from app.schemas.lottery import (
     DJLotteryEntryCreate,
     LotteryEntryResponse,
     LotteryStatusResponse,
+    MyLotteryEntryResponse,
     StaffLotteryEntryCreate,
 )
 from app.services import audit_service
@@ -313,3 +314,26 @@ def withdraw_dj_entry(
         entity_id=show_id,
         details={"entry_type": "dj"},
     )
+
+
+@router.get("/lottery/my-entries", response_model=list[MyLotteryEntryResponse])
+def get_my_lottery_entries(
+    user_info: tuple = Depends(require_promotions_or_staff),
+    db: Session = Depends(get_db),
+):
+    """
+    Get the current staff member's pending lottery entries, across all shows.
+
+    Includes both staff pass-lottery entries and (for Sublist DJs) DJ pass-pair
+    lottery entries. Only entries still awaiting a drawing (status "pending")
+    are returned — once a lottery runs, entries move to "won" or "lost" and are
+    reflected instead as a claimed/pre-assigned pass.
+    """
+    _, staff = user_info
+    entries = (
+        db.query(LotteryEntry)
+        .filter(LotteryEntry.staff_id == staff.id, LotteryEntry.status == "pending")
+        .order_by(LotteryEntry.entered_at.desc())
+        .all()
+    )
+    return [MyLotteryEntryResponse.model_validate(e) for e in entries]

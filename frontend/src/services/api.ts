@@ -58,6 +58,7 @@ import type {
   APIError,
   LotteryStatus,
   LotteryEntryResponse,
+  MyLotteryEntryResponse,
   StaffLotteryEntryCreate,
   DJLotteryEntryCreate,
   OnAirInfo,
@@ -646,6 +647,21 @@ export const passesAPI = {
   getStaffMyGiveaways: async (): Promise<PassResponse[]> => {
     try {
       const response = await apiClient.get<PassResponse[]>('/passes/staff/my-giveaways');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * Get the current staff member's currently claimed staff passes, across all shows.
+   * Available to any staff member or promotions staff.
+   *
+   * @returns Promise resolving to array of claimed staff passes
+   */
+  getStaffMyClaims: async (): Promise<PassResponse[]> => {
+    try {
+      const response = await apiClient.get<PassResponse[]>('/passes/staff/my-claims');
       return response.data;
     } catch (error) {
       return handleAPIError(error);
@@ -1338,6 +1354,20 @@ export const lotteryAPI = {
   withdrawDJ: async (showId: number): Promise<void> => {
     try {
       await apiClient.delete(`/shows/${showId}/lottery/dj_entry`);
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * Get the current staff member's pending lottery entries, across all shows.
+   * Includes both staff pass-lottery entries and (for Sublist DJs) DJ pass-pair
+   * lottery entries.
+   */
+  getMyEntries: async (): Promise<MyLotteryEntryResponse[]> => {
+    try {
+      const response = await apiClient.get<MyLotteryEntryResponse[]>('/shows/lottery/my-entries');
+      return response.data;
     } catch (error) {
       return handleAPIError(error);
     }

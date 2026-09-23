@@ -246,6 +246,33 @@ class PassService:
         )
 
     @staticmethod
+    def get_staff_claims(db: Session, staff_id: int) -> list[Pass]:
+        """
+        Get all staff passes currently claimed by a specific staff member.
+
+        Excludes guest-hold passes (the +1 reservation created alongside a
+        claim, which also carries the claimant's staff_id) so each claim
+        appears once, represented via has_guest/guest_name on the primary pass.
+
+        Args:
+            db: Database session
+            staff_id: Staff member ID
+
+        Returns:
+            List of claimed staff passes (primary claims only)
+        """
+        return (
+            db.query(Pass)
+            .filter(
+                Pass.pass_type == "staff",
+                Pass.staff_id == staff_id,
+                Pass.status == "claimed",
+                Pass.guest_of_pass_id.is_(None),
+            )
+            .all()
+        )
+
+    @staticmethod
     def release_on_air_winner(
         db: Session,
         pass_item: Pass,
