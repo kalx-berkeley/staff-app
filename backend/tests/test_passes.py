@@ -107,9 +107,40 @@ def test_get_show_passes(client, show, promotions_staff):
     assert sum(1 for t in passes if t["pass_type"] == "staff") == 2
 
 
-def test_give_away_pass(client, show, promotions_staff, db):
-    """Test giving away a pass pair."""
+def test_give_away_pass(client, show, db):
+    """Test giving away a pass pair from the DJ studio network."""
     # Get a pass pair
+    pass_item = (
+        db.query(Pass)
+        .filter(
+            Pass.show_id == show.id,
+            Pass.pass_type == "pair",
+            Pass.status == "available",
+        )
+        .first()
+    )
+
+    response = client.post(
+        f"/api/passes/{pass_item.id}/giveaway",
+        json={
+            "recipient_name": "John Doe",
+            "recipient_phone": "555-1234",
+            "given_away_by_dj": "DJ Test",
+        },
+        headers={"X-Forwarded-For": DJ_STUDIO_IP},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "given_away"
+    assert data["recipient_name"] == "John Doe"
+    assert data["recipient_phone"] == "5551234"
+    assert data["given_away_by_dj"] == "DJ Test"
+    assert data["given_away_at"] is not None
+
+
+def test_give_away_pass_denied_for_promotions_staff(client, show, promotions_staff, db):
+    """Promotions staff can preview the DJ giveaway page but cannot actually
+    record a giveaway — they aren't physically in the DJ studio."""
     pass_item = (
         db.query(Pass)
         .filter(
@@ -129,26 +160,30 @@ def test_give_away_pass(client, show, promotions_staff, db):
         },
         headers={"X-Forwarded-User": promotions_staff.email},
     )
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "given_away"
-    assert data["recipient_name"] == "John Doe"
-    assert data["recipient_phone"] == "5551234"
-    assert data["given_away_by_dj"] == "DJ Test"
-    assert data["given_away_at"] is not None
+    assert response.status_code == 401
 
 
-def test_record_attempt(client, show, promotions_staff, db):
-    """Test recording a failed giveaway attempt."""
+def test_record_attempt(client, show, db):
+    """Test recording a failed giveaway attempt from the DJ studio network."""
     response = client.post(
         f"/api/shows/{show.id}/attempt",
         json={"dj_name": "DJ Test"},
-        headers={"X-Forwarded-User": promotions_staff.email},
+        headers={"X-Forwarded-For": DJ_STUDIO_IP},
     )
     assert response.status_code == 200
     data = response.json()
     assert data["dj_name"] == "DJ Test"
     assert data["attempted_at"] is not None
+
+
+def test_record_attempt_denied_for_promotions_staff(client, show, promotions_staff, db):
+    """Promotions staff cannot record a giveaway attempt from the preview page."""
+    response = client.post(
+        f"/api/shows/{show.id}/attempt",
+        json={"dj_name": "DJ Test"},
+        headers={"X-Forwarded-User": promotions_staff.email},
+    )
+    assert response.status_code == 401
 
 
 def test_claim_staff_pass(client, show, staff_member, db):
@@ -195,7 +230,7 @@ def test_get_dj_history(client, show, promotions_staff, db):
             "recipient_phone": "555-1234",
             "given_away_by_dj": "DJ Test",
         },
-        headers={"X-Forwarded-User": promotions_staff.email},
+        headers={"X-Forwarded-For": DJ_STUDIO_IP},
     )
 
     # Get history
@@ -229,7 +264,7 @@ def test_get_dj_autocomplete(client, show, promotions_staff, db):
             "recipient_phone": "555-1234",
             "given_away_by_dj": "DJ Alpha",
         },
-        headers={"X-Forwarded-User": promotions_staff.email},
+        headers={"X-Forwarded-For": DJ_STUDIO_IP},
     )
 
     client.post(
@@ -239,7 +274,7 @@ def test_get_dj_autocomplete(client, show, promotions_staff, db):
             "recipient_phone": "555-5678",
             "given_away_by_dj": "DJ Beta",
         },
-        headers={"X-Forwarded-User": promotions_staff.email},
+        headers={"X-Forwarded-For": DJ_STUDIO_IP},
     )
 
     # Get autocomplete
@@ -277,7 +312,7 @@ def test_cannot_give_away_closed_show_pass(client, show, promotions_staff, db):
             "recipient_phone": "555-1234",
             "given_away_by_dj": "DJ Test",
         },
-        headers={"X-Forwarded-User": promotions_staff.email},
+        headers={"X-Forwarded-For": DJ_STUDIO_IP},
     )
     assert response.status_code == 400
     assert "closed" in response.json()["detail"].lower()

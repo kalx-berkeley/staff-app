@@ -26,6 +26,7 @@ from app.auth import (
     get_promotions_staff,
     get_sublist_dj_staff,
     check_dj_access,
+    check_dj_giveaway_access,
     check_station_office_access,
     is_ip_in_network,
     ACTIVE_STATUS,
@@ -121,13 +122,15 @@ def get_show_passes(
 def give_away_pass(
     pass_id: int,
     giveaway_data: GiveawayData,
-    dj_access: bool = Depends(check_dj_access),
+    dj_access: bool = Depends(check_dj_giveaway_access),
     db: Session = Depends(get_db),
 ):
     """
     Give away a pass pair.
 
-    Requires DJ access (DJ studio IP or promotions staff authentication).
+    Requires DJ studio network access (or, in staging, Sublist DJ staff).
+    Promotions staff can view the DJ giveaway page as a preview but cannot
+    record a real giveaway.
 
     Args:
         pass_id: Pass ID

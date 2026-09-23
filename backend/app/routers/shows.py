@@ -29,6 +29,7 @@ from app.auth import (
     get_current_user_email,
     get_promotions_staff,
     check_dj_access,
+    check_dj_giveaway_access,
     _get_promotions_staff_by_email,
     require_authentication,
 )
@@ -1062,13 +1063,15 @@ def undelete_show(
 def record_show_attempt(
     show_id: int,
     body: AttemptRequest,
-    dj_access: bool = Depends(check_dj_access),
+    dj_access: bool = Depends(check_dj_giveaway_access),
     db: Session = Depends(get_db),
 ):
     """
     Record a failed giveaway attempt for a show.
 
-    Requires DJ access (DJ studio IP or promotions staff authentication).
+    Requires DJ studio network access (or, in staging, Sublist DJ staff).
+    Promotions staff can view the DJ giveaway page as a preview but cannot
+    record a real attempt.
     """
     attempt = ShowService.record_attempt(db, show_id, body.dj_name)
     return ShowAttemptResponse.model_validate(attempt)

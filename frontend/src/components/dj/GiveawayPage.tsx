@@ -4,11 +4,13 @@ import { showsAPI } from '../../services/api';
 import PassGiveawayForm from './PassGiveawayForm';
 import { DjNameInput, DJ_NAME_KEY, EnrichedShowName, MarkdownContent, FeatureBinBadge, KalxLiveBadge } from '../shared';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { useHasRole } from '../../contexts/authHooks';
 import type { ShowResponse, PassResponse, APIError } from '../../types';
 
 const GiveawayPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const isPromotionsPreview = useHasRole('promotions');
   const [show, setShow] = useState<ShowResponse | null>(null);
   usePageTitle(`Pass Giveaway${show ? `: ${show.event_name}` : ''} · DJ`);
   const [loading, setLoading] = useState(true);
@@ -104,6 +106,16 @@ const GiveawayPage = () => {
 
   return (
     <div className="dj-show-document">
+      {isPromotionsPreview && (
+        <div className="kalx-doc-instructions">
+          <p>
+            <strong>Preview only.</strong> You're viewing this as promotions staff, not from
+            the DJ studio, so passes can't actually be given away from here. This is exactly
+            what the on-air DJ will see.
+          </p>
+        </div>
+      )}
+
       <DjNameInput value={djName} onChange={setDjName} id="dj-giveaway-name" />
 
       <div className="kalx-giveaway-split">
@@ -215,6 +227,7 @@ const GiveawayPage = () => {
                     djName={djName}
                     winFrequencyDays={show.venue.win_frequency_days}
                     requiresEmail={show.venue.requires_email_address}
+                    readOnly={isPromotionsPreview}
                   />
                 ) : (
                   <div

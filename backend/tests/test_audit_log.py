@@ -114,9 +114,7 @@ def test_log_event_does_not_raise_on_bad_db(db: Session, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_pass_giveaway_audit(
-    client: TestClient, db: Session, published_show, promotions_staff
-):
+def test_pass_giveaway_audit(client: TestClient, db: Session, published_show):
     pair_pass = (
         db.query(Pass)
         .filter(Pass.show_id == published_show.id, Pass.pass_type == "pair")
@@ -129,7 +127,7 @@ def test_pass_giveaway_audit(
             "recipient_phone": "555-0001",
             "given_away_by_dj": "DJ Test",
         },
-        headers={"X-Forwarded-User": promotions_staff.email},
+        headers={"X-Forwarded-For": "192.168.1.100"},  # within default dj_studio_network
     )
     assert response.status_code == 200
 

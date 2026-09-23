@@ -527,7 +527,7 @@ def test_closed_show_prevents_pass_operations(
     data = response.json()
     assert data["status"] == "closed"
 
-    # Attempting to give away a pass should fail (use promotions staff for DJ access)
+    # Attempting to give away a pass should fail (use DJ studio network for DJ access)
     giveaway_data = {
         "recipient_name": "John Doe",
         "recipient_phone": "555-1234",
@@ -536,7 +536,7 @@ def test_closed_show_prevents_pass_operations(
     response = client.post(
         f"/api/passes/{pass_item.id}/giveaway",
         json=giveaway_data,
-        headers={"X-Forwarded-User": test_promotions_staff.email},
+        headers={"X-Forwarded-For": "192.168.1.100"},  # within default dj_studio_network
     )
     assert response.status_code == 400
     assert "closed" in response.json()["detail"].lower()

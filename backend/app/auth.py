@@ -346,6 +346,48 @@ def check_dj_access(
     )
 
 
+def check_dj_giveaway_access(
+    x_forwarded_user: str | None = Header(None, alias="X-Forwarded-User"),
+    x_forwarded_for: str | None = Header(None, alias="X-Forwarded-For"),
+    db: Session = Depends(get_db),
+) -> bool:
+    """
+    Check if user has access to actually record a pass giveaway or attempt.
+
+    Only DJs actually at the station can perform this action. Unlike
+    check_dj_access, authenticating as promotions staff is not sufficient —
+    promotions staff can view the DJ view (to preview how a show they're
+    promoting will appear on-air) but aren't physically in the DJ studio.
+
+    Access is granted if:
+    1. Request is from DJ studio network (no authentication required — this
+       is the normal path, since DJs on-air don't log in), OR
+    2. In staging, user is an authenticated staff member with active Sublist DJ
+       status (lets Sublist DJ staff test the full giveaway flow remotely
+       before this is rolled out to production)
+
+    :param x_forwarded_user: Email from Apache mod_auth_openidc Google authentication (optional)
+    :param x_forwarded_for: IP address from proxy
+    :param db: Database session
+    :returns: True if access is allowed
+    :raises HTTPException: If access is denied
+    """
+    if x_forwarded_for:
+        client_ip = x_forwarded_for.split(",")[0].strip()
+        if is_ip_in_network(client_ip, settings.dj_studio_network):
+            return True
+
+    if x_forwarded_user and settings.environment == "staging":
+        staff = db.query(Staff).filter(Staff.email == x_forwarded_user).first()
+        if staff and _is_sublist_dj(staff):
+            return True
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Recording a giveaway requires DJ studio network access",
+    )
+
+
 def check_station_office_access(
     x_forwarded_user: str | None = Header(None, alias="X-Forwarded-User"),
     x_forwarded_for: str | None = Header(None, alias="X-Forwarded-For"),

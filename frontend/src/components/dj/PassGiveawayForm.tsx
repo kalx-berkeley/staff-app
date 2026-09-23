@@ -12,9 +12,11 @@ interface PassGiveawayFormProps {
   djName?: string;
   winFrequencyDays?: number | null;
   requiresEmail?: boolean;
+  /** Preview mode: renders the form but disables actually recording a giveaway. */
+  readOnly?: boolean;
 }
 
-const PassGiveawayForm = ({ pass, venueId, onSuccess, djName: propDjName, winFrequencyDays, requiresEmail }: PassGiveawayFormProps) => {
+const PassGiveawayForm = ({ pass, venueId, onSuccess, djName: propDjName, winFrequencyDays, requiresEmail, readOnly }: PassGiveawayFormProps) => {
   const [formData, setFormData] = useState<GiveawayData>({
     recipient_name: '',
     recipient_phone: '',
@@ -111,6 +113,8 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName: propDjName, winFre
     e.preventDefault();
     setError(null);
 
+    if (readOnly) return;
+
     if (!formData.recipient_name.trim()) {
       setError('Winner name is required');
       return;
@@ -159,6 +163,8 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName: propDjName, winFre
 
   const handleNoWinner = async () => {
     setError(null);
+
+    if (readOnly) return;
 
     if (!formData.given_away_by_dj.trim()) {
       setError('DJ name is required');
@@ -214,7 +220,7 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName: propDjName, winFre
             id="recipient_name"
             value={formData.recipient_name}
             onChange={(e) => handleInputChange('recipient_name', e.target.value)}
-            disabled={loading}
+            disabled={loading || readOnly}
             placeholder="Enter winner's name"
             autoComplete="off"
           />
@@ -231,7 +237,7 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName: propDjName, winFre
             value={formData.recipient_phone}
             onChange={(e) => handleInputChange('recipient_phone', e.target.value)}
             onBlur={handlePhoneBlur}
-            disabled={loading}
+            disabled={loading || readOnly}
             placeholder="Enter winner's phone number"
             autoComplete="off"
           />
@@ -264,7 +270,7 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName: propDjName, winFre
               id="recipient_email"
               value={formData.recipient_email ?? ''}
               onChange={(e) => handleInputChange('recipient_email', e.target.value)}
-              disabled={loading}
+              disabled={loading || readOnly}
               placeholder="Enter winner's email address"
               autoComplete="off"
             />
@@ -285,7 +291,7 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName: propDjName, winFre
               }
             }}
             onBlur={() => setTimeout(() => setShowAutocomplete(false), 200)}
-            disabled={loading}
+            disabled={loading || readOnly}
             placeholder="Enter DJ name"
             autoComplete="off"
           />
@@ -311,7 +317,8 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName: propDjName, winFre
           <button
             type="submit"
             className="btn-primary"
-            disabled={loading || isSubmitBlocked}
+            disabled={loading || isSubmitBlocked || readOnly}
+            title={readOnly ? 'Preview only — sign in from the DJ studio to record a giveaway' : undefined}
           >
             {loading ? 'Saving...' : 'Give Away'}
           </button>
@@ -319,8 +326,12 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName: propDjName, winFre
             type="button"
             className="btn-secondary"
             onClick={handleNoWinner}
-            disabled={loading}
-            title="Record that you attempted the giveaway but no eligible caller won. This logs the attempt without awarding the pass."
+            disabled={loading || readOnly}
+            title={
+              readOnly
+                ? 'Preview only — sign in from the DJ studio to record a giveaway'
+                : 'Record that you attempted the giveaway but no eligible caller won. This logs the attempt without awarding the pass.'
+            }
           >
             Tried
           </button>
