@@ -297,7 +297,8 @@ def release_claim(
     """
     Release a claimed staff pass.
 
-    Requires staff member or promotions staff authentication.
+    Requires staff member or promotions staff authentication. Staff members
+    may only release their own claim; promotions staff may release any claim.
     Show must not be closed.
 
     Args:
@@ -313,7 +314,15 @@ def release_claim(
     pre_pass = db.query(Pass).filter(Pass.id == pass_id).first()
     prior_staff_id = pre_pass.staff_id if pre_pass else None
 
-    pass_item = PassService.release_claim(db, pass_id)
+    # Staff may only release their own claim; promotions staff may release
+    # any claim on someone's behalf.
+    if role == "staff" and pre_pass and pre_pass.staff_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only release your own staff pass",
+        )
+
+    pass_item = PassService.release_claim(db, pass_id, actor_email=user.email)
 
     audit_service.log_event(
         db,

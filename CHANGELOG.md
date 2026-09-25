@@ -8,6 +8,25 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Add a staff-pass alternate list: once every staff pass is held by a staff member, staff can join an ordered alternate list (with the same +1 guest options as a claim), and freed passes are assigned to the next alternate automatically with an email notification
+- Queue staff lottery losers as alternates in the order they entered, and state their alternate position in the lottery result email
+- Show alternates under a show's staff pass claims, and on My Passes, in amber with an "Alternate #N" label; promotions staff can remove alternates, who are emailed
+- Email alternates when a show closes without them getting a pass, when a reopened show puts them back in line, and when a show is deleted
+- Email staff pass holders when a show is deleted
+- Email staff whose pass is removed by a pass-count reduction, with their new alternate position
+
+### Changed
+
+- Cut the newest guest holds and then the newest staff claims (instead of random ones) when a show's pass count is reduced, and move cut claimers to the top of the alternate list
+- Link to the show's page from the email sent when a staff pass is released because its +1 guest was bumped
+- Only let staff release their own staff pass: the Release button now appears only on your own claim, and the API rejects staff releasing someone else's (promotions staff can still release any claim)
+
+### Fixed
+
+- Show claim and giveaway times in Pacific time on the staff show page, staff and DJ My Passes, and the staff lottery deadline, matching the promotions and DJ show pages instead of the viewer's browser timezone
+
 ## [1.3.0] - 2026-09-19
 
 ### Changed

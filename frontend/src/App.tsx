@@ -1,36 +1,45 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState, type ComponentType } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import UnauthorizedPage from './components/UnauthorizedPage';
-import {
-  PromotionsLayout,
-  ShowList,
-  ShowForm,
-  ShowDetail as PromotionsShowDetail,
-  VenueList,
-  VenueNew,
-  VenueEdit,
-  Admin,
-  PromoterList,
-  PromoterNew,
-  PromoterEdit,
-  LegacyImport,
-} from './components/promotions';
-import {
-  StaffLayout,
-  ShowBrowser as StaffShowBrowser,
-  ShowDetail as StaffShowDetail,
-  MyPasses as StaffMyPasses,
-  SpecialtyShowList as StaffSpecialtyShowList,
-  SpecialtyShowDetail as StaffSpecialtyShowDetail,
-} from './components/staff';
-import {
-  DJLayout,
-  ShowBrowser as DJShowBrowser,
-  ShowDetail as DJShowDetail,
-  MyPasses,
-  WinnerSearch,
-  GiveawayPage,
-} from './components/dj';
+
+// Each role's section is code-split into its own chunk so users only download
+// the pages for the section they use. Components are loaded through their
+// section's barrel so a whole section shares one chunk, and navigating within
+// a section doesn't suspend again after the first load.
+function lazySection<M, K extends keyof M>(load: () => Promise<M>, name: K) {
+  return lazy(() => load().then((m) => ({ default: m[name] as ComponentType })));
+}
+
+const loadPromotions = () => import('./components/promotions');
+const PromotionsLayout = lazySection(loadPromotions, 'PromotionsLayout');
+const ShowList = lazySection(loadPromotions, 'ShowList');
+const ShowForm = lazySection(loadPromotions, 'ShowForm');
+const PromotionsShowDetail = lazySection(loadPromotions, 'ShowDetail');
+const VenueList = lazySection(loadPromotions, 'VenueList');
+const VenueNew = lazySection(loadPromotions, 'VenueNew');
+const VenueEdit = lazySection(loadPromotions, 'VenueEdit');
+const Admin = lazySection(loadPromotions, 'Admin');
+const PromoterList = lazySection(loadPromotions, 'PromoterList');
+const PromoterNew = lazySection(loadPromotions, 'PromoterNew');
+const PromoterEdit = lazySection(loadPromotions, 'PromoterEdit');
+const LegacyImport = lazySection(loadPromotions, 'LegacyImport');
+
+const loadStaff = () => import('./components/staff');
+const StaffLayout = lazySection(loadStaff, 'StaffLayout');
+const StaffShowBrowser = lazySection(loadStaff, 'ShowBrowser');
+const StaffShowDetail = lazySection(loadStaff, 'ShowDetail');
+const StaffMyPasses = lazySection(loadStaff, 'MyPasses');
+const StaffSpecialtyShowList = lazySection(loadStaff, 'SpecialtyShowList');
+const StaffSpecialtyShowDetail = lazySection(loadStaff, 'SpecialtyShowDetail');
+
+const loadDJ = () => import('./components/dj');
+const DJLayout = lazySection(loadDJ, 'DJLayout');
+const DJShowBrowser = lazySection(loadDJ, 'ShowBrowser');
+const DJShowDetail = lazySection(loadDJ, 'ShowDetail');
+const MyPasses = lazySection(loadDJ, 'MyPasses');
+const WinnerSearch = lazySection(loadDJ, 'WinnerSearch');
+const GiveawayPage = lazySection(loadDJ, 'GiveawayPage');
+
 import { useAuth } from './contexts/authHooks';
 import { AUTH_DIAG_KEY } from './services/api';
 import { isStagingEnvironment, isStagingSublistDjStaff } from './utils';
@@ -241,6 +250,7 @@ function App() {
     <StagingBanner />
     <AuthDiagBanner />
     <BrowserRouter basename="/pass-giveaway">
+      <Suspense fallback={<LoadingScreen />}>
       <Routes>
         {/* Default redirect based on role */}
         <Route path="/" element={<RoleBasedRedirect />} />
@@ -311,6 +321,7 @@ function App() {
         {/* Catch-all route - redirect based on role */}
         <Route path="*" element={<RoleBasedRedirect />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
     </>
   );

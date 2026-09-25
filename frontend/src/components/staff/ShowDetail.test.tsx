@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import ShowDetail from './ShowDetail';
-import { showsAPI, passesAPI } from '../../services/api';
-import type { ShowResponse, PassResponse, UserResponse } from '../../types';
+import { showsAPI, passesAPI, alternatesAPI } from '../../services/api';
+import type { ShowResponse, PassResponse, UserResponse, AlternateEntry, AlternateQueue } from '../../types';
 
 // Mock the API
 vi.mock('../../services/api', () => ({
@@ -14,6 +14,12 @@ vi.mock('../../services/api', () => ({
     claim: vi.fn(),
     releaseClaim: vi.fn(),
     removePreassignment: vi.fn(),
+  },
+  alternatesAPI: {
+    getQueue: vi.fn(),
+    join: vi.fn(),
+    updateMine: vi.fn(),
+    leave: vi.fn(),
   },
 }));
 
@@ -131,6 +137,15 @@ describe('Staff ShowDetail', () => {
     mockUseAuth.mockReturnValue({ user: null, loading: false, error: null, refetchUser: vi.fn() });
   });
 
+  // Only the claimer sees Release on their own pass.
+  const loginAsClaimer = () =>
+    mockUseAuth.mockReturnValue({
+      user: { email: 'jane@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { name: 'Jane Staff', phone: '555-999-0000', dj_name: null, is_sublist_dj: false } },
+      loading: false,
+      error: null,
+      refetchUser: vi.fn(),
+    });
+
   describe('Show Information Display', () => {
     it('should display show details correctly', async () => {
       vi.mocked(showsAPI.get).mockResolvedValue(mockShow);
@@ -196,6 +211,7 @@ describe('Staff ShowDetail', () => {
     });
 
     it('should show Release button for claimed passes when show is published', async () => {
+      loginAsClaimer();
       vi.mocked(showsAPI.get).mockResolvedValue(mockShow);
 
       render(
@@ -210,7 +226,29 @@ describe('Staff ShowDetail', () => {
       });
     });
 
+    it("should not show Release on someone else's claim", async () => {
+      mockUseAuth.mockReturnValue({
+        user: { email: 'other@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { name: 'Other', phone: '555-0000', dj_name: null, is_sublist_dj: false } },
+        loading: false,
+        error: null,
+        refetchUser: vi.fn(),
+      });
+      vi.mocked(showsAPI.get).mockResolvedValue(mockShow);
+
+      render(
+        <BrowserRouter>
+          <ShowDetail />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Jane Staff')).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('button', { name: /^release$/i })).not.toBeInTheDocument();
+    });
+
     it('should disable Release button when show is closed', async () => {
+      loginAsClaimer();
       const closedShow = { ...mockShow, status: 'closed' as const };
       vi.mocked(showsAPI.get).mockResolvedValue(closedShow);
 
@@ -397,6 +435,7 @@ describe('Staff ShowDetail', () => {
 
   describe('Release Pass', () => {
     it('should call releaseClaim API with pass ID', async () => {
+      loginAsClaimer();
       vi.mocked(showsAPI.get).mockResolvedValue(mockShow);
       vi.mocked(passesAPI.releaseClaim).mockResolvedValue({
         ...claimedPass,
@@ -422,6 +461,7 @@ describe('Staff ShowDetail', () => {
     });
 
     it('should show success message after release', async () => {
+      loginAsClaimer();
       vi.mocked(showsAPI.get).mockResolvedValue(mockShow);
       vi.mocked(passesAPI.releaseClaim).mockResolvedValue({
         ...claimedPass,
@@ -443,6 +483,133 @@ describe('Staff ShowDetail', () => {
       await waitFor(() => {
         expect(screen.getByText('Pass released.')).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('Alternate list', () => {
+    const meUser: UserResponse = {
+      email: 'me@example.com',
+      role: 'staff',
+      is_dj_network: false,
+      is_station_office_network: false,
+      profile: { name: 'Me', phone: '555-0000', dj_name: null, is_sublist_dj: false },
+    };
+    const fullShow: ShowResponse = {
+      ...mockShow,
+      passes: [claimedPass, { ...claimedPass, id: 3, staff_name: 'Ken', staff_email: 'ken@example.com' }],
+      available_staff_count: 0,
+    };
+    const entry = (overrides: Partial<AlternateEntry>): AlternateEntry => ({
+      id: 10,
+      show_id: 1,
+      staff_id: 20,
+      staff_name: 'Alex Alt',
+      position: 1,
+      has_guest: false,
+      guest_name: null,
+      only_attend_with_guest: false,
+      source: 'joined',
+      priority_at: '2024-01-11T10:00:00Z',
+      ...overrides,
+    });
+    const queue = (overrides: Partial<AlternateQueue>): AlternateQueue => ({
+      queue_open: true,
+      entries: [],
+      my_entry_id: null,
+      next_candidate_staff_id: null,
+      next_candidate_name: null,
+      ...overrides,
+    });
+
+    beforeEach(() => {
+      mockUseAuth.mockReturnValue({ user: meUser, loading: false, error: null, refetchUser: vi.fn() });
+    });
+
+    it('hides the join control while passes are still available', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue(mockShow);
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue(queue({ queue_open: false }));
+
+      render(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      await waitFor(() => expect(alternatesAPI.getQueue).toHaveBeenCalledWith(1));
+      expect(screen.queryByRole('button', { name: /join alternate list/i })).not.toBeInTheDocument();
+    });
+
+    it('lets a user join once every pass is taken', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue(fullShow);
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue(
+        queue({ entries: [entry({})] })
+      );
+      vi.mocked(alternatesAPI.join).mockResolvedValue(entry({ id: 11, position: 2, staff_name: 'Me' }));
+
+      render(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      await waitFor(() => {
+        expect(screen.getByText(/1 person is already on the alternate list/i)).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByRole('button', { name: /join alternate list/i }));
+      fireEvent.click(screen.getByLabelText(/a pass for me and a guest/i));
+      fireEvent.click(screen.getByRole('button', { name: /join alternate list/i }));
+
+      await waitFor(() => {
+        expect(alternatesAPI.join).toHaveBeenCalledWith(1, {
+          has_guest: true,
+          guest_name: null,
+          only_attend_with_guest: false,
+        });
+      });
+      expect(await screen.findByText(/you're alternate #2/i)).toBeInTheDocument();
+    });
+
+    it('renders alternates after a divider with position labels', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue(fullShow);
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue(
+        queue({
+          entries: [
+            entry({}),
+            entry({ id: 11, staff_id: 21, staff_name: 'Me', position: 2, has_guest: true, guest_name: 'Pal' }),
+          ],
+          my_entry_id: 11,
+        })
+      );
+
+      render(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      expect(await screen.findByRole('separator')).toHaveTextContent('Alternates (2)');
+      expect(screen.getByText('Alternate #1')).toBeInTheDocument();
+      expect(screen.getByText(/1 person is ahead of you/i)).toBeInTheDocument();
+      expect(screen.getByText(/\+1 guest requested: Pal/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /join alternate list/i })).not.toBeInTheDocument();
+
+      vi.mocked(alternatesAPI.leave).mockResolvedValue(undefined);
+      fireEvent.click(screen.getByRole('button', { name: /leave list/i }));
+      await waitFor(() => expect(alternatesAPI.leave).toHaveBeenCalledWith(1));
+    });
+
+    it('warns who will get the pass before releasing', async () => {
+      const myPass = { ...claimedPass, staff_email: 'me@example.com', staff_name: 'Me' };
+      vi.mocked(showsAPI.get).mockResolvedValue({ ...fullShow, passes: [myPass] });
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue(
+        queue({ entries: [entry({})], next_candidate_staff_id: 20, next_candidate_name: 'Alex Alt' })
+      );
+      vi.mocked(passesAPI.releaseClaim).mockResolvedValue({ ...myPass, staff_name: 'Alex Alt' });
+
+      render(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      await waitFor(() => expect(alternatesAPI.getQueue).toHaveBeenCalled());
+      await screen.findByText('Alternate #1');
+      fireEvent.click(screen.getByRole('button', { name: /^release$/i }));
+
+      expect(
+        screen.getByText((_, el) =>
+          el?.tagName === 'P' &&
+          /your pass will go to alex alt; you can rejoin at the back of the line/i.test(el.textContent ?? '')
+        )
+      ).toBeInTheDocument();
+      expect(passesAPI.releaseClaim).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: /release pass/i }));
+      await waitFor(() => expect(passesAPI.releaseClaim).toHaveBeenCalledWith(2));
     });
   });
 });

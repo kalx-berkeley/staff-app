@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { passesAPI, lotteryAPI } from '../../services/api';
-import type { PassResponse, MyLotteryEntryResponse, APIError } from '../../types';
+import { passesAPI, lotteryAPI, alternatesAPI } from '../../services/api';
+import type { PassResponse, MyLotteryEntryResponse, MyAlternateEntry, APIError } from '../../types';
 import { formatPhone } from '../../utils';
 import { useAuth } from '../../contexts/authHooks';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -9,6 +9,7 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 const formatDateTime = (dateTimeStr: string) => {
   const date = new Date(dateTimeStr);
   return date.toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
     weekday: 'short',
     year: 'numeric',
     month: 'short',
@@ -95,6 +96,40 @@ const MyPasses = () => {
     }
   }, []);
 
+  // Alternate-list entries — only shown when the user is waiting somewhere.
+  const [alternateEntries, setAlternateEntries] = useState<MyAlternateEntry[]>([]);
+  const [alternateError, setAlternateError] = useState<string | null>(null);
+  const [leavingShowId, setLeavingShowId] = useState<number | null>(null);
+
+  const loadAlternateEntries = useCallback(async () => {
+    try {
+      setAlternateError(null);
+      setAlternateEntries(await alternatesAPI.getMyEntries());
+    } catch (err) {
+      const apiError = err as APIError;
+      setAlternateError(
+        typeof apiError.detail === 'string'
+          ? apiError.detail
+          : 'Failed to load alternate list entries'
+      );
+    }
+  }, []);
+
+  const handleLeaveAlternates = async (showId: number) => {
+    setLeavingShowId(showId);
+    try {
+      await alternatesAPI.leave(showId);
+      await loadAlternateEntries();
+    } catch (err) {
+      const apiError = err as APIError;
+      setAlternateError(
+        typeof apiError.detail === 'string' ? apiError.detail : 'Failed to leave the alternate list'
+      );
+    } finally {
+      setLeavingShowId(null);
+    }
+  };
+
   const loadPasses = useCallback(async () => {
     try {
       setLoading(true);
@@ -117,7 +152,8 @@ const MyPasses = () => {
   useEffect(() => {
     loadClaimedPasses();
     loadLotteryEntries();
-  }, [loadClaimedPasses, loadLotteryEntries]);
+    loadAlternateEntries();
+  }, [loadClaimedPasses, loadLotteryEntries, loadAlternateEntries]);
 
   useEffect(() => {
     if (isSublistDj) {
@@ -290,6 +326,74 @@ const MyPasses = () => {
           </div>
         )}
       </div>
+
+      {(alternateEntries.length > 0 || alternateError) && (
+        <div className="passes-list-section">
+          <h3 className="passes-section-title">Alternate Lists</h3>
+
+          {alternateError && (
+            <div className="error">
+              <p>Error: {alternateError}</p>
+            </div>
+          )}
+
+          <div className="passes-list">
+            {alternateEntries.map((entry) => (
+              <div key={entry.id} className="pass-card alternate-card">
+                <div className="pass-header">
+                  <h3>{entry.show_event_name || 'Show'}</h3>
+                  <span className="pass-status alternate-label">Alternate #{entry.position}</span>
+                </div>
+
+                <div className="pass-body">
+                  <div className="pass-info">
+                    {entry.show_venue_name && (
+                      <div className="info-row">
+                        <span className="info-label">Venue:</span>
+                        <span className="info-value">{entry.show_venue_name}</span>
+                      </div>
+                    )}
+                    {entry.show_date && (
+                      <div className="info-row">
+                        <span className="info-label">Show Date:</span>
+                        <span className="info-value">{formatDate(entry.show_date)}</span>
+                      </div>
+                    )}
+                    <div className="info-row">
+                      <span className="info-label">Ahead of you:</span>
+                      <span className="info-value">
+                        {entry.position === 1 ? 'Nobody — you are next' : entry.position - 1}
+                      </span>
+                    </div>
+                    {entry.has_guest && (
+                      <div className="info-row">
+                        <span className="info-label">+1 Guest:</span>
+                        <span className="info-value">
+                          {entry.guest_name || 'Requested'}
+                          {entry.only_attend_with_guest ? ' (only attending with guest)' : ''}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="show-card-footer">
+                  <Link to={`/staff/shows/${entry.show_id}`} className="btn-primary">
+                    View Show
+                  </Link>
+                  <button
+                    onClick={() => handleLeaveAlternates(entry.show_id)}
+                    className="btn-small btn-danger"
+                    disabled={leavingShowId === entry.show_id}
+                  >
+                    {leavingShowId === entry.show_id ? 'Leaving…' : 'Leave list'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {isSublistDj && (
         <div className="passes-list-section">

@@ -416,10 +416,34 @@ class LotteryService:
                 entry.status = "lost"
                 entry.updated_at = now
 
+        # Losers join the alternate queue in the order they entered the lottery.
+        # Passes returned by only-with-guest winners may go straight to them.
+        from app.services.alternate_service import AlternateService
+
+        losers = [e for e in entries if e.id not in staff_pass]
+        queued = AlternateService.enqueue_lottery_losers(db, show, losers)
+        promotions = AlternateService.fill_open_passes(db, show, trigger="lottery")
+
         db.commit()
+        if queued:
+            AlternateService._audit_bulk(
+                db, "alternates_enqueued_from_lottery", show, queued
+            )
+        AlternateService.finalize_promotions(db, promotions)
+
+        promoted_staff_ids = {p.entry.staff_id for p in promotions}
+        alternate_positions = {
+            alt.staff_id: position
+            for position, alt in enumerate(
+                AlternateService.waiting_entries(db, show.id), start=1
+            )
+        }
 
         # Send notification emails — 8 distinct outcome cases
         for entry in entries:
+            if entry.id not in staff_pass and entry.staff_id in promoted_staff_ids:
+                # Already emailed about the pass they got from the alternate queue.
+                continue
             staff_member = db.query(Staff).filter(Staff.id == entry.staff_id).first()
             if not staff_member or not staff_member.email:
                 continue
@@ -549,6 +573,24 @@ class LotteryService:
                         "Thank you for entering!",
                     ])
                     subject = f"Lottery result for {show.event_name}"
+
+            position = alternate_positions.get(entry.staff_id)
+            if entry.id not in staff_pass and position is not None:
+                body = body.replace(
+                    "Thank you for entering!",
+                    "\n".join([
+                        (
+                            "You have been added to the staff pass alternate list as"
+                            f" alternate #{position}."
+                        ),
+                        (
+                            "If a staff pass frees up before the guest list closes, it will"
+                            " be assigned to you automatically and you'll be emailed."
+                        ),
+                        "",
+                        "Thank you for entering!",
+                    ]),
+                )
 
             notification_service.send_email(
                 to_email=staff_member.email,

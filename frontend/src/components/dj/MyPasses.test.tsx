@@ -294,7 +294,7 @@ describe('MyPasses', () => {
     it('should format datetime with correct locale', async () => {
       const pass: PassResponse = {
         ...mockPasses[0],
-        given_away_at: '2024-12-31T23:45:00',
+        given_away_at: '2025-01-01T07:45:00Z', // 11:45 PM PST
       };
       vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([pass]);
       renderWithDJName();
@@ -308,7 +308,7 @@ describe('MyPasses', () => {
     it('should handle AM times correctly', async () => {
       const pass: PassResponse = {
         ...mockPasses[0],
-        given_away_at: '2024-01-15T09:30:00',
+        given_away_at: '2024-01-15T17:30:00Z', // 9:30 AM PST
       };
       vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([pass]);
       renderWithDJName();
@@ -321,7 +321,7 @@ describe('MyPasses', () => {
     it('should handle noon correctly', async () => {
       const pass: PassResponse = {
         ...mockPasses[0],
-        given_away_at: '2024-01-15T12:00:00',
+        given_away_at: '2024-01-15T20:00:00Z', // 12:00 PM PST
       };
       vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([pass]);
       renderWithDJName();

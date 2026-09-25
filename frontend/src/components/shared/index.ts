@@ -18,3 +18,4 @@ export { default as GenreTagInput } from './GenreTagInput';
 export { default as PersonAutocomplete } from './PersonAutocomplete';
 export type { PersonOption } from './PersonAutocomplete';
 export { extractPersonEmail } from './personUtils';
+export { AlternateQueueList, AlternateGuestForm } from './AlternateQueue';

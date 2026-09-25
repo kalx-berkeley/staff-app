@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { showsAPI, passesAPI, lotteryAPI, specialtyShowsAPI } from '../../services/api';
-import { Tooltip, EnrichedShowName, MarkdownContent, FeatureBinBadge, KalxLiveBadge, DatePicker } from '../shared';
+import { showsAPI, passesAPI, lotteryAPI, specialtyShowsAPI, alternatesAPI } from '../../services/api';
+import { Tooltip, EnrichedShowName, MarkdownContent, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, AlternateGuestForm } from '../shared';
 import { formatPhone, formatDateValue } from '../../utils';
 import { useAuth } from '../../contexts/authHooks';
 import { usePageTitle } from '../../hooks/usePageTitle';
-import type { ShowResponse, StaffProfile, APIError, ClaimData, LotteryStatus, SpecialtyShowResponse } from '../../types';
+import type { ShowResponse, StaffProfile, APIError, ClaimData, LotteryStatus, SpecialtyShowResponse, AlternateQueue, AlternateJoinRequest } from '../../types';
 
 const ShowDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -36,6 +36,14 @@ const ShowDetail = () => {
   const [guestClaimPassId, setGuestClaimPassId] = useState<number | null>(null);
   const [guestName, setGuestName] = useState('');
   const [onlyWithGuest, setOnlyWithGuest] = useState(false);
+
+  // Alternate queue state
+  const [alternateQueue, setAlternateQueue] = useState<AlternateQueue | null>(null);
+  const [alternateFormMode, setAlternateFormMode] = useState<'join' | 'edit' | null>(null);
+  const [alternateActionLoading, setAlternateActionLoading] = useState(false);
+  const [alternateActionError, setAlternateActionError] = useState<string | null>(null);
+  // Pass awaiting confirmation that releasing it hands it to the next alternate
+  const [releaseConfirmPassId, setReleaseConfirmPassId] = useState<number | null>(null);
 
   // Lottery state
   const [lotteryStatus, setLotteryStatus] = useState<LotteryStatus | null>(null);
@@ -96,6 +104,20 @@ const ShowDetail = () => {
   useEffect(() => {
     if (show) loadLotteryStatus(show);
   }, [show, loadLotteryStatus]);
+
+  const loadAlternateQueue = useCallback(async (showData: ShowResponse) => {
+    if (showData.status === 'draft') return;
+    try {
+      setAlternateQueue(await alternatesAPI.getQueue(showData.id));
+    } catch {
+      // non-fatal — the alternate queue UI is hidden if it can't load
+    }
+  }, []);
+
+  // Re-fetched whenever the show reloads, since claims and releases move the queue.
+  useEffect(() => {
+    if (show) loadAlternateQueue(show);
+  }, [show, loadAlternateQueue]);
 
   useEffect(() => {
     const staffProfile = user?.profile as StaffProfile | undefined;
@@ -258,7 +280,66 @@ const ShowDetail = () => {
     }
   };
 
+  const handleJoinAlternates = async (data: AlternateJoinRequest) => {
+    if (!show) return;
+    setAlternateActionLoading(true);
+    setAlternateActionError(null);
+    try {
+      const entry = await alternatesAPI.join(show.id, data);
+      setAlternateFormMode(null);
+      showEphemeralSuccess(
+        `You're alternate #${entry.position}. If a pass frees up it will be assigned to you automatically and you'll be emailed.`
+      );
+      await loadShow(true);
+    } catch (err) {
+      const apiError = err as APIError;
+      setAlternateActionError(
+        typeof apiError.detail === 'string' ? apiError.detail : 'Failed to join the alternate list'
+      );
+    } finally {
+      setAlternateActionLoading(false);
+    }
+  };
+
+  const handleUpdateAlternate = async (data: AlternateJoinRequest) => {
+    if (!show) return;
+    setAlternateActionLoading(true);
+    setAlternateActionError(null);
+    try {
+      await alternatesAPI.updateMine(show.id, data);
+      setAlternateFormMode(null);
+      showEphemeralSuccess('Your alternate request has been updated.');
+      await loadShow(true);
+    } catch (err) {
+      const apiError = err as APIError;
+      setAlternateActionError(
+        typeof apiError.detail === 'string' ? apiError.detail : 'Failed to update your alternate request'
+      );
+    } finally {
+      setAlternateActionLoading(false);
+    }
+  };
+
+  const handleLeaveAlternates = async () => {
+    if (!show) return;
+    setAlternateActionLoading(true);
+    setAlternateActionError(null);
+    try {
+      await alternatesAPI.leave(show.id);
+      showEphemeralSuccess('You have left the alternate list.');
+      await loadShow(true);
+    } catch (err) {
+      const apiError = err as APIError;
+      setAlternateActionError(
+        typeof apiError.detail === 'string' ? apiError.detail : 'Failed to leave the alternate list'
+      );
+    } finally {
+      setAlternateActionLoading(false);
+    }
+  };
+
   const handleReleasePass = async (passId: number) => {
+    setReleaseConfirmPassId(null);
     setPassActionId(passId);
     setPassActionError(null);
     setSuccessMessage(null);
@@ -446,6 +527,7 @@ const ShowDetail = () => {
   const formatDateTime = (dateTimeStr: string) => {
     const date = new Date(dateTimeStr);
     return date.toLocaleString('en-US', {
+      timeZone: 'America/Los_Angeles',
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
@@ -508,10 +590,22 @@ const ShowDetail = () => {
     ? lotteryStatus.is_active
     : show.lottery_enabled && lotteryDeadline !== null && new Date() < lotteryDeadline;
   const myStaffEntry = lotteryStatus?.my_staff_entry ?? null;
+
+  const alternateEntries = alternateQueue?.entries ?? [];
+  const myAlternateEntry =
+    alternateEntries.find((e) => e.id === alternateQueue?.my_entry_id) ?? null;
+  // The join control only appears once every staff pass is held by a staff member.
+  const canJoinAlternates =
+    !!alternateQueue?.queue_open &&
+    !alreadyHasStaffPass &&
+    !myAlternateEntry &&
+    show.status === 'published' &&
+    !lotteryActive;
+  const releaseCandidateName = alternateQueue?.next_candidate_name ?? null;
   const myDJEntry = lotteryStatus?.my_dj_entry ?? null;
 
   const formatLotteryDeadline = (d: Date) =>
-    d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    d.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   // First date on or after which DJ pass-pair reservations are prohibited
   // (within `dj_preassign_prohibition_days` of the planned close date).
@@ -1135,6 +1229,8 @@ const ShowDetail = () => {
               const isPrimaryWithGuest = pass.status === 'claimed' && pass.has_guest;
 
               if (pass.status === 'claimed' && !isGuestHold) {
+                // Only the claimer can release their own pass.
+                const isMine = !!myEmail && pass.staff_email?.toLowerCase() === myEmail;
                 return (
                   <div key={pass.id} className="pass-card">
                     <div className="pass-details">
@@ -1151,16 +1247,26 @@ const ShowDetail = () => {
                       {pass.claimed_at && (
                         <p><strong>Claimed:</strong> {formatDateTime(pass.claimed_at)}</p>
                       )}
-                      <button
-                        onClick={() => handleReleasePass(pass.id)}
-                        className="btn-small"
-                        disabled={show.status === 'closed' || passActionId === pass.id}
-                        title="Release your claim if you can no longer attend the show."
-                      >
-                        {passActionId === pass.id ? 'Releasing...' : 'Release'}
-                      </button>
-                      {show.status === 'closed' && (
-                        <p className="pass-closed-note">Show is closed — cannot release.</p>
+                      {isMine && (
+                        <>
+                          <button
+                            onClick={() => {
+                              if (releaseCandidateName) {
+                                setReleaseConfirmPassId(pass.id);
+                              } else {
+                                handleReleasePass(pass.id);
+                              }
+                            }}
+                            className="btn-small"
+                            disabled={show.status === 'closed' || passActionId === pass.id}
+                            title="Release your claim if you can no longer attend the show."
+                          >
+                            {passActionId === pass.id ? 'Releasing...' : 'Release'}
+                          </button>
+                          {show.status === 'closed' && (
+                            <p className="pass-closed-note">Show is closed — cannot release.</p>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -1288,8 +1394,117 @@ const ShowDetail = () => {
               );
             })}
           </div>
+
+          {alternateActionError && <p className="field-error">{alternateActionError}</p>}
+
+          {canJoinAlternates && (
+            <div className="alternate-summary">
+              <p style={{ margin: '0 0 0.5rem' }}>
+                <strong>All staff passes are taken.</strong>{' '}
+                {alternateEntries.length === 0
+                  ? 'You can join the alternate list — if a pass frees up, the first alternate gets it automatically and is emailed.'
+                  : `${alternateEntries.length} ${alternateEntries.length === 1 ? 'person is' : 'people are'} already on the alternate list ahead of you. If a pass frees up, the first alternate gets it automatically and is emailed.`}
+              </p>
+              {alternateFormMode === 'join' ? (
+                <AlternateGuestForm
+                  idPrefix="alternate-join"
+                  requireGuestName={show.venue.staff_guest_requires_name}
+                  submitLabel="Join Alternate List"
+                  busy={alternateActionLoading}
+                  onSubmit={handleJoinAlternates}
+                  onCancel={() => { setAlternateFormMode(null); setAlternateActionError(null); }}
+                />
+              ) : (
+                <button
+                  onClick={() => setAlternateFormMode('join')}
+                  className="btn-small btn-primary"
+                  title="Get in line for a staff pass in case someone releases theirs."
+                >
+                  Join Alternate List
+                </button>
+              )}
+            </div>
+          )}
+
+          {myAlternateEntry && (
+            <div className="alternate-summary">
+              You are <strong>alternate #{myAlternateEntry.position}</strong>
+              {myAlternateEntry.position === 1
+                ? ' — you are next in line if a staff pass frees up.'
+                : ` — ${myAlternateEntry.position - 1} ${myAlternateEntry.position === 2 ? 'person is' : 'people are'} ahead of you.`}
+              {myAlternateEntry.only_attend_with_guest &&
+                ' Because you only want to attend with your guest, you will be skipped until two passes are free at once.'}
+            </div>
+          )}
+
+          <AlternateQueueList
+            entries={alternateEntries}
+            myEntryId={myAlternateEntry?.id ?? null}
+            renderMyActions={(entry) =>
+              alternateFormMode === 'edit' ? (
+                <AlternateGuestForm
+                  idPrefix="alternate-edit"
+                  requireGuestName={show.venue.staff_guest_requires_name}
+                  initial={{
+                    has_guest: entry.has_guest,
+                    guest_name: entry.guest_name,
+                    only_attend_with_guest: entry.only_attend_with_guest,
+                  }}
+                  submitLabel="Save"
+                  busy={alternateActionLoading}
+                  onSubmit={handleUpdateAlternate}
+                  onCancel={() => { setAlternateFormMode(null); setAlternateActionError(null); }}
+                />
+              ) : (
+                <div className="claim-buttons">
+                  <button
+                    onClick={() => setAlternateFormMode('edit')}
+                    className="btn-small"
+                    disabled={alternateActionLoading}
+                    title="Change your +1 guest request without losing your place in line."
+                  >
+                    Edit guest
+                  </button>
+                  <button
+                    onClick={handleLeaveAlternates}
+                    className="btn-small btn-danger"
+                    disabled={alternateActionLoading}
+                    title="Leave the alternate list. Rejoining puts you at the back of the line."
+                  >
+                    {alternateActionLoading ? 'Leaving…' : 'Leave list'}
+                  </button>
+                </div>
+              )
+            }
+          />
         </div>
       </div>
+
+      {releaseConfirmPassId !== null && (
+        <div className="modal-overlay" onClick={() => setReleaseConfirmPassId(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Release Your Pass</h3>
+              <button className="btn-close" onClick={() => setReleaseConfirmPassId(null)}>×</button>
+            </div>
+            <p>
+              Your pass will go to <strong>{releaseCandidateName}</strong>; you can rejoin at
+              the back of the line.
+            </p>
+            <div className="form-actions" style={{ marginTop: '1rem' }}>
+              <button onClick={() => setReleaseConfirmPassId(null)} className="btn-secondary">
+                Cancel
+              </button>
+              <button
+                onClick={() => handleReleasePass(releaseConfirmPassId)}
+                className="btn-primary"
+              >
+                Release Pass
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

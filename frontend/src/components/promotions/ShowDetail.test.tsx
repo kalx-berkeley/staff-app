@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import ShowDetail from './ShowDetail';
-import { showsAPI, passesAPI, autocompleteAPI, specialtyShowsAPI, lotteryAPI } from '../../services/api';
+import { showsAPI, passesAPI, autocompleteAPI, specialtyShowsAPI, lotteryAPI, alternatesAPI } from '../../services/api';
 import type { ShowResponse, PassResponse, DjSuggestion } from '../../types';
 
 vi.mock('../../services/api', () => ({
@@ -31,6 +31,16 @@ vi.mock('../../services/api', () => ({
       my_staff_entry: null,
       my_dj_entry: null,
     }),
+  },
+  alternatesAPI: {
+    getQueue: vi.fn().mockResolvedValue({
+      queue_open: false,
+      entries: [],
+      my_entry_id: null,
+      next_candidate_staff_id: null,
+      next_candidate_name: null,
+    }),
+    remove: vi.fn(),
   },
 }));
 
@@ -298,5 +308,63 @@ describe('Promotions ShowDetail — Suggest DJs', () => {
       const input = screen.getByPlaceholderText('DJ Name') as HTMLInputElement;
       expect(input.value).toBe('Wolfman');
     });
+  });
+});
+
+describe('Promotions ShowDetail — alternates', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('lists alternates and removes one after confirmation', async () => {
+    const staffPass: PassResponse = {
+      ...basePass,
+      id: 2,
+      pass_type: 'staff',
+      status: 'claimed',
+      staff_name: 'Holder',
+    };
+    vi.mocked(showsAPI.get).mockResolvedValue(makeShow([staffPass]));
+    const alt = {
+      id: 7,
+      show_id: 1,
+      staff_id: 30,
+      staff_name: 'Wanda Waiting',
+      position: 1,
+      has_guest: false,
+      guest_name: null,
+      only_attend_with_guest: false,
+      source: 'lottery',
+      priority_at: '2024-01-01T00:00:00Z',
+    };
+    vi.mocked(alternatesAPI.getQueue)
+      .mockResolvedValueOnce({
+        queue_open: true,
+        entries: [alt],
+        my_entry_id: null,
+        next_candidate_staff_id: null,
+        next_candidate_name: null,
+      })
+      .mockResolvedValue({
+        queue_open: true,
+        entries: [],
+        my_entry_id: null,
+        next_candidate_staff_id: null,
+        next_candidate_name: null,
+      });
+    vi.mocked(alternatesAPI.remove).mockResolvedValue(undefined);
+
+    renderShowDetail();
+
+    expect(await screen.findByText('Alternate #1')).toBeInTheDocument();
+    expect(screen.getByText('Wanda Waiting')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    const dialog = screen.getByRole('heading', { name: 'Remove Alternate' }).closest('.modal-content') as HTMLElement;
+    expect(within(dialog).getByText(/they will be emailed/i)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove' }));
+
+    await waitFor(() => expect(alternatesAPI.remove).toHaveBeenCalledWith(1, 7));
+    await waitFor(() => expect(screen.queryByText('Alternate #1')).not.toBeInTheDocument());
   });
 });

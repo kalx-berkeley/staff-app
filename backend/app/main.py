@@ -17,6 +17,7 @@ from app.routers import (
     admin,
     promoters,
     lottery,
+    alternates,
     specialty_shows,
     on_air,
 )
@@ -241,6 +242,7 @@ app.include_router(passes.router, dependencies=_auth_check)
 app.include_router(admin.router, dependencies=_auth_check)
 app.include_router(promoters.router, dependencies=_auth_check)
 app.include_router(lottery.router, dependencies=_auth_check)
+app.include_router(alternates.router, dependencies=_auth_check)
 app.include_router(specialty_shows.router, dependencies=_auth_check)
 app.include_router(on_air.router, dependencies=_auth_check)
 if settings.legacy_import_enabled:
