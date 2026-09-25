@@ -2,6 +2,7 @@
 
 from .audit_log import AuditLog
 from .lottery_entry import LotteryEntry
+from .staff_pass_alternate import StaffPassAlternate
 from .promoter import Promoter
 from .promoter_owner import PromoterOwner
 from .promoter_contact import PromoterContact
@@ -34,6 +35,7 @@ from .dismissed_spin_match import DismissedSpinMatch
 __all__ = [
     "AuditLog",
     "LotteryEntry",
+    "StaffPassAlternate",
     "Promoter",
     "PromoterOwner",
     "PromoterContact",

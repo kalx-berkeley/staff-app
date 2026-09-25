@@ -279,9 +279,9 @@ async def auto_close_show(show_id: int):
         ShowService.close_show(db, show_id)
         db.refresh(show)
         ShowService._notify_venue_owners_of_auto_close(db, show)
-        from app.routers.shows import _notify_staff_guests_confirmed
+        from app.routers.shows import run_close_side_effects
 
-        _notify_staff_guests_confirmed(db, show)
+        run_close_side_effects(db, show)
         logger.info(f"Auto-close complete for show {show_id} ({show.event_name})")
     except Exception as e:
         logger.error(f"Auto-close job failed for show {show_id}: {str(e)}", exc_info=True)
@@ -358,9 +358,9 @@ def _reschedule_pending_auto_close_jobs() -> None:
                     ShowService.close_show(db, show.id)
                     db.refresh(show)
                     ShowService._notify_venue_owners_of_auto_close(db, show)
-                    from app.routers.shows import _notify_staff_guests_confirmed
+                    from app.routers.shows import run_close_side_effects
 
-                    _notify_staff_guests_confirmed(db, show)
+                    run_close_side_effects(db, show)
                 except Exception as e:
                     logger.error(f"Failed to close missed auto-close show {show.id}: {e}")
     finally:

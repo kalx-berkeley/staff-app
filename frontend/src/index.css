@@ -3748,3 +3748,56 @@ fieldset.radio-group legend {
   color: var(--secondary-color);
   padding: 0.2rem;
 }
+
+/* Staff-pass alternate queue (staff/promotions ShowDetail, My Passes) */
+.alternate-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #8a5a00;
+}
+
+.alternate-divider::before,
+.alternate-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 2px dashed #f0b429;
+}
+
+.alternate-card {
+  background: #fffaeb;
+  border-color: #f0b429;
+  border-left: 4px solid #d97706;
+}
+
+.alternate-card--mine {
+  box-shadow: 0 0 0 2px #d97706;
+}
+
+.alternate-label {
+  font-weight: 700;
+  color: #8a5a00;
+}
+
+.alternate-you {
+  font-weight: 400;
+}
+
+.alternate-summary {
+  background: #fffaeb;
+  border: 1px solid #f0b429;
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+  margin: 0.75rem 0;
+  font-size: 0.9rem;
+  color: #5c3d00;
+}
+
+.alternate-card .show-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}

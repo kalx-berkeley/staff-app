@@ -80,6 +80,9 @@ class Show(Base):
     lottery_entries = relationship(
         "LotteryEntry", back_populates="show", cascade="all, delete-orphan"
     )
+    alternates = relationship(
+        "StaffPassAlternate", back_populates="show", cascade="all, delete-orphan"
+    )
 
     @property
     def effective_promoter(self) -> "Promoter | None":

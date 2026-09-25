@@ -340,6 +340,42 @@ export interface MyLotteryEntryResponse extends LotteryEntryResponse {
   specialty_show_name: string | null;
 }
 
+/** One waiting entry in a show's staff-pass alternate queue. */
+export interface AlternateEntry {
+  id: number;
+  show_id: number;
+  staff_id: number;
+  staff_name: string | null;
+  position: number;
+  has_guest: boolean;
+  guest_name: string | null;
+  only_attend_with_guest: boolean;
+  source: string;
+  priority_at: string;
+}
+
+/** A show's alternate queue as seen by the current user. */
+export interface AlternateQueue {
+  queue_open: boolean;
+  entries: AlternateEntry[];
+  my_entry_id: number | null;
+  /** Who would get the current user's pass if they released it now. */
+  next_candidate_staff_id: number | null;
+  next_candidate_name: string | null;
+}
+
+export interface MyAlternateEntry extends AlternateEntry {
+  show_event_name: string | null;
+  show_date: string | null; // ISO date string
+  show_venue_name: string | null;
+}
+
+export interface AlternateJoinRequest {
+  has_guest: boolean;
+  guest_name: string | null;
+  only_attend_with_guest: boolean;
+}
+
 export interface LotteryScheduleItem {
   show_id: number;
   event_name: string;

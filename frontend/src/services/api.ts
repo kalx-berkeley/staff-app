@@ -60,6 +60,10 @@ import type {
   LotteryEntryResponse,
   MyLotteryEntryResponse,
   StaffLotteryEntryCreate,
+  AlternateEntry,
+  AlternateQueue,
+  AlternateJoinRequest,
+  MyAlternateEntry,
   DJLotteryEntryCreate,
   OnAirInfo,
   SpinMatch,
@@ -1367,6 +1371,66 @@ export const lotteryAPI = {
   getMyEntries: async (): Promise<MyLotteryEntryResponse[]> => {
     try {
       const response = await apiClient.get<MyLotteryEntryResponse[]>('/shows/lottery/my-entries');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+};
+
+/**
+ * Staff-pass alternate queue API. Staff join once every staff pass is held by a
+ * staff member; freed passes go to waiting alternates automatically.
+ */
+export const alternatesAPI = {
+  getQueue: async (showId: number): Promise<AlternateQueue> => {
+    try {
+      const response = await apiClient.get<AlternateQueue>(`/shows/${showId}/alternates`);
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  join: async (showId: number, data: AlternateJoinRequest): Promise<AlternateEntry> => {
+    try {
+      const response = await apiClient.post<AlternateEntry>(`/shows/${showId}/alternates`, data);
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  updateMine: async (showId: number, data: AlternateJoinRequest): Promise<AlternateEntry> => {
+    try {
+      const response = await apiClient.patch<AlternateEntry>(`/shows/${showId}/alternates/me`, data);
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  leave: async (showId: number): Promise<void> => {
+    try {
+      await apiClient.delete(`/shows/${showId}/alternates/me`);
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /** Promotions staff only: remove someone from the queue (they are emailed). */
+  remove: async (showId: number, entryId: number): Promise<void> => {
+    try {
+      await apiClient.delete(`/shows/${showId}/alternates/${entryId}`);
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /** The current staff member's waiting alternate entries, across all shows. */
+  getMyEntries: async (): Promise<MyAlternateEntry[]> => {
+    try {
+      const response = await apiClient.get<MyAlternateEntry[]>('/shows/alternates/my-entries');
       return response.data;
     } catch (error) {
       return handleAPIError(error);

@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from fastapi import HTTPException, status
 import logging
 
+from app.config import settings
 from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.staff import Staff
@@ -20,6 +21,13 @@ import re
 logger = logging.getLogger(__name__)
 
 _LA = ZoneInfo("America/Los_Angeles")
+
+
+def _as_utc(dt: datetime | None) -> datetime:
+    """Return dt as UTC-aware (SQLite returns naive datetimes); None sorts first."""
+    if dt is None:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
 
 
 def normalize_phone(phone: str) -> str:
@@ -331,11 +339,13 @@ class PassService:
         return pass_item
 
     @staticmethod
-    def release_claim(db: Session, pass_id: int) -> Pass:
+    def release_claim(db: Session, pass_id: int, actor_email: str | None = None) -> Pass:
         """
         Release a claimed staff pass, making it available again.
 
-        Validates the pass is claimed and the show is not closed.
+        Validates the pass is claimed and the show is not closed. If staff are
+        waiting in the alternate queue, the freed pass (and any freed guest hold)
+        is immediately claimed for the next eligible alternate.
 
         Args:
             db: Database session
@@ -368,25 +378,27 @@ class PassService:
             )
 
         now = datetime.now(timezone.utc)
-        pass_item.status = "available"
-        pass_item.staff_id = None
-        pass_item.claimed_at = None
-        pass_item.has_guest = False
-        pass_item.guest_name = None
-        pass_item.only_attend_with_guest = False
-        pass_item.updated_at = now
+        PassService._clear_claim(pass_item, now)
 
         # Release any guest hold that was linked to this pass.
         guest_hold = db.query(Pass).filter(Pass.guest_of_pass_id == pass_item.id).first()
         if guest_hold:
-            guest_hold.status = "available"
-            guest_hold.staff_id = None
-            guest_hold.claimed_at = None
-            guest_hold.guest_of_pass_id = None
-            guest_hold.updated_at = now
+            PassService._clear_claim(guest_hold, now)
+
+        from app.services.alternate_service import AlternateService
 
         try:
+            promotions = []
+            if show:
+                promotions = AlternateService.fill_open_passes(
+                    db,
+                    show,
+                    trigger="release",
+                    triggering_pass_id=pass_item.id,
+                    actor_email=actor_email,
+                )
             db.commit()
+            AlternateService.finalize_promotions(db, promotions)
             db.refresh(pass_item)
             return pass_item
         except Exception as e:
@@ -519,6 +531,12 @@ class PassService:
             )
 
         show = db.query(Show).filter(Show.id == pass_item.show_id).first()
+        PassService._validate_show_claimable(show)
+        return show
+
+    @staticmethod
+    def _validate_show_claimable(show: Show | None) -> None:
+        """Reject claims (and alternate-queue joins) for closed or past-close shows."""
         if show and show.status == "closed":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -536,7 +554,82 @@ class PassService:
                         " passed"
                     ),
                 )
-        return show
+
+    @staticmethod
+    def _assign_claim(pass_item: Pass, staff_id: int | None, now: datetime) -> None:
+        """Mark a staff pass as claimed by ``staff_id`` with no guest attached."""
+        pass_item.staff_id = staff_id
+        pass_item.claimed_at = now
+        pass_item.status = "claimed"
+        pass_item.has_guest = False
+        pass_item.guest_name = None
+        pass_item.only_attend_with_guest = False
+        pass_item.guest_of_pass_id = None
+        pass_item.updated_at = now
+
+    @staticmethod
+    def _assign_guest_hold(
+        primary: Pass,
+        guest_pass: Pass,
+        now: datetime,
+        guest_name: str | None,
+        only_attend_with_guest: bool,
+    ) -> None:
+        """Attach ``guest_pass`` to ``primary`` as its +1 guest hold."""
+        primary.has_guest = True
+        primary.guest_name = guest_name
+        primary.only_attend_with_guest = only_attend_with_guest
+        guest_pass.staff_id = primary.staff_id
+        guest_pass.claimed_at = now
+        guest_pass.status = "claimed"
+        guest_pass.guest_of_pass_id = primary.id
+        guest_pass.updated_at = now
+
+    @staticmethod
+    def _clear_claim(pass_item: Pass, now: datetime) -> None:
+        """Return a staff pass to the available pool."""
+        pass_item.status = "available"
+        pass_item.staff_id = None
+        pass_item.claimed_at = None
+        pass_item.has_guest = False
+        pass_item.guest_name = None
+        pass_item.only_attend_with_guest = False
+        pass_item.guest_of_pass_id = None
+        pass_item.updated_at = now
+
+    @staticmethod
+    def _displace_guest_hold(
+        db: Session,
+        guest_hold: Pass,
+        primary_pass: Pass | None,
+        show: Show,
+        now: datetime,
+    ) -> bool:
+        """
+        Detach a guest hold from its primary pass so it can be claimed by someone else.
+
+        The primary's staff member is emailed. If they only wanted to attend with
+        their guest, their own pass is released too (it becomes available).
+
+        Returns True when the primary pass was released.
+        """
+        released = False
+        if primary_pass:
+            released = primary_pass.only_attend_with_guest
+            # Notify before clearing staff_id so the staff relationship
+            # is still intact when the email address is looked up.
+            PassService._notify_guest_bumped(db, primary_pass, show, released)
+
+            primary_pass.has_guest = False
+            primary_pass.guest_name = None
+            primary_pass.only_attend_with_guest = False
+            primary_pass.updated_at = now
+
+            if released:
+                PassService._clear_claim(primary_pass, now)
+
+        guest_hold.guest_of_pass_id = None
+        return released
 
     @staticmethod
     def _notify_guest_bumped(
@@ -570,7 +663,12 @@ class PassService:
                 "",
                 reason_line,
                 "",
-                "Your pass is now available for another staff member to claim.",
+                (
+                    "If you would still like to attend without your guest, you can claim"
+                    " a pass if one is available or join the alternate queue for this"
+                    " show:"
+                ),
+                f"{settings.frontend_base_url}/pass-giveaway/staff/shows/{show.id}",
             ])
             subject = f"Your staff pass has been released: {show.event_name}"
         else:
@@ -706,32 +804,10 @@ class PassService:
                 primary_pass = (
                     db.query(Pass).filter(Pass.id == pass_item.guest_of_pass_id).first()
                 )
-                if primary_pass:
-                    released = primary_pass.only_attend_with_guest
-                    # Notify before clearing staff_id so the staff relationship
-                    # is still intact when the email address is looked up.
-                    PassService._notify_guest_bumped(db, primary_pass, show, released)
-
-                    primary_pass.has_guest = False
-                    primary_pass.guest_name = None
-                    primary_pass.only_attend_with_guest = False
-                    primary_pass.updated_at = now
-
-                    if released:
-                        primary_pass.status = "available"
-                        primary_pass.staff_id = None
-                        primary_pass.claimed_at = None
-
-                pass_item.guest_of_pass_id = None
+                PassService._displace_guest_hold(db, pass_item, primary_pass, show, now)
 
             # Claim the primary pass for the staff member.
-            pass_item.staff_id = staff_id
-            pass_item.claimed_at = now
-            pass_item.status = "claimed"
-            pass_item.has_guest = has_guest and not is_guest_hold
-            pass_item.guest_name = None
-            pass_item.only_attend_with_guest = False
-            pass_item.updated_at = now
+            PassService._assign_claim(pass_item, staff_id, now)
 
             if has_guest and not is_guest_hold:
                 # Find a second available staff pass on the same show.
@@ -750,15 +826,23 @@ class PassService:
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Not enough available staff passes to reserve a guest hold",
                     )
-                pass_item.guest_name = guest_name
-                pass_item.only_attend_with_guest = only_attend_with_guest
-                guest_pass.staff_id = staff_id
-                guest_pass.claimed_at = now
-                guest_pass.status = "claimed"
-                guest_pass.guest_of_pass_id = pass_item.id
-                guest_pass.updated_at = now
+                PassService._assign_guest_hold(
+                    pass_item, guest_pass, now, guest_name, only_attend_with_guest
+                )
+
+            # A direct claim ends any place this staff member held in the
+            # alternate queue, and a displaced only-with-guest claimer may
+            # have freed a pass for the next alternate.
+            from app.services.alternate_service import AlternateService
+
+            if staff_id is not None:
+                AlternateService.leave_if_waiting(db, show.id, staff_id, now)
+            promotions = AlternateService.fill_open_passes(
+                db, show, trigger="guest_conditional_release"
+            )
 
             db.commit()
+            AlternateService.finalize_promotions(db, promotions)
             db.refresh(pass_item)
             return pass_item
         except HTTPException:
@@ -1046,6 +1130,15 @@ class PassService:
                 db.delete(p)
 
         # --- staff passes ---
+        # Cuts follow the claim-time "stack": the newest guest holds go first,
+        # then the newest claims. Cut claimers move to the top of the alternate
+        # queue (ordered by their original claim time).
+        from app.services.alternate_service import AlternateService
+
+        def newest_first(p: Pass):
+            return (_as_utc(p.claimed_at), p.id)
+
+        cut_staff_ids: list[int] = []
         staff_delta = new_num_pairs - len(staff_passes)
         if staff_delta > 0:
             for _ in range(staff_delta):
@@ -1074,8 +1167,8 @@ class PassService:
                 to_delete_ids.add(p.id)
                 to_remove -= 1
 
-            # Step 2: guest holds (least impact)
-            random.shuffle(guest_holds)
+            # Step 2: guest holds (least impact), newest first
+            guest_holds.sort(key=newest_first, reverse=True)
             for gh in guest_holds:
                 if to_remove <= 0:
                     break
@@ -1087,13 +1180,7 @@ class PassService:
                             "phone": primary.staff.phone if primary.staff else None,
                             "email": primary.staff.email if primary.staff else None,
                         })
-                        primary.status = "available"
-                        primary.staff_id = None
-                        primary.claimed_at = None
-                        primary.has_guest = False
-                        primary.guest_name = None
-                        primary.only_attend_with_guest = False
-                        primary.updated_at = now
+                        PassService._clear_claim(primary, now)
                         primaries.remove(primary)
                         # Delete the released primary too if we still need to shrink
                         if to_remove > 1:
@@ -1109,8 +1196,8 @@ class PassService:
                 to_delete_ids.add(gh.id)
                 to_remove -= 1
 
-            # Step 3: primary claimed passes
-            random.shuffle(primaries)
+            # Step 3: primary claimed passes, newest first
+            primaries.sort(key=newest_first, reverse=True)
             for p in primaries:
                 if to_remove <= 0:
                     break
@@ -1121,6 +1208,9 @@ class PassService:
                     "phone": p.staff.phone if p.staff else None,
                     "email": p.staff.email if p.staff else None,
                 })
+                if p.staff_id is not None:
+                    AlternateService.enqueue_cut_claim(db, show, p, now)
+                    cut_staff_ids.append(p.staff_id)
                 # Also delete any guest hold still linked to this primary
                 linked_gh = next(
                     (
@@ -1140,7 +1230,15 @@ class PassService:
                 if p.id in to_delete_ids:
                     db.delete(p)
 
+        # New passes, or a primary released above but not deleted, go to
+        # waiting alternates first.
+        db.flush()
+        db.expire(show, ["passes"])
+        promotions = AlternateService.fill_open_passes(db, show, trigger="capacity_change")
+
         db.commit()
+        AlternateService.finalize_promotions(db, promotions)
+        AlternateService.notify_cut_claims(db, show, cut_staff_ids)
         db.refresh(show)
         return {"affected_djs": affected_djs, "affected_staff": affected_staff}
 

@@ -96,6 +96,53 @@ def _notify_staff_guests_confirmed(db, show) -> None:
         )
 
 
+def run_close_side_effects(db, show) -> None:
+    """
+    Notifications that follow closing a show, whether manual or automatic.
+
+    Confirms +1 guests to their staff hosts and tells anyone still on the
+    alternate list that they did not get a pass.
+    """
+    from app.services.alternate_service import AlternateService
+
+    _notify_staff_guests_confirmed(db, show)
+    AlternateService.expire_on_close(db, show)
+
+
+def _notify_claimers_of_cancellation(db, show) -> None:
+    """Tell staff who hold a pass for a deleted show that it has been cancelled."""
+    from app.models.pass_model import Pass
+    from app.services.alternate_service import AlternateService
+
+    claims = (
+        db.query(Pass)
+        .filter(
+            Pass.show_id == show.id,
+            Pass.pass_type == "staff",
+            Pass.status == "claimed",
+            Pass.guest_of_pass_id.is_(None),
+            Pass.staff_id.isnot(None),
+        )
+        .all()
+    )
+    for pass_item in claims:
+        lines = [
+            (
+                f"{AlternateService._show_desc(show)} has been cancelled, so your staff"
+                " pass is no longer valid."
+            ),
+        ]
+        if pass_item.has_guest:
+            guest_label = pass_item.guest_name or "your guest"
+            lines.append(f"The guest pass reserved for {guest_label} is cancelled as well.")
+        AlternateService._email(
+            db,
+            pass_item.staff,
+            subject=f"Show cancelled: {show.event_name}",
+            lines=lines,
+        )
+
+
 def _build_promotions_contacts(show) -> list[dict]:
     """Build promotions contact list from effective promoter owners (or venue owners)."""
     effective_promoter = show.effective_promoter
@@ -894,6 +941,15 @@ def publish_show(
         lottery_deadline = show.published_at + timedelta(hours=show.lottery_window_hours)
         schedule_lottery_job(show.id, lottery_deadline)
 
+    # A republished show may have passes freed while it was a draft.
+    from app.services.alternate_service import AlternateService
+
+    alternate_promotions = AlternateService.fill_open_passes(
+        db, show, trigger="show_published", actor_email=promotions.email
+    )
+    db.commit()
+    AlternateService.finalize_promotions(db, alternate_promotions)
+
     # Schedule auto-close job now that the show is published
     if show.auto_close and show.planned_close_date and show.planned_close_time:
         from zoneinfo import ZoneInfo
@@ -926,7 +982,7 @@ def close_show(
     """Close a show (promotions staff only)."""
     show = ShowService.close_show(db, show_id)
     unschedule_auto_close_job(show_id)
-    _notify_staff_guests_confirmed(db, show)
+    run_close_side_effects(db, show)
     audit_service.log_event(
         db,
         event_type="show_closed",
@@ -989,7 +1045,10 @@ def reopen_show(
     from datetime import datetime, timedelta, timezone
     from zoneinfo import ZoneInfo
 
+    from app.services.alternate_service import AlternateService
+
     show = ShowService.reopen_show(db, show_id)
+    AlternateService.restore_on_reopen(db, show)
     _LA = ZoneInfo("America/Los_Angeles")
     if show.auto_close and show.planned_close_date and show.planned_close_time:
         close_dt = datetime.combine(
@@ -1023,9 +1082,13 @@ def delete_show(
     db: Session = Depends(get_db),
 ):
     """Soft-delete a show by marking its status as 'deleted' (promotions staff only)."""
+    from app.services.alternate_service import AlternateService
+
     show = ShowService.get_show(db, show_id)
     event_name = show.event_name
     ShowService.delete_show(db, show_id, actor_email=promotions.email)
+    _notify_claimers_of_cancellation(db, show)
+    AlternateService.cancel_on_delete(db, show)
     unschedule_auto_close_job(show_id)
     unschedule_lottery_job(show_id)
     audit_service.log_event(

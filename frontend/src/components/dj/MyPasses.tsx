@@ -113,6 +113,7 @@ const MyPasses = () => {
   const formatDateTime = (dateTimeStr: string) => {
     const date = new Date(dateTimeStr);
     return date.toLocaleString('en-US', {
+      timeZone: 'America/Los_Angeles',
       weekday: 'short',
       year: 'numeric',
       month: 'short',

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { showsAPI, passesAPI, autocompleteAPI, specialtyShowsAPI, lotteryAPI } from '../../services/api';
-import { Tooltip, EnrichedShowName, MarkdownContent, FeatureBinBadge, KalxLiveBadge, DatePicker } from '../shared';
+import { showsAPI, passesAPI, autocompleteAPI, specialtyShowsAPI, lotteryAPI, alternatesAPI } from '../../services/api';
+import { Tooltip, EnrichedShowName, MarkdownContent, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList } from '../shared';
 import { formatPhone, formatDateValue } from '../../utils';
 import { useAuth } from '../../contexts/authHooks';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -13,6 +13,7 @@ import type {
   PromotionsStaffProfile,
   PassResponse,
   DjSuggestion,
+  AlternateEntry,
 } from '../../types';
 
 type SuggestMode = 'choose' | 'date' | 'genre' | null;
@@ -189,6 +190,45 @@ const ShowDetail = () => {
   useEffect(() => {
     loadLotteryStatus();
   }, [loadLotteryStatus]);
+
+  // Staff-pass alternate queue (read-only apart from removal).
+  const [alternates, setAlternates] = useState<AlternateEntry[]>([]);
+  const [alternateToRemove, setAlternateToRemove] = useState<AlternateEntry | null>(null);
+  const [removingAlternateId, setRemovingAlternateId] = useState<number | null>(null);
+
+  const loadAlternates = useCallback(async () => {
+    if (!id) return;
+    try {
+      const queue = await alternatesAPI.getQueue(parseInt(id));
+      setAlternates(queue.entries);
+    } catch {
+      // non-fatal — section will not render
+    }
+  }, [id]);
+
+  // Re-fetched whenever the show reloads, since claims and releases move the queue.
+  useEffect(() => {
+    if (show) loadAlternates();
+  }, [show, loadAlternates]);
+
+  const handleRemoveAlternate = async () => {
+    if (!show || !alternateToRemove) return;
+    const entry = alternateToRemove;
+    setAlternateToRemove(null);
+    setRemovingAlternateId(entry.id);
+    setActionError(null);
+    try {
+      await alternatesAPI.remove(show.id, entry.id);
+      await loadAlternates();
+    } catch (err) {
+      const apiError = err as APIError;
+      setActionError(
+        typeof apiError.detail === 'string' ? apiError.detail : 'Failed to remove alternate'
+      );
+    } finally {
+      setRemovingAlternateId(null);
+    }
+  };
 
   useEffect(() => {
     autocompleteAPI.getDJNames().then(setDjNames).catch(() => {});
@@ -1370,7 +1410,36 @@ const ShowDetail = () => {
             </div>
           ))}
         </div>
+        <AlternateQueueList
+          entries={alternates}
+          onRemove={show.status === 'published' ? setAlternateToRemove : undefined}
+          removingId={removingAlternateId}
+        />
       </div>
+
+      {alternateToRemove && (
+        <div className="modal-overlay" onClick={() => setAlternateToRemove(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Remove Alternate</h3>
+              <button className="btn-close" onClick={() => setAlternateToRemove(null)}>×</button>
+            </div>
+            <p>
+              Remove <strong>{alternateToRemove.staff_name}</strong> (alternate #
+              {alternateToRemove.position}) from the staff pass alternate list? They will be
+              emailed that you removed them.
+            </p>
+            <div className="form-actions" style={{ marginTop: '1rem' }}>
+              <button onClick={() => setAlternateToRemove(null)} className="btn-secondary">
+                Cancel
+              </button>
+              <button onClick={handleRemoveAlternate} className="btn-danger">
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
