@@ -1,1 +1,1 @@
-# Promotions Pass Giveaway System - Backend
+# KALX Staff App - Backend

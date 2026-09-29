@@ -61,9 +61,9 @@ jobs:
 
     env:
       DEPLOY_USER: staff-app
-      DEPLOY_PATH: ${{ github.event_name == 'release' && '/home/staff-app/promotions-app-production' || '/home/staff-app/promotions-app-staging' }}
+      DEPLOY_PATH: ${{ github.event_name == 'release' && '/home/staff-app/staff-app-production' || '/home/staff-app/staff-app-staging' }}
       SYSTEMD_USER_PATH: /home/staff-app/.config/systemd/user
-      SERVICE_NAME: ${{ github.event_name == 'release' && 'promotions-app-backend-production' || 'promotions-app-backend-staging' }}
+      SERVICE_NAME: ${{ github.event_name == 'release' && 'staff-app-backend-production' || 'staff-app-backend-staging' }}
       BACKEND_PORT: ${{ github.event_name == 'release' && '8420' || '8421' }}
       SITE_DOMAIN: ${{ vars.SITE_DOMAIN }}
       FRONTEND_BASE_URL: ${{ github.event_name == 'release' && format('https://staff.{0}', vars.SITE_DOMAIN) || format('https://staff.stage.{0}', vars.SITE_DOMAIN) }}
@@ -169,6 +169,16 @@ jobs:
           VITE_COMMIT_SHA="${{ github.sha }}" npm run build:staging
         fi
 
+    - name: Migrate promotions-app paths to staff-app
+      # One-time rename; a no-op once the server has been migrated. Remove
+      # this step along with scripts/migrate-to-staff-app-paths.sh once both
+      # environments are done (see docs/staff-app-rename-runbook.md).
+      run: |
+        set -ex
+        SSH_HOST="${{ steps.get-target-ip.outputs.ip }}"
+        ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${SSH_HOST} bash -s -- ${{ env.ENV_NAME }} \
+          < scripts/migrate-to-staff-app-paths.sh
+
     - name: Deploy application
       run: |
         set -ex
@@ -183,8 +193,8 @@ jobs:
         mkdir -p ${{ env.DEPLOY_PATH }}/backend/data
         mkdir -p ${{ env.DEPLOY_PATH }}/frontend/dist
         mkdir -p ${{ env.SYSTEMD_USER_PATH }}
-        if [ -f "${{ env.DEPLOY_PATH }}/backend/data/promotions.db" ]; then
-          cp "${{ env.DEPLOY_PATH }}/backend/data/promotions.db" \
+        if [ -f "${{ env.DEPLOY_PATH }}/backend/data/staff-app.db" ]; then
+          cp "${{ env.DEPLOY_PATH }}/backend/data/staff-app.db" \
              "${{ env.DEPLOY_PATH }}/backend/data/backup_$(date +%Y%m%d_%H%M%S).db"
         fi
         ENDSSH
@@ -212,7 +222,7 @@ jobs:
         touch ${{ env.DEPLOY_PATH }}/backend/.env
         chmod 600 ${{ env.DEPLOY_PATH }}/backend/.env
         cat > ${{ env.DEPLOY_PATH }}/backend/.env << EOF
-        DATABASE_URL=sqlite:///${{ env.DEPLOY_PATH }}/backend/data/promotions.db
+        DATABASE_URL=sqlite:///${{ env.DEPLOY_PATH }}/backend/data/staff-app.db
         DJ_STUDIO_NETWORK=${{ env.DJ_STUDIO_NETWORK }}
         STATION_OFFICE_NETWORK=${{ env.STATION_OFFICE_NETWORK }}
         AIRTABLE_API_KEY=${{ secrets.AIRTABLE_API_KEY }}

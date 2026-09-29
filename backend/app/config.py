@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     model_config = ConfigDict(env_file=".env", case_sensitive=False)
 
     # Database
-    database_url: str = "sqlite:///./promotions.db"
+    database_url: str = "sqlite:///./staff-app.db"
 
     # Airtable
     airtable_api_key: Optional[str] = None

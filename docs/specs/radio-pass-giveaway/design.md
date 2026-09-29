@@ -840,9 +840,9 @@ overwrite production code or data.
 
 **`staff-app` user:**
 - Runs the FastAPI backend as two systemd user services:
-  - `promotions-app-backend-production` — port 8420, working directory `~/promotions-app-production/backend`
-  - `promotions-app-backend-staging` — port 8421, working directory `~/promotions-app-staging/backend`
-- Each stores its own SQLite database (`backend/data/promotions.db` under its own deploy path)
+  - `staff-app-backend-production` — port 8420, working directory `~/staff-app-production/backend`
+  - `staff-app-backend-staging` — port 8421, working directory `~/staff-app-staging/backend`
+- Each stores its own SQLite database (`backend/data/staff-app.db` under its own deploy path)
 - Each serves its frontend static files from its own `frontend/dist/`
 
 **Apache (system service, managed by root/sudo):**

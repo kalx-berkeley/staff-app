@@ -8,14 +8,14 @@ and reuse them:
 
 ```bash
 # Production
-SERVICE=promotions-app-backend-production
+SERVICE=staff-app-backend-production
 PORT=8420
-DEPLOY_PATH=~/promotions-app-production
+DEPLOY_PATH=~/staff-app-production
 
 # Staging
-SERVICE=promotions-app-backend-staging
+SERVICE=staff-app-backend-staging
 PORT=8421
-DEPLOY_PATH=~/promotions-app-staging
+DEPLOY_PATH=~/staff-app-staging
 ```
 
 ## Quick Diagnostics
@@ -131,10 +131,10 @@ df -h
 
 ```bash
 # Check database file
-ls -la $DEPLOY_PATH/backend/data/promotions.db
+ls -la $DEPLOY_PATH/backend/data/staff-app.db
 
 # Backup database
-cp $DEPLOY_PATH/backend/data/promotions.db \
+cp $DEPLOY_PATH/backend/data/staff-app.db \
    $DEPLOY_PATH/backend/data/backup_$(date +%Y%m%d_%H%M%S).db
 
 # Restart backend
@@ -196,13 +196,13 @@ sudo tail -f /var/log/apache2/kalx-stage-staff-error.log
 
 ```bash
 # Backup database
-cp $DEPLOY_PATH/backend/data/promotions.db \
+cp $DEPLOY_PATH/backend/data/staff-app.db \
    $DEPLOY_PATH/backend/data/backup_$(date +%Y%m%d).db
 
 # Restore database
 systemctl --user stop $SERVICE
 cp $DEPLOY_PATH/backend/data/backup_YYYYMMDD.db \
-   $DEPLOY_PATH/backend/data/promotions.db
+   $DEPLOY_PATH/backend/data/staff-app.db
 systemctl --user start $SERVICE
 
 # Check database integrity
@@ -210,7 +210,7 @@ cd $DEPLOY_PATH/backend
 source venv/bin/activate
 python3 << EOF
 import sqlite3
-conn = sqlite3.connect('data/promotions.db')
+conn = sqlite3.connect('data/staff-app.db')
 cursor = conn.cursor()
 cursor.execute('PRAGMA integrity_check;')
 print(cursor.fetchone())
@@ -330,18 +330,18 @@ Add to `~/.bashrc` for convenience:
 
 ```bash
 # Production
-alias rtp-status='systemctl --user status promotions-app-backend-production'
-alias rtp-restart='systemctl --user restart promotions-app-backend-production'
-alias rtp-logs='journalctl --user -u promotions-app-backend-production -f'
+alias rtp-status='systemctl --user status staff-app-backend-production'
+alias rtp-restart='systemctl --user restart staff-app-backend-production'
+alias rtp-logs='journalctl --user -u staff-app-backend-production -f'
 alias rtp-health='curl http://127.0.0.1:8420/health'
-alias rtp-backup='cp ~/promotions-app-production/backend/data/promotions.db ~/promotions-app-production/backend/data/backup_$(date +%Y%m%d_%H%M%S).db'
+alias rtp-backup='cp ~/staff-app-production/backend/data/staff-app.db ~/staff-app-production/backend/data/backup_$(date +%Y%m%d_%H%M%S).db'
 
 # Staging
-alias rts-status='systemctl --user status promotions-app-backend-staging'
-alias rts-restart='systemctl --user restart promotions-app-backend-staging'
-alias rts-logs='journalctl --user -u promotions-app-backend-staging -f'
+alias rts-status='systemctl --user status staff-app-backend-staging'
+alias rts-restart='systemctl --user restart staff-app-backend-staging'
+alias rts-logs='journalctl --user -u staff-app-backend-staging -f'
 alias rts-health='curl http://127.0.0.1:8421/health'
-alias rts-backup='cp ~/promotions-app-staging/backend/data/promotions.db ~/promotions-app-staging/backend/data/backup_$(date +%Y%m%d_%H%M%S).db'
+alias rts-backup='cp ~/staff-app-staging/backend/data/staff-app.db ~/staff-app-staging/backend/data/backup_$(date +%Y%m%d_%H%M%S).db'
 ```
 
 Then reload: `source ~/.bashrc`

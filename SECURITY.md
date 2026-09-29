@@ -125,7 +125,7 @@ Both Apache and the backend check this CIDR independently:
 
 #### Log Monitoring
 - Review Apache logs: `/var/log/apache2/promotions-*.log`
-- Review backend logs: `journalctl --user -u promotions-app-backend-production` (staging: `promotions-app-backend-staging`)
+- Review backend logs: `journalctl --user -u staff-app-backend-production` (staging: `staff-app-backend-staging`)
 - Look for suspicious patterns, failed authentication attempts, unusual traffic
 
 #### Database Backups

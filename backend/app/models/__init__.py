@@ -1,4 +1,4 @@
-"""SQLAlchemy models for the Promotions Pass Giveaway System."""
+"""SQLAlchemy models for the KALX Staff App."""
 
 from .audit_log import AuditLog
 from .lottery_entry import LotteryEntry
