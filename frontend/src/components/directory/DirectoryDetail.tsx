@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 import type { DirectoryEntry } from '../../types';
 import MarkdownContent from '../shared/MarkdownContent';
+import DjNames from './DjNames';
 import StaffPhoto from './StaffPhoto';
-import { spinitronUrl } from './directorySearch';
 
 interface DirectoryDetailProps {
   // null when the URL names someone who isn't in the directory
@@ -67,20 +67,7 @@ const DirectoryDetail = ({ entry, isMe, onClose }: DirectoryDetailProps) => {
               <dd>{entry.phone ? <a href={`tel:${entry.phone}`}>{entry.phone}</a> : '—'}</dd>
 
               <dt>DJ name</dt>
-              <dd>
-                {entry.dj_name ?? '—'}
-                {entry.spinitron_ids.map((personaId, index) => (
-                  <a
-                    key={personaId}
-                    className="directory-spinitron-link"
-                    href={spinitronUrl(personaId)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Spinitron profile{entry.spinitron_ids.length > 1 ? ` ${index + 1}` : ''}
-                  </a>
-                ))}
-              </dd>
+              <dd>{entry.dj_name ? <DjNames entry={entry} /> : '—'}</dd>
 
               <dt>Departments</dt>
               <dd>{entry.departments.length > 0 ? entry.departments.join(', ') : '—'}</dd>

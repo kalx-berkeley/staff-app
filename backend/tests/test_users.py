@@ -412,6 +412,62 @@ async def test_sync_populates_promotions_from_airtable(client: TestClient, db: S
 
 
 @pytest.mark.asyncio
+async def test_sync_looks_up_dj_names_for_each_persona(
+    client: TestClient, db: Session, monkeypatch
+):
+    """Test sync stores each Spinitron persona's name alongside its ID."""
+    from unittest.mock import patch, AsyncMock
+
+    from app import config
+
+    monkeypatch.setattr(config.settings, "spinitron_api_key", "test-key")
+    _make_promotions_staff(db, "admin@example.com", "Admin", "555-0000")
+
+    airtable_records = [
+        {
+            "Email address": "admin@example.com",
+            "Department": ["Promotions"],
+            "Status": ["Active"],
+        },
+        {
+            "Email address": "dj@example.com",
+            "Status": ["Active"],
+            "DJ Name": (
+                "[DJ Zed](https://spinitron.com/KALX/dj/111/), "
+                "[Gone](https://spinitron.com/KALX/dj/999/), "
+                "[Zed, Esq.](https://spinitron.com/KALX/dj/222/)"
+            ),
+        },
+    ]
+
+    with (
+        patch(
+            "app.services.user_service.UserService.fetch_airtable_records",
+            new_callable=AsyncMock,
+            return_value=_airtable_records(airtable_records),
+        ),
+        patch(
+            "app.services.spinitron_service.SpinitronService.fetch_all_personas",
+            new_callable=AsyncMock,
+            return_value={111: "DJ Zed", 222: "Zed, Esq."},
+        ),
+    ):
+        response = client.post(
+            "/api/users/sync", headers={"X-Forwarded-User": "admin@example.com"}
+        )
+
+    assert response.json()["errors"] == []
+    dj = db.query(Staff).filter_by(email="dj@example.com").first()
+    db.refresh(dj)
+    assert dj.spinitron_ids == [111, 999, 222]
+    assert dj.dj_name == "DJ Zed, Zed, Esq."
+    assert dj.dj_personas == [
+        {"id": 111, "name": "DJ Zed"},
+        {"id": 222, "name": "Zed, Esq."},
+    ]
+
+
+@pytest.mark.asyncio
 async def test_sync_paid_staff_gets_promotions_role(client: TestClient, db: Session):
     """Sync: user with 'Paid Staff' + 'Active' statuses gets promotions role after sync."""
     from unittest.mock import patch, AsyncMock

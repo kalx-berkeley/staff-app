@@ -69,8 +69,9 @@ def test_directory_lists_active_staff_sorted_by_name(client: TestClient, db: Ses
         departments=("Music", "News"),
         pronouns="he/him",
         titles_and_roles="News Director\nOffice hours: Tue 2-4",
-        dj_name="DJ Zed",
-        spinitron_ids=[123],
+        dj_name="DJ Zed, Zed, Esq.",
+        spinitron_ids=[123, 456],
+        dj_personas=[{"id": 123, "name": "DJ Zed"}, {"id": 456, "name": "Zed, Esq."}],
         photo_attachment_id="attA",
     )
     _make_staff(db, "amy@example.com", "amy Adams")
@@ -86,12 +87,42 @@ def test_directory_lists_active_staff_sorted_by_name(client: TestClient, db: Ses
     assert zed["phone"] == "510-555-0100"
     assert zed["pronouns"] == "he/him"
     assert zed["titles_and_roles"] == "News Director\nOffice hours: Tue 2-4"
-    assert zed["dj_name"] == "DJ Zed"
-    assert zed["spinitron_ids"] == [123]
+    assert zed["dj_name"] == "DJ Zed, Zed, Esq."
+    assert zed["dj_personas"] == [
+        {"id": 123, "name": "DJ Zed"},
+        {"id": 456, "name": "Zed, Esq."},
+    ]
     assert zed["departments"] == ["Music", "News"]
     assert zed["statuses"] == ["Active", "Paid Staff"]
     assert zed["photo_version"] == "attA"
     assert entries[0]["photo_version"] is None
+
+
+@pytest.mark.parametrize(
+    "dj_name, spinitron_ids, expected",
+    [
+        ("DJ Zed", [123], [{"id": 123, "name": "DJ Zed"}]),
+        ("Zed, Esq.", [123], [{"id": 123, "name": "Zed, Esq."}]),
+        (
+            "DJ Zed, DJ Z",
+            [123, 456],
+            [{"id": 123, "name": "DJ Zed"}, {"id": 456, "name": "DJ Z"}],
+        ),
+        # One persona wasn't found in Spinitron, so the names can't be paired up
+        ("DJ Zed", [123, 456], []),
+        (None, [123], []),
+    ],
+)
+def test_directory_pairs_dj_names_for_records_without_dj_personas(
+    client: TestClient, db: Session, dj_name, spinitron_ids, expected
+):
+    _make_staff(
+        db, "zed@example.com", "Zed Zulu", dj_name=dj_name, spinitron_ids=spinitron_ids
+    )
+
+    response = client.get("/api/directory", headers=_as("zed@example.com"))
+
+    assert response.json()[0]["dj_personas"] == expected
 
 
 @pytest.mark.parametrize("email", ["gone@example.com", "stranger@example.com"])

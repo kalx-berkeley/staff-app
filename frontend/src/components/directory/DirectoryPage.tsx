@@ -17,9 +17,10 @@ import { directoryAPI } from '../../services/api';
 import { HOME_TITLE, SUBSITES, subsiteForPath } from '../../subsites';
 import type { DirectoryEntry } from '../../types';
 import DirectoryDetail from './DirectoryDetail';
+import DjNames from './DjNames';
 import FilterMenu from './FilterMenu';
 import StaffPhoto from './StaffPhoto';
-import { matchesSearch, spinitronUrl } from './directorySearch';
+import { matchesSearch } from './directorySearch';
 import {
   DEFAULT_SORT,
   parseViewState,
@@ -98,15 +99,7 @@ const columns = helper.columns([
   helper.accessor('dj_name', {
     header: 'DJ name',
     sortFn: textSort,
-    cell: ({ row }) => {
-      const { dj_name: djName, spinitron_ids: personaIds } = row.original;
-      if (!djName) return null;
-      return personaIds.length > 0 ? (
-        <a href={spinitronUrl(personaIds[0])} target="_blank" rel="noreferrer">{djName}</a>
-      ) : (
-        djName
-      );
-    },
+    cell: ({ row }) => <DjNames entry={row.original} />,
   }),
   helper.accessor('email', {
     header: 'Email',

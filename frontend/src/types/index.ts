@@ -728,14 +728,20 @@ export interface SpinMatch {
 }
 
 // Staff Directory types
+export interface DjPersona {
+  id: number;
+  name: string;
+}
+
 export interface DirectoryEntry {
   id: number;
   name: string;
   pronouns: string | null;
   email: string;
   phone: string;
+  // Spinitron persona names joined with commas, and each persona on its own
   dj_name: string | null;
-  spinitron_ids: number[];
+  dj_personas: DjPersona[];
   departments: string[];
   statuses: string[];
   titles_and_roles: string | null;

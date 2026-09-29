@@ -9,7 +9,7 @@ const entry: DirectoryEntry = {
   email: 'jane@example.com',
   phone: '(510) 642-1111',
   dj_name: 'DJ Janey',
-  spinitron_ids: [42],
+  dj_personas: [{ id: 42, name: 'DJ Janey' }],
   departments: ['Music', 'News'],
   statuses: ['Active', 'Paid Staff'],
   titles_and_roles: 'Music Director\nOffice hours: Tue 2-4',

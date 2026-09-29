@@ -3,6 +3,13 @@
 from pydantic import BaseModel
 
 
+class DjPersona(BaseModel):
+    """One of a staff member's Spinitron DJ personas."""
+
+    id: int
+    name: str
+
+
 class DirectoryEntry(BaseModel):
     """One active staff member in the Staff Directory."""
 
@@ -11,9 +18,9 @@ class DirectoryEntry(BaseModel):
     pronouns: str | None = None
     email: str
     phone: str
-    # Spinitron persona names, and the persona IDs they were looked up from
+    # Spinitron persona names joined with commas, and each persona on its own
     dj_name: str | None = None
-    spinitron_ids: list[int] = []
+    dj_personas: list[DjPersona] = []
     departments: list[str] = []
     statuses: list[str] = []
     titles_and_roles: str | None = None

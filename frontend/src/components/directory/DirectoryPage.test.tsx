@@ -22,7 +22,7 @@ const entry = (overrides: Partial<DirectoryEntry>): DirectoryEntry => ({
   email: '',
   phone: '',
   dj_name: null,
-  spinitron_ids: [],
+  dj_personas: [],
   departments: [],
   statuses: ['Active'],
   titles_and_roles: null,
@@ -44,8 +44,11 @@ const ENTRIES: DirectoryEntry[] = [
     pronouns: 'she/her',
     email: 'bea@example.com',
     phone: '(510) 642-1111',
-    dj_name: 'DJ Bea',
-    spinitron_ids: [42],
+    dj_name: 'DJ Bea, Bea, Esq.',
+    dj_personas: [
+      { id: 42, name: 'DJ Bea' },
+      { id: 43, name: 'Bea, Esq.' },
+    ],
     departments: ['News'],
     statuses: ['Active', 'Paid Staff'],
     titles_and_roles: 'News Director\nOffice hours: Tue 2-4',
@@ -110,6 +113,10 @@ describe('DirectoryPage', () => {
     expect(screen.getByRole('link', { name: 'DJ Bea' })).toHaveAttribute(
       'href',
       'https://spinitron.com/KALX/dj/42/',
+    );
+    expect(screen.getByRole('link', { name: 'Bea, Esq.' })).toHaveAttribute(
+      'href',
+      'https://spinitron.com/KALX/dj/43/',
     );
     expect(document.title).toBe('KALX Staff Directory');
   });
@@ -184,6 +191,14 @@ describe('DirectoryPage', () => {
     expect(window.location.pathname).toBe('/directory/2');
     expect(window.location.search).toBe('?q=bea');
     expect(within(panel).getByText(/Office hours: Tue 2-4/)).toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: 'DJ Bea' })).toHaveAttribute(
+      'href',
+      'https://spinitron.com/KALX/dj/42/',
+    );
+    expect(within(panel).getByRole('link', { name: 'Bea, Esq.' })).toHaveAttribute(
+      'href',
+      'https://spinitron.com/KALX/dj/43/',
+    );
     expect(document.title).toBe('Bea Brown · KALX Staff Directory');
 
     fireEvent.keyDown(document, { key: 'Escape' });

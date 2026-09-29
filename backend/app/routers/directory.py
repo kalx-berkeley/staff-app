@@ -11,7 +11,7 @@ from app.database import get_db
 from app.models.staff import Staff
 from app.models.staff_status import StaffStatus
 from app.rate_limiter import create_rate_limit_dependency
-from app.schemas.directory import DirectoryEntry
+from app.schemas.directory import DirectoryEntry, DjPersona
 from app.services.staff_photo_service import photo_path
 
 router = APIRouter(prefix="/api/directory", tags=["directory"])
@@ -29,6 +29,28 @@ def _active_staff_query(db: Session):
         .join(StaffStatus, Staff.id == StaffStatus.staff_id)
         .filter(StaffStatus.status == ACTIVE_STATUS)
     )
+
+
+def _dj_personas(staff: Staff) -> list[DjPersona]:
+    """
+    A staff member's Spinitron personas, each with its DJ name.
+
+    Records not yet re-synced since dj_personas was added only have the
+    comma-joined dj_name, which can be split back up when there's one name per
+    persona ID.
+
+    :param staff: The staff member.
+    :returns: The staff member's personas, in Airtable order.
+    """
+    if staff.dj_personas is not None:
+        return [DjPersona(**persona) for persona in staff.dj_personas]
+    ids = staff.spinitron_ids or []
+    if not ids or not staff.dj_name:
+        return []
+    names = [staff.dj_name] if len(ids) == 1 else staff.dj_name.split(", ")
+    if len(names) != len(ids):
+        return []
+    return [DjPersona(id=pid, name=name) for pid, name in zip(ids, names)]
 
 
 @router.get(
@@ -59,7 +81,7 @@ def list_directory(
             email=s.email,
             phone=s.phone,
             dj_name=s.dj_name,
-            spinitron_ids=s.spinitron_ids or [],
+            dj_personas=_dj_personas(s),
             departments=sorted(d.department for d in s.departments),
             statuses=sorted(st.status for st in s.statuses),
             titles_and_roles=s.titles_and_roles,

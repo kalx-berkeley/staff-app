@@ -440,8 +440,15 @@ class UserService:
                     if staff_record is None:
                         continue
                     ids = staff_record.spinitron_ids or []
-                    dj_names = [persona_map[sid] for sid in ids if sid in persona_map]
-                    staff_record.dj_name = ", ".join(dj_names) if dj_names else None
+                    personas = [
+                        {"id": sid, "name": persona_map[sid]}
+                        for sid in ids
+                        if sid in persona_map
+                    ]
+                    staff_record.dj_name = (
+                        ", ".join(p["name"] for p in personas) if personas else None
+                    )
+                    staff_record.dj_personas = personas or None
                 db.commit()
                 logger.info(
                     "Updated DJ names from Spinitron for %d staff records",

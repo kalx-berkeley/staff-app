@@ -46,6 +46,9 @@ class Staff(Base):
     spinitron_ids = Column(JSON, nullable=True)
     # Derived: persona names looked up in Spinitron for spinitron_ids
     dj_name = Column(String, nullable=True)
+    # Derived: the same lookup as [{"id": persona_id, "name": persona_name}],
+    # keeping each name with its persona (dj_name joins them with commas)
+    dj_personas = Column(JSON, nullable=True)
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )

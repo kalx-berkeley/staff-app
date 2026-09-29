@@ -4257,11 +4257,6 @@ body.staging-active .directory-detail-close {
   color: #1a6fb0;
 }
 
-.directory-spinitron-link {
-  display: block;
-  font-size: 0.85rem;
-}
-
 /* Keep the field's line breaks (e.g. office hours on their own line), which
    Markdown would otherwise run together. */
 .directory-titles p {
