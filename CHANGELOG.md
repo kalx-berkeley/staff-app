@@ -8,25 +8,38 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ## [Unreleased]
 
-### Added
-
-- Add a staff-pass alternate list: once every staff pass is held by a staff member, staff can join an ordered alternate list (with the same +1 guest options as a claim), and freed passes are assigned to the next alternate automatically with an email notification
-- Queue staff lottery losers as alternates in the order they entered, and state their alternate position in the lottery result email
-- Show alternates under a show's staff pass claims, and on My Passes, in amber with an "Alternate #N" label; promotions staff can remove alternates, who are emailed
-- Email alternates when a show closes without them getting a pass, when a reopened show puts them back in line, and when a show is deleted
-- Email staff pass holders when a show is deleted
-- Email staff whose pass is removed by a pass-count reduction, with their new alternate position
+## [1.4.0] - 2026-09-29
 
 ### Changed
 
-- Rename the app's infrastructure from "promotions-app" to "staff-app" now that it is the KALX Staff App rather than only the pass giveaway: systemd units `staff-app-backend-{production,staging}`, deploy paths `~/staff-app-{production,staging}`, and database `staff-app.db`. The deploy migrates the server automatically; see `docs/staff-app-rename-runbook.md` for the Apache follow-up
-- Cut the newest guest holds and then the newest staff claims (instead of random ones) when a show's pass count is reduced, and move cut claimers to the top of the alternate list
-- Link to the show's page from the email sent when a staff pass is released because its +1 guest was bumped
-- Only let staff release their own staff pass: the Release button now appears only on your own claim, and the API rejects staff releasing someone else's (promotions staff can still release any claim)
+- Rename the app's infrastructure from "promotions-app" to "staff-app" now that it is the KALX Staff App rather than only the pass giveaway: systemd units `staff-app-backend-{production,staging}`, deploy paths `~/staff-app-{production,staging}`, and database `staff-app.db`. The deploy migrates the server automatically; the Apache `Alias` and `<Directory>` paths must be updated to match ([35a1a49](https://github.com/kalx-berkeley/staff-app/commit/35a1a49))
+- Cut the newest guest holds and then the newest staff claims (instead of random ones) when a show's pass count is reduced, and move cut claimers to the top of the alternate list ([839b714](https://github.com/kalx-berkeley/staff-app/commit/839b714))
+- Link to the show's page from the email sent when a staff pass is released because its +1 guest was bumped ([839b714](https://github.com/kalx-berkeley/staff-app/commit/839b714))
+- Only let staff release their own staff pass: the Release button now appears only on your own claim, and the API rejects staff releasing someone else's (promotions staff can still release any claim) ([839b714](https://github.com/kalx-berkeley/staff-app/commit/839b714))
+- Keep users signed in for up to 7 days and across browser restarts, instead of ending every session within 8 hours; a session still ends after 24 hours without use ([a4967a7](https://github.com/kalx-berkeley/staff-app/commit/a4967a7))
+- Make the DJ giveaway page a read-only preview for promotions staff: recording a giveaway or attempt now requires the DJ studio network (or, in staging, an active Sublist DJ) ([11de9d6](https://github.com/kalx-berkeley/staff-app/commit/11de9d6))
+- Open My Passes to all staff and promotions members, showing their claimed staff passes and pending lottery entries; Sublist DJs still also see their giveaway history ([169a1a8](https://github.com/kalx-berkeley/staff-app/commit/169a1a8))
+- Restyle the Legacy Import page to use the app's shared form styles ([d23f5bf](https://github.com/kalx-berkeley/staff-app/commit/d23f5bf))
+- Improve mobile layouts: stack page headers above their buttons, let button rows wrap, and keep button labels on one line; shorten "Create New …" buttons to "New …" and "View Details" to "View" ([2d28edf](https://github.com/kalx-berkeley/staff-app/commit/2d28edf))
+
+### Added
+
+- Add a staff-pass alternate list: once every staff pass is held by a staff member, staff can join an ordered alternate list (with the same +1 guest options as a claim), and freed passes are assigned to the next alternate automatically with an email notification ([839b714](https://github.com/kalx-berkeley/staff-app/commit/839b714))
+- Queue staff lottery losers as alternates in the order they entered, and state their alternate position in the lottery result email ([839b714](https://github.com/kalx-berkeley/staff-app/commit/839b714))
+- Show alternates under a show's staff pass claims, and on My Passes, in amber with an "Alternate #N" label; promotions staff can remove alternates, who are emailed ([839b714](https://github.com/kalx-berkeley/staff-app/commit/839b714))
+- Email alternates when a show closes without them getting a pass, when a reopened show puts them back in line, and when a show is deleted ([839b714](https://github.com/kalx-berkeley/staff-app/commit/839b714))
+- Email staff pass holders when a show is deleted ([839b714](https://github.com/kalx-berkeley/staff-app/commit/839b714))
+- Email staff whose pass is removed by a pass-count reduction, with their new alternate position ([839b714](https://github.com/kalx-berkeley/staff-app/commit/839b714))
+- Add an "Add to Existing Show" mode to Legacy Import that backfills on-air winners and staff claims onto a show already created in the app, publishing it if it was still a draft ([d23f5bf](https://github.com/kalx-berkeley/staff-app/commit/d23f5bf))
+- Let active Sublist DJ staff use the DJ view in staging without being on the DJ studio or station office network ([daf7372](https://github.com/kalx-berkeley/staff-app/commit/daf7372))
+- Add a "Hide already closed shows" option, on by default, to the auto-close schedule on the Admin page ([d56d24d](https://github.com/kalx-berkeley/staff-app/commit/d56d24d))
 
 ### Fixed
 
-- Show claim and giveaway times in Pacific time on the staff show page, staff and DJ My Passes, and the staff lottery deadline, matching the promotions and DJ show pages instead of the viewer's browser timezone
+- Show claim and giveaway times in Pacific time on the staff show page, staff and DJ My Passes, and the staff lottery deadline, matching the promotions and DJ show pages instead of the viewer's browser timezone ([839b714](https://github.com/kalx-berkeley/staff-app/commit/839b714))
+- Fix the "log out and switch accounts" link on the unauthorized page, which didn't end the session, and always show Google's account chooser on sign-in so a wrong account isn't silently reused ([e560518](https://github.com/kalx-berkeley/staff-app/commit/e560518))
+- Stop browsers from showing a cached copy of a sign-in-protected page after logout ([e560518](https://github.com/kalx-berkeley/staff-app/commit/e560518))
+- Only schedule auto-close jobs while a show is published, so draft shows no longer appear on the Admin page's auto-close schedule ([2b3b7cf](https://github.com/kalx-berkeley/staff-app/commit/2b3b7cf))
 
 ## [1.3.0] - 2026-09-19
 
@@ -124,6 +137,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.4.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.0.0...v1.1.0
