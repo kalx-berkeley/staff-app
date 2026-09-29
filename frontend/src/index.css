@@ -236,6 +236,90 @@ body.staging-active .dj-layout {
   height: calc(100vh - 2rem);
 }
 
+/* Home page (/): a card for each sub-site the user can use */
+.home-page {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+  color: #222;
+  line-height: 1.6;
+}
+
+.home-page h1 {
+  font-size: 1.6rem;
+  margin-bottom: 0.25rem;
+}
+
+.home-subtitle {
+  color: #666;
+  margin-top: 0;
+  margin-bottom: 2.5rem;
+}
+
+.home-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.25rem;
+}
+
+.home-card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.home-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: #1a6fb0;
+}
+
+.home-card h2 {
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem;
+  color: #1a6fb0;
+}
+
+.home-card p {
+  margin: 0;
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.home-empty {
+  color: #555;
+}
+
+.home-footer {
+  margin-top: 3rem;
+  font-size: 0.8rem;
+  color: #aaa;
+  text-align: center;
+}
+
+/* Sub-site switcher at the top of AppNav: the home page and other sub-sites */
+.app-nav-subsites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 0.78rem;
+}
+
+.app-nav-subsites a {
+  color: rgba(255, 255, 255, 0.75);
+  text-decoration: none;
+}
+
+.app-nav-subsites a:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
 /* App Nav (cross-view switcher) */
 .app-nav {
   margin-bottom: 0.5rem;

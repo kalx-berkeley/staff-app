@@ -3,15 +3,14 @@ import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: '/pass-giveaway/',
+  base: '/',
   plugins: [react()],
   server: {
     port: 3000,
     proxy: {
-      '/pass-giveaway/api': {
+      '/api': {
         target: 'http://localhost:8420',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/pass-giveaway/, ''),
       },
     },
   },

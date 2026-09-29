@@ -141,7 +141,7 @@ const GiveawayPage = () => {
               <span className="kalx-doc-value kalx-value-large">
                 {show.venue.has_logo ? (
                   <img
-                    src={`/pass-giveaway/api/venues/${show.venue.id}/logo`}
+                    src={`/api/venues/${show.venue.id}/logo`}
                     alt={show.venue.name}
                     className="venue-logo-display"
                   />

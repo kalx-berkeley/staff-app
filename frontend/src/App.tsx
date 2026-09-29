@@ -1,6 +1,8 @@
 import { lazy, Suspense, useState, type ComponentType } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import UnauthorizedPage from './components/UnauthorizedPage';
+import HomePage from './components/home/HomePage';
+import { subsiteForPath } from './subsites';
 
 // Each role's section is code-split into its own chunk so users only download
 // the pages for the section they use. Components are loaded through their
@@ -234,21 +236,10 @@ function DJNetworkOnlyRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function App() {
-  const { loading, error } = useAuth();
-
-  if (loading) {
-    return <><StagingBanner /><AuthDiagBanner /><LoadingScreen /></>;
-  }
-
-  if (error) {
-    return <><StagingBanner /><AuthDiagBanner /><ErrorScreen message={error} /></>;
-  }
-
+// The Radio Pass Giveaway sub-site, served under /pass-giveaway. Its routes
+// and links are relative to that basename.
+function PassGiveawayApp() {
   return (
-    <>
-    <StagingBanner />
-    <AuthDiagBanner />
     <BrowserRouter basename="/pass-giveaway">
       <Suspense fallback={<LoadingScreen />}>
       <Routes>
@@ -323,6 +314,47 @@ function App() {
       </Routes>
       </Suspense>
     </BrowserRouter>
+  );
+}
+
+// The home page at /. Paths outside every sub-site land here too.
+function HomeApp() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+// Each sub-site's app, keyed by its base path in SUBSITES (subsites.ts).
+const SUBSITE_APPS: Record<string, ComponentType> = {
+  '/pass-giveaway': PassGiveawayApp,
+};
+
+function App() {
+  const { loading, error } = useAuth();
+
+  if (loading) {
+    return <><StagingBanner /><AuthDiagBanner /><LoadingScreen /></>;
+  }
+
+  if (error) {
+    return <><StagingBanner /><AuthDiagBanner /><ErrorScreen message={error} /></>;
+  }
+
+  // Each sub-site has its own router, chosen once from the URL: moving between
+  // sub-sites is a full page load, so the choice never changes while mounted.
+  const subsite = subsiteForPath(window.location.pathname);
+  const SubsiteApp = subsite ? SUBSITE_APPS[subsite.basePath] : HomeApp;
+
+  return (
+    <>
+    <StagingBanner />
+    <AuthDiagBanner />
+    <SubsiteApp />
     </>
   );
 }

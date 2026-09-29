@@ -475,4 +475,78 @@ describe('App - Role-Based UI Elements', () => {
       consoleErrorSpy.mockRestore();
     });
   });
+
+  describe('Home page and sub-sites', () => {
+    const staffUser: UserResponse = {
+      email: 'staff-home@example.com',
+      role: 'staff',
+      is_dj_network: false,
+      is_station_office_network: false,
+      profile: null,
+    };
+
+    it('should show a card linking to each available sub-site at /', async () => {
+      window.history.pushState({}, '', '/');
+
+      await renderAppWithUser(staffUser);
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'KALX Staff Portal' })).toBeInTheDocument();
+      });
+      expect(screen.getByRole('link', { name: /Radio Pass Giveaway/i })).toHaveAttribute(
+        'href',
+        '/pass-giveaway/'
+      );
+      expect(document.title).toBe('KALX Staff Portal');
+    });
+
+    it('should show the access page at / for unauthorized users', async () => {
+      window.history.pushState({}, '', '/');
+
+      await renderAppWithUser({ ...staffUser, role: 'unauthorized' });
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /Access Not Available/i })).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('link', { name: /Radio Pass Giveaway/i })).not.toBeInTheDocument();
+    });
+
+    it('should send paths outside every sub-site to the home page', async () => {
+      window.history.pushState({}, '', '/no-such-site/page');
+
+      await renderAppWithUser(staffUser);
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'KALX Staff Portal' })).toBeInTheDocument();
+      });
+      expect(window.location.pathname).toBe('/');
+    });
+
+    it('should link back to the home page from a sub-site', async () => {
+      window.history.pushState({}, '', '/pass-giveaway/staff/shows');
+
+      await renderAppWithUser(staffUser);
+
+      await waitFor(() => {
+        expect(screen.getByRole('link', { name: 'KALX Staff Portal' })).toHaveAttribute('href', '/');
+      });
+    });
+
+    it('should not link to the home page for DJ studio network guests', async () => {
+      window.history.pushState({}, '', '/pass-giveaway/dj/shows');
+
+      await renderAppWithUser({
+        email: null,
+        role: 'dj',
+        is_dj_network: true,
+        is_station_office_network: false,
+        profile: null,
+      });
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /Radio Pass Giveaway/i })).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('link', { name: 'KALX Staff Portal' })).not.toBeInTheDocument();
+    });
+  });
 });

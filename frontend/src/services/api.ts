@@ -68,13 +68,14 @@ import type {
   OnAirInfo,
   SpinMatch,
 } from '../types';
+import { currentSubsiteRoot } from '../subsites';
 
 /**
  * Axios instance configured with base URL and authentication settings.
  * Includes credentials for cookie-based authentication with mod_auth_openidc.
  */
 const apiClient: AxiosInstance = axios.create({
-  baseURL: '/pass-giveaway/api',
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -84,7 +85,8 @@ const apiClient: AxiosInstance = axios.create({
 // Key used to store a single 401 diagnostic record across the redirect.
 export const AUTH_DIAG_KEY = 'kalx_auth_diag';
 
-// Redirect to app root on 401 so Apache mod_auth_openidc can re-initiate OAuth.
+// Redirect to the current sub-site's root on 401 so Apache mod_auth_openidc can
+// re-initiate OAuth.
 // DJ-network unauthenticated users always get 200 (role="dj"), never 401.
 //
 // If a 401 is already recorded in sessionStorage it means we already redirected
@@ -108,7 +110,7 @@ apiClient.interceptors.response.use(
             })
           );
         } catch { /* sessionStorage unavailable — skip diagnostic */ }
-        window.location.href = '/pass-giveaway/';
+        window.location.href = currentSubsiteRoot();
         return new Promise(() => {}); // prevent error propagation during navigation
       }
       // Already captured — propagate so React can render the diagnostic banner.

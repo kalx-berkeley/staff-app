@@ -28,8 +28,8 @@ systemctl --user status $SERVICE
 curl http://127.0.0.1:$PORT/health
 
 # Test via Apache
-curl https://staff.kalx.berkeley.edu/pass-giveaway/api/health          # production
-curl https://staff.stage.kalx.berkeley.edu/pass-giveaway/api/health    # staging
+curl https://staff.kalx.berkeley.edu/api/health          # production
+curl https://staff.stage.kalx.berkeley.edu/api/health    # staging
 
 # View recent logs
 journalctl --user -u $SERVICE -n 50
@@ -247,7 +247,7 @@ ss -tlnp | grep $PORT
 curl http://127.0.0.1:$PORT/health
 
 # Test via Apache
-curl https://staff.kalx.berkeley.edu/pass-giveaway/api/health
+curl https://staff.kalx.berkeley.edu/api/health
 
 # Check Netbird
 sudo netbird status

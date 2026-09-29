@@ -1,15 +1,15 @@
 {
-  "name": "KALX Pass Giveaway",
-  "short_name": "KALX Passes",
+  "name": "KALX Staff",
+  "short_name": "KALX Staff",
   "icons": [
     {
-      "src": "/pass-giveaway/images/web-app-manifest-192x192.png",
+      "src": "/images/web-app-manifest-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/pass-giveaway/images/web-app-manifest-512x512.png",
+      "src": "/images/web-app-manifest-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

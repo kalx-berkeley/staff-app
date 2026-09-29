@@ -1,15 +1,15 @@
 {
-  "name": "KALX Pass Giveaway (Staging)",
-  "short_name": "KALX Passes (Stage)",
+  "name": "KALX Staff (Staging)",
+  "short_name": "KALX Staff (Stage)",
   "icons": [
     {
-      "src": "/pass-giveaway/images/web-app-manifest-192x192-stage.png",
+      "src": "/images/web-app-manifest-192x192-stage.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/pass-giveaway/images/web-app-manifest-512x512-stage.png",
+      "src": "/images/web-app-manifest-512x512-stage.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

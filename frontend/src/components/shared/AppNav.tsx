@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/authHooks';
 import { adminAPI } from '../../services/api';
 import { isStagingSublistDjStaff } from '../../utils';
+import { HOME_TITLE, SUBSITES, subsiteForPath } from '../../subsites';
 import FeedbackModal from './FeedbackModal';
 import { useCurrentView, VIEW_LABELS } from './currentView';
 import type { AppView } from './currentView';
@@ -111,8 +112,25 @@ const AppNav = ({ showGoogleLogout = false }: AppNavProps) => {
     user?.is_impersonating_dj_network ||
     user?.is_impersonating_station_office_network;
 
+  // Links to the home page and the other sub-sites. Hidden from guests and from
+  // anyone really on the DJ studio network, whom Apache keeps on the DJ view.
+  const onDjNetwork = user?.is_dj_network && !user?.is_impersonating_dj_network;
+  const showSubsiteLinks = !!user?.email && !onDjNetwork;
+  const currentSubsite = subsiteForPath(window.location.pathname);
+  const otherSubsites = SUBSITES.filter(
+    (subsite) => subsite !== currentSubsite && subsite.isAvailable(user),
+  );
+
   return (
     <div className="app-nav">
+      {showSubsiteLinks && (
+        <div className="app-nav-subsites">
+          <a href="/">{HOME_TITLE}</a>
+          {otherSubsites.map((subsite) => (
+            <a key={subsite.basePath} href={`${subsite.basePath}/`}>{subsite.name}</a>
+          ))}
+        </div>
+      )}
       <div className="app-nav-user">
         {isImpersonating ? (
           <div className="impersonation-block">
