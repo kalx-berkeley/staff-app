@@ -14,10 +14,14 @@ from typing import Any, Dict, Optional
 
 import httpx2 as httpx
 from PIL import Image, ImageOps
+from pillow_heif import register_heif_opener
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Let Pillow open HEIC/HEIF photos, the default format for iPhone cameras.
+register_heif_opener()
 
 # Square thumbnail for the directory table; bounding box for the detail panel.
 # Both are about twice their largest display size, for high-DPI screens.

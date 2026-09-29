@@ -41,6 +41,12 @@ def _jpeg_bytes(size: tuple[int, int] = (600, 800)) -> bytes:
     return buffer.getvalue()
 
 
+def _heic_bytes(size: tuple[int, int] = (600, 800)) -> bytes:
+    buffer = BytesIO()
+    Image.new("RGB", size, (30, 30, 200)).save(buffer, format="HEIF")
+    return buffer.getvalue()
+
+
 @pytest.fixture
 def photo_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(config.settings, "staff_photo_dir", str(tmp_path))
@@ -332,3 +338,16 @@ def test_sync_keeps_the_old_photo_when_a_download_fails(
     assert db.get(Staff, admin.id).photo_attachment_id == "attOld"
     assert photo_path(admin.id, "thumb").is_file()
     assert any("admin@example.com" in error for error in result["errors"])
+
+
+def test_heic_photos_are_converted_to_jpeg(photo_dir):
+    from app.services.staff_photo_service import save_photo
+
+    save_photo(7, _heic_bytes())
+
+    with Image.open(photo_path(7, "thumb")) as thumb:
+        assert thumb.format == "JPEG"
+        assert thumb.size == (128, 128)
+    with Image.open(photo_path(7, "medium")) as medium:
+        assert medium.format == "JPEG"
+        assert medium.size == (360, 480)
