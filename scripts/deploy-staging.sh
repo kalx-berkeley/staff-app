@@ -83,16 +83,6 @@ log "Building frontend (staging mode)"
   VITE_COMMIT_SHA="local-$(git -C "$REPO_ROOT" rev-parse --short HEAD)-$(date +%s)" npm run build:staging
 )
 
-log "Checking the server has been migrated to staff-app paths"
-connecting
-if ! ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$SSH_HOST" test -d "$DEPLOY_PATH"; then
-  # This script doesn't install systemd units, so it can't finish the
-  # promotions-app -> staff-app rename; the GitHub Actions deploy does.
-  echo "ERROR: $DEPLOY_PATH doesn't exist on the server yet. Deploy to staging via" >&2
-  echo "GitHub Actions first (see docs/staff-app-rename-runbook.md)." >&2
-  exit 1
-fi
-
 log "Backing up remote database"
 connecting
 ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$SSH_HOST" bash <<ENDSSH

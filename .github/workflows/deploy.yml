@@ -169,16 +169,6 @@ jobs:
           VITE_COMMIT_SHA="${{ github.sha }}" npm run build:staging
         fi
 
-    - name: Migrate promotions-app paths to staff-app
-      # One-time rename; a no-op once the server has been migrated. Remove
-      # this step along with scripts/migrate-to-staff-app-paths.sh once both
-      # environments are done (see docs/staff-app-rename-runbook.md).
-      run: |
-        set -ex
-        SSH_HOST="${{ steps.get-target-ip.outputs.ip }}"
-        ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${SSH_HOST} bash -s -- ${{ env.ENV_NAME }} \
-          < scripts/migrate-to-staff-app-paths.sh
-
     - name: Deploy application
       run: |
         set -ex
