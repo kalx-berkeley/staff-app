@@ -1,6 +1,8 @@
-# Promotions Pass Giveaway System
+# KALX Staff App
 
-A web-based application for managing radio station pass giveaways, coordinating between music venues, radio DJs, promotions staff, and station staff members.
+The web application behind the KALX staff site. It currently hosts one sub-site, the
+Radio Pass Giveaway, for managing radio station pass giveaways, coordinating between music
+venues, radio DJs, promotions staff, and station staff members.
 
 ## Before Deploying
 
@@ -20,7 +22,7 @@ Update these values before deploying to production:
 
 ## Overview
 
-The system provides three distinct user interfaces:
+The Radio Pass Giveaway sub-site provides three distinct user interfaces:
 
 - **Promotions Staff View** (`/pass-giveaway/promotions`): Manage shows, venues, and pass allocation
 - **DJ View** (`/pass-giveaway/dj`): Record pass winners and giveaway attempts during live broadcasts
@@ -270,8 +272,8 @@ Client
               │    X-Forwarded-User: OIDC email (absent for DJ-network-only requests)
               │    X-Forwarded-For: real client IP (set by mod_proxy)
               │
-              ├── Static files  →  /home/staff-app/promotions-app-production/frontend/dist/
-              │                    (staging: /home/staff-app/promotions-app-staging/frontend/dist/)
+              ├── Static files  →  /home/staff-app/staff-app-production/frontend/dist/
+              │                    (staging: /home/staff-app/staff-app-staging/frontend/dist/)
               │
               └── /pass-giveaway/api/*  →  Uvicorn (127.0.0.1:8420, staff-app user)
                                               (staging: 127.0.0.1:8421)
@@ -295,7 +297,7 @@ Client
 
 | Variable | Description | Default |
 |---|---|---|
-| `DATABASE_URL` | SQLite path | `sqlite:///./promotions.db` |
+| `DATABASE_URL` | SQLite path | `sqlite:///./staff-app.db` |
 | `DJ_STUDIO_NETWORK` | DJ studio CIDR | `192.168.1.0/24` |
 | `AIRTABLE_API_KEY` | Airtable API key | — |
 | `AIRTABLE_BASE_ID` | Airtable base ID | — |
@@ -365,8 +367,8 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 │   ├── src/
 │   └── package.json
 ├── systemd/                    # Systemd service files
-│   ├── promotions-app-backend-production.service
-│   └── promotions-app-backend-staging.service
+│   ├── staff-app-backend-production.service
+│   └── staff-app-backend-staging.service
 ├── docs/specs/                 # Architecture and requirements
 └── .github/workflows/
     └── deploy.yml
@@ -378,8 +380,8 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 
 ```bash
 # Backend (as staff-app user)
-journalctl --user -u promotions-app-backend-production -f
-journalctl --user -u promotions-app-backend-staging -f
+journalctl --user -u staff-app-backend-production -f
+journalctl --user -u staff-app-backend-staging -f
 
 # Apache (requires sudo)
 sudo tail -f /var/log/apache2/kalx-auth-error.log
@@ -390,8 +392,8 @@ sudo tail -f /var/log/apache2/kalx-staff-error.log
 
 ```bash
 # Backend (as staff-app user)
-systemctl --user restart promotions-app-backend-production
-systemctl --user restart promotions-app-backend-staging
+systemctl --user restart staff-app-backend-production
+systemctl --user restart staff-app-backend-staging
 
 # Apache (requires sudo)
 sudo systemctl reload apache2
@@ -407,7 +409,7 @@ curl http://127.0.0.1:8421/health   # staging
 ### Database Migrations
 
 ```bash
-cd ~/promotions-app-production/backend   # or ~/promotions-app-staging/backend
+cd ~/staff-app-production/backend   # or ~/staff-app-staging/backend
 source venv/bin/activate
 alembic upgrade head
 ```

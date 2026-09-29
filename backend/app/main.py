@@ -133,7 +133,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Promotions Pass Giveaway API",
+    title="KALX Staff App API",
     description="API for managing radio station pass giveaways",
     version="1.0.0",
     lifespan=lifespan,
@@ -251,7 +251,7 @@ if settings.legacy_import_enabled:
 
 @app.get("/")
 async def root():
-    return {"message": "Promotions Pass Giveaway API"}
+    return {"message": "KALX Staff App API"}
 
 
 @app.get("/health")

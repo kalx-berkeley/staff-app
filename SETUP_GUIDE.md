@@ -1,6 +1,6 @@
 # Complete Setup Guide
 
-Setup and deployment guide for the Promotions Pass Giveaway System.
+Setup and deployment guide for the KALX Staff App.
 
 ---
 
@@ -134,10 +134,10 @@ separate systemd services — so a staging deploy can never touch production cod
 # As staff-app user
 sudo -u staff-app bash << 'EOF'
 mkdir -p /home/staff-app/.config/systemd/user
-mkdir -p /home/staff-app/promotions-app-production/backend/data
-mkdir -p /home/staff-app/promotions-app-production/frontend/dist
-mkdir -p /home/staff-app/promotions-app-staging/backend/data
-mkdir -p /home/staff-app/promotions-app-staging/frontend/dist
+mkdir -p /home/staff-app/staff-app-production/backend/data
+mkdir -p /home/staff-app/staff-app-production/frontend/dist
+mkdir -p /home/staff-app/staff-app-staging/backend/data
+mkdir -p /home/staff-app/staff-app-staging/frontend/dist
 EOF
 chmod 755 /home/staff-app
 ```
@@ -301,9 +301,9 @@ There are two independent services — one per environment:
 
 | | Production | Staging |
 |---|---|---|
-| Unit file | `promotions-app-backend-production.service` | `promotions-app-backend-staging.service` |
+| Unit file | `staff-app-backend-production.service` | `staff-app-backend-staging.service` |
 | Port | 8420 | 8421 |
-| Working directory | `~/promotions-app-production/backend` | `~/promotions-app-staging/backend` |
+| Working directory | `~/staff-app-production/backend` | `~/staff-app-staging/backend` |
 
 ### 1. Install the systemd Services
 
@@ -316,13 +316,13 @@ ssh staff-app@your-server
 Then copy both service files, enable them, and start them:
 
 ```bash
-cp /path/to/repo/systemd/promotions-app-backend-production.service ~/.config/systemd/user/
-cp /path/to/repo/systemd/promotions-app-backend-staging.service ~/.config/systemd/user/
+cp /path/to/repo/systemd/staff-app-backend-production.service ~/.config/systemd/user/
+cp /path/to/repo/systemd/staff-app-backend-staging.service ~/.config/systemd/user/
 systemctl --user daemon-reload
-systemctl --user enable promotions-app-backend-production.service
-systemctl --user enable promotions-app-backend-staging.service
-systemctl --user start promotions-app-backend-production.service
-systemctl --user start promotions-app-backend-staging.service
+systemctl --user enable staff-app-backend-production.service
+systemctl --user enable staff-app-backend-staging.service
+systemctl --user start staff-app-backend-production.service
+systemctl --user start staff-app-backend-staging.service
 ```
 
 `enable` creates the symlink so each service starts at future boots. `start` starts it immediately — without this step the service will not run until the next reboot or re-login.
@@ -330,16 +330,16 @@ systemctl --user start promotions-app-backend-staging.service
 Verify both are running:
 
 ```bash
-systemctl --user status promotions-app-backend-production
+systemctl --user status staff-app-backend-production
 curl http://127.0.0.1:8420/health
 
-systemctl --user status promotions-app-backend-staging
+systemctl --user status staff-app-backend-staging
 curl http://127.0.0.1:8421/health
 ```
 
 ### 2. Backend Environment
 
-The `.env` file is **generated automatically by GitHub Actions** on every deployment from the configured GitHub secrets and variables — do not create it manually, as the workflow will overwrite it. Each environment gets its own `.env`, written to its own deploy path (`~/promotions-app-production/backend/.env` or `~/promotions-app-staging/backend/.env`).
+The `.env` file is **generated automatically by GitHub Actions** on every deployment from the configured GitHub secrets and variables — do not create it manually, as the workflow will overwrite it. Each environment gets its own `.env`, written to its own deploy path (`~/staff-app-production/backend/.env` or `~/staff-app-staging/backend/.env`).
 
 | Variable | Source |
 |---|---|
@@ -398,14 +398,14 @@ All code deployment — backend and frontend — is handled by the GitHub Action
 ### What the workflow does
 
 On every push to `main` (staging) or published release (production) the workflow resolves a
-per-environment deploy path, systemd unit name, and port (production: `~/promotions-app-production`,
-`promotions-app-backend-production.service`, port 8420; staging: `~/promotions-app-staging`,
-`promotions-app-backend-staging.service`, port 8421), then:
+per-environment deploy path, systemd unit name, and port (production: `~/staff-app-production`,
+`staff-app-backend-production.service`, port 8420; staging: `~/staff-app-staging`,
+`staff-app-backend-staging.service`, port 8421), then:
 
 1. **Runs tests** — backend (`pytest`) and frontend (`tsc`, `eslint`, `npm test`)
 2. **Builds the frontend** — `npm run build` produces `frontend/dist/`
 3. **Connects to the server** via Netbird VPN using `NETBIRD_SETUP_KEY`
-4. **Backs up the database** — copies `promotions.db` to a timestamped file before touching anything
+4. **Backs up the database** — copies `staff-app.db` to a timestamped file before touching anything
 5. **Rsyncs the backend** — copies `backend/` to the environment's deploy path on the server, excluding `venv/` and cache files
 6. **Rsyncs the frontend build** — copies `frontend/dist/` to the environment's deploy path
 7. **Writes `.env`** — generates `backend/.env` under the environment's deploy path from GitHub secrets and variables (overwrites any previous file)
@@ -443,8 +443,8 @@ To trigger manually: **Actions** tab → **Deploy** → **Run workflow**.
 
 ```bash
 # Backend services
-systemctl --user status promotions-app-backend-production
-systemctl --user status promotions-app-backend-staging
+systemctl --user status staff-app-backend-production
+systemctl --user status staff-app-backend-staging
 
 # Apache
 sudo systemctl status apache2
@@ -517,16 +517,16 @@ Apache — the GitHub Actions workflow does not deploy them.
 ### Restart Backend
 
 ```bash
-systemctl --user restart promotions-app-backend-production
-systemctl --user restart promotions-app-backend-staging
+systemctl --user restart staff-app-backend-production
+systemctl --user restart staff-app-backend-staging
 ```
 
 ### View Backend Logs
 
 ```bash
-journalctl --user -u promotions-app-backend-production -f
-journalctl --user -u promotions-app-backend-staging -f
-journalctl --user -u promotions-app-backend-production -n 50
+journalctl --user -u staff-app-backend-production -f
+journalctl --user -u staff-app-backend-staging -f
+journalctl --user -u staff-app-backend-production -n 50
 ```
 
 ### View Apache Logs
@@ -544,15 +544,15 @@ sudo tail -f /var/log/apache2/kalx-staff-access.log
 ### Update Backend Environment
 
 ```bash
-nano ~/promotions-app-production/backend/.env   # or ~/promotions-app-staging/backend/.env
-systemctl --user restart promotions-app-backend-production   # or -staging
+nano ~/staff-app-production/backend/.env   # or ~/staff-app-staging/backend/.env
+systemctl --user restart staff-app-backend-production   # or -staging
 ```
 
 ### Database Backup
 
 ```bash
-cp ~/promotions-app-production/backend/data/promotions.db \
-   ~/promotions-app-production/backend/data/backup_$(date +%Y%m%d_%H%M%S).db
+cp ~/staff-app-production/backend/data/staff-app.db \
+   ~/staff-app-production/backend/data/backup_$(date +%Y%m%d_%H%M%S).db
 ```
 
 ### Sync Users from Airtable
@@ -618,7 +618,7 @@ If Apache logs `AH00125: Request exceeded the limit of 10 subrequest nesting lev
 The staff configs use `mod_rewrite` with an explicit guard (`RewriteCond %{REQUEST_URI} !^/index\.html$`) to break the loop.  If you see this error, confirm the `<Directory>` block in `staff.conf` does not use `FallbackResource` and that `RewriteEngine On` is present with the three `RewriteCond` / `RewriteRule` lines.  Also verify that `index.html` actually exists in the frontend dist directory:
 
 ```bash
-ls ~/promotions-app-production/frontend/dist/index.html   # or ~/promotions-app-staging/...
+ls ~/staff-app-production/frontend/dist/index.html   # or ~/staff-app-staging/...
 ```
 
 If the file is missing, the frontend has not been built or deployed yet.
@@ -627,7 +627,7 @@ If the file is missing, the frontend has not been built or deployed yet.
 
 ```bash
 # Check backend is running (production shown; swap -staging / 8421 as needed)
-systemctl --user is-active promotions-app-backend-production
+systemctl --user is-active staff-app-backend-production
 curl http://127.0.0.1:8420/health
 
 # Check Apache config
@@ -638,10 +638,10 @@ sudo tail -20 /var/log/apache2/kalx-staff-error.log
 ### Backend Won't Start
 
 ```bash
-journalctl --user -u promotions-app-backend-production --no-pager -n 50   # or -staging
+journalctl --user -u staff-app-backend-production --no-pager -n 50   # or -staging
 
 # Test manually
-cd ~/promotions-app-production/backend   # or ~/promotions-app-staging/backend
+cd ~/staff-app-production/backend   # or ~/staff-app-staging/backend
 source venv/bin/activate
 uvicorn app.main:app --host 127.0.0.1 --port 8420   # or 8421 for staging
 ```
@@ -649,9 +649,9 @@ uvicorn app.main:app --host 127.0.0.1 --port 8420   # or 8421 for staging
 ### Frontend Not Loading
 
 ```bash
-ls -la ~/promotions-app-production/frontend/dist/   # or ~/promotions-app-staging/...
+ls -la ~/staff-app-production/frontend/dist/   # or ~/staff-app-staging/...
 chmod 755 ~
-chmod -R 755 ~/promotions-app-production/frontend/dist
+chmod -R 755 ~/staff-app-production/frontend/dist
 ```
 
 ### Deployment Failed
@@ -690,7 +690,7 @@ df -h                         # Check disk space
 - [ ] Verified `apache2ctl -S` shows both hostnames routed to the correct config files (not the default VirtualHost)
 
 ### Backend
-- [ ] Copied `promotions-app-backend-production.service` and `promotions-app-backend-staging.service` to `~/.config/systemd/user/` as the `staff-app` user
+- [ ] Copied `staff-app-backend-production.service` and `staff-app-backend-staging.service` to `~/.config/systemd/user/` as the `staff-app` user
 - [ ] Ran `systemctl --user daemon-reload` and `systemctl --user enable` for both services (via SSH as `staff-app`, not via sudo)
 - [ ] **Note:** do not manually create `.env` — the GitHub Actions workflow generates it from secrets/variables on first deployment
 

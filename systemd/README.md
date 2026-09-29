@@ -1,15 +1,15 @@
 # Systemd Service Files
 
-This directory contains user systemd service files for the Promotions Pass Giveaway System.
+This directory contains user systemd service files for the KALX Staff App.
 Production and staging run as two independent services on the same server, under separate
 deploy directories and separate ports, so a staging deploy can never affect production.
 
 ## Services
 
-- `promotions-app-backend-production.service`: Backend API service (uvicorn), port 8420,
-  working directory `~/promotions-app-production/backend`
-- `promotions-app-backend-staging.service`: Backend API service (uvicorn), port 8421,
-  working directory `~/promotions-app-staging/backend`
+- `staff-app-backend-production.service`: Backend API service (uvicorn), port 8420,
+  working directory `~/staff-app-production/backend`
+- `staff-app-backend-staging.service`: Backend API service (uvicorn), port 8421,
+  working directory `~/staff-app-staging/backend`
 
 Both run as the `staff-app` user. The GitHub Actions deploy workflow installs/updates and
 restarts the appropriate one automatically (production on a published release, staging on a
@@ -26,19 +26,19 @@ These services are installed as **user services** (not system services).
 mkdir -p ~/.config/systemd/user
 
 # Copy service file(s)
-cp promotions-app-backend-production.service ~/.config/systemd/user/
-cp promotions-app-backend-staging.service ~/.config/systemd/user/
+cp staff-app-backend-production.service ~/.config/systemd/user/
+cp staff-app-backend-staging.service ~/.config/systemd/user/
 
 # Reload systemd
 systemctl --user daemon-reload
 
 # Enable services to start at boot
-systemctl --user enable promotions-app-backend-production
-systemctl --user enable promotions-app-backend-staging
+systemctl --user enable staff-app-backend-production
+systemctl --user enable staff-app-backend-staging
 
 # Start services
-systemctl --user start promotions-app-backend-production
-systemctl --user start promotions-app-backend-staging
+systemctl --user start staff-app-backend-production
+systemctl --user start staff-app-backend-staging
 ```
 
 ### Automatic Installation
@@ -48,7 +48,7 @@ See [SETUP_GUIDE.md](../SETUP_GUIDE.md) for first-time server setup.
 
 ## Managing Services
 
-Substitute `promotions-app-backend-production` or `promotions-app-backend-staging` for
+Substitute `staff-app-backend-production` or `staff-app-backend-staging` for
 `<service>` below.
 
 ### Check Status
@@ -86,9 +86,9 @@ systemctl --user disable <service>
 
 | | Production | Staging |
 |---|---|---|
-| Unit | `promotions-app-backend-production.service` | `promotions-app-backend-staging.service` |
+| Unit | `staff-app-backend-production.service` | `staff-app-backend-staging.service` |
 | Port | 8420 (localhost only) | 8421 (localhost only) |
-| Working Directory | `~/promotions-app-production/backend` | `~/promotions-app-staging/backend` |
+| Working Directory | `~/staff-app-production/backend` | `~/staff-app-staging/backend` |
 | Command | `uvicorn app.main:app --host 127.0.0.1 --port 8420` | `uvicorn app.main:app --host 127.0.0.1 --port 8421` |
 
 Both: **Type**: Simple, **Restart**: Always (with 10s delay), **Security**: NoNewPrivileges,
@@ -135,7 +135,7 @@ systemctl --user cat <service>
 systemctl --user daemon-reload
 
 # Try starting manually to see errors
-cd ~/promotions-app-production/backend   # or ~/promotions-app-staging/backend
+cd ~/staff-app-production/backend   # or ~/staff-app-staging/backend
 source venv/bin/activate
 uvicorn app.main:app --host 127.0.0.1 --port 8420   # or 8421 for staging
 ```

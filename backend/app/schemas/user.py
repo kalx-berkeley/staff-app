@@ -3,20 +3,6 @@
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 
 
-class PromotionsStaffProfile(BaseModel):
-    """Schema for promotions staff profile data."""
-
-    name: str = Field(..., min_length=1, max_length=100, description="Display name")
-    phone: str = Field(..., min_length=1, max_length=20, description="Contact phone number")
-
-
-class StaffProfile(BaseModel):
-    """Schema for staff member profile data."""
-
-    name: str = Field(..., min_length=1, max_length=100, description="Display name")
-    phone: str = Field(..., min_length=1, max_length=20, description="Contact phone number")
-
-
 class PromotionsStaffResponse(BaseModel):
     """Schema for promotions staff response."""
 

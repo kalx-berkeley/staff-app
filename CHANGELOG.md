@@ -19,6 +19,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ### Changed
 
+- Rename the app's infrastructure from "promotions-app" to "staff-app" now that it is the KALX Staff App rather than only the pass giveaway: systemd units `staff-app-backend-{production,staging}`, deploy paths `~/staff-app-{production,staging}`, and database `staff-app.db`. The deploy migrates the server automatically; see `docs/staff-app-rename-runbook.md` for the Apache follow-up
 - Cut the newest guest holds and then the newest staff claims (instead of random ones) when a show's pass count is reduced, and move cut claimers to the top of the alternate list
 - Link to the show's page from the email sent when a staff pass is released because its +1 guest was bumped
 - Only let staff release their own staff pass: the Release button now appears only on your own claim, and the API rejects staff releasing someone else's (promotions staff can still release any claim)
