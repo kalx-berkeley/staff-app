@@ -140,7 +140,7 @@ describe('Staff ShowDetail', () => {
   // Only the claimer sees Release on their own pass.
   const loginAsClaimer = () =>
     mockUseAuth.mockReturnValue({
-      user: { email: 'jane@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { name: 'Jane Staff', phone: '555-999-0000', dj_name: null, is_sublist_dj: false } },
+      user: { email: 'jane@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { id: 1, name: 'Jane Staff', phone: '555-999-0000', dj_name: null, is_sublist_dj: false } },
       loading: false,
       error: null,
       refetchUser: vi.fn(),
@@ -228,7 +228,7 @@ describe('Staff ShowDetail', () => {
 
     it("should not show Release on someone else's claim", async () => {
       mockUseAuth.mockReturnValue({
-        user: { email: 'other@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { name: 'Other', phone: '555-0000', dj_name: null, is_sublist_dj: false } },
+        user: { email: 'other@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { id: 1, name: 'Other', phone: '555-0000', dj_name: null, is_sublist_dj: false } },
         loading: false,
         error: null,
         refetchUser: vi.fn(),
@@ -391,7 +391,7 @@ describe('Staff ShowDetail', () => {
         passes: [secondAvailablePass, myClaimedPass],
       };
       mockUseAuth.mockReturnValue({
-        user: { email: 'me@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { name: 'Me', phone: '555-0000', dj_name: null, is_sublist_dj: false } },
+        user: { email: 'me@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { id: 1, name: 'Me', phone: '555-0000', dj_name: null, is_sublist_dj: false } },
         loading: false,
         error: null,
         refetchUser: vi.fn(),
@@ -414,7 +414,7 @@ describe('Staff ShowDetail', () => {
 
     it('leaves Claim enabled for a user with no existing pass on this show', async () => {
       mockUseAuth.mockReturnValue({
-        user: { email: 'someone-else@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { name: 'Someone Else', phone: '555-0000', dj_name: null, is_sublist_dj: false } },
+        user: { email: 'someone-else@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { id: 1, name: 'Someone Else', phone: '555-0000', dj_name: null, is_sublist_dj: false } },
         loading: false,
         error: null,
         refetchUser: vi.fn(),
@@ -492,7 +492,7 @@ describe('Staff ShowDetail', () => {
       role: 'staff',
       is_dj_network: false,
       is_station_office_network: false,
-      profile: { name: 'Me', phone: '555-0000', dj_name: null, is_sublist_dj: false },
+      profile: { id: 1, name: 'Me', phone: '555-0000', dj_name: null, is_sublist_dj: false },
     };
     const fullShow: ShowResponse = {
       ...mockShow,

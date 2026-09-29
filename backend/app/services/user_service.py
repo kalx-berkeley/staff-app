@@ -14,6 +14,13 @@ from app.models.staff_department import StaffDepartment
 from app.models.staff_status import StaffStatus
 from app.models.job_log import JobLog
 from app.config import settings
+from app.services.staff_photo_service import (
+    delete_photo,
+    download_photo,
+    photo_exists,
+    save_photo,
+    select_photo_attachment,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +37,14 @@ def _format_airtable_name(raw: str) -> str:
         if first:
             return f"{first} {last}"
     return name
+
+
+def _extract_pronouns(raw: str) -> Optional[str]:
+    """Return the pronouns from Airtable's 'Last, First (pronouns)' Name format, if any."""
+    match = re.search(r"\(([^)]*)\)", raw)
+    if not match:
+        return None
+    return match.group(1).strip() or None
 
 
 def _extract_spinitron_ids(raw: str) -> List[int]:
@@ -49,7 +64,8 @@ class UserService:
         "Department" comma-delimited string field.
 
         Returns:
-            List of Airtable field dicts
+            List of Airtable records, each a dict with the record's "id" and
+            its "fields" dict
 
         Raises:
             HTTPException: If Airtable API call fails
@@ -80,7 +96,9 @@ class UserService:
 
                     data = response.json()
                     for record in data.get("records", []):
-                        records.append(record.get("fields", {}))
+                        records.append(
+                            {"id": record.get("id"), "fields": record.get("fields", {})}
+                        )
 
                     offset = data.get("offset")
                     if not offset:
@@ -149,7 +167,13 @@ class UserService:
 
         from app.services.audit_service import log_event
 
-        for fields in records:
+        # (staff ID, "Photo" attachment or None) for each upserted record,
+        # reconciled with the photos on disk after the loop.
+        photo_updates: List[tuple[int, Optional[Dict[str, Any]]]] = []
+
+        for record in records:
+            fields = record.get("fields", {})
+            record_id = record.get("id")
             email = (
                 fields.get("Email address") or fields.get("email") or fields.get("Email")
             )
@@ -157,8 +181,16 @@ class UserService:
                 continue
             email = email.strip().lower()
 
-            name = _format_airtable_name((fields.get("Name") or "").strip())
+            raw_name = (fields.get("Name") or "").strip()
+            name = _format_airtable_name(raw_name)
+            pronouns = _extract_pronouns(raw_name)
             phone = (fields.get("Phone") or "").strip()
+            titles_and_roles = fields.get("Titles and Roles")
+            if not isinstance(titles_and_roles, str) or not titles_and_roles.strip():
+                titles_and_roles = None
+            else:
+                titles_and_roles = titles_and_roles.strip()
+            photo_attachment = select_photo_attachment(fields.get("Photo"))
 
             departments = fields.get("Department", [])
             if isinstance(departments, str):
@@ -181,11 +213,37 @@ class UserService:
                     spinitron_ids = ids
 
             try:
-                # Everyone goes into the staff table
-                existing_staff = db.query(Staff).filter(Staff.email == email).first()
+                # Everyone goes into the staff table. Match on the Airtable
+                # record ID so an email change in Airtable updates the existing
+                # row; rows synced before record IDs were stored match by email.
+                existing_staff = None
+                if record_id:
+                    existing_staff = (
+                        db.query(Staff)
+                        .filter(Staff.airtable_record_id == record_id)
+                        .first()
+                    )
+                if existing_staff is None:
+                    existing_staff = db.query(Staff).filter(Staff.email == email).first()
+                elif existing_staff.email != email:
+                    email_taken = (
+                        db.query(Staff)
+                        .filter(Staff.email == email, Staff.id != existing_staff.id)
+                        .first()
+                    )
+                    if email_taken:
+                        error_msg = (
+                            f"Can't change {existing_staff.email} to {email}: another "
+                            "staff record already has that email"
+                        )
+                        logger.error(error_msg)
+                        result["errors"].append(error_msg)
+                        continue
                 if existing_staff:
                     # Detect field changes for audit logging
                     changed: Dict[str, Any] = {}
+                    if existing_staff.email != email:
+                        changed["email"] = {"before": existing_staff.email, "after": email}
                     if existing_staff.name != name:
                         changed["name"] = {"before": existing_staff.name, "after": name}
                     if existing_staff.phone != phone:
@@ -194,14 +252,35 @@ class UserService:
                     new_ids = spinitron_ids or []
                     if old_ids != new_ids:
                         changed["spinitron_ids"] = {"before": old_ids, "after": new_ids}
+                    if existing_staff.pronouns != pronouns:
+                        changed["pronouns"] = {
+                            "before": existing_staff.pronouns,
+                            "after": pronouns,
+                        }
+                    if existing_staff.titles_and_roles != titles_and_roles:
+                        changed["titles_and_roles"] = {
+                            "before": existing_staff.titles_and_roles,
+                            "after": titles_and_roles,
+                        }
+                    existing_staff.email = email
                     existing_staff.name = name
+                    existing_staff.pronouns = pronouns
                     existing_staff.phone = phone
+                    existing_staff.titles_and_roles = titles_and_roles
                     existing_staff.spinitron_ids = spinitron_ids
+                    if record_id:
+                        existing_staff.airtable_record_id = record_id
                     staff_record = existing_staff
                     is_new = False
                 else:
                     staff_record = Staff(
-                        email=email, name=name, phone=phone, spinitron_ids=spinitron_ids
+                        airtable_record_id=record_id,
+                        email=email,
+                        name=name,
+                        pronouns=pronouns,
+                        phone=phone,
+                        titles_and_roles=titles_and_roles,
+                        spinitron_ids=spinitron_ids,
                     )
                     db.add(staff_record)
                     db.flush()
@@ -271,6 +350,7 @@ class UserService:
                     result["promotions_upserted"].append(email)
 
                 db.commit()
+                photo_updates.append((staff_record.id, photo_attachment))
 
                 # Audit log after successful commit
                 if is_new:
@@ -307,14 +387,14 @@ class UserService:
         # and deactivate the entire directory.
         seen_emails = {
             (
-                fields.get("Email address")
-                or fields.get("email")
-                or fields.get("Email")
+                record.get("fields", {}).get("Email address")
+                or record.get("fields", {}).get("email")
+                or record.get("fields", {}).get("Email")
                 or ""
             )
             .strip()
             .lower()
-            for fields in records
+            for record in records
         }
         seen_emails.discard("")
         if seen_emails:
@@ -373,6 +453,9 @@ class UserService:
                 logger.error(error_msg)
                 result["errors"].append(error_msg)
 
+        # Phase 3: Bring the staff directory photos on disk up to date
+        await UserService._sync_photos(db, photo_updates, result)
+
         # Record sync event for admin display
         try:
             db.add(
@@ -390,6 +473,53 @@ class UserService:
             f"deactivated, {len(result['errors'])} errors"
         )
         return result
+
+    @staticmethod
+    async def _sync_photos(
+        db: Session,
+        photo_updates: List[tuple[int, Optional[Dict[str, Any]]]],
+        result: Dict[str, Any],
+    ) -> None:
+        """
+        Download new or changed staff photos from Airtable and remove deleted ones.
+
+        A photo is downloaded only when its Airtable attachment ID differs from
+        the one stored on the staff record, or its files are missing from disk.
+        A failed download leaves the previous photo, if any, in place so the
+        next sync retries it.
+
+        :param db: Database session.
+        :param photo_updates: (staff ID, "Photo" attachment or None) pairs.
+        :param result: Sync result dict; failures are added to its "errors".
+        """
+        for staff_id, attachment in photo_updates:
+            staff_record = db.get(Staff, staff_id)
+            if staff_record is None:
+                continue
+
+            if attachment is None:
+                if staff_record.photo_attachment_id:
+                    delete_photo(staff_id)
+                    staff_record.photo_attachment_id = None
+                    db.commit()
+                continue
+
+            if staff_record.photo_attachment_id == attachment["id"] and photo_exists(
+                staff_id
+            ):
+                continue
+
+            try:
+                image_bytes = await download_photo(attachment["url"])
+                save_photo(staff_id, image_bytes)
+            except Exception as e:
+                error_msg = f"Failed to update photo for {staff_record.email}: {str(e)}"
+                logger.error(error_msg)
+                result["errors"].append(error_msg)
+                continue
+
+            staff_record.photo_attachment_id = attachment["id"]
+            db.commit()
 
     @staticmethod
     def get_or_create_profile(db: Session, email: str) -> Staff:

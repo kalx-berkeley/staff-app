@@ -8,6 +8,11 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Add the KALX Staff Directory at `/directory/`, where active staff can look up other active staff's photo, name, pronouns, DJ name, email, phone, departments, status, and titles and roles. Search, department and status filters, and sorting are kept in the URL so a view can be shared, and each person has a shareable detail page at `/directory/<id>`, with a "My record" shortcut to your own
+- Sync each staff member's pronouns, titles and roles, photo, and Airtable record ID from Airtable; photos are downloaded and resized only when they change, and an email address changed in Airtable now updates the existing staff record instead of creating a new one
+
 ## [1.5.0] - 2026-09-29
 
 ### Changed

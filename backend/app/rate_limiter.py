@@ -41,7 +41,9 @@ def _reset_for_testing() -> None:
         _store.clear()
 
 
-def create_rate_limit_dependency(max_requests: int, window_seconds: int):
+def create_rate_limit_dependency(
+    max_requests: int, window_seconds: int, scope: str = "default"
+):
     """
     Return a FastAPI dependency that enforces a per-IP sliding-window rate limit.
 
@@ -52,6 +54,9 @@ def create_rate_limit_dependency(max_requests: int, window_seconds: int):
 
     :param max_requests: Maximum requests allowed within the window.
     :param window_seconds: Length of the sliding window in seconds.
+    :param scope: Name for the requests counted together. Dependencies with
+        different scopes count requests separately, so one endpoint's traffic
+        doesn't use up another's limit.
     :returns: FastAPI dependency callable.
     """
 
@@ -64,7 +69,7 @@ def create_rate_limit_dependency(max_requests: int, window_seconds: int):
         cutoff = now - window_seconds
 
         with _lock:
-            timestamps = _store[ip]
+            timestamps = _store[f"{scope}:{ip}"]
             while timestamps and timestamps[0] <= cutoff:
                 timestamps.popleft()
 

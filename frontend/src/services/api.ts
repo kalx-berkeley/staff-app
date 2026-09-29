@@ -67,6 +67,7 @@ import type {
   DJLotteryEntryCreate,
   OnAirInfo,
   SpinMatch,
+  DirectoryEntry,
 } from '../types';
 import { currentSubsiteRoot } from '../subsites';
 
@@ -1532,6 +1533,25 @@ export const feedbackAPI = {
       return handleAPIError(error);
     }
   },
+};
+
+/**
+ * Staff Directory API: contact details for every active staff member.
+ */
+export const directoryAPI = {
+  list: async (): Promise<DirectoryEntry[]> => {
+    try {
+      const response = await apiClient.get<DirectoryEntry[]>('/directory');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  photoUrl: (entry: DirectoryEntry, size: 'thumb' | 'medium'): string | null =>
+    entry.photo_version
+      ? `/api/directory/${entry.id}/photo?size=${size}&v=${encodeURIComponent(entry.photo_version)}`
+      : null,
 };
 
 /**

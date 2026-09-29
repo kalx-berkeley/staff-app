@@ -23,6 +23,15 @@ def _make_promotions_staff(db: Session, email: str, name: str, phone: str) -> St
     return staff
 
 
+def _airtable_records(fields_list: list[dict]) -> list[dict]:
+    """Wrap Airtable field dicts as the records fetch_airtable_records returns,
+    with a record ID derived from each email."""
+    return [
+        {"id": f"rec-{fields.get('Email address')}", "fields": fields}
+        for fields in fields_list
+    ]
+
+
 def _make_active_staff(db: Session, email: str, name: str, phone: str) -> Staff:
     """Create a staff member with Active status but no Promotions department."""
     staff = Staff(email=email, name=name, phone=phone)
@@ -365,7 +374,7 @@ async def test_sync_populates_promotions_from_airtable(client: TestClient, db: S
     with patch(
         "app.services.user_service.UserService.fetch_airtable_records",
         new_callable=AsyncMock,
-        return_value=airtable_records,
+        return_value=_airtable_records(airtable_records),
     ):
         response = client.post(
             "/api/users/sync", headers={"X-Forwarded-User": "admin@example.com"}
@@ -427,7 +436,7 @@ async def test_sync_paid_staff_gets_promotions_role(client: TestClient, db: Sess
     with patch(
         "app.services.user_service.UserService.fetch_airtable_records",
         new_callable=AsyncMock,
-        return_value=airtable_records,
+        return_value=_airtable_records(airtable_records),
     ):
         client.post("/api/users/sync", headers={"X-Forwarded-User": "admin@example.com"})
 
@@ -463,7 +472,7 @@ async def test_sync_idempotent(client: TestClient, db: Session):
     with patch(
         "app.services.user_service.UserService.fetch_airtable_records",
         new_callable=AsyncMock,
-        return_value=airtable_records,
+        return_value=_airtable_records(airtable_records),
     ):
         client.post("/api/users/sync", headers={"X-Forwarded-User": "admin@example.com"})
         client.post("/api/users/sync", headers={"X-Forwarded-User": "admin@example.com"})
@@ -499,7 +508,7 @@ async def test_sync_deactivates_staff_missing_from_airtable(
     with patch(
         "app.services.user_service.UserService.fetch_airtable_records",
         new_callable=AsyncMock,
-        return_value=airtable_records,
+        return_value=_airtable_records(airtable_records),
     ):
         response = client.post(
             "/api/users/sync", headers={"X-Forwarded-User": "admin@example.com"}
