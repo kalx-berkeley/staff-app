@@ -1,0 +1,334 @@
+"""Tests for the Staff Directory API and the Airtable sync fields it relies on."""
+
+from io import BytesIO
+from unittest.mock import AsyncMock, patch
+
+import pytest
+from fastapi.testclient import TestClient
+from PIL import Image
+from sqlalchemy.orm import Session
+
+from app import config
+from app.models.impersonation_session import ImpersonationSession
+from app.models.staff import Staff
+from app.models.staff_department import StaffDepartment
+from app.models.staff_status import StaffStatus
+from app.services.staff_photo_service import photo_path
+
+
+def _make_staff(
+    db: Session,
+    email: str,
+    name: str,
+    statuses: tuple[str, ...] = ("Active",),
+    departments: tuple[str, ...] = (),
+    **columns,
+) -> Staff:
+    staff = Staff(email=email, name=name, phone="510-555-0100", **columns)
+    db.add(staff)
+    db.flush()
+    for status in statuses:
+        db.add(StaffStatus(staff_id=staff.id, status=status))
+    for department in departments:
+        db.add(StaffDepartment(staff_id=staff.id, department=department))
+    db.commit()
+    return staff
+
+
+def _jpeg_bytes(size: tuple[int, int] = (600, 800)) -> bytes:
+    buffer = BytesIO()
+    Image.new("RGB", size, (200, 30, 30)).save(buffer, format="JPEG")
+    return buffer.getvalue()
+
+
+@pytest.fixture
+def photo_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(config.settings, "staff_photo_dir", str(tmp_path))
+    return tmp_path
+
+
+def _as(email: str) -> dict:
+    return {"X-Forwarded-User": email}
+
+
+# --- GET /api/directory ---
+
+
+def test_directory_lists_active_staff_sorted_by_name(client: TestClient, db: Session):
+    _make_staff(
+        db,
+        "zed@example.com",
+        "Zed Zulu",
+        statuses=("Active", "Paid Staff"),
+        departments=("Music", "News"),
+        pronouns="he/him",
+        titles_and_roles="News Director\nOffice hours: Tue 2-4",
+        dj_name="DJ Zed",
+        spinitron_ids=[123],
+        photo_attachment_id="attA",
+    )
+    _make_staff(db, "amy@example.com", "amy Adams")
+    _make_staff(db, "gone@example.com", "Gone Person", statuses=("Sublist DJ",))
+
+    response = client.get("/api/directory", headers=_as("amy@example.com"))
+
+    assert response.status_code == 200
+    entries = response.json()
+    assert [e["name"] for e in entries] == ["amy Adams", "Zed Zulu"]
+    zed = entries[1]
+    assert zed["email"] == "zed@example.com"
+    assert zed["phone"] == "510-555-0100"
+    assert zed["pronouns"] == "he/him"
+    assert zed["titles_and_roles"] == "News Director\nOffice hours: Tue 2-4"
+    assert zed["dj_name"] == "DJ Zed"
+    assert zed["spinitron_ids"] == [123]
+    assert zed["departments"] == ["Music", "News"]
+    assert zed["statuses"] == ["Active", "Paid Staff"]
+    assert zed["photo_version"] == "attA"
+    assert entries[0]["photo_version"] is None
+
+
+@pytest.mark.parametrize("email", ["gone@example.com", "stranger@example.com"])
+def test_directory_rejects_anyone_not_active(client: TestClient, db: Session, email):
+    _make_staff(db, "gone@example.com", "Gone Person", statuses=("Sublist DJ",))
+
+    response = client.get("/api/directory", headers=_as(email))
+
+    assert response.status_code == 403
+
+
+def test_directory_follows_impersonation(client: TestClient, db: Session, monkeypatch):
+    monkeypatch.setattr(config.settings, "environment", "staging")
+    _make_staff(db, "promo@example.com", "Promo Person", departments=("Promotions",))
+    _make_staff(db, "gone@example.com", "Gone Person", statuses=())
+    db.add(
+        ImpersonationSession(
+            real_email="promo@example.com", impersonated_email="gone@example.com"
+        )
+    )
+    db.commit()
+
+    response = client.get("/api/directory", headers=_as("promo@example.com"))
+
+    assert response.status_code == 403
+
+
+def test_directory_is_rate_limited(client: TestClient, db: Session):
+    _make_staff(db, "amy@example.com", "Amy Adams")
+
+    statuses = [
+        client.get("/api/directory", headers=_as("amy@example.com")).status_code
+        for _ in range(31)
+    ]
+
+    assert statuses[:30] == [200] * 30
+    assert statuses[30] == 429
+
+
+# --- GET /api/directory/{id}/photo ---
+
+
+def test_photo_is_served_to_active_staff(client: TestClient, db: Session, photo_dir):
+    from app.services.staff_photo_service import save_photo
+
+    staff = _make_staff(db, "amy@example.com", "Amy Adams", photo_attachment_id="attA")
+    save_photo(staff.id, _jpeg_bytes())
+
+    thumb = client.get(f"/api/directory/{staff.id}/photo", headers=_as("amy@example.com"))
+    medium = client.get(
+        f"/api/directory/{staff.id}/photo?size=medium", headers=_as("amy@example.com")
+    )
+
+    assert thumb.status_code == 200
+    assert thumb.headers["content-type"] == "image/jpeg"
+    assert Image.open(BytesIO(thumb.content)).size == (128, 128)
+    assert Image.open(BytesIO(medium.content)).size == (360, 480)
+
+
+def test_photo_404s_without_a_photo_or_for_inactive_staff(
+    client: TestClient, db: Session, photo_dir
+):
+    from app.services.staff_photo_service import save_photo
+
+    _make_staff(db, "amy@example.com", "Amy Adams")
+    no_photo = _make_staff(db, "bob@example.com", "Bob Brown")
+    gone = _make_staff(
+        db, "gone@example.com", "Gone Person", statuses=(), photo_attachment_id="attG"
+    )
+    save_photo(gone.id, _jpeg_bytes())
+
+    for staff_id in (no_photo.id, gone.id):
+        response = client.get(
+            f"/api/directory/{staff_id}/photo", headers=_as("amy@example.com")
+        )
+        assert response.status_code == 404
+
+
+def test_photo_requires_active_viewer(client: TestClient, db: Session, photo_dir):
+    staff = _make_staff(db, "amy@example.com", "Amy Adams", photo_attachment_id="attA")
+
+    response = client.get(
+        f"/api/directory/{staff.id}/photo", headers=_as("stranger@example.com")
+    )
+
+    assert response.status_code == 403
+
+
+# --- Airtable sync ---
+
+
+def _sync(client: TestClient, records: list[dict], download=None):
+    download = download or AsyncMock(return_value=_jpeg_bytes())
+    with (
+        patch(
+            "app.services.user_service.UserService.fetch_airtable_records",
+            new_callable=AsyncMock,
+            return_value=records,
+        ),
+        patch("app.services.user_service.download_photo", download),
+    ):
+        response = client.post("/api/users/sync", headers=_as("admin@example.com"))
+    assert response.status_code == 200
+    return response.json()
+
+
+def _admin_record() -> dict:
+    return {
+        "id": "recAdmin",
+        "fields": {
+            "Email address": "admin@example.com",
+            "Name": "Admin, Ada",
+            "Department": ["Promotions"],
+            "Status": ["Active"],
+        },
+    }
+
+
+def test_sync_stores_pronouns_titles_and_record_id(
+    client: TestClient, db: Session, photo_dir
+):
+    _make_staff(db, "admin@example.com", "Ada Admin", departments=("Promotions",))
+
+    _sync(
+        client,
+        [
+            _admin_record(),
+            {
+                "id": "recJane",
+                "fields": {
+                    "Email address": "Jane@Example.com",
+                    "Name": "Doe, Jane (she/they)",
+                    "Titles and Roles": "  Music Director\nOffice hours: Mon 1-3 \n",
+                    "Status": ["Active"],
+                },
+            },
+        ],
+    )
+
+    jane = db.query(Staff).filter_by(email="jane@example.com").one()
+    assert jane.name == "Jane Doe"
+    assert jane.pronouns == "she/they"
+    assert jane.titles_and_roles == "Music Director\nOffice hours: Mon 1-3"
+    assert jane.airtable_record_id == "recJane"
+    admin = db.query(Staff).filter_by(email="admin@example.com").one()
+    assert admin.pronouns is None
+    assert admin.titles_and_roles is None
+    assert admin.airtable_record_id == "recAdmin"
+
+
+def test_sync_follows_an_email_change_by_record_id(
+    client: TestClient, db: Session, photo_dir
+):
+    _make_staff(db, "admin@example.com", "Ada Admin", departments=("Promotions",))
+    jane = _make_staff(db, "old@example.com", "Jane Doe", airtable_record_id="recJane")
+
+    _sync(
+        client,
+        [
+            _admin_record(),
+            {
+                "id": "recJane",
+                "fields": {"Email address": "new@example.com", "Name": "Doe, Jane"},
+            },
+        ],
+    )
+
+    db.expire_all()
+    assert db.get(Staff, jane.id).email == "new@example.com"
+    assert db.query(Staff).filter_by(email="old@example.com").first() is None
+
+
+def test_sync_reports_an_email_change_that_collides(
+    client: TestClient, db: Session, photo_dir
+):
+    _make_staff(db, "admin@example.com", "Ada Admin", departments=("Promotions",))
+    jane = _make_staff(db, "old@example.com", "Jane Doe", airtable_record_id="recJane")
+    _make_staff(db, "taken@example.com", "Someone Else")
+
+    result = _sync(
+        client,
+        [
+            _admin_record(),
+            {"id": "recJane", "fields": {"Email address": "taken@example.com"}},
+        ],
+    )
+
+    db.expire_all()
+    assert db.get(Staff, jane.id).email == "old@example.com"
+    assert any("taken@example.com" in error for error in result["errors"])
+
+
+def test_sync_downloads_photos_only_when_they_change(
+    client: TestClient, db: Session, photo_dir
+):
+    _make_staff(db, "admin@example.com", "Ada Admin", departments=("Promotions",))
+
+    def records(photo):
+        admin = _admin_record()
+        if photo is not None:
+            admin["fields"]["Photo"] = photo
+        return [admin]
+
+    attachment = [{"id": "attOne", "url": "https://example.com/1", "type": "image/jpeg"}]
+    download = AsyncMock(return_value=_jpeg_bytes())
+
+    _sync(client, records(attachment), download)
+    _sync(client, records(attachment), download)
+
+    admin = db.query(Staff).filter_by(email="admin@example.com").one()
+    assert download.await_count == 1
+    download.assert_awaited_with("https://example.com/1")
+    assert admin.photo_attachment_id == "attOne"
+    assert photo_path(admin.id, "thumb").is_file()
+    assert photo_path(admin.id, "medium").is_file()
+
+    _sync(client, records(None), download)
+
+    db.expire_all()
+    assert db.get(Staff, admin.id).photo_attachment_id is None
+    assert not photo_path(admin.id, "thumb").exists()
+    assert not photo_path(admin.id, "medium").exists()
+
+
+def test_sync_keeps_the_old_photo_when_a_download_fails(
+    client: TestClient, db: Session, photo_dir
+):
+    admin = _make_staff(
+        db,
+        "admin@example.com",
+        "Ada Admin",
+        departments=("Promotions",),
+        photo_attachment_id="attOld",
+    )
+    from app.services.staff_photo_service import save_photo
+
+    save_photo(admin.id, _jpeg_bytes())
+    record = _admin_record()
+    record["fields"]["Photo"] = [{"id": "attNew", "url": "https://example.com/new"}]
+
+    result = _sync(client, [record], AsyncMock(side_effect=RuntimeError("boom")))
+
+    db.expire_all()
+    assert db.get(Staff, admin.id).photo_attachment_id == "attOld"
+    assert photo_path(admin.id, "thumb").is_file()
+    assert any("admin@example.com" in error for error in result["errors"])

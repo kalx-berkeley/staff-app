@@ -20,6 +20,7 @@ from app.routers import (
     alternates,
     specialty_shows,
     on_air,
+    directory,
 )
 from app.routers import legacy_import as legacy_import_router
 from app.scheduler import (
@@ -245,6 +246,7 @@ app.include_router(lottery.router, dependencies=_auth_check)
 app.include_router(alternates.router, dependencies=_auth_check)
 app.include_router(specialty_shows.router, dependencies=_auth_check)
 app.include_router(on_air.router, dependencies=_auth_check)
+app.include_router(directory.router, dependencies=_auth_check)
 if settings.legacy_import_enabled:
     app.include_router(legacy_import_router.router, dependencies=_auth_check)
 

@@ -156,6 +156,7 @@ export interface VenueResponse {
 
 // Profile types
 export interface PromotionsStaffProfile {
+  id: number;
   name: string;
   phone: string;
   dj_name?: string | null;
@@ -163,6 +164,7 @@ export interface PromotionsStaffProfile {
 }
 
 export interface StaffProfile {
+  id: number;
   name: string;
   phone: string;
   dj_name: string | null;
@@ -723,4 +725,20 @@ export interface SpinMatch {
   song: string;
   image: string | null;
   show: SpinMatchShow;
+}
+
+// Staff Directory types
+export interface DirectoryEntry {
+  id: number;
+  name: string;
+  pronouns: string | null;
+  email: string;
+  phone: string;
+  dj_name: string | null;
+  spinitron_ids: number[];
+  departments: string[];
+  statuses: string[];
+  titles_and_roles: string | null;
+  // Changes whenever the photo does; null when there's no photo
+  photo_version: string | null;
 }

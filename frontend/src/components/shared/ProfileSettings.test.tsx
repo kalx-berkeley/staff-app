@@ -19,12 +19,14 @@ vi.mock('../../services/api', () => ({
 
 describe('ProfileSettings', () => {
   const mockPromotionsProfile: PromotionsStaffProfile = {
+    id: 1,
     name: 'John Doe',
     phone: '555-123-4567',
     is_sublist_dj: false,
   };
 
   const mockStaffProfile: StaffProfile = {
+    id: 2,
     name: 'Jane Smith',
     phone: '555-987-6543',
     dj_name: null,
@@ -130,7 +132,7 @@ describe('ProfileSettings', () => {
   });
 
   it('should display em-dash for missing name or phone', async () => {
-    vi.mocked(usersAPI.getProfile).mockResolvedValue({ name: '', phone: '', is_sublist_dj: false });
+    vi.mocked(usersAPI.getProfile).mockResolvedValue({ id: 1, name: '', phone: '', is_sublist_dj: false });
 
     render(<ProfileSettings section="Promotions" />);
 

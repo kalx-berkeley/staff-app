@@ -96,3 +96,4 @@ no application OS user can modify Apache configuration.
 |---|---|
 | `/` | Home page linking to each sub-site |
 | `/pass-giveaway/` | Radio Pass Giveaway |
+| `/directory/` | KALX Staff Directory |

@@ -31,7 +31,7 @@ describe('isStagingSublistDjStaff', () => {
     is_dj_network: false,
     is_station_office_network: false,
     is_staging: true,
-    profile: { name: 'DJ Test', phone: '555-0000', dj_name: 'DJ Test', is_sublist_dj: true },
+    profile: { id: 1, name: 'DJ Test', phone: '555-0000', dj_name: 'DJ Test', is_sublist_dj: true },
   };
 
   it('allows a staff member with Sublist DJ status in staging', () => {
@@ -45,7 +45,7 @@ describe('isStagingSublistDjStaff', () => {
   it('denies a staff member without Sublist DJ status', () => {
     expect(isStagingSublistDjStaff({
       ...baseUser,
-      profile: { name: 'Staffer', phone: '555-0000', dj_name: null, is_sublist_dj: false },
+      profile: { id: 1, name: 'Staffer', phone: '555-0000', dj_name: null, is_sublist_dj: false },
     })).toBe(false);
   });
 

@@ -1,8 +1,13 @@
 # KALX Staff App
 
-The web application behind the KALX staff site. It currently hosts one sub-site, the
-Radio Pass Giveaway, for managing radio station pass giveaways, coordinating between music
-venues, radio DJs, promotions staff, and station staff members.
+The web application behind the KALX staff site. It hosts two sub-sites:
+
+- **Radio Pass Giveaway** (`/pass-giveaway/`), for managing radio station pass giveaways,
+  coordinating between music venues, radio DJs, promotions staff, and station staff members
+- **KALX Staff Directory** (`/directory/`), where active staff look up each other's contact
+  details (name, pronouns, photo, email, phone, DJ name, departments, status, and titles and
+  roles) in a searchable, sortable, filterable table. The data comes from the same nightly
+  Airtable sync that drives staff access, and is read-only here: changes are made in Airtable
 
 ## Before Deploying
 
@@ -264,6 +269,7 @@ Client
               │
               │  /                →  home page linking to each sub-site
               │  /pass-giveaway/  →  Radio Pass Giveaway sub-site
+              │  /directory/      →  KALX Staff Directory sub-site
               │
               │  Authentication (Apache layer):
               │    DJ studio network IP  → authenticated without OIDC
@@ -303,6 +309,7 @@ Client
 | `AIRTABLE_API_KEY` | Airtable API key | — |
 | `AIRTABLE_BASE_ID` | Airtable base ID | — |
 | `AIRTABLE_TABLE_NAME` | Staff directory table | `KALX Active Staff Directory` |
+| `STAFF_PHOTO_DIR` | Where the Airtable sync stores resized staff directory photos (relative to `backend/`) | `data/staff_photos` |
 | `CORS_ORIGINS` | Allowed CORS origins | `http://localhost:3000` (production: `https://staff.kalx.berkeley.edu`) |
 | `SMTP2GO_API_KEY` | smtp2go API key for email notifications | — (falls back to local SMTP relay when unset) |
 | `EMAIL_FROM_ADDRESS` | From address for notification emails | `noreply@kalx.berkeley.edu` |

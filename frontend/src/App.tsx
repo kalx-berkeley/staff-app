@@ -34,6 +34,9 @@ const StaffMyPasses = lazySection(loadStaff, 'MyPasses');
 const StaffSpecialtyShowList = lazySection(loadStaff, 'SpecialtyShowList');
 const StaffSpecialtyShowDetail = lazySection(loadStaff, 'SpecialtyShowDetail');
 
+const loadDirectory = () => import('./components/directory');
+const DirectoryPage = lazySection(loadDirectory, 'DirectoryPage');
+
 const loadDJ = () => import('./components/dj');
 const DJLayout = lazySection(loadDJ, 'DJLayout');
 const DJShowBrowser = lazySection(loadDJ, 'ShowBrowser');
@@ -317,6 +320,29 @@ function PassGiveawayApp() {
   );
 }
 
+// The KALX Staff Directory sub-site, served under /directory. Anyone who can't
+// use it is sent to the home page, which offers what they can use.
+function DirectoryApp() {
+  const { user } = useAuth();
+
+  if (!subsiteForPath('/directory')?.isAvailable(user)) {
+    window.location.replace('/');
+    return null;
+  }
+
+  return (
+    <BrowserRouter basename="/directory">
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          <Route path="/" element={<DirectoryPage />} />
+          <Route path="/:staffId" element={<DirectoryPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  );
+}
+
 // The home page at /. Paths outside every sub-site land here too.
 function HomeApp() {
   return (
@@ -332,6 +358,7 @@ function HomeApp() {
 // Each sub-site's app, keyed by its base path in SUBSITES (subsites.ts).
 const SUBSITE_APPS: Record<string, ComponentType> = {
   '/pass-giveaway': PassGiveawayApp,
+  '/directory': DirectoryApp,
 };
 
 function App() {

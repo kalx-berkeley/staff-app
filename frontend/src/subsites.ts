@@ -23,6 +23,14 @@ export const SUBSITES: Subsite[] = [
       'Manage concert pass giveaways — create shows, distribute passes, and record on-air winners.',
     isAvailable: (user) => !!user && user.role !== 'unauthorized',
   },
+  {
+    basePath: '/directory',
+    name: 'KALX Staff Directory',
+    description: 'Look up contact details for other KALX staff members.',
+    // The promotions and staff roles both require Active status in Airtable,
+    // which is what the directory API requires.
+    isAvailable: (user) => user?.role === 'promotions' || user?.role === 'staff',
+  },
 ];
 
 export const HOME_TITLE = 'KALX Staff Portal';

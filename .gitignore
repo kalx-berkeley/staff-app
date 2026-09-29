@@ -51,6 +51,9 @@ apache/confs/kalx-variables.conf
 *.sqlite
 *.sqlite3
 
+# Staff directory photos downloaded by the Airtable sync
+backend/data/staff_photos/
+
 # IDE
 .vscode/
 .idea/
