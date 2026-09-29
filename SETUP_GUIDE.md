@@ -147,11 +147,11 @@ chmod 755 /home/staff-app
 ## Apache Configuration
 
 The staff site Apache configuration lives in the `apache/` directory of this repo. The
-`/pass-giveaway/` `Alias`, `Directory`, `Location`, and `ProxyPass` blocks for this app live
-directly inside the staff VirtualHost config:
+`DocumentRoot`, `Directory`, `Location`, and `ProxyPass` blocks for this app live directly
+inside the staff VirtualHost config:
 
 - **`apache/sites/auth.conf`** — `auth.kalx.berkeley.edu`: handles Google OAuth2 callbacks only
-- **`apache/sites/staff.conf`** — `staff.kalx.berkeley.edu`: top-level staff site with landing page and all `/pass-giveaway/` location blocks inline
+- **`apache/sites/staff.conf`** — `staff.kalx.berkeley.edu`: top-level staff site; serves the app's frontend build at `/` and proxies `/api/` to the backend
 
 mod_auth_openidc uses the shared passphrase to encrypt/decrypt session cookies, and `OIDCCookieDomain .kalx.berkeley.edu` scopes 
 those cookies to all subdomains, so a user who logs in once on `auth.kalx.berkeley.edu` is recognized automatically on `staff.kalx.berkeley.edu`.
@@ -224,20 +224,15 @@ certbot --apache -d auth.stage.kalx.berkeley.edu
 certbot --apache -d staff.stage.kalx.berkeley.edu
 ```
 
-### 3. Deploy the Auth Site and Staff Landing Pages
+### 3. Deploy the Auth Site Landing Pages
 
-The auth VirtualHost serves a small static page at `/` so that visitors who land there directly see something useful rather than a blank page or error. The staff VirtualHost serves a landing page linking to all available services.
+The auth VirtualHost serves a small static page at `/` so that visitors who land there directly see something useful rather than a blank page or error. The staff VirtualHost needs no static files of its own: its home page at `/` is part of the app, served from the deployed frontend build.
 
 ```bash
 mkdir -p /var/www/html/auth.kalx.berkeley.edu
 mkdir -p /var/www/html/auth.stage.kalx.berkeley.edu
 cp apache/www/html/auth/index.html /var/www/html/auth.kalx.berkeley.edu/
 cp apache/www/html/auth.stage/index.html /var/www/html/auth.stage.kalx.berkeley.edu/
-
-mkdir -p /var/www/html/staff.kalx.berkeley.edu
-mkdir -p /var/www/html/staff.stage.kalx.berkeley.edu
-cp apache/www/html/staff/index.html /var/www/html/staff.kalx.berkeley.edu/
-cp apache/www/html/staff.stage/index.html /var/www/html/staff.stage.kalx.berkeley.edu/
 ```
 
 ### 4. Enable the Sites
@@ -461,15 +456,15 @@ curl http://127.0.0.1:8420/health   # production
 curl http://127.0.0.1:8421/health   # staging
 
 # Via Apache (public)
-curl https://staff.kalx.berkeley.edu/pass-giveaway/api/health
-curl https://staff.stage.kalx.berkeley.edu/pass-giveaway/api/health
+curl https://staff.kalx.berkeley.edu/api/health
+curl https://staff.stage.kalx.berkeley.edu/api/health
 ```
 
 ### Test Authentication
 
 1. Open `https://staff.kalx.berkeley.edu` in a browser
 2. You should be redirected to Google login (the callback goes through `auth.kalx.berkeley.edu`)
-3. After login, you should be returned to `staff.kalx.berkeley.edu` and see the staff portal landing page
+3. After login, you should be returned to `staff.kalx.berkeley.edu` and see the KALX Staff Portal home page
 4. Click the "Radio Pass Giveaway" card — you should land at `https://staff.kalx.berkeley.edu/pass-giveaway/` and see the app
 5. Open `https://staff.kalx.berkeley.edu/pass-giveaway/dj` — should load without requiring login (when accessed from DJ studio network) or prompt for Google login (from other networks)
 6. Open `https://auth.kalx.berkeley.edu` in a browser — you should see the auth endpoint landing page with a link to the staff portal
@@ -559,7 +554,7 @@ cp ~/staff-app-production/backend/data/staff-app.db \
 
 Trigger via the admin UI (promotions staff only), or via the API:
 ```bash
-curl -X POST https://staff.kalx.berkeley.edu/pass-giveaway/api/users/sync
+curl -X POST https://staff.kalx.berkeley.edu/api/users/sync
 ```
 
 ---

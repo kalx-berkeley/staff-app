@@ -13,7 +13,7 @@ import type {
   PromotionsStaffOption,
 } from '../../types';
 
-const venueLogoUrl = (id: number) => `/pass-giveaway/api/venues/${id}/logo`;
+const venueLogoUrl = (id: number) => `/api/venues/${id}/logo`;
 
 interface VenueFormProps {
   venue: VenueResponse | null;

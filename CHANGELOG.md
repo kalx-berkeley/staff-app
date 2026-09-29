@@ -8,6 +8,16 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** serve the whole staff site from the app so it can host more sub-sites than the Radio Pass Giveaway: the frontend is served from the site root, and the API moves from `/pass-giveaway/api/` to `/api/`. Apache's `staff.conf` and `staff.stage.conf` must be updated when this is deployed
+- Replace the static staff portal landing page with a home page at `/` that shows a card for each sub-site you can use; Google accounts without access see the access help page there
+- Rename the browser tab and installed web app from "Radio Pass Giveaway" to "KALX Staff" outside the pass giveaway pages
+
+### Added
+
+- Add links to the KALX Staff Portal home page and the other sub-sites at the top of the pass giveaway navigation
+
 ## [1.4.0] - 2026-09-29
 
 ### Changed

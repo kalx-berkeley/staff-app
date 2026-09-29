@@ -1,9 +1,10 @@
 # kalx-staff
 
-Apache configuration and landing page for the KALX staff portal at `staff.kalx.berkeley.edu`.
+Apache configuration for the KALX staff portal at `staff.kalx.berkeley.edu`.
 
-This project owns the staff website infrastructure. Individual applications (such as the Radio Pass
-Giveaway) are separate projects that provide Apache Include snippets which this project references.
+The staff VirtualHost serves the staff-app frontend (this repo's `frontend/`) at `/`: a home
+page linking to each sub-site, and the sub-sites themselves (such as the Radio Pass Giveaway at
+`/pass-giveaway/`). It proxies `/api/` to the staff-app backend.
 
 ## Directory structure
 
@@ -19,10 +20,6 @@ apache/
       auth/
         index.html                   # "Not intended for direct access" page
       auth.stage/
-        index.html                   # Staging equivalent
-      staff/
-        index.html                   # Staff portal landing page
-      staff.stage/
         index.html                   # Staging equivalent
 ```
 
@@ -48,12 +45,9 @@ sudo cp apache/sites/auth.conf        /etc/apache2/sites-available/
 sudo cp apache/sites/staff.conf       /etc/apache2/sites-available/
 sudo a2ensite auth.conf staff.conf
 
-# Deploy landing page and auth stub
+# Deploy the auth stub page
 sudo mkdir -p /var/www/html/auth.kalx.berkeley.edu
 sudo cp apache/www/html/auth/index.html /var/www/html/auth.kalx.berkeley.edu/
-
-sudo mkdir -p /var/www/html/staff.kalx.berkeley.edu
-sudo cp apache/www/html/staff/index.html /var/www/html/staff.kalx.berkeley.edu/
 ```
 
 ### Fill in credentials
@@ -85,18 +79,20 @@ sudo certbot certonly --apache -d staff.kalx.berkeley.edu
 sudo apachectl configtest && sudo systemctl reload apache2
 ```
 
-## Adding a new service
+## Adding a new sub-site
 
-1. Add the service's `Alias`, `Directory`, `Location`, and `ProxyPass` blocks directly to
-   `apache/sites/staff.conf` (and the staging equivalent) under a new URL path.
-2. Add a card to `apache/www/html/staff/index.html`.
-3. Deploy the updated config and reload Apache.
+Sub-sites are added in the app, not here: register the sub-site in
+`frontend/src/subsites.ts` and add its app to `SUBSITE_APPS` in `frontend/src/App.tsx`.
+Every path is already served by the SPA and requires a Google login, so `staff.conf` only
+needs to change if the new sub-site relaxes authentication for some of its paths, as the
+Radio Pass Giveaway does for the DJ studio and station office networks.
 
 Keeping all location blocks inside `staff.conf` (root-owned in `/etc/apache2/`) ensures
 no application OS user can modify Apache configuration.
 
-## Mounted applications
+## Sub-sites
 
-| Path | Project |
+| Path | Sub-site |
 |---|---|
-| `/pass-giveaway/` | [kalx-promotions](https://github.com/gene1wood/kalx-promotions) |
+| `/` | Home page linking to each sub-site |
+| `/pass-giveaway/` | Radio Pass Giveaway |

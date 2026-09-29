@@ -29,7 +29,8 @@ The Radio Pass Giveaway sub-site provides three distinct user interfaces:
 - **Staff Member View** (`/pass-giveaway/staff`): Browse and claim staff passes to events
 
 The app is mounted at `/pass-giveaway/` on the staff site, managed by the
-[`apache/`](apache/) directory in this repo, which owns the Apache VirtualHost and landing page.
+[`apache/`](apache/) directory in this repo, which owns the Apache VirtualHost. The staff site's
+home page at `/` is part of this app too: it links to each sub-site the signed-in user can use.
 
 ## Features
 
@@ -259,9 +260,10 @@ Client
         │  mod_auth_openidc: validates shared session cookie; initiates login via auth site
         │  Sets X-Forwarded-User header from OIDC email claim
         │
-        ├── /          →  landing page (apache/www/html/staff/)
-        │
-        └── /pass-giveaway/  [kalx-promotions — this project]
+        └── /  [staff-app — this project: one React SPA for the whole site]
+              │
+              │  /                →  home page linking to each sub-site
+              │  /pass-giveaway/  →  Radio Pass Giveaway sub-site
               │
               │  Authentication (Apache layer):
               │    DJ studio network IP  → authenticated without OIDC
@@ -275,9 +277,8 @@ Client
               ├── Static files  →  /home/staff-app/staff-app-production/frontend/dist/
               │                    (staging: /home/staff-app/staff-app-staging/frontend/dist/)
               │
-              └── /pass-giveaway/api/*  →  Uvicorn (127.0.0.1:8420, staff-app user)
-                                              (staging: 127.0.0.1:8421)
-                                              │  (Apache strips /pass-giveaway prefix)
+              └── /api/*  →  Uvicorn (127.0.0.1:8420, staff-app user)
+                                (staging: 127.0.0.1:8421)
                                               │  Defense-in-depth: 400 if neither
                                               │  X-Forwarded-User nor DJ network IP present
                                               └── SQLite database
@@ -354,10 +355,10 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 
 ```
 .
-├── apache/                     # Staff portal website: Apache VirtualHosts and landing pages
+├── apache/                     # Staff portal website: Apache VirtualHosts and auth landing pages
 │   ├── sites/                  # auth/staff VirtualHost configs (production + staging)
 │   ├── confs/                  # Shared variables and secrets, loaded via a2enconf
-│   ├── www/html/               # Static landing pages (auth, auth.stage, staff, staff.stage)
+│   ├── www/html/               # Static auth landing pages (auth, auth.stage)
 │   └── README.md
 ├── backend/                    # Python FastAPI backend
 │   ├── app/
