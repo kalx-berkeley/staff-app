@@ -4088,6 +4088,10 @@ body.staging-active .directory-table th {
   width: 3rem;
 }
 
+td.directory-col-phone {
+  white-space: nowrap;
+}
+
 .directory-sort-button {
   background: none;
   border: none;
@@ -4121,13 +4125,18 @@ body.staging-active .directory-table th {
   gap: 0.25rem;
 }
 
-.directory-tag {
+.directory-table a.directory-tag {
   padding: 0.05rem 0.45rem;
   border-radius: 999px;
   background: #e8eef6;
   color: #34495e;
   font-size: 0.75rem;
   white-space: nowrap;
+}
+
+.directory-table a.directory-tag:hover {
+  background: #d3e0f0;
+  text-decoration: none;
 }
 
 .directory-empty {

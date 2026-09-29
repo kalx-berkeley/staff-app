@@ -146,6 +146,22 @@ describe('DirectoryPage', () => {
     expect(names()).toEqual(['Bea Brown']);
   });
 
+  it('filters on a department or status tag when it is clicked', async () => {
+    await renderDirectory('/directory?q=b&status=Active');
+    const row = screen.getByRole('link', { name: 'Bea Brown' }).closest('tr')!;
+
+    const newsTag = within(row).getByRole('link', { name: 'News' });
+    expect(newsTag).toHaveAttribute('href', '/directory?q=b&dept=News&status=Active');
+    fireEvent.click(newsTag);
+    await waitFor(() => expect(window.location.search).toBe('?q=b&dept=News&status=Active'));
+    expect(window.location.pathname).toBe('/directory');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(within(row).getByRole('link', { name: 'Paid Staff' }));
+    await waitFor(() => expect(window.location.search).toBe('?q=b&dept=News&status=Paid+Staff'));
+    expect(names()).toEqual(['Bea Brown']);
+  });
+
   it('sorts by a column header, keeping the sort in the URL', async () => {
     await renderDirectory();
 

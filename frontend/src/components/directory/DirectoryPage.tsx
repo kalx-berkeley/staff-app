@@ -53,13 +53,25 @@ const textSort: SortFn<Features, DirectoryEntry> = (rowA, rowB, columnId) => {
   return a.localeCompare(b, undefined, { sensitivity: 'base' });
 };
 
-const Tags = ({ values }: { values: string[] }) => (
-  <span className="directory-tags">
-    {values.map((value) => (
-      <span key={value} className="directory-tag">{value}</span>
-    ))}
-  </span>
-);
+// A row's departments or statuses, each linking to the table filtered on just
+// that value (keeping the current search, sort, and other filter).
+const Tags = ({ values, filter }: { values: string[]; filter: 'departments' | 'statuses' }) => {
+  const view = parseViewState(new URLSearchParams(window.location.search));
+  return (
+    <span className="directory-tags">
+      {values.map((value) => (
+        <Link
+          key={value}
+          className="directory-tag"
+          to={`/?${viewStateParams({ ...view, [filter]: [value] })}`}
+          title={`Show only ${value}`}
+        >
+          {value}
+        </Link>
+      ))}
+    </span>
+  );
+};
 
 const helper = createColumnHelper<Features, DirectoryEntry>();
 
@@ -111,13 +123,13 @@ const columns = helper.columns([
     header: 'Departments',
     enableSorting: false,
     filterFn: includesAny,
-    cell: ({ row }) => <Tags values={row.original.departments} />,
+    cell: ({ row }) => <Tags values={row.original.departments} filter="departments" />,
   }),
   helper.accessor('statuses', {
     header: 'Status',
     enableSorting: false,
     filterFn: includesAny,
-    cell: ({ row }) => <Tags values={row.original.statuses} />,
+    cell: ({ row }) => <Tags values={row.original.statuses} filter="statuses" />,
   }),
 ]);
 
@@ -310,7 +322,7 @@ export default function DirectoryPage() {
                 key={row.id}
                 className={row.original.id === myId ? 'directory-row-me' : undefined}
                 onClick={(event) => {
-                  // Let links (email, phone, DJ) do their own thing.
+                  // Let links (email, phone, DJ, tags) do their own thing.
                   if ((event.target as HTMLElement).closest('a')) return;
                   navigate(`/${row.original.id}${search}`);
                 }}
