@@ -510,7 +510,7 @@ describe('App - Role-Based UI Elements', () => {
       await renderAppWithUser({ ...staffUser, role: 'unauthorized' });
 
       await waitFor(() => {
-        expect(screen.getByRole('heading', { name: /Access Not Available/i })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /can't access the KALX Staff Site/i })).toBeInTheDocument();
       });
       expect(screen.queryByRole('link', { name: /Radio Pass Giveaway/i })).not.toBeInTheDocument();
     });
