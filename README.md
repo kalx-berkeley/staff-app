@@ -308,7 +308,7 @@ Client
 | `DJ_STUDIO_NETWORK` | DJ studio CIDR | `192.168.1.0/24` |
 | `AIRTABLE_API_KEY` | Airtable API key | — |
 | `AIRTABLE_BASE_ID` | Airtable base ID | — |
-| `AIRTABLE_TABLE_NAME` | Staff directory table | `KALX Active Staff Directory` |
+| `AIRTABLE_TABLE_NAME` | Staff directory table | `Online Staff App Directory` |
 | `STAFF_PHOTO_DIR` | Where the Airtable sync stores resized staff directory photos (relative to `backend/`) | `data/staff_photos` |
 | `CORS_ORIGINS` | Allowed CORS origins | `http://localhost:3000` (production: `https://staff.kalx.berkeley.edu`) |
 | `SMTP2GO_API_KEY` | smtp2go API key for email notifications | — (falls back to local SMTP relay when unset) |
@@ -326,7 +326,7 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 
 ### Airtable Schema
 
-**Table: KALX Active Staff Directory**
+**Table: Online Staff App Directory**
 
 | Field | Type |
 |---|---|

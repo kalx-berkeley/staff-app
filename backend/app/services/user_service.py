@@ -127,7 +127,7 @@ class UserService:
         """
         Synchronize users from Airtable into the local database.
 
-        Fetches the "KALX Active Staff Directory" table (configurable via
+        Fetches the "Online Staff App Directory" table (configurable via
         AIRTABLE_TABLE_NAME). Each record's "Department" comma-delimited string
         field determines the role: "Promotions" department maps to the
         promotions_staff table; all other departments map to the staff table.

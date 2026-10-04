@@ -88,7 +88,7 @@ This document specifies the requirements for a web-based pass giveaway managemen
 
 #### Acceptance Criteria
 
-1. WHEN the daily synchronization runs, THE System SHALL retrieve all records from the "KALX Active Staff Directory" Airtable table (configurable via `AIRTABLE_TABLE_NAME`)
+1. WHEN the daily synchronization runs, THE System SHALL retrieve all records from the "Online Staff App Directory" Airtable table (configurable via `AIRTABLE_TABLE_NAME`)
 2. WHEN the daily synchronization runs, THE System SHALL read each record's "Email address" field and "Department" multi-select field
 3. WHEN a record's Department includes "Promotions", THE System SHALL upsert that email into the `promotions_staff` database table
 4. WHEN a record's Department does not include "Promotions", THE System SHALL upsert that email into the `staff` database table
