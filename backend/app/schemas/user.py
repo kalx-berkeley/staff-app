@@ -58,7 +58,7 @@ class SyncResult(BaseModel):
         default_factory=list,
         description=(
             "Staff emails whose 'Active' status was removed because "
-            "they no longer appear in Airtable"
+            "they no longer appear in Airtable as Active"
         ),
     )
     errors: list[str] = Field(

@@ -16,6 +16,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 ### Changed
 
 - Sync staff from the "Online Staff App Directory" Airtable table instead of "KALX Active Staff Directory" by default (`AIRTABLE_TABLE_NAME` still overrides it)
+- Import only Airtable records whose Status includes "Active"; the new table also lists people who aren't active yet ("🆕"), and anyone listed but no longer Active loses access as if they'd left the table. `backend/scripts/delete_inactive_staff.py` removes the staff rows an earlier sync created for them
 
 ## [1.5.0] - 2026-09-29
 

@@ -285,7 +285,11 @@ def test_sync_follows_an_email_change_by_record_id(
             _admin_record(),
             {
                 "id": "recJane",
-                "fields": {"Email address": "new@example.com", "Name": "Doe, Jane"},
+                "fields": {
+                    "Email address": "new@example.com",
+                    "Name": "Doe, Jane",
+                    "Status": ["Active"],
+                },
             },
         ],
     )
@@ -306,7 +310,10 @@ def test_sync_reports_an_email_change_that_collides(
         client,
         [
             _admin_record(),
-            {"id": "recJane", "fields": {"Email address": "taken@example.com"}},
+            {
+                "id": "recJane",
+                "fields": {"Email address": "taken@example.com", "Status": ["Active"]},
+            },
         ],
     )
 

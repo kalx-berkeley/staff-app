@@ -128,7 +128,10 @@ class UserService:
         Synchronize users from Airtable into the local database.
 
         Fetches the "Online Staff App Directory" table (configurable via
-        AIRTABLE_TABLE_NAME). Each record's "Department" comma-delimited string
+        AIRTABLE_TABLE_NAME). Only records whose "Status" includes "Active"
+        are imported; the table also lists people who aren't active yet (e.g.
+        "🆕"), and they're skipped as if absent. Each record's "Department"
+        comma-delimited string
         field determines the role: "Promotions" department maps to the
         promotions_staff table; all other departments map to the staff table.
 
@@ -137,10 +140,11 @@ class UserService:
         resolve the DJ name for each persona ID and stores the result in
         staff.dj_name.
 
-        Existing DB records not present in Airtable are left in place so that
+        Existing DB records not present in Airtable (or present but not
+        "Active") are left in place so that
         historical show/pass associations are preserved. The one exception is
         the "Active" status: a staff member who no longer appears in Airtable
-        at all has their "Active" status removed (see the deactivation step
+        as "Active" has their "Active" status removed (see the deactivation step
         below), since access-control checks (`_is_promotions_staff`,
         `get_staff_member`) treat "Active" as a gate. Everything else about
         the record — the Staff row itself, other statuses, departments, venue/
@@ -170,6 +174,9 @@ class UserService:
         # (staff ID, "Photo" attachment or None) for each upserted record,
         # reconciled with the photos on disk after the loop.
         photo_updates: List[tuple[int, Optional[Dict[str, Any]]]] = []
+        # Emails of the "Active" records Airtable returned, for the
+        # deactivation step below.
+        seen_emails: set[str] = set()
 
         for record in records:
             fields = record.get("fields", {})
@@ -180,6 +187,15 @@ class UserService:
             if not email or not isinstance(email, str):
                 continue
             email = email.strip().lower()
+
+            statuses = fields.get("Status", [])
+            if isinstance(statuses, str):
+                statuses = [s.strip() for s in statuses.split(",")]
+            elif not isinstance(statuses, list):
+                statuses = []
+            if ACTIVE_STATUS not in statuses:
+                continue
+            seen_emails.add(email)
 
             raw_name = (fields.get("Name") or "").strip()
             name = _format_airtable_name(raw_name)
@@ -197,12 +213,6 @@ class UserService:
                 departments = [d.strip() for d in departments.split(",")]
             elif not isinstance(departments, list):
                 departments = []
-
-            statuses = fields.get("Status", [])
-            if isinstance(statuses, str):
-                statuses = [s.strip() for s in statuses.split(",")]
-            elif not isinstance(statuses, list):
-                statuses = []
 
             # Extract Spinitron persona IDs from URLs in the "DJ Name" field
             raw_dj_field = fields.get("DJ Name", "")
@@ -377,26 +387,15 @@ class UserService:
                 logger.error(error_msg)
                 result["errors"].append(error_msg)
 
-        # Deactivate staff who no longer appear in Airtable at all. The loop
-        # above only reconciles departments/statuses for emails Airtable
-        # actually returned, so someone removed from the table entirely would
-        # otherwise keep whatever access they already had, indefinitely.
+        # Deactivate staff who no longer appear in Airtable as "Active". The
+        # loop above only reconciles departments/statuses for the Active
+        # records Airtable returned, so someone removed from the table, or no
+        # longer Active in it, would otherwise keep whatever access they
+        # already had, indefinitely.
         # Guarded on a non-empty `seen_emails`: if Airtable returned nothing
         # (e.g. credentials misconfigured — see fetch_airtable_records), an
         # empty set here would otherwise match every "Active" staff member
         # and deactivate the entire directory.
-        seen_emails = {
-            (
-                record.get("fields", {}).get("Email address")
-                or record.get("fields", {}).get("email")
-                or record.get("fields", {}).get("Email")
-                or ""
-            )
-            .strip()
-            .lower()
-            for record in records
-        }
-        seen_emails.discard("")
         if seen_emails:
             vanished = (
                 db.query(Staff)
@@ -420,7 +419,7 @@ class UserService:
                         entity_id=staff_record.id,
                         details={
                             "email": staff_record.email,
-                            "reason": "no longer present in Airtable",
+                            "reason": "no longer Active in Airtable",
                         },
                     )
                 except SQLAlchemyError as e:

@@ -610,6 +610,84 @@ async def test_sync_deactivates_staff_missing_from_airtable(
 
 
 @pytest.mark.asyncio
+async def test_sync_skips_records_without_active_status(client: TestClient, db: Session):
+    """Sync imports only records whose Status includes 'Active': the table also
+    lists people who aren't active yet (e.g. '🆕'), and they get no Staff row."""
+    from unittest.mock import patch, AsyncMock
+
+    _make_promotions_staff(db, "admin@example.com", "Admin", "555-0000")
+
+    airtable_records = [
+        {
+            "Email address": "admin@example.com",
+            "Department": ["Promotions"],
+            "Status": ["Active"],
+        },
+        {"Email address": "new@example.com", "Department": ["Music"], "Status": ["🆕"]},
+        {"Email address": "nostatus@example.com", "Department": ["Music"]},
+    ]
+
+    with patch(
+        "app.services.user_service.UserService.fetch_airtable_records",
+        new_callable=AsyncMock,
+        return_value=_airtable_records(airtable_records),
+    ):
+        response = client.post(
+            "/api/users/sync", headers={"X-Forwarded-User": "admin@example.com"}
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["staff_upserted"] == ["admin@example.com"]
+    assert data["errors"] == []
+    assert db.query(Staff).filter_by(email="new@example.com").first() is None
+    assert db.query(Staff).filter_by(email="nostatus@example.com").first() is None
+    assert db.query(AuditLog).filter_by(event_type="airtable_sync_added").count() == 0
+
+
+@pytest.mark.asyncio
+async def test_sync_deactivates_staff_no_longer_active_in_airtable(
+    client: TestClient, db: Session
+):
+    """Sync removes 'Active' status for staff still listed in Airtable but no
+    longer Active there, the same as if they'd left the table, and leaves
+    their record otherwise untouched."""
+    from unittest.mock import patch, AsyncMock
+
+    _make_promotions_staff(db, "admin@example.com", "Admin", "555-0000")
+    _make_active_staff(db, "lapsed@example.com", "Lapsed User", "555-1111")
+
+    airtable_records = [
+        {
+            "Email address": "admin@example.com",
+            "Department": ["Promotions"],
+            "Status": ["Active"],
+        },
+        {
+            "Email address": "lapsed@example.com",
+            "Name": "Renamed, Someone",
+            "Status": ["🆕"],
+        },
+    ]
+
+    with patch(
+        "app.services.user_service.UserService.fetch_airtable_records",
+        new_callable=AsyncMock,
+        return_value=_airtable_records(airtable_records),
+    ):
+        response = client.post(
+            "/api/users/sync", headers={"X-Forwarded-User": "admin@example.com"}
+        )
+
+    assert response.status_code == 200
+    assert response.json()["deactivated"] == ["lapsed@example.com"]
+
+    lapsed = db.query(Staff).filter_by(email="lapsed@example.com").first()
+    assert lapsed.name == "Lapsed User"
+    assert {s.status for s in lapsed.statuses} == set()
+
+
+@pytest.mark.asyncio
 async def test_sync_skips_deactivation_when_airtable_returns_empty(
     client: TestClient, db: Session
 ):
