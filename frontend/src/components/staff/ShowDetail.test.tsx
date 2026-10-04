@@ -433,6 +433,40 @@ describe('Staff ShowDetail', () => {
     });
   });
 
+  describe('Leave of absence', () => {
+    const onLeave = (loa_start: string | null, loa_end: string | null) =>
+      mockUseAuth.mockReturnValue({
+        user: { email: 'me@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { id: 1, name: 'Me', phone: '555-0000', dj_name: null, is_sublist_dj: false, loa_start, loa_end } },
+        loading: false,
+        error: null,
+        refetchUser: vi.fn(),
+      });
+
+    it('replaces the Claim buttons with an explanation during a leave covering the show', async () => {
+      onLeave('2024-12-01', '2025-01-15');
+      vi.mocked(showsAPI.get).mockResolvedValue(mockShow);
+
+      render(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      expect(
+        await screen.findByText(
+          "You're on leave of absence Dec 1, 2024 – Jan 15, 2025, so you can't claim passes for this show."
+        )
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^claim$/i })).not.toBeInTheDocument();
+    });
+
+    it('leaves Claim available when the leave ends before the show', async () => {
+      onLeave(null, '2024-12-30');
+      vi.mocked(showsAPI.get).mockResolvedValue(mockShow);
+
+      render(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      expect(await screen.findByRole('button', { name: /^claim$/i })).not.toBeDisabled();
+      expect(screen.queryByText(/on leave of absence/i)).not.toBeInTheDocument();
+    });
+  });
+
   describe('Release Pass', () => {
     it('should call releaseClaim API with pass ID', async () => {
       loginAsClaimer();

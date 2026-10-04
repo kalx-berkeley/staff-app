@@ -31,6 +31,7 @@ from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.staff import Staff
 from app.models.staff_pass_alternate import StaffPassAlternate
+from app.services.leave_service import ensure_not_on_leave_for_show, leave_covers_show
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,18 @@ class AlternateService:
             .all()
         )
         return sorted(entries, key=_queue_key)
+
+    @staticmethod
+    def _eligible(
+        show: Show, waiting: list[StaffPassAlternate]
+    ) -> list[StaffPassAlternate]:
+        """
+        Waiting entries that can be promoted now, in queue order.
+
+        Alternates on leave of absence for the whole show are skipped but keep
+        their place, so they're eligible again if their leave changes.
+        """
+        return [e for e in waiting if not leave_covers_show(e.staff, show)]
 
     @staticmethod
     def _staff_passes(db: Session, show_id: int) -> list[Pass]:
@@ -152,7 +165,9 @@ class AlternateService:
 
         Used to warn a claimer who is about to release their pass.
         """
-        waiting = AlternateService.waiting_entries(db, show.id)
+        waiting = AlternateService._eligible(
+            show, AlternateService.waiting_entries(db, show.id)
+        )
         if not waiting or freed_passes <= 0 or show.status != "published":
             return None
         for entry in waiting:
@@ -197,6 +212,7 @@ class AlternateService:
             )
         # Same close-time rules as a direct claim.
         PassService._validate_show_claimable(show)
+        ensure_not_on_leave_for_show(staff, show)
 
         if AlternateService._has_claim(db, show.id, staff.id):
             raise HTTPException(
@@ -448,7 +464,9 @@ class AlternateService:
         if AlternateService._promotion_blocked(db, show):
             return []
 
-        waiting = AlternateService.waiting_entries(db, show.id)
+        waiting = AlternateService._eligible(
+            show, AlternateService.waiting_entries(db, show.id)
+        )
         if not waiting:
             return []
 

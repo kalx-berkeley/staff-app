@@ -1,5 +1,7 @@
 """Pydantic schemas for the Staff Directory API."""
 
+from datetime import date
+
 from pydantic import BaseModel
 
 
@@ -27,3 +29,8 @@ class DirectoryEntry(BaseModel):
     # Changes whenever the photo does, for cache-busting the photo URL; None
     # when the staff member has no photo.
     photo_version: str | None = None
+    # Leave of absence that hasn't ended yet (None once it's past); either
+    # date may be None for a one-sided leave. on_leave is True during it.
+    on_leave: bool = False
+    loa_start: date | None = None
+    loa_end: date | None = None

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { showsAPI, passesAPI, lotteryAPI, specialtyShowsAPI, alternatesAPI } from '../../services/api';
 import { Tooltip, EnrichedShowName, MarkdownContent, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, AlternateGuestForm } from '../shared';
-import { formatPhone, formatDateValue } from '../../utils';
+import { formatPhone, formatDateValue, formatLeave, isOnLeave, leaveCoversShow } from '../../utils';
 import { useAuth } from '../../contexts/authHooks';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import type { ShowResponse, StaffProfile, APIError, ClaimData, LotteryStatus, SpecialtyShowResponse, AlternateQueue, AlternateJoinRequest } from '../../types';
@@ -574,6 +574,18 @@ const ShowDetail = () => {
       )
     : [];
   const staffProfile = user?.profile as StaffProfile | undefined;
+  // Staff on leave for the whole show can't claim a pass, enter the lottery, or
+  // join the alternate list (enforced server-side too).
+  const leaveBlocksPasses = leaveCoversShow(staffProfile, show);
+  const leaveBlockMessage = staffProfile
+    ? `You're on leave of absence ${formatLeave(staffProfile)}, so you can't claim passes for this show.`
+    : '';
+  // Replaces the "schedule doesn't show you" warning for a DJ-name reservation
+  // on a date during the DJ's own leave (not a specialty show, which has others).
+  const leaveWarningFor = (reserveFor: string, date: string): string | null =>
+    date && !reserveFor.startsWith('ss:') && isOnLeave(staffProfile, date)
+      ? `You're on leave of absence ${formatLeave(staffProfile!)}, so you probably won't be on air on ${formatDate(date)}. Only continue if you're sure that's correct.`
+      : null;
   const isSublistDj = staffProfile?.is_sublist_dj ?? false;
   const myDjName = staffProfile?.dj_name ?? null;
   const myDjNames = myDjName ? myDjName.split(',').map((n) => n.trim()).filter(Boolean) : [];
@@ -600,7 +612,8 @@ const ShowDetail = () => {
     !alreadyHasStaffPass &&
     !myAlternateEntry &&
     show.status === 'published' &&
-    !lotteryActive;
+    !lotteryActive &&
+    !leaveBlocksPasses;
   const releaseCandidateName = alternateQueue?.next_candidate_name ?? null;
   const myDJEntry = lotteryStatus?.my_dj_entry ?? null;
 
@@ -897,14 +910,20 @@ const ShowDetail = () => {
                             : undefined
                         }
                       />
-                      {lotteryScheduleDates !== null &&
+                      {leaveWarningFor(lotteryDJReserveFor, lotteryDJDate) ? (
+                        <p className="field-warning">
+                          {leaveWarningFor(lotteryDJReserveFor, lotteryDJDate)}
+                        </p>
+                      ) : (
+                        lotteryScheduleDates !== null &&
                         lotteryDJDate &&
                         !lotteryScheduleDates.includes(lotteryDJDate) && (
                           <p className="field-warning">
                             The on-air schedule doesn't show you on {formatDate(lotteryDJDate)}.
                             Only enter the lottery for this date if you're sure that's correct.
                           </p>
-                        )}
+                        )
+                      )}
                       <button
                         onClick={handleEnterDJLottery}
                         className="btn-small btn-primary"
@@ -1029,7 +1048,12 @@ const ShowDetail = () => {
                                     : undefined
                                 }
                               />
-                              {scheduleDates !== null &&
+                              {leaveWarningFor(preassignSelfReserveFor, preassignSelfDate) ? (
+                                <p className="field-warning">
+                                  {leaveWarningFor(preassignSelfReserveFor, preassignSelfDate)}
+                                </p>
+                              ) : (
+                                scheduleDates !== null &&
                                 preassignSelfDate &&
                                 !scheduleDates.includes(preassignSelfDate) && (
                                   <p className="field-warning">
@@ -1037,7 +1061,8 @@ const ShowDetail = () => {
                                     {formatDate(preassignSelfDate)}. Only save this if you're sure
                                     that's correct.
                                   </p>
-                                )}
+                                )
+                              )}
                               <button
                                 onClick={() => handleSelfPreassignSubmit(pass.id)}
                                 className="btn-small btn-primary"
@@ -1098,6 +1123,10 @@ const ShowDetail = () => {
             <p className="field-hint">
               You already have a staff pass for this show — release it before claiming another.
             </p>
+          )}
+
+          {leaveBlocksPasses && !alreadyHasStaffPass && (
+            <p className="field-hint">{leaveBlockMessage}</p>
           )}
 
           {lotteryActive && lotteryDeadline && (
@@ -1212,7 +1241,7 @@ const ShowDetail = () => {
                   </button>
                 </div>
               </div>
-            ) : (
+            ) : leaveBlocksPasses ? null : (
               <button
                 onClick={() => setShowStaffLotteryForm(true)}
                 className="btn-small btn-primary"
@@ -1280,7 +1309,7 @@ const ShowDetail = () => {
                       <p className={show.status === 'closed' ? 'pass-unavailable-note' : 'pass-available-note'}>
                         {show.status === 'closed' ? 'Unavailable' : 'Available'}
                       </p>
-                      {show.status !== 'closed' && (
+                      {show.status !== 'closed' && !leaveBlocksPasses && (
                         <div className="claim-buttons">
                           <button
                             onClick={() => handleClaimPass(pass.id)}
@@ -1304,7 +1333,7 @@ const ShowDetail = () => {
                     <p className={show.status === 'closed' ? 'pass-unavailable-note' : 'pass-available-note'}>
                       {show.status === 'closed' ? 'Unavailable' : 'Available'}
                     </p>
-                    {show.status !== 'closed' && !lotteryActive && (
+                    {show.status !== 'closed' && !lotteryActive && !leaveBlocksPasses && (
                       <>
                         {guestClaimPassId === pass.id ? (
                           <div className="guest-claim-form">

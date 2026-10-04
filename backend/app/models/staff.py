@@ -1,7 +1,7 @@
 """Staff model."""
 
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, JSON, String, Text, DateTime
+from sqlalchemy import Column, Date, Integer, JSON, String, Text, DateTime
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -31,9 +31,10 @@ class Staff(Base):
     airtable_record_id = Column(String, unique=True, nullable=True, index=True)
     # Airtable: "Email address"
     email = Column(String, unique=True, nullable=False, index=True)
-    # Airtable: "Name", reformatted from "Last, First (pronouns)" to "First Last"
+    # Airtable: "First Name" and "Surname" as "First Last" (or "Name" as-is if
+    # both are blank)
     name = Column(String, nullable=False)
-    # Airtable: the parenthesized part of "Name", e.g. "she/her"
+    # Airtable: "Pronouns", e.g. "she/her"
     pronouns = Column(String, nullable=True)
     # Airtable: "Phone"
     phone = Column(String, nullable=False)
@@ -42,6 +43,11 @@ class Staff(Base):
     # Airtable: the ID of the "Photo" attachment whose resized copies are on
     # disk (see app/services/staff_photo_service.py). Null when there's no photo.
     photo_attachment_id = Column(String, nullable=True)
+    # Airtable: "LOA start" and "LOA end", the first and last days (inclusive)
+    # of a leave of absence. Either may be blank: a start alone is open-ended,
+    # an end alone means on leave until then. See app/services/leave_service.py.
+    loa_start = Column(Date, nullable=True)
+    loa_end = Column(Date, nullable=True)
     # Derived: Spinitron persona IDs parsed from the URLs in Airtable's "DJ Name"
     spinitron_ids = Column(JSON, nullable=True)
     # Derived: persona names looked up in Spinitron for spinitron_ids

@@ -406,8 +406,22 @@ class TestSuggestByDateEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data == [
-            {"name": "Sunday Jazz Brunch", "is_specialty": True, "matched_genres": []},
-            {"name": "Wolfman", "is_specialty": False, "matched_genres": []},
+            {
+                "name": "Sunday Jazz Brunch",
+                "is_specialty": True,
+                "matched_genres": [],
+                "on_leave": False,
+                "loa_start": None,
+                "loa_end": None,
+            },
+            {
+                "name": "Wolfman",
+                "is_specialty": False,
+                "matched_genres": [],
+                "on_leave": False,
+                "loa_start": None,
+                "loa_end": None,
+            },
         ]
 
     def test_requires_authentication(self, client: TestClient):

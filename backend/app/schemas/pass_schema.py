@@ -74,6 +74,17 @@ class DjSuggestion(BaseModel):
     name: str
     is_specialty: bool = False
     matched_genres: list[str] = Field(default_factory=list)
+    # Genre suggestions only: set when the DJ's leave of absence covers the show
+    on_leave: bool = False
+    loa_start: date | None = None
+    loa_end: date | None = None
+
+
+class DjLeave(BaseModel):
+    """A DJ's current or upcoming leave of absence; either date may be None."""
+
+    loa_start: date | None = None
+    loa_end: date | None = None
 
 
 class ClaimData(BaseModel):
@@ -112,6 +123,11 @@ class PassResponse(BaseModel):
     staff_phone: str | None = None
     staff_email: str | None = None
     claimed_at: UtcDatetime | None = None
+    # Set when the claimant's leave of absence covers the whole show (their own
+    # pass only, not a guest hold); the dates may be None for a one-sided leave.
+    staff_on_leave: bool = False
+    staff_loa_start: date | None = None
+    staff_loa_end: date | None = None
 
     # Staff +1 guest fields
     has_guest: bool = False

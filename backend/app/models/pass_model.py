@@ -95,6 +95,28 @@ class Pass(Base):
     def staff_email(self):
         return self.staff.email if self.staff else None
 
+    def _claimant_leave_covering_show(self):
+        """The claimant, if this is their own staff pass and they're on leave for the show."""
+        from app.services.leave_service import leave_covers_show
+
+        if self.staff is None or self.show is None or self.guest_of_pass_id is not None:
+            return None
+        return self.staff if leave_covers_show(self.staff, self.show) else None
+
+    @property
+    def staff_loa_start(self):
+        staff = self._claimant_leave_covering_show()
+        return staff.loa_start if staff else None
+
+    @property
+    def staff_loa_end(self):
+        staff = self._claimant_leave_covering_show()
+        return staff.loa_end if staff else None
+
+    @property
+    def staff_on_leave(self):
+        return self._claimant_leave_covering_show() is not None
+
     @property
     def show_event_name(self):
         return self.show.event_name if self.show else None

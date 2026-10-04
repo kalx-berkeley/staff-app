@@ -1,5 +1,7 @@
 """Pydantic schemas for User API."""
 
+from datetime import date
+
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 
 
@@ -14,6 +16,9 @@ class PromotionsStaffResponse(BaseModel):
     phone: str
     dj_name: str | None = None
     is_sublist_dj: bool = False
+    # Leave of absence, inclusive; either may be None (see leave_service)
+    loa_start: date | None = None
+    loa_end: date | None = None
 
 
 class StaffResponse(BaseModel):
@@ -27,6 +32,9 @@ class StaffResponse(BaseModel):
     phone: str
     dj_name: str | None = None
     is_sublist_dj: bool = False
+    # Leave of absence, inclusive; either may be None (see leave_service)
+    loa_start: date | None = None
+    loa_end: date | None = None
 
 
 class UserInfo(BaseModel):

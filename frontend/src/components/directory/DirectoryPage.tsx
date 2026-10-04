@@ -16,6 +16,7 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import { directoryAPI } from '../../services/api';
 import { HOME_TITLE, SUBSITES, subsiteForPath } from '../../subsites';
 import type { DirectoryEntry } from '../../types';
+import { formatLeave } from '../../utils';
 import DirectoryDetail from './DirectoryDetail';
 import DjNames from './DjNames';
 import FilterMenu from './FilterMenu';
@@ -90,6 +91,14 @@ const columns = helper.columns([
         <Link className="directory-name" to={`/${row.original.id}${window.location.search}`}>
           {row.original.name}
         </Link>
+        {row.original.on_leave && (
+          <>
+            {' '}
+            <span className="leave-badge" title={`On leave of absence ${formatLeave(row.original)}`}>
+              On leave
+            </span>
+          </>
+        )}
         {row.original.pronouns && (
           <div className="directory-pronouns">{row.original.pronouns}</div>
         )}
@@ -313,7 +322,14 @@ export default function DirectoryPage() {
             {rows.map((row) => (
               <tr
                 key={row.id}
-                className={row.original.id === myId ? 'directory-row-me' : undefined}
+                className={
+                  [
+                    row.original.id === myId && 'directory-row-me',
+                    row.original.on_leave && 'directory-row-on-leave',
+                  ]
+                    .filter(Boolean)
+                    .join(' ') || undefined
+                }
                 onClick={(event) => {
                   // Let links (email, phone, DJ, tags) do their own thing.
                   if ((event.target as HTMLElement).closest('a')) return;

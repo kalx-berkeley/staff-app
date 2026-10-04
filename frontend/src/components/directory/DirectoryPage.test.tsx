@@ -27,6 +27,9 @@ const entry = (overrides: Partial<DirectoryEntry>): DirectoryEntry => ({
   statuses: ['Active'],
   titles_and_roles: null,
   photo_version: null,
+  on_leave: false,
+  loa_start: null,
+  loa_end: null,
   ...overrides,
 });
 
@@ -59,6 +62,9 @@ const ENTRIES: DirectoryEntry[] = [
     email: 'cal@example.com',
     phone: '510-555-0003',
     departments: ['Music', 'News'],
+    on_leave: true,
+    loa_start: '2030-03-01',
+    loa_end: '2030-06-01',
   }),
 ];
 
@@ -205,6 +211,39 @@ describe('DirectoryPage', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(window.location.pathname).toBe('/directory');
     expect(window.location.search).toBe('?q=bea');
+  });
+
+  it('sets apart staff on leave of absence and shows the dates in their detail panel', async () => {
+    await renderDirectory('/directory/3');
+
+    const row = screen.getByRole('link', { name: 'Cal Chen' }).closest('tr')!;
+    expect(row).toHaveClass('directory-row-on-leave');
+    expect(within(row).getByText('On leave')).toBeInTheDocument();
+    const panel = await screen.findByRole('dialog', { name: /Cal Chen/ });
+    expect(
+      within(panel).getByText('On leave of absence: Mar 1, 2030 – Jun 1, 2030'),
+    ).toBeInTheDocument();
+    const amyRow = screen.getByRole('link', { name: 'Amy Adams' }).closest('tr')!;
+    expect(amyRow).not.toHaveClass('directory-row-on-leave');
+  });
+
+  it('shows a leave that has not started yet only in the detail panel', async () => {
+    window.history.pushState({}, '', '/directory/1');
+    vi.mocked(usersAPI.getMe).mockResolvedValue(staffUser);
+    vi.mocked(directoryAPI.list).mockResolvedValue([
+      entry({ id: 1, name: 'Amy Adams', email: 'amy@example.com', loa_start: '2030-03-01' }),
+    ]);
+    render(
+      <AuthProvider>
+        <App />
+      </AuthProvider>,
+    );
+
+    const panel = await screen.findByRole('dialog', { name: /Amy Adams/ });
+    expect(
+      within(panel).getByText('Leave of absence scheduled: from Mar 1, 2030'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('On leave')).not.toBeInTheDocument();
   });
 
   it('links to your own record', async () => {

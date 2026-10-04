@@ -13,6 +13,7 @@ vi.mock('../../services/api', () => ({
     setPreassignment: vi.fn(),
     removePreassignment: vi.fn(),
     getPreassignSchedule: vi.fn().mockResolvedValue([]),
+    getPreassignLeave: vi.fn().mockResolvedValue(null),
     getSuggestionsByDate: vi.fn(),
     getSuggestionsByGenre: vi.fn(),
   },
@@ -162,6 +163,7 @@ describe('Promotions ShowDetail — Suggest DJs', () => {
     vi.mocked(autocompleteAPI.getDJNames).mockResolvedValue([]);
     vi.mocked(specialtyShowsAPI.list).mockResolvedValue([]);
     vi.mocked(passesAPI.getPreassignSchedule).mockResolvedValue([]);
+    vi.mocked(passesAPI.getPreassignLeave).mockResolvedValue(null);
     vi.mocked(lotteryAPI.getStatus).mockResolvedValue({
       is_active: false,
       deadline: null,
@@ -308,6 +310,56 @@ describe('Promotions ShowDetail — Suggest DJs', () => {
       const input = screen.getByPlaceholderText('DJ Name') as HTMLInputElement;
       expect(input.value).toBe('Wolfman');
     });
+  });
+});
+
+describe('Promotions ShowDetail — leave of absence', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('labels a claimant whose leave covers the show', async () => {
+    const staffPass: PassResponse = {
+      ...basePass,
+      id: 1,
+      pass_type: 'staff',
+      status: 'claimed',
+      staff_id: 7,
+      staff_name: 'Away Person',
+      staff_on_leave: true,
+      staff_loa_start: '2099-12-01',
+      staff_loa_end: null,
+    };
+    vi.mocked(showsAPI.get).mockResolvedValue(makeShow([staffPass]));
+
+    renderShowDetail();
+
+    expect(await screen.findByText('On leave from Dec 1, 2099')).toBeInTheDocument();
+  });
+
+  it('labels genre suggestions for DJs on leave', async () => {
+    vi.mocked(showsAPI.get).mockResolvedValue(makeShow([{ ...basePass, id: 1 }]));
+    vi.mocked(passesAPI.getSuggestionsByGenre).mockResolvedValue([
+      { name: 'Wolfman', is_specialty: false, matched_genres: ['rock'] },
+      {
+        name: 'Away DJ',
+        is_specialty: false,
+        matched_genres: ['rock'],
+        on_leave: true,
+        loa_start: '2099-11-01',
+        loa_end: '2099-12-31',
+      },
+    ]);
+
+    renderShowDetail();
+    await openPreassignForm(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest…' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest DJs by genre' }));
+
+    expect(
+      await screen.findByText('On leave Nov 1, 2099 – Dec 31, 2099'),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/On leave/)).toHaveLength(1);
   });
 });
 

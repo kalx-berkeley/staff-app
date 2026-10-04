@@ -12,11 +12,13 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 - Add the KALX Staff Directory at `/directory/`, where active staff can look up other active staff's photo, name, pronouns, DJ name, email, phone, departments, status, and titles and roles. Search, department and status filters, and sorting are kept in the URL so a view can be shared, and each person has a shareable detail page at `/directory/<id>`, with a "My record" shortcut to your own
 - Sync each staff member's pronouns, titles and roles, photo, and Airtable record ID from Airtable; photos (including iPhone HEIC/HEIF photos) are downloaded and resized only when they change, and an email address changed in Airtable now updates the existing staff record instead of creating a new one
+- Sync each staff member's leave of absence from Airtable's "LOA start" and "LOA end" columns. Staff can't claim a staff pass, enter the staff pass lottery, or join the alternate list for a show their leave covers; lottery entries and alternates whose leave covers the show are skipped when passes are handed out. Pre-assigning a pass pair to a DJ for a date during their leave shows a warning, promotions sees an "On leave" label on claimed passes and genre suggestions, and the directory sets apart staff on leave and shows the dates in their detail panel
 
 ### Changed
 
 - Sync staff from the "Online Staff App Directory" Airtable table instead of "KALX Active Staff Directory" by default (`AIRTABLE_TABLE_NAME` still overrides it)
 - Import only Airtable records whose Status includes "Active"; the new table also lists people who aren't active yet ("🆕"), and anyone listed but no longer Active loses access as if they'd left the table. `backend/scripts/delete_inactive_staff.py` removes the staff rows an earlier sync created for them
+- Take staff names from Airtable's "First Name" and "Surname" columns and pronouns from "Pronouns", instead of parsing them out of "Name" (which is still used as-is when both name columns are blank)
 
 ## [1.5.0] - 2026-09-29
 

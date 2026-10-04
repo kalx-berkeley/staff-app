@@ -1434,6 +1434,18 @@ fieldset.radio-group legend {
   background-color: #f3e5f5;
 }
 
+/* Leave of absence: next to a claimant, a suggested DJ, or a directory entry. */
+.leave-badge {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  white-space: nowrap;
+  color: #92400e;
+  background-color: #fef3c7;
+}
+
 /* "Suggest DJs by date/genre" panel inside the Pre-assign to DJ box. */
 .suggest-panel {
   display: flex;
@@ -4065,6 +4077,15 @@ body.staging-active .directory-table th {
 
 .directory-table tbody tr {
   cursor: pointer;
+}
+
+/* Staff currently on leave of absence: still listed, but visibly set apart. */
+.directory-table tbody tr.directory-row-on-leave {
+  opacity: 0.55;
+}
+
+.directory-leave {
+  margin: 0.75rem 0 0;
 }
 
 .directory-table tbody tr:hover {

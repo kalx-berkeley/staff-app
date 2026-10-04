@@ -14,6 +14,9 @@ const entry: DirectoryEntry = {
   statuses: ['Active', 'Paid Staff'],
   titles_and_roles: 'Music Director\nOffice hours: Tue 2-4',
   photo_version: null,
+  on_leave: false,
+  loa_start: null,
+  loa_end: null,
 };
 
 describe('matchesSearch', () => {

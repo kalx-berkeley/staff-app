@@ -161,6 +161,9 @@ export interface PromotionsStaffProfile {
   phone: string;
   dj_name?: string | null;
   is_sublist_dj: boolean;
+  // Leave of absence (YYYY-MM-DD, inclusive); either may be null
+  loa_start?: string | null;
+  loa_end?: string | null;
 }
 
 export interface StaffProfile {
@@ -169,6 +172,9 @@ export interface StaffProfile {
   phone: string;
   dj_name: string | null;
   is_sublist_dj: boolean;
+  // Leave of absence (YYYY-MM-DD, inclusive); either may be null
+  loa_start?: string | null;
+  loa_end?: string | null;
 }
 
 // MusicBrainz types
@@ -510,6 +516,10 @@ export interface PassResponse {
   staff_phone: string | null;
   staff_email: string | null;
   claimed_at: string | null; // ISO datetime string
+  // Set when the claimant's leave of absence covers the whole show
+  staff_on_leave?: boolean;
+  staff_loa_start?: string | null;
+  staff_loa_end?: string | null;
 
   // Staff +1 guest fields
   has_guest: boolean;
@@ -660,6 +670,16 @@ export interface DjSuggestion {
   name: string;
   is_specialty: boolean;
   matched_genres: string[];
+  // Genre suggestions only: the DJ's leave of absence overlaps the time until the show
+  on_leave?: boolean;
+  loa_start?: string | null;
+  loa_end?: string | null;
+}
+
+// A DJ's current or upcoming leave of absence (YYYY-MM-DD); either may be null
+export interface DjLeave {
+  loa_start: string | null;
+  loa_end: string | null;
 }
 
 // Impersonation
@@ -747,4 +767,8 @@ export interface DirectoryEntry {
   titles_and_roles: string | null;
   // Changes whenever the photo does; null when there's no photo
   photo_version: string | null;
+  // Leave of absence that hasn't ended yet (null once past); on_leave is true during it
+  on_leave: boolean;
+  loa_start: string | null;
+  loa_end: string | null;
 }

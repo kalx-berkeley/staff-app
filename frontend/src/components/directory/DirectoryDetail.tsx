@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { DirectoryEntry } from '../../types';
+import { formatLeave } from '../../utils';
 import MarkdownContent from '../shared/MarkdownContent';
 import DjNames from './DjNames';
 import StaffPhoto from './StaffPhoto';
@@ -58,6 +59,13 @@ const DirectoryDetail = ({ entry, isMe, onClose }: DirectoryDetailProps) => {
                 {entry.pronouns && <div className="directory-pronouns">{entry.pronouns}</div>}
               </div>
             </div>
+
+            {(entry.loa_start || entry.loa_end) && (
+              <p className="field-warning directory-leave">
+                {entry.on_leave ? 'On leave of absence' : 'Leave of absence scheduled'}:{' '}
+                {formatLeave(entry)}
+              </p>
+            )}
 
             <dl className="directory-detail-fields">
               <dt>Email</dt>

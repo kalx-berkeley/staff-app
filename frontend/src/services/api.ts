@@ -50,6 +50,7 @@ import type {
   UserListItem,
   NotificationPreferences,
   GenrePreferences,
+  DjLeave,
   DjSuggestion,
   AuditLogItem,
   AuditLogFilters,
@@ -729,6 +730,24 @@ export const passesAPI = {
   getPreassignSchedule: async (name: string): Promise<string[]> => {
     try {
       const response = await apiClient.get<string[]>('/passes/preassign/schedule', {
+        params: { name },
+      });
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * Get the current or upcoming leave of absence of the DJ named *name*.
+   *
+   * @param name - DJ name, as typed in the pre-assignment form
+   * @returns Promise resolving to the leave dates, or null for a specialty
+   *   show, an unknown name, or a DJ with no leave on record
+   */
+  getPreassignLeave: async (name: string): Promise<DjLeave | null> => {
+    try {
+      const response = await apiClient.get<DjLeave | null>('/passes/preassign/leave', {
         params: { name },
       });
       return response.data;

@@ -12,6 +12,7 @@ from app.models.notification_preferences import NotificationPreferences
 from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.staff import Staff
+from app.services.leave_service import ensure_not_on_leave_for_show, leave_covers_show
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,9 @@ class LotteryService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="The lottery window for this show is not active",
             )
+        staff = db.query(Staff).filter(Staff.id == staff_id).first()
+        if staff:
+            ensure_not_on_leave_for_show(staff, show)
 
         existing = (
             db.query(LotteryEntry)
@@ -317,6 +321,9 @@ class LotteryService:
         passes. If a staff member with only_attend_with_guest cannot get a guest
         pass, their staff pass is returned and both loops repeat until no further
         conversions occur.
+
+        Entrants on leave of absence for the whole show aren't drawn or queued
+        as alternates; they get the same "not selected" email as other losers.
         """
         from app.services import notification_service
 
@@ -344,6 +351,14 @@ class LotteryService:
         was_converted: set[int] = set()
         # Entries whose guest-pass fate is already settled (won or accepted loss)
         guest_decided: set[int] = set()
+        # Entrants whose leave of absence covers the show (e.g. one added in
+        # Airtable after they entered) lose without being drawn.
+        on_leave = {
+            entry.id
+            for entry in entries
+            if entry.staff is not None and leave_covers_show(entry.staff, show)
+        }
+        final_losers.update(on_leave)
 
         def staff_loop() -> None:
             for entry in entries:
@@ -420,7 +435,7 @@ class LotteryService:
         # Passes returned by only-with-guest winners may go straight to them.
         from app.services.alternate_service import AlternateService
 
-        losers = [e for e in entries if e.id not in staff_pass]
+        losers = [e for e in entries if e.id not in staff_pass and e.id not in on_leave]
         queued = AlternateService.enqueue_lottery_losers(db, show, losers)
         promotions = AlternateService.fill_open_passes(db, show, trigger="lottery")
 

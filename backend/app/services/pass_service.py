@@ -11,6 +11,11 @@ from app.config import settings
 from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.staff import Staff
+from app.services.leave_service import (
+    ensure_not_on_leave_for_show,
+    leave_is_current_or_upcoming,
+    today_pt,
+)
 from app.models.on_air_winner import OnAirWinner
 from app.models.job_log import JobLog
 from app.models.specialty_show import SpecialtyShow
@@ -444,6 +449,35 @@ class PassService:
         return sorted(staff_names | winner_names | specialty_names)
 
     @staticmethod
+    def find_dj_leave(db: Session, name: str) -> Staff | None:
+        """
+        Find the staff member behind a DJ name who has a current or upcoming leave.
+
+        Matches the name case-insensitively against each staff member's DJ
+        names (the comma-joined `Staff.dj_name`). Specialty-show titles never
+        match, since a specialty show has several DJs.
+
+        :param db: Database session.
+        :param name: A DJ name, as typed in the pre-assignment form.
+        :returns: The staff member, or None if no DJ by that name has a leave.
+        """
+        key = name.strip().lower()
+        today = today_pt()
+        candidates = (
+            db.query(Staff)
+            .filter(
+                Staff.dj_name.isnot(None),
+                (Staff.loa_start.isnot(None)) | (Staff.loa_end.isnot(None)),
+            )
+            .all()
+        )
+        for staff in candidates:
+            dj_names = {n.strip().lower() for n in staff.dj_name.split(",")}
+            if key in dj_names and leave_is_current_or_upcoming(staff, today):
+                return staff
+        return None
+
+    @staticmethod
     def suggest_djs_by_genre(db: Session, show: Show) -> list[dict]:
         """
         Suggest active Sublist DJs (and specialty shows they belong to) whose genre
@@ -455,6 +489,10 @@ class PassService:
         name is suggested individually. A specialty show is suggested once, with
         the union of its member DJs' matched genres, when at least one member has
         a genre match.
+
+        A DJ whose leave of absence overlaps the time between today and the
+        show is labeled with their leave dates and sorted after everyone else,
+        since they may not be on air to give the passes away.
 
         :param db: Database session.
         :param show: Show to match genres against.
@@ -477,8 +515,8 @@ class PassService:
             .all()
         )
 
-        # Lowercase individual DJ name -> (display name, matched genres).
-        dj_matches: dict[str, tuple[str, set[str]]] = {}
+        # Lowercase individual DJ name -> (display name, matched genres, staff).
+        dj_matches: dict[str, tuple[str, set[str], Staff]] = {}
         for staff, prefs in rows:
             if not _is_sublist_dj(staff):
                 continue
@@ -493,12 +531,23 @@ class PassService:
                 if key in dj_matches:
                     dj_matches[key][1].update(matched)
                 else:
-                    dj_matches[key] = (name, set(matched))
+                    dj_matches[key] = (name, set(matched), staff)
 
-        suggestions = [
-            {"name": name, "is_specialty": False, "matched_genres": sorted(genres)}
-            for name, genres in dj_matches.values()
-        ]
+        today = today_pt()
+        suggestions = []
+        for name, genres, staff in dj_matches.values():
+            suggestion = {
+                "name": name,
+                "is_specialty": False,
+                "matched_genres": sorted(genres),
+            }
+            if leave_is_current_or_upcoming(staff, today) and (
+                staff.loa_start is None or staff.loa_start <= show.show_date
+            ):
+                suggestion.update(
+                    on_leave=True, loa_start=staff.loa_start, loa_end=staff.loa_end
+                )
+            suggestions.append(suggestion)
 
         specialty_shows = (
             db.query(SpecialtyShow)
@@ -518,7 +567,7 @@ class PassService:
                     "matched_genres": sorted(matched_genres),
                 })
 
-        suggestions.sort(key=lambda s: s["name"].lower())
+        suggestions.sort(key=lambda s: (s.get("on_leave", False), s["name"].lower()))
         return suggestions
 
     @staticmethod
@@ -748,6 +797,7 @@ class PassService:
                         status_code=status.HTTP_404_NOT_FOUND,
                         detail=f"Staff member with id {staff_id} not found",
                     )
+                ensure_not_on_leave_for_show(staff, show)
 
                 # A staff member may hold at most one staff pass per show.
                 existing_claim = (

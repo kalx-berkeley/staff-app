@@ -78,3 +78,41 @@ export function parseFreeformDate(text: string): string | null {
   }
   return formatDateValue(date);
 }
+
+/** Leave-of-absence dates as `YYYY-MM-DD` strings; either may be null for a one-sided leave. */
+export interface LeaveDates {
+  loa_start?: string | null;
+  loa_end?: string | null;
+}
+
+/**
+ * Whether `day` (`YYYY-MM-DD`) falls within a leave of absence, inclusive.
+ * A start alone is open-ended; an end alone means on leave until then.
+ */
+export function isOnLeave(leave: LeaveDates | null | undefined, day: string): boolean {
+  if (!leave || (!leave.loa_start && !leave.loa_end)) return false;
+  if (leave.loa_start && day < leave.loa_start) return false;
+  if (leave.loa_end && day > leave.loa_end) return false;
+  return true;
+}
+
+/** Whether a leave covers every day of a show (`show_start_date` through `show_date`). */
+export function leaveCoversShow(
+  leave: LeaveDates | null | undefined,
+  show: { show_date: string; show_start_date?: string | null },
+): boolean {
+  return isOnLeave(leave, show.show_start_date ?? show.show_date) && isOnLeave(leave, show.show_date);
+}
+
+function formatLeaveDate(value: string): string {
+  return parseDateValue(value)!.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** Describe leave dates the way the backend does, e.g. "Mar 1, 2027 – Jun 1, 2027" or "from Mar 1, 2027". */
+export function formatLeave(leave: LeaveDates): string {
+  if (leave.loa_start && leave.loa_end) {
+    return `${formatLeaveDate(leave.loa_start)} – ${formatLeaveDate(leave.loa_end)}`;
+  }
+  if (leave.loa_start) return `from ${formatLeaveDate(leave.loa_start)}`;
+  return leave.loa_end ? `until ${formatLeaveDate(leave.loa_end)}` : '';
+}

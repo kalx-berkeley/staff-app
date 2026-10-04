@@ -1013,8 +1013,22 @@ def test_suggest_by_genre_matches_sublist_dj_and_specialty_show(
     assert response.status_code == 200
     data = response.json()
     assert data == [
-        {"name": "Sunday Jazz Brunch", "is_specialty": True, "matched_genres": ["rock"]},
-        {"name": "Wolfman", "is_specialty": False, "matched_genres": ["rock"]},
+        {
+            "name": "Sunday Jazz Brunch",
+            "is_specialty": True,
+            "matched_genres": ["rock"],
+            "on_leave": False,
+            "loa_start": None,
+            "loa_end": None,
+        },
+        {
+            "name": "Wolfman",
+            "is_specialty": False,
+            "matched_genres": ["rock"],
+            "on_leave": False,
+            "loa_start": None,
+            "loa_end": None,
+        },
     ]
 
 

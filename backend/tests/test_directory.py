@@ -1,5 +1,6 @@
 """Tests for the Staff Directory API and the Airtable sync fields it relies on."""
 
+from datetime import date
 from io import BytesIO
 from unittest.mock import AsyncMock, patch
 
@@ -9,6 +10,7 @@ from PIL import Image
 from sqlalchemy.orm import Session
 
 from app import config
+from app.models.audit_log import AuditLog
 from app.models.impersonation_session import ImpersonationSession
 from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
@@ -255,6 +257,9 @@ def test_sync_stores_pronouns_titles_and_record_id(
                 "fields": {
                     "Email address": "Jane@Example.com",
                     "Name": "Doe, Jane (she/they)",
+                    "First Name": " Jane ",
+                    "Surname": "Doe",
+                    "Pronouns": "she/they",
                     "Titles and Roles": "  Music Director\nOffice hours: Mon 1-3 \n",
                     "Status": ["Active"],
                 },
@@ -271,6 +276,82 @@ def test_sync_stores_pronouns_titles_and_record_id(
     assert admin.pronouns is None
     assert admin.titles_and_roles is None
     assert admin.airtable_record_id == "recAdmin"
+
+
+def test_sync_falls_back_to_name_when_first_name_and_surname_are_blank(
+    client: TestClient, db: Session, photo_dir
+):
+    _make_staff(db, "admin@example.com", "Ada Admin", departments=("Promotions",))
+
+    _sync(
+        client,
+        [
+            _admin_record(),
+            {
+                "id": "recMono",
+                "fields": {
+                    "Email address": "mono@example.com",
+                    "Name": "Mononym (they/them)",
+                    "First Name": "",
+                    "Status": ["Active"],
+                },
+            },
+            {
+                "id": "recFirst",
+                "fields": {
+                    "Email address": "first@example.com",
+                    "Name": "Only, First",
+                    "First Name": "First",
+                    "Status": ["Active"],
+                },
+            },
+        ],
+    )
+
+    mono = db.query(Staff).filter_by(email="mono@example.com").one()
+    # Name is used as-is, and pronouns come only from the Pronouns column.
+    assert mono.name == "Mononym (they/them)"
+    assert mono.pronouns is None
+    assert db.query(Staff).filter_by(email="first@example.com").one().name == "First"
+
+
+def test_sync_stores_and_audits_leave_of_absence(
+    client: TestClient, db: Session, photo_dir
+):
+    _make_staff(db, "admin@example.com", "Ada Admin", departments=("Promotions",))
+    jane = _make_staff(db, "jane@example.com", "Jane Doe", airtable_record_id="recJane")
+    jane.loa_end = date(2026, 1, 31)
+    db.commit()
+
+    _sync(
+        client,
+        [
+            _admin_record(),
+            {
+                "id": "recJane",
+                "fields": {
+                    "Email address": "jane@example.com",
+                    "First Name": "Jane",
+                    "Surname": "Doe",
+                    "LOA start": "2027-03-01",
+                    "LOA end": "not a date",
+                    "Status": ["Active"],
+                },
+            },
+        ],
+    )
+
+    db.expire_all()
+    jane = db.get(Staff, jane.id)
+    assert jane.loa_start == date(2027, 3, 1)
+    assert jane.loa_end is None
+    event = (
+        db.query(AuditLog)
+        .filter_by(event_type="airtable_sync_changed", entity_id=jane.id)
+        .one()
+    )
+    assert event.details["changes"]["loa_start"] == {"before": None, "after": "2027-03-01"}
+    assert event.details["changes"]["loa_end"] == {"before": "2026-01-31", "after": None}
 
 
 def test_sync_follows_an_email_change_by_record_id(

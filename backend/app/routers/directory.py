@@ -1,5 +1,6 @@
 """Staff Directory API endpoints."""
 
+from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -12,6 +13,7 @@ from app.models.staff import Staff
 from app.models.staff_status import StaffStatus
 from app.rate_limiter import create_rate_limit_dependency
 from app.schemas.directory import DirectoryEntry, DjPersona
+from app.services.leave_service import leave_is_current_or_upcoming, on_leave, today_pt
 from app.services.staff_photo_service import photo_path
 
 router = APIRouter(prefix="/api/directory", tags=["directory"])
@@ -53,6 +55,17 @@ def _dj_personas(staff: Staff) -> list[DjPersona]:
     return [DjPersona(id=pid, name=name) for pid, name in zip(ids, names)]
 
 
+def _leave_fields(staff: Staff, today: date) -> dict:
+    """The directory's leave-of-absence fields: empty unless the leave hasn't ended."""
+    if not leave_is_current_or_upcoming(staff, today):
+        return {}
+    return {
+        "on_leave": on_leave(staff, today),
+        "loa_start": staff.loa_start,
+        "loa_end": staff.loa_end,
+    }
+
+
 @router.get(
     "",
     response_model=list[DirectoryEntry],
@@ -73,6 +86,7 @@ def list_directory(
         .all()
     )
     staff_members.sort(key=lambda s: s.name.casefold())
+    today = today_pt()
     return [
         DirectoryEntry(
             id=s.id,
@@ -86,6 +100,7 @@ def list_directory(
             statuses=sorted(st.status for st in s.statuses),
             titles_and_roles=s.titles_and_roles,
             photo_version=s.photo_attachment_id,
+            **_leave_fields(s, today),
         )
         for s in staff_members
     ]

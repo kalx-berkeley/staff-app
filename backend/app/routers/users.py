@@ -199,6 +199,8 @@ def get_current_user(
                 phone=promotions.phone or "",
                 dj_name=promotions.dj_name,
                 is_sublist_dj=SUBLIST_DJ_STATUS in _staff_statuses(promotions),
+                loa_start=promotions.loa_start,
+                loa_end=promotions.loa_end,
             )
     elif role == "staff":
         staff = db.query(Staff).filter(Staff.email == effective_email).first()
@@ -210,6 +212,8 @@ def get_current_user(
                 phone=staff.phone or "",
                 dj_name=staff.dj_name,
                 is_sublist_dj=SUBLIST_DJ_STATUS in _staff_statuses(staff),
+                loa_start=staff.loa_start,
+                loa_end=staff.loa_end,
             )
 
     return UserInfo(

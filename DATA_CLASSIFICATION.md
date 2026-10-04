@@ -4,7 +4,7 @@ The data that the Radio Pass Giveaway system handles includes
   * KALX Staff member (which includes some UC Berkeley students) name, email address and phone number
   * On-air pass winner's name, phone number (and in the case of one venue, email address)
   * Venue contact information including name, email address and title
-  * Airtable API key granting read access to a view of the KALX Staff Directory which includes staff members name, email address, phone number, photograph (when provided), DJ Name, departments and active status
+  * Airtable API key granting read access to a view of the KALX Staff Directory which includes staff members name, pronouns, email address, phone number, photograph (when provided), DJ Name, departments, active status and leave of absence dates
   * Public data about Venues and Shows such as postal address, date/time, what band is playing and wheelchair accessibility of the venue
 * GitHub Action Workflow
   * Netbird setup-key which grants network access to the KALX stream server

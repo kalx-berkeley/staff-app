@@ -1,11 +1,11 @@
 """Delete staff rows that aren't "Active" and that nothing else refers to.
 
-The Airtable sync once imported every record in the staff table, including
-people who aren't active yet ("🆕"); it now imports only "Active" records
-(see app/services/user_service.py), but the rows it already created stay.
-This removes them, along with any other leftover staff row without "Active"
-status (e.g. former staff the sync deactivated) that no pass, lottery entry,
-alternate, or venue/promoter/specialty-show ownership refers to.
+The Airtable sync never deletes staff rows: when someone stops being "Active"
+in Airtable, it only removes their "Active" status (see
+app/services/user_service.py), so rows for former staff accumulate. This is
+occasional upkeep that removes the ones no pass, lottery entry, alternate, or
+venue/promoter/specialty-show ownership refers to. (It was first used to clear
+out rows an earlier sync created for people who weren't active yet, "🆕".)
 
 A deleted row's own data goes with it: departments, statuses, notification
 and genre preferences, and directory photos. Audit log events are kept. Any
@@ -17,8 +17,6 @@ DATABASE_URL pointed at the target database:
 
     python scripts/delete_inactive_staff.py           # dry run: lists the rows
     python scripts/delete_inactive_staff.py --apply   # actually deletes them
-
-Run it after deploying the sync change, or the next sync re-creates the rows.
 """
 
 import argparse

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.pass_schema import (
     ClaimData,
+    DjLeave,
     DjSuggestion,
     GiveawayData,
     PreassignmentData,
@@ -556,6 +557,25 @@ async def get_preassign_schedule(
     only sees dates the schedule actually backs up.
     """
     return await SpinitronUpcomingScheduleService.get_dates_for_name(db, name)
+
+
+@router.get("/passes/preassign/leave", response_model=DjLeave | None)
+def get_preassign_leave(
+    name: str = Query(..., min_length=1, max_length=100),
+    role_and_staff: tuple = Depends(require_promotions_or_staff),
+    db: Session = Depends(get_db),
+):
+    """
+    Return the current or upcoming leave of absence of the DJ named *name*, if any.
+
+    Used alongside `/passes/preassign/schedule` to warn when a pass pair is
+    pre-assigned to a DJ for a date during their leave. Null for a specialty
+    show, an unknown name, or a DJ with no leave on record.
+    """
+    staff = PassService.find_dj_leave(db, name)
+    if staff is None:
+        return None
+    return DjLeave(loa_start=staff.loa_start, loa_end=staff.loa_end)
 
 
 @router.get("/passes/preassign/suggest-by-date", response_model=list[DjSuggestion])

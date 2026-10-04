@@ -330,14 +330,19 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 
 | Field | Type |
 |---|---|
-| `Name` | multilineText |
+| `Name` | multilineText (used only when `First Name` and `Surname` are blank) |
+| `First Name` | singleLineText |
+| `Surname` | singleLineText |
+| `Pronouns` | singleLineText |
 | `Photo` | multipleAttachments |
 | `Email address` | email |
 | `Phone` | phoneNumber |
 | `Titles and Roles` | richText |
 | `DJ Name` | richText |
 | `Department` | singleLineText |
-| `Status` | multipleSelects |
+| `Status` | multipleSelects (only records including `Active` are imported) |
+| `LOA start` | date (first day of a leave of absence, inclusive) |
+| `LOA end` | date (last day of a leave of absence, inclusive) |
 
 ### GitHub Actions Secrets/Variables
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { showsAPI, passesAPI, autocompleteAPI, specialtyShowsAPI, lotteryAPI, alternatesAPI } from '../../services/api';
 import { Tooltip, EnrichedShowName, MarkdownContent, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList } from '../shared';
-import { formatPhone, formatDateValue } from '../../utils';
+import { formatPhone, formatDateValue, formatLeave, isOnLeave } from '../../utils';
 import { useAuth } from '../../contexts/authHooks';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import type {
@@ -13,6 +13,7 @@ import type {
   PromotionsStaffProfile,
   PassResponse,
   DjSuggestion,
+  DjLeave,
   AlternateEntry,
 } from '../../types';
 
@@ -136,6 +137,9 @@ const ShowDetail = () => {
   // null = unknown (name not yet checked, or the check failed); [] = checked, no matching dates.
   const [scheduleDates, setScheduleDates] = useState<string[] | null>(null);
   const [scheduleLoading, setScheduleLoading] = useState(false);
+  // The entered DJ's current or upcoming leave of absence, checked alongside
+  // the schedule; null when there's none (or for a specialty show).
+  const [preassignLeave, setPreassignLeave] = useState<DjLeave | null>(null);
   // Tracks the name a schedule check was last fetched (or is in flight) for, so
   // selecting an autocomplete suggestion (which immediately fetches) followed by
   // the input's blur (which fires right after, for the same name) only fetches once.
@@ -242,6 +246,7 @@ const ShowDetail = () => {
     if (!trimmed) {
       lastScheduleFetchNameRef.current = null;
       setScheduleDates(null);
+      setPreassignLeave(null);
       return;
     }
     if (lastScheduleFetchNameRef.current === trimmed) {
@@ -253,11 +258,16 @@ const ShowDetail = () => {
     lastScheduleFetchNameRef.current = trimmed;
     setScheduleLoading(true);
     try {
-      const dates = await passesAPI.getPreassignSchedule(trimmed);
+      const [dates, leave] = await Promise.all([
+        passesAPI.getPreassignSchedule(trimmed),
+        passesAPI.getPreassignLeave(trimmed).catch(() => null),
+      ]);
       setScheduleDates(dates);
+      setPreassignLeave(leave);
     } catch {
       // Non-fatal — degrade to an unrestricted date picker with no warning.
       setScheduleDates(null);
+      setPreassignLeave(null);
     } finally {
       setScheduleLoading(false);
     }
@@ -378,6 +388,7 @@ const ShowDetail = () => {
       setPreassignDj('');
       setPreassignDate('');
       setScheduleDates(null);
+      setPreassignLeave(null);
       lastScheduleFetchNameRef.current = null;
     } catch (err) {
       const apiError = err as APIError;
@@ -396,6 +407,7 @@ const ShowDetail = () => {
     setPreassignDj('');
     setPreassignDate('');
     setScheduleDates(null);
+    setPreassignLeave(null);
     lastScheduleFetchNameRef.current = null;
     setSuggestMode(null);
     setSuggestions(null);
@@ -482,6 +494,7 @@ const ShowDetail = () => {
         // the same on-air date and suggestion pool usually apply to the next
         // pass pair too, minus the DJ we just used.
         setScheduleDates(null);
+        setPreassignLeave(null);
         lastScheduleFetchNameRef.current = null;
       } else {
         // No more available pass pairs to suggest for — close out the form.
@@ -1033,7 +1046,15 @@ const ShowDetail = () => {
                                 : undefined
                             }
                           />
-                          {scheduleDates !== null &&
+                          {preassignDate && preassignLeave && isOnLeave(preassignLeave, preassignDate) ? (
+                            <p className="field-warning">
+                              {preassignDj.trim() || 'This DJ'} is on leave of absence{' '}
+                              {formatLeave(preassignLeave)}, so they probably won't be on air on{' '}
+                              {formatDate(preassignDate)}. Only save this if you're sure that's
+                              correct.
+                            </p>
+                          ) : (
+                            scheduleDates !== null &&
                             preassignDate &&
                             !scheduleDates.includes(preassignDate) && (
                               <p className="field-warning">
@@ -1041,7 +1062,8 @@ const ShowDetail = () => {
                                 scheduled on {formatDate(preassignDate)}. Only save this if you're sure
                                 that's correct.
                               </p>
-                            )}
+                            )
+                          )}
                           <button
                             onClick={() => handlePreassignSubmit(pass.id)}
                             className="btn-small btn-primary"
@@ -1221,6 +1243,9 @@ const ShowDetail = () => {
                                       </span>
                                     )}
                                   </span>
+                                  {s.on_leave && (
+                                    <span className="leave-badge">On leave {formatLeave(s)}</span>
+                                  )}
                                   <span
                                     className={
                                       s.is_specialty ? 'specialty-show-badge' : 'dj-name-badge'
@@ -1391,6 +1416,18 @@ const ShowDetail = () => {
                 <div className="pass-details">
                   <p>
                     <strong>Claimed by:</strong> {pass.staff_name}
+                    {pass.staff_on_leave && (
+                      <>
+                        {' '}
+                        <span
+                          className="leave-badge"
+                          title="Their leave of absence covers this show, so they may not attend."
+                        >
+                          On leave{' '}
+                          {formatLeave({ loa_start: pass.staff_loa_start, loa_end: pass.staff_loa_end })}
+                        </span>
+                      </>
+                    )}
                   </p>
                   <p>
                     <strong>Phone:</strong> {formatPhone(pass.staff_phone)}

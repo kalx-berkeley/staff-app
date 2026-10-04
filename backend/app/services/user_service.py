@@ -2,6 +2,7 @@
 
 import logging
 import re
+from datetime import date
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -29,22 +30,32 @@ PROMOTIONS_DEPARTMENT = "Promotions"
 _SPINITRON_URL_RE = re.compile(r"https://(?:widgets\.)?spinitron\.com/KALX/dj/(\d+)/")
 
 
-def _format_airtable_name(raw: str) -> str:
-    """Convert Airtable 'Last, First (pronouns)' format to 'First Last'."""
-    name = re.sub(r"\s*\([^)]*\)", "", raw).strip()
-    if "," in name:
-        last, first = [p.strip() for p in name.split(",", 1)]
-        if first:
-            return f"{first} {last}"
-    return name
+def _text_field(fields: Dict[str, Any], name: str) -> str:
+    """Return an Airtable text field's value, stripped, or "" if blank or not text."""
+    value = fields.get(name)
+    return value.strip() if isinstance(value, str) else ""
 
 
-def _extract_pronouns(raw: str) -> Optional[str]:
-    """Return the pronouns from Airtable's 'Last, First (pronouns)' Name format, if any."""
-    match = re.search(r"\(([^)]*)\)", raw)
-    if not match:
+def _staff_name(fields: Dict[str, Any]) -> str:
+    """Return "First Last" from the "First Name" and "Surname" fields, or "Name" as-is."""
+    name = " ".join(
+        part
+        for part in (_text_field(fields, "First Name"), _text_field(fields, "Surname"))
+        if part
+    )
+    return name or _text_field(fields, "Name")
+
+
+def _date_field(fields: Dict[str, Any], name: str) -> Optional[date]:
+    """Return an Airtable date field's value ("YYYY-MM-DD"), or None if blank or invalid."""
+    value = fields.get(name)
+    if not isinstance(value, str):
         return None
-    return match.group(1).strip() or None
+    try:
+        return date.fromisoformat(value.strip())
+    except ValueError:
+        logger.warning(f"Ignoring invalid {name!r} date from Airtable: {value!r}")
+        return None
 
 
 def _extract_spinitron_ids(raw: str) -> List[int]:
@@ -197,9 +208,10 @@ class UserService:
                 continue
             seen_emails.add(email)
 
-            raw_name = (fields.get("Name") or "").strip()
-            name = _format_airtable_name(raw_name)
-            pronouns = _extract_pronouns(raw_name)
+            name = _staff_name(fields)
+            pronouns = _text_field(fields, "Pronouns") or None
+            loa_start = _date_field(fields, "LOA start")
+            loa_end = _date_field(fields, "LOA end")
             phone = (fields.get("Phone") or "").strip()
             titles_and_roles = fields.get("Titles and Roles")
             if not isinstance(titles_and_roles, str) or not titles_and_roles.strip():
@@ -272,11 +284,20 @@ class UserService:
                             "before": existing_staff.titles_and_roles,
                             "after": titles_and_roles,
                         }
+                    for field, value in (("loa_start", loa_start), ("loa_end", loa_end)):
+                        before = getattr(existing_staff, field)
+                        if before != value:
+                            changed[field] = {
+                                "before": before and before.isoformat(),
+                                "after": value and value.isoformat(),
+                            }
                     existing_staff.email = email
                     existing_staff.name = name
                     existing_staff.pronouns = pronouns
                     existing_staff.phone = phone
                     existing_staff.titles_and_roles = titles_and_roles
+                    existing_staff.loa_start = loa_start
+                    existing_staff.loa_end = loa_end
                     existing_staff.spinitron_ids = spinitron_ids
                     if record_id:
                         existing_staff.airtable_record_id = record_id
@@ -290,6 +311,8 @@ class UserService:
                         pronouns=pronouns,
                         phone=phone,
                         titles_and_roles=titles_and_roles,
+                        loa_start=loa_start,
+                        loa_end=loa_end,
                         spinitron_ids=spinitron_ids,
                     )
                     db.add(staff_record)

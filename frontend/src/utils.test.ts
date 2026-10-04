@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isStagingEnvironment, isStagingSublistDjStaff } from './utils';
+import { formatLeave, isOnLeave, isStagingEnvironment, isStagingSublistDjStaff, leaveCoversShow } from './utils';
 import type { UserResponse } from './types';
 
 describe('isStagingEnvironment', () => {
@@ -56,5 +56,31 @@ describe('isStagingSublistDjStaff', () => {
   it('denies a missing user', () => {
     expect(isStagingSublistDjStaff(null)).toBe(false);
     expect(isStagingSublistDjStaff(undefined)).toBe(false);
+  });
+});
+
+describe('leave of absence helpers', () => {
+  it('treats both ends as inclusive and handles one-sided leave', () => {
+    const leave = { loa_start: '2030-03-01', loa_end: '2030-03-31' };
+    expect(isOnLeave(leave, '2030-02-28')).toBe(false);
+    expect(isOnLeave(leave, '2030-03-01')).toBe(true);
+    expect(isOnLeave(leave, '2030-03-31')).toBe(true);
+    expect(isOnLeave(leave, '2030-04-01')).toBe(false);
+    expect(isOnLeave({ loa_start: '2030-03-01', loa_end: null }, '2099-01-01')).toBe(true);
+    expect(isOnLeave({ loa_start: null, loa_end: '2030-03-31' }, '2000-01-01')).toBe(true);
+    expect(isOnLeave({ loa_start: null, loa_end: null }, '2030-03-01')).toBe(false);
+    expect(isOnLeave(null, '2030-03-01')).toBe(false);
+  });
+
+  it('covers a show only when every day of it falls within the leave', () => {
+    const leave = { loa_start: '2030-06-01', loa_end: '2030-06-15' };
+    expect(leaveCoversShow(leave, { show_date: '2030-06-15' })).toBe(true);
+    expect(leaveCoversShow(leave, { show_start_date: '2030-06-14', show_date: '2030-06-16' })).toBe(false);
+  });
+
+  it('formats the range like the backend', () => {
+    expect(formatLeave({ loa_start: '2030-03-01', loa_end: '2030-06-01' })).toBe('Mar 1, 2030 – Jun 1, 2030');
+    expect(formatLeave({ loa_start: '2030-03-01', loa_end: null })).toBe('from Mar 1, 2030');
+    expect(formatLeave({ loa_start: null, loa_end: '2030-06-01' })).toBe('until Jun 1, 2030');
   });
 });
