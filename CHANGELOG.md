@@ -6,20 +6,21 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
-## [Unreleased]
-
-### Added
-
-- Add the KALX Staff Directory at `/directory/`, where active staff can look up other active staff's photo, name, pronouns, DJ name, email, phone, departments, status, and titles and roles. Search, department and status filters, and sorting are kept in the URL so a view can be shared, and each person has a shareable detail page at `/directory/<id>`, with a "My record" shortcut to your own
-- Sync each staff member's pronouns, titles and roles, photo, and Airtable record ID from Airtable; photos (including iPhone HEIC/HEIF photos) are downloaded and resized only when they change, and an email address changed in Airtable now updates the existing staff record instead of creating a new one
-- Sync each staff member's leave of absence from Airtable's "LOA start" and "LOA end" columns. Staff can't claim a staff pass, enter the staff pass lottery, or join the alternate list for a show their leave covers; lottery entries and alternates whose leave covers the show are skipped when passes are handed out. Pre-assigning a pass pair to a DJ for a date during their leave shows a warning, promotions sees an "On leave" label on claimed passes and genre suggestions, and the directory sets apart staff on leave and shows the dates in their detail panel
-- In the directory, show the first line of each person's titles and roles under their name. DJ names of staff who can't sub for DJ shifts (not a Sublist DJ, or on leave by their leave dates or an "On leave" status) are greyed out and unlinked in the table, and their detail panel says why. The detail panel of anyone with an "On leave" status shows their leave dates, even past ones, or says none are on record
+## [1.6.0] - 2026-10-05
 
 ### Changed
 
-- Sync staff from the "Online Staff App Directory" Airtable table instead of "KALX Active Staff Directory" by default (`AIRTABLE_TABLE_NAME` still overrides it)
-- Import only Airtable records whose Status includes "Active"; the new table also lists people who aren't active yet ("🆕"), and anyone listed but no longer Active loses access as if they'd left the table. `backend/scripts/delete_inactive_staff.py` removes the staff rows an earlier sync created for them
-- Take staff names from Airtable's "First Name" and "Surname" columns and pronouns from "Pronouns", instead of parsing them out of "Name" (which is still used as-is when both name columns are blank)
+- Sync staff from the "Online Staff App Directory" Airtable table instead of "KALX Active Staff Directory" by default (`AIRTABLE_TABLE_NAME` still overrides it) ([266bca8](https://github.com/kalx-berkeley/staff-app/commit/266bca8))
+- Import only Airtable records whose Status includes "Active"; the new table also lists people who aren't active yet ("🆕"), and anyone listed but no longer Active loses access as if they'd left the table. `backend/scripts/delete_inactive_staff.py` removes the staff rows an earlier sync created for them ([3fd0c71](https://github.com/kalx-berkeley/staff-app/commit/3fd0c71))
+- Take staff names from Airtable's "First Name" and "Surname" columns and pronouns from "Pronouns", instead of parsing them out of "Name" (which is still used as-is when both name columns are blank) ([997c221](https://github.com/kalx-berkeley/staff-app/commit/997c221))
+- Simplify the page shown to Google accounts without access: a short note for people who aren't KALX staff, and three steps for staff signed in with the wrong Google account, with a link to the sign-in guide ([6d20991](https://github.com/kalx-berkeley/staff-app/commit/6d20991))
+
+### Added
+
+- Add the KALX Staff Directory at `/directory/`, where active staff can look up other active staff's photo, name, pronouns, DJ name, email, phone, departments, status, and titles and roles. Search, department and status filters, and sorting are kept in the URL so a view can be shared, and each person has a shareable detail page at `/directory/<id>`, with a "My record" shortcut to your own. Each DJ name links to its own Spinitron profile, and department and status tags link to the directory filtered on that value ([ab785dc](https://github.com/kalx-berkeley/staff-app/commit/ab785dc), [0b457bd](https://github.com/kalx-berkeley/staff-app/commit/0b457bd), [ed0261f](https://github.com/kalx-berkeley/staff-app/commit/ed0261f))
+- Sync each staff member's pronouns, titles and roles, photo, and Airtable record ID from Airtable; photos (including iPhone HEIC/HEIF photos) are downloaded and resized only when they change, and an email address changed in Airtable now updates the existing staff record instead of creating a new one ([ab785dc](https://github.com/kalx-berkeley/staff-app/commit/ab785dc), [275b5a9](https://github.com/kalx-berkeley/staff-app/commit/275b5a9))
+- Sync each staff member's leave of absence from Airtable's "LOA start" and "LOA end" columns. Staff can't claim a staff pass, enter the staff pass lottery, or join the alternate list for a show their leave covers; lottery entries and alternates whose leave covers the show are skipped when passes are handed out. Pre-assigning a pass pair to a DJ for a date during their leave shows a warning, promotions sees an "On leave" label on claimed passes and genre suggestions, and the directory sets apart staff on leave and shows the dates in their detail panel ([997c221](https://github.com/kalx-berkeley/staff-app/commit/997c221))
+- In the directory, show the first line of each person's titles and roles under their name. DJ names of staff who can't sub for DJ shifts (not a Sublist DJ, or on leave by their leave dates or an "On leave" status) are greyed out and unlinked in the table, and their detail panel says why. The detail panel of anyone with an "On leave" status shows their leave dates, even past ones, or says none are on record ([61262d4](https://github.com/kalx-berkeley/staff-app/commit/61262d4))
 
 ## [1.5.0] - 2026-09-29
 
@@ -162,6 +163,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.6.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.2.0...v1.3.0
