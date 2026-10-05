@@ -100,6 +100,45 @@ def test_directory_lists_active_staff_sorted_by_name(client: TestClient, db: Ses
     assert entries[0]["photo_version"] is None
 
 
+def test_directory_shows_leave_dates_until_the_leave_ends(client: TestClient, db: Session):
+    _make_staff(
+        db,
+        "now@example.com",
+        "Now Leave",
+        loa_start=date(2000, 1, 1),
+        loa_end=date(2999, 1, 1),
+    )
+    _make_staff(db, "past@example.com", "Past Leave", loa_end=date(2000, 1, 1))
+
+    entries = {
+        e["name"]: e
+        for e in client.get("/api/directory", headers=_as("now@example.com")).json()
+    }
+
+    assert entries["Now Leave"]["on_leave"] is True
+    assert entries["Now Leave"]["loa_start"] == "2000-01-01"
+    assert entries["Past Leave"]["loa_end"] is None
+
+
+def test_directory_shows_past_leave_dates_for_on_leave_status(
+    client: TestClient, db: Session
+):
+    _make_staff(
+        db,
+        "eve@example.com",
+        "Eve Ellis",
+        statuses=("Active", "On leave"),
+        loa_start=date(2000, 1, 1),
+        loa_end=date(2000, 2, 1),
+    )
+
+    eve = client.get("/api/directory", headers=_as("eve@example.com")).json()[0]
+
+    assert eve["on_leave"] is False
+    assert eve["loa_start"] == "2000-01-01"
+    assert eve["loa_end"] == "2000-02-01"
+
+
 @pytest.mark.parametrize(
     "dj_name, spinitron_ids, expected",
     [

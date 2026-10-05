@@ -4285,6 +4285,29 @@ body.staging-active .directory-detail-close {
   white-space: pre-line;
 }
 
+/* The first line of Titles and Roles, under the name in the table. */
+.directory-byline {
+  color: #555;
+  font-size: 0.8rem;
+}
+
+.directory-byline p {
+  margin: 0;
+}
+
+/* DJ names of staff who can't sub for DJ shifts right now (not on the
+   sublist, or on leave): greyed out and not linked in the table. */
+.dj-names-ineligible {
+  color: #999;
+}
+
+.directory-dj-ineligible {
+  margin: 0.3rem 0 0;
+  color: #777;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
 /* Narrow screens: show each staff member as a card instead of a table row */
 @media (max-width: 760px) {
   .directory-page {

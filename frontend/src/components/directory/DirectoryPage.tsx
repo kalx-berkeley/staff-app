@@ -17,11 +17,12 @@ import { directoryAPI } from '../../services/api';
 import { HOME_TITLE, SUBSITES, subsiteForPath } from '../../subsites';
 import type { DirectoryEntry } from '../../types';
 import { formatLeave } from '../../utils';
+import MarkdownContent from '../shared/MarkdownContent';
 import DirectoryDetail from './DirectoryDetail';
 import DjNames from './DjNames';
 import FilterMenu from './FilterMenu';
 import StaffPhoto from './StaffPhoto';
-import { matchesSearch } from './directorySearch';
+import { firstNonBlankLine, matchesSearch } from './directorySearch';
 import {
   DEFAULT_SORT,
   parseViewState,
@@ -86,29 +87,35 @@ const columns = helper.columns([
   helper.accessor('name', {
     header: 'Name',
     sortFn: textSort,
-    cell: ({ row }) => (
-      <>
-        <Link className="directory-name" to={`/${row.original.id}${window.location.search}`}>
-          {row.original.name}
-        </Link>
-        {row.original.on_leave && (
-          <>
-            {' '}
-            <span className="leave-badge" title={`On leave of absence ${formatLeave(row.original)}`}>
-              On leave
-            </span>
-          </>
-        )}
-        {row.original.pronouns && (
-          <div className="directory-pronouns">{row.original.pronouns}</div>
-        )}
-      </>
-    ),
+    cell: ({ row }) => {
+      // A byline from Titles and Roles: only its first line here; the detail
+      // panel shows the whole field.
+      const title = firstNonBlankLine(row.original.titles_and_roles);
+      return (
+        <>
+          <Link className="directory-name" to={`/${row.original.id}${window.location.search}`}>
+            {row.original.name}
+          </Link>
+          {row.original.on_leave && (
+            <>
+              {' '}
+              <span className="leave-badge" title={`On leave of absence ${formatLeave(row.original)}`}>
+                On leave
+              </span>
+            </>
+          )}
+          {row.original.pronouns && (
+            <div className="directory-pronouns">{row.original.pronouns}</div>
+          )}
+          {title && <MarkdownContent className="directory-byline" content={title} />}
+        </>
+      );
+    },
   }),
   helper.accessor('dj_name', {
     header: 'DJ name',
     sortFn: textSort,
-    cell: ({ row }) => <DjNames entry={row.original} />,
+    cell: ({ row }) => <DjNames entry={row.original} greyIneligible />,
   }),
   helper.accessor('email', {
     header: 'Email',

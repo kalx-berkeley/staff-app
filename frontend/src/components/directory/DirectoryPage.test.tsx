@@ -53,7 +53,7 @@ const ENTRIES: DirectoryEntry[] = [
       { id: 43, name: 'Bea, Esq.' },
     ],
     departments: ['News'],
-    statuses: ['Active', 'Paid Staff'],
+    statuses: ['Active', 'Paid Staff', 'Sublist DJ'],
     titles_and_roles: 'News Director\nOffice hours: Tue 2-4',
   }),
   entry({
@@ -62,6 +62,9 @@ const ENTRIES: DirectoryEntry[] = [
     email: 'cal@example.com',
     phone: '510-555-0003',
     departments: ['Music', 'News'],
+    dj_name: 'DJ Cal',
+    dj_personas: [{ id: 7, name: 'DJ Cal' }],
+    statuses: ['Active', 'Sublist DJ'],
     on_leave: true,
     loa_start: '2030-03-01',
     loa_end: '2030-06-01',
@@ -244,6 +247,99 @@ describe('DirectoryPage', () => {
       within(panel).getByText('Leave of absence scheduled: from Mar 1, 2030'),
     ).toBeInTheDocument();
     expect(screen.queryByText('On leave')).not.toBeInTheDocument();
+  });
+
+  it('shows the first line of Titles and Roles under the name in the table', async () => {
+    await renderDirectory();
+
+    const nameCell = screen.getByRole('link', { name: 'Bea Brown' }).closest('td')!;
+    expect(within(nameCell).getByText('News Director')).toBeInTheDocument();
+    const row = nameCell.closest('tr')!;
+    expect(within(row).queryByText(/Office hours/)).not.toBeInTheDocument();
+  });
+
+  it('greys out DJ names of DJs not on the sublist, and explains why in the detail panel', async () => {
+    window.history.pushState({}, '', '/directory/4');
+    vi.mocked(usersAPI.getMe).mockResolvedValue(staffUser);
+    vi.mocked(directoryAPI.list).mockResolvedValue([
+      entry({ id: 4, name: 'Dee Diaz', dj_name: 'DJ Dee', dj_personas: [{ id: 8, name: 'DJ Dee' }] }),
+    ]);
+    render(
+      <AuthProvider>
+        <App />
+      </AuthProvider>,
+    );
+
+    const panel = await screen.findByRole('dialog', { name: /Dee Diaz/ });
+    const row = screen.getByRole('link', { name: 'Dee Diaz' }).closest('tr')!;
+    expect(within(row).getByText('DJ Dee')).toHaveClass('dj-names-ineligible');
+    expect(within(row).queryByRole('link', { name: 'DJ Dee' })).not.toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: 'DJ Dee' })).toHaveAttribute(
+      'href',
+      'https://spinitron.com/KALX/dj/8/',
+    );
+    expect(within(panel).getByText(/not on the DJ sublist/)).toBeInTheDocument();
+  });
+
+  it('greys out DJ names of DJs on leave, and explains why in the detail panel', async () => {
+    await renderDirectory('/directory/3');
+
+    const panel = await screen.findByRole('dialog', { name: /Cal Chen/ });
+    const row = screen.getByRole('link', { name: 'Cal Chen' }).closest('tr')!;
+    expect(within(row).getByText('DJ Cal')).toHaveClass('dj-names-ineligible');
+    expect(within(row).queryByRole('link', { name: 'DJ Cal' })).not.toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: 'DJ Cal' })).toBeInTheDocument();
+    expect(within(panel).getByText(/on leave of absence from the station/)).toBeInTheDocument();
+    expect(within(panel).queryByText(/sublist/)).not.toBeInTheDocument();
+  });
+
+  it('treats an "On leave" status like a leave of absence for DJ names', async () => {
+    window.history.pushState({}, '', '/directory/5');
+    vi.mocked(usersAPI.getMe).mockResolvedValue(staffUser);
+    vi.mocked(directoryAPI.list).mockResolvedValue([
+      entry({
+        id: 5,
+        name: 'Eve Ellis',
+        dj_name: 'DJ Eve',
+        dj_personas: [{ id: 9, name: 'DJ Eve' }],
+        statuses: ['Active', 'On leave', 'Sublist DJ'],
+        loa_start: '2000-01-01',
+        loa_end: '2000-02-01',
+      }),
+    ]);
+    render(
+      <AuthProvider>
+        <App />
+      </AuthProvider>,
+    );
+
+    const panel = await screen.findByRole('dialog', { name: /Eve Ellis/ });
+    const row = screen.getByRole('link', { name: 'Eve Ellis' }).closest('tr')!;
+    expect(within(row).getByText('DJ Eve')).toHaveClass('dj-names-ineligible');
+    expect(within(row).queryByRole('link', { name: 'DJ Eve' })).not.toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: 'DJ Eve' })).toBeInTheDocument();
+    expect(within(panel).getByText(/on leave of absence from the station/)).toBeInTheDocument();
+    expect(
+      within(panel).getByText('On leave of absence: Jan 1, 2000 – Feb 1, 2000'),
+    ).toBeInTheDocument();
+  });
+
+  it('says when an "On leave" status has no leave dates on record', async () => {
+    window.history.pushState({}, '', '/directory/5');
+    vi.mocked(usersAPI.getMe).mockResolvedValue(staffUser);
+    vi.mocked(directoryAPI.list).mockResolvedValue([
+      entry({ id: 5, name: 'Eve Ellis', statuses: ['Active', 'On leave'] }),
+    ]);
+    render(
+      <AuthProvider>
+        <App />
+      </AuthProvider>,
+    );
+
+    const panel = await screen.findByRole('dialog', { name: /Eve Ellis/ });
+    expect(
+      within(panel).getByText('On leave of absence: dates not on record'),
+    ).toBeInTheDocument();
   });
 
   it('links to your own record', async () => {

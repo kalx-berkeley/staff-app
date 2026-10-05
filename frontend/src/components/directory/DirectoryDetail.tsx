@@ -3,6 +3,7 @@ import type { DirectoryEntry } from '../../types';
 import { formatLeave } from '../../utils';
 import MarkdownContent from '../shared/MarkdownContent';
 import DjNames from './DjNames';
+import { DJ_INELIGIBLE_NOTES, djIneligibility, hasOnLeaveStatus } from './djEligibility';
 import StaffPhoto from './StaffPhoto';
 
 interface DirectoryDetailProps {
@@ -16,6 +17,8 @@ interface DirectoryDetailProps {
 // table. Its URL (/directory/:staffId) can be shared.
 const DirectoryDetail = ({ entry, isMe, onClose }: DirectoryDetailProps) => {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const ineligible = entry && djIneligibility(entry);
+  const leaveStatus = !!entry && hasOnLeaveStatus(entry);
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -60,10 +63,10 @@ const DirectoryDetail = ({ entry, isMe, onClose }: DirectoryDetailProps) => {
               </div>
             </div>
 
-            {(entry.loa_start || entry.loa_end) && (
+            {(leaveStatus || entry.loa_start || entry.loa_end) && (
               <p className="field-warning directory-leave">
-                {entry.on_leave ? 'On leave of absence' : 'Leave of absence scheduled'}:{' '}
-                {formatLeave(entry)}
+                {entry.on_leave || leaveStatus ? 'On leave of absence' : 'Leave of absence scheduled'}:{' '}
+                {formatLeave(entry) || 'dates not on record'}
               </p>
             )}
 
@@ -75,7 +78,12 @@ const DirectoryDetail = ({ entry, isMe, onClose }: DirectoryDetailProps) => {
               <dd>{entry.phone ? <a href={`tel:${entry.phone}`}>{entry.phone}</a> : '—'}</dd>
 
               <dt>DJ name</dt>
-              <dd>{entry.dj_name ? <DjNames entry={entry} /> : '—'}</dd>
+              <dd>
+                {entry.dj_name ? <DjNames entry={entry} /> : '—'}
+                {entry.dj_name && ineligible && (
+                  <p className="directory-dj-ineligible">{DJ_INELIGIBLE_NOTES[ineligible]}</p>
+                )}
+              </dd>
 
               <dt>Departments</dt>
               <dd>{entry.departments.length > 0 ? entry.departments.join(', ') : '—'}</dd>

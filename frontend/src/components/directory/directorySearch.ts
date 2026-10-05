@@ -36,6 +36,11 @@ export function matchesSearch(entry: DirectoryEntry, query: string): boolean {
   });
 }
 
+/** The first line with any text in it, trimmed, or null if there is none. */
+export function firstNonBlankLine(value: string | null): string | null {
+  return value?.split('\n').map((line) => line.trim()).find(Boolean) ?? null;
+}
+
 /** Up to two initials for a name, e.g. "Jane Q. Doe" → "JD". */
 export function initials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);

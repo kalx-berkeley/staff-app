@@ -13,7 +13,12 @@ from app.models.staff import Staff
 from app.models.staff_status import StaffStatus
 from app.rate_limiter import create_rate_limit_dependency
 from app.schemas.directory import DirectoryEntry, DjPersona
-from app.services.leave_service import leave_is_current_or_upcoming, on_leave, today_pt
+from app.services.leave_service import (
+    has_leave,
+    leave_is_current_or_upcoming,
+    on_leave,
+    today_pt,
+)
 from app.services.staff_photo_service import photo_path
 
 router = APIRouter(prefix="/api/directory", tags=["directory"])
@@ -55,9 +60,27 @@ def _dj_personas(staff: Staff) -> list[DjPersona]:
     return [DjPersona(id=pid, name=name) for pid, name in zip(ids, names)]
 
 
+# An Airtable "Status" value, separate from the LOA dates.
+_ON_LEAVE_STATUS = "on leave"
+
+
 def _leave_fields(staff: Staff, today: date) -> dict:
-    """The directory's leave-of-absence fields: empty unless the leave hasn't ended."""
-    if not leave_is_current_or_upcoming(staff, today):
+    """
+    The directory's leave-of-absence fields.
+
+    Empty unless the leave hasn't ended, or the staff member has an "On leave"
+    status (matched ignoring case), in which case their leave dates are shown
+    whenever they're on record, so the detail panel can say when the leave is.
+
+    :param staff: The staff member, with statuses loaded.
+    :param today: Today's date in Pacific time.
+    """
+    if not has_leave(staff):
+        return {}
+    has_leave_status = any(
+        st.status.casefold() == _ON_LEAVE_STATUS for st in staff.statuses
+    )
+    if not has_leave_status and not leave_is_current_or_upcoming(staff, today):
         return {}
     return {
         "on_leave": on_leave(staff, today),
