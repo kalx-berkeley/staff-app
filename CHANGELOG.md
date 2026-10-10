@@ -6,6 +6,21 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.6.1] - 2026-10-10
+
+### Changed
+
+- Remove contact details that DJ studio and station office guests (no Google login) don't need from pass giveaway responses: staff phones and emails, winner emails, and promotions, venue and specialty-show owner contacts for every guest, plus winner phones for station office guests outside winner search ([6d85e14](https://github.com/kalx-berkeley/staff-app/commit/6d85e14))
+- Limit viewing promoters to promotions staff ([6d85e14](https://github.com/kalx-berkeley/staff-app/commit/6d85e14))
+
+### Removed
+
+- Remove the unauthenticated `/api/users/debug/headers` endpoint ([6d85e14](https://github.com/kalx-berkeley/staff-app/commit/6d85e14))
+
+### Fixed
+
+- Fix the Airtable staff sync storing record IDs as departments (and so revoking department-based roles) now that the "Department" column links to the "All departments" table. The IDs are looked up there, and if any can't be found, that person's departments are left as they were and an error is reported ([d36141f](https://github.com/kalx-berkeley/staff-app/commit/d36141f))
+
 ## [1.6.0] - 2026-10-05
 
 ### Changed
@@ -163,6 +178,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.6.1]: https://github.com/kalx-berkeley/staff-app/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.3.0...v1.4.0
