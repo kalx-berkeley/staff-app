@@ -58,17 +58,23 @@ Ensure all GitHub secrets and variables are properly configured per environment 
 This application implements several security best practices:
 
 #### Authentication & Authorization
-- **Two-path authentication**: every request is authenticated at the Apache layer by either a valid
-  Google OIDC session or a source IP in the DJ studio network. Unauthenticated non-DJ requests are
-  redirected to Google login; there is no anonymous access.
+- **Three-path authentication**: every request is authenticated at the Apache layer by a valid
+  Google OIDC session, a source IP in the DJ studio network, or a source IP in the station office
+  network. Requests from anywhere else without a session are redirected to Google login; there is
+  no anonymous access from outside those two networks. See
+  [Guest Access From Trusted Networks](#guest-access-from-trusted-networks) for what the two
+  networks can reach without a login.
 - **Role-Based Access Control (RBAC)**: Three distinct roles (promotions, staff, DJ) enforced by
   the backend.
 - **Defense-in-depth authentication check**: the backend independently verifies that every `/api/`
-  request carries either a Google identity (`X-Forwarded-User`) or a DJ studio network IP
-  (`X-Forwarded-For`). If neither is present, the request is rejected with HTTP 400 and a CRITICAL
+  request carries a Google identity (`X-Forwarded-User`) or comes from the DJ studio or station
+  office network. If neither is present, the request is rejected with HTTP 400 and a CRITICAL
   log entry is emitted, indicating a server misconfiguration or Apache bypass.
-- **Header-Based Identity**: Apache sets `X-Forwarded-User` from the verified OIDC email claim and
-  strips any client-supplied `X-Forwarded-For` before setting the real client IP via mod_proxy.
+- **Header-Based Identity**: Apache removes any client-supplied `X-Forwarded-User`,
+  `X-Forwarded-For`, `X-DJ-Network` and `X-Station-Office-Network` headers, then sets
+  `X-Forwarded-User` only from a verified OIDC email claim and the network headers only from the
+  real source IP. `backend/tests/common/test_apache_config.py` checks both staff VirtualHosts
+  still do this.
 
 #### Network Security
 - **HTTPS Enforcement**: All HTTP traffic redirected to HTTPS
@@ -110,6 +116,50 @@ Both Apache and the backend check this CIDR independently:
 - Using public IP ranges
 - Using overly broad ranges (e.g., `0.0.0.0/0`)
 - Exposing this to untrusted networks
+
+### Guest Access From Trusted Networks
+
+Two networks can use parts of the Radio Pass Giveaway without a Google login. Apache lets their
+requests through, and the backend decides what each request may do.
+
+| Network | Setting | Pages | Why |
+|---|---|---|---|
+| DJ studio | `DJ_STUDIO_NETWORK` | `/pass-giveaway/dj` only (Apache redirects every other page there) | DJs give away passes on air from a shared studio computer |
+| Station office | `STATION_OFFICE_NETWORK` | `/pass-giveaway/` pages; other pages ask for a login | Office staff look up winners by phone when they collect passes |
+
+Without a login, guests from these networks can:
+- see who they are to the app (`GET /api/users/me` reports a guest);
+- browse shows, venues and specialty shows, including each show's passes (with contact details
+  removed, as described below);
+- search winners by phone and release a winner (winner search).
+
+DJ studio guests can also:
+- give away passes, record failed giveaway attempts and check winner eligibility;
+- see their own giveaways and the on-air DJ;
+- see and dismiss spin matches;
+- remove their own pass pre-assignment.
+
+Guests cannot reach anything else, including the KALX Staff Directory, user profiles and
+preferences, promoters, the admin pages, or any create/edit/delete action for shows, venues and
+promoters. Those require a Google login, and the backend checks the role.
+
+The exact list of routes each kind of guest can reach is the allowlist in
+`backend/tests/common/test_guest_access.py`. That test calls every API route as each kind of
+guest and fails if the routes that answer differ from the allowlist, so a route can't be opened
+to guests by accident. Opening a route to guests means updating that allowlist and this section.
+
+**Contact details guests get:** responses to guests are shared with signed-in users, so
+`backend/app/pass_giveaway/guest_redaction.py` removes the contact details guests don't need
+before a response goes out:
+- Every guest: staff phones and emails, winner emails, and the promotions, venue and
+  specialty-show owner contacts.
+- Station office guests: winner phone numbers too, except in winner search results.
+- DJ studio guests keep winner names and phone numbers, which the DJ view shows for each show's
+  previous winners and the DJ's own giveaways.
+
+Every pass giveaway router applies this, so new endpoints are covered. The redaction tests in
+`backend/tests/common/test_guest_access.py` seed contact details and fail if any guest-reachable
+route returns them.
 
 ### Regular Security Maintenance
 
@@ -163,7 +213,9 @@ Before deploying to production, verify:
 
 #### DJ Network Bypass
 The DJ studio network bypass is intentional to support live broadcast workflow. This means:
-- Anyone on the DJ studio network can access DJ endpoints without authentication
+- Anyone on the DJ studio network can access DJ endpoints without authentication (see
+  [Guest Access From Trusted Networks](#guest-access-from-trusted-networks); the same applies to
+  winner search from the station office network)
 - Ensure the DJ studio network is physically secure
 - Consider additional network segmentation if needed
 - Monitor DJ endpoint access in logs

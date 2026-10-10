@@ -2,7 +2,7 @@
 
 The Airtable sync never deletes staff rows: when someone stops being "Active"
 in Airtable, it only removes their "Active" status (see
-app/services/user_service.py), so rows for former staff accumulate. This is
+app/common/services/user_service.py), so rows for former staff accumulate. This is
 occasional upkeep that removes the ones no pass, lottery entry, alternate, or
 venue/promoter/specialty-show ownership refers to. (It was first used to clear
 out rows an earlier sync created for people who weren't active yet, "🆕".)
@@ -32,7 +32,7 @@ from app.auth import ACTIVE_STATUS  # noqa: E402
 from app.database import Base, SessionLocal  # noqa: E402
 from app.models.staff import Staff  # noqa: E402
 from app.models.staff_status import StaffStatus  # noqa: E402
-from app.services.staff_photo_service import delete_photo  # noqa: E402
+from app.common.services.staff_photo_service import delete_photo  # noqa: E402
 
 # Tables holding a staff member's own data, deleted along with the row.
 OWNED_TABLES = {

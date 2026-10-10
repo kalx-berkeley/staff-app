@@ -1,4 +1,4 @@
-import type { UserResponse } from './types';
+import type { UserResponse } from './common/types';
 
 /**
  * A sub-site of the KALX Staff App. Each one is served under its own top-level

@@ -49,11 +49,11 @@ area:
   the event name (e.g. the band's name inside `"Foo Fighters w/ Death Cab for Cutie"`) and a
   MusicBrainz artist search panel pops up at the selection; picking a result — or pasting a
   MusicBrainz artist URL — tags that exact span with the artist's MusicBrainz ID, type, country,
-  and genre tags (`frontend/src/components/shared/BandAnnotator.tsx`).
+  and genre tags (`frontend/src/pass-giveaway/components/BandAnnotator.tsx`).
 - **Enriched show names.** Anywhere a tagged event name is displayed, the tagged spans become
   clickable: a popup shows a live Wikipedia extract (via MusicBrainz → Wikidata → Wikipedia), the
   artist's genre tags (click one to filter the show list by that genre), and a MusicBrainz link
-  (`frontend/src/components/shared/EnrichedShowName.tsx`). If a show has no genre set, the app
+  (`frontend/src/pass-giveaway/components/EnrichedShowName.tsx`). If a show has no genre set, the app
   falls back to looking up the artist's MusicBrainz tags automatically.
 - **Full show lifecycle** — draft → published → closed — plus soft-delete/undelete for shows,
   venues, and promoters, recoverable from the admin panel.
@@ -84,7 +84,7 @@ area:
 KALX is a non-commercial station, so on-air copy about a show can state facts but can't praise
 the band, promote the show, or tell listeners to go. As promotions staff type the on-air
 description, the app flags language that reads as promotional rather than neutral
-(`backend/app/services/language_analysis_service.py`):
+(`backend/app/pass_giveaway/services/language_analysis_service.py`):
 
 - A curated lexicon catches endorsement words ("legendary," "unforgettable"), comparative/
   superlative claims ("the best," "unrivaled"), calls to action ("don't miss," "grab your"),
@@ -99,7 +99,7 @@ description, the app flags language that reads as promotional rather than neutra
 ### Lottery system
 
 Shows can allocate passes by lottery instead of first-come giveaway/claiming
-(`backend/app/services/lottery_service.py`). Staff and DJs enter separately during a configurable
+(`backend/app/pass_giveaway/services/lottery_service.py`). Staff and DJs enter separately during a configurable
 window after the show is published:
 
 - Staff entrants can request to bring a guest, and can mark that they'll only attend *with* that
@@ -117,7 +117,7 @@ KALX's "feature bin" — recently added releases — lives in a public Google Sh
 nightly and fuzzy-matches feature-bin artists against tagged show artists (or, failing that, the
 event name itself) so a show gets a **★ Feature Bin** badge when a performer has a new release in
 the library, complete with the release's dot-color status and a listen link
-(`backend/app/services/feature_bin_service.py`).
+(`backend/app/pass_giveaway/services/feature_bin_service.py`).
 
 ### KALX Live! matching
 
@@ -126,7 +126,7 @@ Google Calendar. The app syncs it nightly as an ICS export and fuzzy-matches KAL
 against tagged show artists (or, failing that, the event name itself), so a show gets a
 **🤘🏽 KALX Live!** badge when a performer recently was, or will be, on KALX Live! (within a
 two-month lookback, with no limit on future dates), complete with the performance date(s)
-(`backend/app/services/kalx_live_service.py`).
+(`backend/app/pass_giveaway/services/kalx_live_service.py`).
 
 ### DJ on-air tools
 
@@ -143,7 +143,7 @@ two-month lookback, with no limit on future dates), complete with the performanc
   notice) right when a show ends.
 - **Live spin-match notifications** — polling `GET /api/dj/spin-matches` roughly every 30 seconds,
   the DJ view fuzzy-matches recently played Spinitron spins against shows with passes still to give
-  away (`backend/app/services/spin_match_service.py`, reusing the feature bin's rapidfuzz approach)
+  away (`backend/app/pass_giveaway/services/spin_match_service.py`, reusing the feature bin's rapidfuzz approach)
   and pops up a dismissible toast with the artist, show, date, and a link straight to that show's
   giveaway page — so a DJ can catch a match and give tickets away in the next mic break. The
   Spinitron API itself is only re-polled once the cached spins are over a minute old, and a given
@@ -374,15 +374,25 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 │   └── README.md
 ├── backend/                    # Python FastAPI backend
 │   ├── app/
-│   ├── tests/
+│   │   ├── *.py                # Shared core: main, config, database, auth, scheduler
+│   │   ├── models/             # All SQLAlchemy models (one shared database)
+│   │   ├── common/             # Shared by every sub-site: users, Airtable sync, email
+│   │   ├── pass_giveaway/      # Radio Pass Giveaway: routers/, services/, schemas/
+│   │   └── directory/          # Staff Directory: routers/, schemas/
+│   ├── tests/                  # common/, pass_giveaway/, directory/
 │   └── requirements.txt
-├── frontend/                   # React TypeScript frontend (mounted at /pass-giveaway/)
+├── frontend/                   # React TypeScript SPA served at /
 │   ├── src/
+│   │   ├── App.tsx, subsites.ts  # App shell and the sub-site list
+│   │   ├── common/             # Shared by every sub-site: API client, auth, utils
+│   │   ├── home/               # Home page at /
+│   │   ├── pass-giveaway/      # Radio Pass Giveaway at /pass-giveaway/
+│   │   └── directory/          # Staff Directory at /directory/
 │   └── package.json
 ├── systemd/                    # Systemd service files
 │   ├── staff-app-backend-production.service
 │   └── staff-app-backend-staging.service
-├── docs/specs/                 # Architecture and requirements
+├── docs/pass-giveaway/         # Radio Pass Giveaway specs and how-tos
 └── .github/workflows/
     └── deploy.yml
 ```
@@ -435,11 +445,5 @@ Check that `mod_auth_openidc` is setting the header correctly:
 
 ```bash
 curl -H "X-Forwarded-User: test@example.com" http://127.0.0.1:8420/api/users/me
-```
-
-Use the debug endpoint (from the server, bypassing Apache):
-
-```bash
-curl http://127.0.0.1:8420/api/users/debug/headers
 ```
 
