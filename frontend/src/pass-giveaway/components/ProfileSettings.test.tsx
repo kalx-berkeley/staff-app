@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import ProfileSettings from './ProfileSettings';
 import { usersAPI } from '../../common/api';
 import { preferencesAPI, showsAPI } from '../api';
@@ -20,6 +20,9 @@ vi.mock('../api', () => ({
   },
   showsAPI: {
     listGenres: vi.fn().mockResolvedValue([]),
+  },
+  specialtyShowsAPI: {
+    listMine: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -43,7 +46,7 @@ describe('ProfileSettings', () => {
     vi.clearAllMocks();
   });
 
-  it('should show loading state initially', () => {
+  it('should show loading state initially', async () => {
     vi.mocked(usersAPI.getProfile).mockImplementation(
       () => new Promise(() => {})
     );
@@ -51,6 +54,10 @@ describe('ProfileSettings', () => {
     render(<ProfileSettings section="Promotions" />);
 
     expect(screen.getByText('Loading profile...')).toBeInTheDocument();
+
+    // The other sections' loads still resolve; let them settle inside act()
+    // so their state updates don't land after the test has finished.
+    await act(async () => {});
   });
 
   it('should display profile name and phone for a promotions profile', async () => {
