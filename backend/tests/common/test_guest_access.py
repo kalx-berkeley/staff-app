@@ -31,6 +31,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.main import app
 from app.models.pass_model import Pass
 from app.models.promoter import Promoter
@@ -54,7 +55,6 @@ OFFICE_GUEST = {"X-Station-Office-Network": "1", "X-Forwarded-For": "192.168.2.5
 SHARED_GUEST_ROUTES = {
     # Identity: tells the SPA the caller is a network guest.
     "GET /api/users/me",
-    "GET /api/legacy-import/enabled",
     # Browsing shows, venues and specialty shows. Show passes include winner
     # and staff contact details.
     "GET /api/shows",
@@ -92,6 +92,21 @@ DJ_GUEST_ROUTES = SHARED_GUEST_ROUTES | {
 
 # Winner search, used from station office computers.
 OFFICE_GUEST_ROUTES = SHARED_GUEST_ROUTES
+
+# Routes that only exist when a setting turns their router on (see main.py).
+FLAGGED_GUEST_ROUTES = {
+    "legacy_import_enabled": {"GET /api/legacy-import/enabled"},
+}
+
+
+def _with_enabled_flags(routes: set[str]) -> set[str]:
+    enabled = {
+        route
+        for flag, flagged in FLAGGED_GUEST_ROUTES.items()
+        if getattr(settings, flag)
+        for route in flagged
+    }
+    return routes | enabled
 
 
 @pytest.fixture
@@ -178,6 +193,7 @@ def test_guests_reach_only_allowlisted_routes(
     client: TestClient, seeded, no_outbound_requests, headers, allowed
 ):
     answering = _routes_answering(client, headers)
+    allowed = _with_enabled_flags(allowed)
 
     assert sorted(answering - allowed) == [], "routes newly open to guests"
     assert sorted(allowed - answering) == [], "allowlisted routes guests can't reach"

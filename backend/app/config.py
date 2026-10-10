@@ -90,5 +90,6 @@ class Settings(BaseSettings):
     kalx_live_calendar_id: Optional[str] = None
 
 
-# Global settings instance
-settings = Settings()
+# Global settings instance. The test suite ignores .env so it runs with the same
+# settings locally as in CI, where there is no .env.
+settings = Settings(_env_file=None) if os.getenv("TESTING") == "1" else Settings()

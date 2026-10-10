@@ -7,13 +7,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 
-from app.main import app
-from app.database import Base, get_db
-from app.rate_limiter import _reset_for_testing
-
-# Set testing environment variable
+# Set before importing the app: app.config ignores .env when TESTING is set.
 os.environ["TESTING"] = "1"
 
+from app.main import app  # noqa: E402
+from app.database import Base, get_db  # noqa: E402
+from app.rate_limiter import _reset_for_testing  # noqa: E402
 
 # Create a single test database engine that all tests will share
 # Using StaticPool to ensure the in-memory database persists across connections
