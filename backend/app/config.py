@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     airtable_api_key: Optional[str] = None
     airtable_base_id: Optional[str] = None
     airtable_table_name: str = "Online Staff App Directory"
+    # Table that the staff table's "Department" linked-record field links to.
+    # Its "Department" (primary) field holds each department's name.
+    airtable_departments_table_name: str = "All departments"
     # Where the Airtable sync stores resized staff directory photos. Relative
     # paths are relative to the backend's working directory; in deployments
     # that's backend/, so this is backend/data/staff_photos alongside the

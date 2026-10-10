@@ -537,6 +537,121 @@ async def test_sync_idempotent(client: TestClient, db: Session):
     assert db.query(StaffStatus).filter_by(status="Active").count() >= 1
 
 
+PROMOTIONS_REC = "recPromotions0001"
+MUSIC_REC = "recMusic000000001"
+
+
+@pytest.mark.asyncio
+async def test_sync_resolves_linked_department_record_ids(client: TestClient, db: Session):
+    """Linked "Department" record IDs are stored as department names."""
+    from unittest.mock import patch, AsyncMock
+
+    _make_promotions_staff(db, "admin@example.com", "Admin", "555-0000")
+
+    airtable_records = [
+        {
+            "Email address": "admin@example.com",
+            "Department": [PROMOTIONS_REC],
+            "Status": ["Active"],
+        },
+        {
+            "Email address": "user@example.com",
+            "Department": [PROMOTIONS_REC, MUSIC_REC],
+            "Status": ["Active"],
+        },
+    ]
+
+    with (
+        patch(
+            "app.common.services.user_service.UserService.fetch_airtable_records",
+            new_callable=AsyncMock,
+            return_value=_airtable_records(airtable_records),
+        ),
+        patch(
+            "app.common.services.user_service.UserService.fetch_department_names",
+            new_callable=AsyncMock,
+            return_value={PROMOTIONS_REC: "Promotions", MUSIC_REC: "Music"},
+        ),
+    ):
+        response = client.post(
+            "/api/users/sync", headers={"X-Forwarded-User": "admin@example.com"}
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["errors"] == []
+    assert "user@example.com" in data["promotions_upserted"]
+    user = db.query(Staff).filter_by(email="user@example.com").one()
+    assert {d.department for d in user.departments} == {"Promotions", "Music"}
+    admin = db.query(Staff).filter_by(email="admin@example.com").one()
+    assert {d.department for d in admin.departments} == {"Promotions"}
+
+
+@pytest.mark.asyncio
+async def test_sync_keeps_departments_when_record_ids_unresolved(
+    client: TestClient, db: Session
+):
+    """If department record IDs can't be resolved (e.g. the departments table
+    can't be fetched), departments are left as they were, not replaced with
+    record IDs, and the sync reports an error."""
+    from unittest.mock import patch, AsyncMock
+    from fastapi import HTTPException
+
+    _make_promotions_staff(db, "admin@example.com", "Admin", "555-0000")
+
+    airtable_records = [
+        {
+            "Email address": "admin@example.com",
+            "Department": [PROMOTIONS_REC],
+            "Status": ["Active"],
+        },
+    ]
+
+    with (
+        patch(
+            "app.common.services.user_service.UserService.fetch_airtable_records",
+            new_callable=AsyncMock,
+            return_value=_airtable_records(airtable_records),
+        ),
+        patch(
+            "app.common.services.user_service.UserService.fetch_department_names",
+            new_callable=AsyncMock,
+            side_effect=HTTPException(status_code=503, detail="departments down"),
+        ),
+    ):
+        response = client.post(
+            "/api/users/sync", headers={"X-Forwarded-User": "admin@example.com"}
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "departments down" in data["errors"]
+    assert any(PROMOTIONS_REC in e for e in data["errors"])
+    assert "admin@example.com" in data["promotions_upserted"]
+    admin = db.query(Staff).filter_by(email="admin@example.com").one()
+    assert {d.department for d in admin.departments} == {"Promotions"}
+
+
+@pytest.mark.asyncio
+async def test_fetch_department_names_maps_record_ids_to_names():
+    """fetch_department_names reads the departments table's "Department" field."""
+    from unittest.mock import patch, AsyncMock
+    from app.common.services.user_service import UserService
+
+    with patch(
+        "app.common.services.user_service.UserService.fetch_airtable_records",
+        new_callable=AsyncMock,
+        return_value=[
+            {"id": PROMOTIONS_REC, "fields": {"Department": "Promotions "}},
+            {"id": MUSIC_REC, "fields": {}},
+        ],
+    ) as fetch:
+        names = await UserService.fetch_department_names()
+
+    fetch.assert_awaited_once_with("All departments")
+    assert names == {PROMOTIONS_REC: "Promotions"}
+
+
 @pytest.mark.asyncio
 async def test_sync_deactivates_staff_missing_from_airtable(
     client: TestClient, db: Session

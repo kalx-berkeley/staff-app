@@ -37,7 +37,7 @@ jobs:
         pytest --cov=app --cov-report=xml
 
     - name: Set up Node.js
-      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
       with:
         node-version: '26'
 
@@ -119,7 +119,7 @@ jobs:
 
     - name: Connect to Netbird
       # uses: Alemiz112/netbird-connect@v1.0.1
-      uses: gene1wood/netbird-connect@v1.1.0
+      uses: gene1wood/netbird-connect@b8c6916d108aee5e327546e49efcd29bbd41b69f # v1.1.0
       with:
         setup-key: ${{ secrets.NETBIRD_SETUP_KEY }}
         args: '--log-level DEBUG'

@@ -26,6 +26,10 @@ from app.common.services.staff_photo_service import (
 logger = logging.getLogger(__name__)
 
 PROMOTIONS_DEPARTMENT = "Promotions"
+# The primary field of the departments table, holding each department's name
+DEPARTMENT_NAME_FIELD = "Department"
+
+_AIRTABLE_RECORD_ID_RE = re.compile(r"^rec[A-Za-z0-9]{14}$")
 
 _SPINITRON_URL_RE = re.compile(r"https://(?:widgets\.)?spinitron\.com/KALX/dj/(\d+)/")
 
@@ -67,16 +71,19 @@ class UserService:
     """Service for managing user profiles and Airtable synchronization."""
 
     @staticmethod
-    async def fetch_airtable_records() -> List[Dict[str, Any]]:
+    async def fetch_airtable_records(
+        table_name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """
-        Fetch all records from the Airtable staff directory table.
+        Fetch all records from an Airtable table.
 
-        Each record is expected to have an "Email address" field and a
-        "Department" comma-delimited string field.
-
-        Returns:
-            List of Airtable records, each a dict with the record's "id" and
-            its "fields" dict
+        :param table_name: Table to fetch; defaults to the staff directory
+            table, whose records have an "Email address" field and a
+            "Department" linked-record field
+        :type table_name: str or None
+        :returns: List of Airtable records, each a dict with the record's "id"
+            and its "fields" dict
+        :rtype: list
 
         Raises:
             HTTPException: If Airtable API call fails
@@ -85,7 +92,8 @@ class UserService:
             logger.warning("Airtable credentials not configured, returning empty list")
             return []
 
-        url = f"https://api.airtable.com/v0/{settings.airtable_base_id}/{settings.airtable_table_name}"
+        table_name = table_name or settings.airtable_table_name
+        url = f"https://api.airtable.com/v0/{settings.airtable_base_id}/{table_name}"
         headers = {
             "Authorization": f"Bearer {settings.airtable_api_key}",
             "Content-Type": "application/json",
@@ -115,7 +123,7 @@ class UserService:
                     if not offset:
                         break
 
-            logger.info(f"Fetched {len(records)} records from Airtable")
+            logger.info(f"Fetched {len(records)} records from Airtable {table_name!r}")
             return records
 
         except httpx.HTTPStatusError as e:
@@ -134,6 +142,28 @@ class UserService:
             )
 
     @staticmethod
+    async def fetch_department_names() -> Dict[str, str]:
+        """
+        Fetch the departments table and map each record ID to its name.
+
+        The staff table's "Department" field links to this table, so the
+        Airtable API returns its values as record IDs rather than names.
+
+        :returns: Dict of department record ID to department name
+        :rtype: dict
+        :raises HTTPException: If the Airtable API call fails
+        """
+        records = await UserService.fetch_airtable_records(
+            settings.airtable_departments_table_name
+        )
+        names = {}
+        for record in records:
+            name = _text_field(record.get("fields", {}), DEPARTMENT_NAME_FIELD)
+            if record.get("id") and name:
+                names[record["id"]] = name
+        return names
+
+    @staticmethod
     async def sync_from_airtable(db: Session, trigger: str = "manual") -> Dict[str, Any]:
         """
         Synchronize users from Airtable into the local database.
@@ -142,9 +172,12 @@ class UserService:
         AIRTABLE_TABLE_NAME). Only records whose "Status" includes "Active"
         are imported; the table also lists people who aren't active yet (e.g.
         "🆕"), and they're skipped as if absent. Each record's "Department"
-        comma-delimited string
-        field determines the role: "Promotions" department maps to the
-        promotions_staff table; all other departments map to the staff table.
+        field links to records in the "All departments" table (configurable
+        via AIRTABLE_DEPARTMENTS_TABLE_NAME); the API returns their record
+        IDs, which are resolved to department names. Membership of the
+        "Promotions" department grants the promotions role. If a record's
+        departments can't all be resolved, its departments are left unchanged
+        rather than replaced with record IDs, and an error is reported.
 
         Extracts Spinitron persona IDs from URLs in the "DJ Name" column and
         stores them in staff.spinitron_ids. Then calls the Spinitron API to
@@ -179,6 +212,20 @@ class UserService:
         except HTTPException as e:
             result["errors"].append(str(e.detail))
             return result
+
+        # Resolve linked "Department" record IDs to names. Only fetched when
+        # some record has record IDs, so a "Department" field holding names
+        # (e.g. a lookup field) needs no access to the departments table.
+        department_names: Dict[str, str] = {}
+        if any(
+            isinstance(d, str) and _AIRTABLE_RECORD_ID_RE.match(d)
+            for record in records
+            for d in record.get("fields", {}).get("Department") or []
+        ):
+            try:
+                department_names = await UserService.fetch_department_names()
+            except HTTPException as e:
+                result["errors"].append(str(e.detail))
 
         from app.common.services.audit_service import log_event
 
@@ -220,11 +267,27 @@ class UserService:
                 titles_and_roles = titles_and_roles.strip()
             photo_attachment = select_photo_attachment(fields.get("Photo"))
 
-            departments = fields.get("Department", [])
+            departments: Optional[List[str]] = fields.get("Department", [])
             if isinstance(departments, str):
                 departments = [d.strip() for d in departments.split(",")]
             elif not isinstance(departments, list):
                 departments = []
+            departments = [department_names.get(d, d) for d in departments]
+            unresolved = [
+                d
+                for d in departments
+                if isinstance(d, str) and _AIRTABLE_RECORD_ID_RE.match(d)
+            ]
+            if unresolved:
+                # Storing record IDs as department names would revoke roles
+                # (e.g. Promotions), so leave this member's departments as-is.
+                error_msg = (
+                    f"Could not resolve departments {unresolved} for {email}; "
+                    "left their departments unchanged"
+                )
+                logger.error(error_msg)
+                result["errors"].append(error_msg)
+                departments = None
 
             # Extract Spinitron persona IDs from URLs in the "DJ Name" field
             raw_dj_field = fields.get("DJ Name", "")
@@ -330,6 +393,8 @@ class UserService:
                         .all()
                     )
                 }
+                if departments is None:
+                    departments = sorted(existing_depts)
                 depts_added = []
                 depts_removed = []
                 for dept in departments:
