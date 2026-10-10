@@ -81,8 +81,10 @@ sudo apachectl configtest && sudo systemctl reload apache2
 
 ## Adding a new sub-site
 
-Sub-sites are added in the app, not here: register the sub-site in
-`frontend/src/subsites.ts` and add its app to `SUBSITE_APPS` in `frontend/src/App.tsx`.
+Sub-sites are added in the app, not here: put its code in its own
+`frontend/src/<sub-site>/` folder (with a `<Name>App.tsx` holding its router), register it
+in `frontend/src/subsites.ts`, and add its app to `SUBSITE_APPS` in `frontend/src/App.tsx`.
+Its backend code goes in `backend/app/<sub_site>/`.
 Every path is already served by the SPA and requires a Google login, so `staff.conf` only
 needs to change if the new sub-site relaxes authentication for some of its paths, as the
 Radio Pass Giveaway does for the DJ studio and station office networks.

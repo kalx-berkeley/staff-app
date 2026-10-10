@@ -41,11 +41,11 @@ class Staff(Base):
     # Airtable: "Titles and Roles" (free text, may span several lines)
     titles_and_roles = Column(Text, nullable=True)
     # Airtable: the ID of the "Photo" attachment whose resized copies are on
-    # disk (see app/services/staff_photo_service.py). Null when there's no photo.
+    # disk (see app/common/services/staff_photo_service.py). Null when there's no photo.
     photo_attachment_id = Column(String, nullable=True)
     # Airtable: "LOA start" and "LOA end", the first and last days (inclusive)
     # of a leave of absence. Either may be blank: a start alone is open-ended,
-    # an end alone means on leave until then. See app/services/leave_service.py.
+    # an end alone means on leave until then. See app/common/services/leave_service.py.
     loa_start = Column(Date, nullable=True)
     loa_end = Column(Date, nullable=True)
     # Derived: Spinitron persona IDs parsed from the URLs in Airtable's "DJ Name"

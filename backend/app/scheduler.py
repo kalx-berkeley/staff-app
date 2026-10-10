@@ -7,9 +7,9 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 
-from app.services.user_service import UserService
-from app.services.pass_service import PassService
-from app.services.show_service import ShowService
+from app.common.services.user_service import UserService
+from app.pass_giveaway.services.pass_service import PassService
+from app.pass_giveaway.services.show_service import ShowService
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ async def sync_feature_bin():
     Runs daily at 1 AM.
     """
     from app.database import SessionLocal
-    from app.services.feature_bin_service import FeatureBinService
+    from app.pass_giveaway.services.feature_bin_service import FeatureBinService
 
     logger.info("Starting scheduled feature bin sync")
 
@@ -114,7 +114,7 @@ async def sync_kalx_live():
     Runs daily at 1:30 AM.
     """
     from app.database import SessionLocal
-    from app.services.kalx_live_service import KalxLiveService
+    from app.pass_giveaway.services.kalx_live_service import KalxLiveService
 
     logger.info("Starting scheduled KALX Live sync")
 
@@ -134,7 +134,9 @@ async def sync_spinitron_schedule():
     Runs every 6 hours.
     """
     from app.database import SessionLocal
-    from app.services.spinitron_schedule_service import SpinitronScheduleService
+    from app.pass_giveaway.services.spinitron_schedule_service import (
+        SpinitronScheduleService,
+    )
 
     logger.info("Starting scheduled Spinitron schedule sync")
 
@@ -191,7 +193,7 @@ async def bootstrap_feature_bin_if_stale():
         return
 
     from app.database import SessionLocal
-    from app.services.feature_bin_service import FeatureBinService
+    from app.pass_giveaway.services.feature_bin_service import FeatureBinService
 
     if not FeatureBinService.is_configured():
         logger.info("Feature bin sheet not configured - skipping startup sync check")
@@ -221,7 +223,7 @@ async def bootstrap_kalx_live_if_stale():
         return
 
     from app.database import SessionLocal
-    from app.services.kalx_live_service import KalxLiveService
+    from app.pass_giveaway.services.kalx_live_service import KalxLiveService
 
     if not KalxLiveService.is_configured():
         logger.info("KALX Live calendar not configured - skipping startup sync check")
@@ -261,7 +263,7 @@ async def auto_close_show(show_id: int):
     """DateTrigger job that closes a show and emails venue owners the guest list."""
     from app.database import SessionLocal
     from app.models.show import Show
-    from app.services.show_service import ShowService
+    from app.pass_giveaway.services.show_service import ShowService
 
     logger.info(f"Auto-closing show {show_id}")
 
@@ -279,7 +281,7 @@ async def auto_close_show(show_id: int):
         ShowService.close_show(db, show_id)
         db.refresh(show)
         ShowService._notify_venue_owners_of_auto_close(db, show)
-        from app.routers.shows import run_close_side_effects
+        from app.pass_giveaway.routers.shows import run_close_side_effects
 
         run_close_side_effects(db, show)
         logger.info(f"Auto-close complete for show {show_id} ({show.event_name})")
@@ -324,7 +326,7 @@ def _reschedule_pending_auto_close_jobs() -> None:
 
     from app.database import SessionLocal
     from app.models.show import Show
-    from app.services.show_service import ShowService
+    from app.pass_giveaway.services.show_service import ShowService
     from datetime import datetime
     from zoneinfo import ZoneInfo
 
@@ -358,7 +360,7 @@ def _reschedule_pending_auto_close_jobs() -> None:
                     ShowService.close_show(db, show.id)
                     db.refresh(show)
                     ShowService._notify_venue_owners_of_auto_close(db, show)
-                    from app.routers.shows import run_close_side_effects
+                    from app.pass_giveaway.routers.shows import run_close_side_effects
 
                     run_close_side_effects(db, show)
                 except Exception as e:
@@ -371,7 +373,7 @@ async def run_lottery_draw(show_id: int):
     """DateTrigger job that runs the lottery for a show after its window closes."""
     from app.database import SessionLocal
     from app.models.show import Show
-    from app.services.lottery_service import LotteryService
+    from app.pass_giveaway.services.lottery_service import LotteryService
 
     logger.info(f"Running lottery draw for show {show_id}")
 
@@ -426,7 +428,7 @@ def _reschedule_pending_lottery_jobs() -> None:
 
     from app.database import SessionLocal
     from app.models.show import Show
-    from app.services.lottery_service import LotteryService
+    from app.pass_giveaway.services.lottery_service import LotteryService
     from datetime import timedelta, timezone
 
     db = SessionLocal()

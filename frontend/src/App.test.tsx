@@ -1,15 +1,19 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import App from './App';
-import { AuthProvider } from './contexts/AuthContext';
-import { usersAPI } from './services/api';
-import type { UserResponse } from './types';
+import { AuthProvider } from './common/contexts/AuthContext';
+import { usersAPI } from './common/api';
+import type { UserResponse } from './common/types';
 
 // Mock the API
-vi.mock('./services/api', () => ({
+vi.mock('./common/api', () => ({
   usersAPI: {
     getMe: vi.fn(),
   },
+  handleAPIError: vi.fn(),
+}));
+
+vi.mock('./pass-giveaway/api', () => ({
   showsAPI: {
     list: vi.fn().mockResolvedValue([]),
   },
@@ -37,7 +41,6 @@ vi.mock('./services/api', () => ({
   legacyImportAPI: {
     checkEnabled: vi.fn().mockResolvedValue(false),
   },
-  handleAPIError: vi.fn(),
 }));
 
 describe('App - Role-Based UI Elements', () => {
@@ -71,9 +74,9 @@ describe('App - Role-Based UI Elements', () => {
   // first test's waitFor isn't racing Vitest's on-demand transform.
   beforeAll(async () => {
     await Promise.all([
-      import('./components/promotions'),
-      import('./components/staff'),
-      import('./components/dj'),
+      import('./pass-giveaway/promotions'),
+      import('./pass-giveaway/staff'),
+      import('./pass-giveaway/dj'),
     ]);
   });
 

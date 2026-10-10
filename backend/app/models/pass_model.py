@@ -97,7 +97,7 @@ class Pass(Base):
 
     def _claimant_leave_covering_show(self):
         """The claimant, if this is their own staff pass and they're on leave for the show."""
-        from app.services.leave_service import leave_covers_show
+        from app.common.services.leave_service import leave_covers_show
 
         if self.staff is None or self.show is None or self.guest_of_pass_id is not None:
             return None

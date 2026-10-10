@@ -9,9 +9,10 @@ import ipaddress
 import logging
 import re
 
-from app.routers import (
+from app.common.routers import users
+from app.directory.routers import directory
+from app.pass_giveaway.routers import (
     venues,
-    users,
     shows,
     passes,
     admin,
@@ -20,9 +21,9 @@ from app.routers import (
     alternates,
     specialty_shows,
     on_air,
-    directory,
+    preferences,
 )
-from app.routers import legacy_import as legacy_import_router
+from app.pass_giveaway.routers import legacy_import as legacy_import_router
 from app.scheduler import (
     start_scheduler,
     shutdown_scheduler,
@@ -238,6 +239,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 _auth_check = [Depends(check_apache_auth_layer)]
 app.include_router(venues.router, dependencies=_auth_check)
 app.include_router(users.router, dependencies=_auth_check)
+app.include_router(preferences.router, dependencies=_auth_check)
 app.include_router(shows.router, dependencies=_auth_check)
 app.include_router(passes.router, dependencies=_auth_check)
 app.include_router(admin.router, dependencies=_auth_check)

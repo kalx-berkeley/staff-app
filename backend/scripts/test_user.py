@@ -2,7 +2,7 @@
 
 Writes directly to the database, bypassing Airtable — so the account is NOT
 removed by the next Airtable sync (sync_from_airtable only upserts records
-present in Airtable; see app/services/user_service.py). Delete it yourself
+present in Airtable; see app/common/services/user_service.py). Delete it yourself
 with the `delete` subcommand when you're done testing.
 
 --role sets which department/status combination the row gets: "staff"
@@ -51,7 +51,7 @@ DEFAULT_NAME = "Test Promoter"
 DEFAULT_PHONE = "555-0100"
 
 # role -> (departments, statuses), matching the rules in app/auth.py and
-# determine_user_role() in app/routers/users.py
+# determine_user_role() in app/common/routers/users.py
 ROLE_DEPARTMENTS_STATUSES: dict[str, tuple[list[str], list[str]]] = {
     "promotions": (["Promotions"], ["Active"]),
     "staff": ([], ["Active"]),
