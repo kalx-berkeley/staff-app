@@ -31,9 +31,7 @@ def _make_staff(
     if active:
         db.add(StaffStatus(staff_id=staff.id, status="Active"))
     if head_of:
-        db.add(
-            DepartmentHead(department=head_of, staff_airtable_record_id=f"rec-{email}")
-        )
+        db.add(DepartmentHead(department=head_of, staff_airtable_record_id=f"rec-{email}"))
     db.commit()
     return staff
 
@@ -170,9 +168,7 @@ def test_non_admin_cannot_impersonate(client: TestClient, db: Session, staging):
     assert response.status_code == 403
 
 
-def test_anyone_can_end_their_own_impersonation(
-    client: TestClient, db: Session, staging
-):
+def test_anyone_can_end_their_own_impersonation(client: TestClient, db: Session, staging):
     # e.g. someone who stopped heading a department mid-impersonation
     _make_staff(db, "former-head@example.com")
     db.add(

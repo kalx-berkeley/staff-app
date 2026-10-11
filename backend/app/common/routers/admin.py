@@ -167,9 +167,7 @@ def end_impersonation(
     ended, even by someone who has stopped being an admin.
     """
     _require_staging()
-    db.query(ImpersonationSession).filter(
-        ImpersonationSession.real_email == email
-    ).delete()
+    db.query(ImpersonationSession).filter(ImpersonationSession.real_email == email).delete()
     db.commit()
     return {"status": "ok"}
 
