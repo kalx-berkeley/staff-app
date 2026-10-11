@@ -2411,6 +2411,7 @@ fieldset.radio-group legend {
 .audit-log-details details[open] summary {
   list-style: disclosure-open;
   white-space: normal;
+  overflow-wrap: anywhere;
   overflow: visible;
   text-overflow: unset;
   max-width: none;
@@ -3924,7 +3925,7 @@ fieldset.radio-group legend {
 
 /* KALX Staff Admin (/admin) */
 .staff-admin-page {
-  max-width: 1100px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 1.5rem;
 }
