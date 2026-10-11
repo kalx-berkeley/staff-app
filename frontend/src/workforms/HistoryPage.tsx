@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { usePageTitle } from '../common/hooks/usePageTitle';
 import { workformsAPI } from './api';
 import DecisionBadge from './DecisionBadge';
+import RequiredHoursBadge from './RequiredHoursBadge';
 import type { MyWorkforms } from './types';
 import { errorMessage, formatHours, formatMonth, statusLabel } from './utils';
 import { WORKFORMS_TITLE } from './WorkformsLayout';
@@ -40,6 +41,10 @@ export default function HistoryPage() {
                 <Link to={`/month/${workform.month}`}>{formatMonth(workform.month)}</Link>
               </h3>
               <span className="workforms-dept-total">{formatHours(workform.total_hours)} h</span>
+              <RequiredHoursBadge
+                total={workform.total_hours}
+                onLeave={workform.loa_overlaps_month}
+              />
               <span className="workforms-status">{statusLabel(workform)}</span>
               {workform.is_late && <span className="leave-badge">Late</span>}
             </div>

@@ -228,6 +228,30 @@ def test_loa_flags_on_entries(client: TestClient, db, departments):
     assert undated["loa_flag"] == "may_overlap"
 
 
+def test_leave_overlapping_the_month_is_flagged(client: TestClient, db, departments, amy):
+    month = _this_month()
+    make_staff(
+        db,
+        "lou@example.com",
+        "Lou",
+        "recLOU00000000000",
+        loa_start=month.replace(day=10),
+        loa_end=month.replace(day=20),
+    )
+    lou = client.get(
+        f"/api/workforms/me/{_month_path()}", headers=as_user("lou@example.com")
+    )
+    assert lou.json()["loa_overlaps_month"] is True
+    summaries = client.get("/api/workforms/me", headers=as_user("lou@example.com")).json()
+    flags = {w["month"]: w["loa_overlaps_month"] for w in summaries["workforms"]}
+    assert flags[_month_path()] is True
+    previous = format_month(previous_month(month.replace(day=1)))
+    assert flags.get(previous, False) is False
+
+    amy_month = client.get(f"/api/workforms/me/{_month_path()}", headers=as_user(AMY))
+    assert amy_month.json()["loa_overlaps_month"] is False
+
+
 # --- submitting ---
 
 

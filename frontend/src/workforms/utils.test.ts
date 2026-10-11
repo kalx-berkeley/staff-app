@@ -5,6 +5,7 @@ import {
   formatMonth,
   groupEntries,
   hoursProblem,
+  hoursShort,
   monthBounds,
   nextPendingIndex,
   statusLabel,
@@ -79,5 +80,17 @@ describe('statusLabel', () => {
     );
     expect(statusLabel({ status: 'locked', results: { A: approved } })).toBe('Reviewed');
     expect(statusLabel({ status: 'draft', results: {} })).toBe('Not submitted');
+  });
+});
+
+describe('hoursShort', () => {
+  it('counts the hours still needed to reach 6', () => {
+    expect(hoursShort(0)).toBe(6);
+    expect(hoursShort(4.75)).toBe(1.25);
+  });
+
+  it('is 0 at or over 6 hours', () => {
+    expect(hoursShort(6)).toBe(0);
+    expect(hoursShort(9.5)).toBe(0);
   });
 });

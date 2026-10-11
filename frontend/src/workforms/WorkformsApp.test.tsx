@@ -74,6 +74,7 @@ const workform = (overrides: Partial<Workform> = {}): Workform => ({
   results: {},
   loa_start: null,
   loa_end: null,
+  loa_overlaps_month: false,
   ...overrides,
 });
 
@@ -100,6 +101,7 @@ describe('KALX Workforms month page', () => {
           is_late: false,
           total_hours: 3.5,
           results: {},
+          loa_overlaps_month: false,
         },
         {
           month: '2026-09',
@@ -108,6 +110,7 @@ describe('KALX Workforms month page', () => {
           is_late: false,
           total_hours: 0,
           results: {},
+          loa_overlaps_month: false,
         },
       ],
     });
@@ -134,6 +137,37 @@ describe('KALX Workforms month page', () => {
     expect(screen.getByLabelText(/^Date/)).toHaveAttribute('max', '2026-10-31');
     expect(screen.getByRole('link', { name: /September 2026/ })).toBeInTheDocument();
     expect(screen.getByRole('note')).toHaveTextContent(/not the official way to submit workforms/);
+  });
+
+  it('shows whether the month reaches the 6-hour minimum', async () => {
+    vi.mocked(workformsAPI.get).mockResolvedValue(workform());
+    await renderAt('/workforms/');
+    expect(await screen.findByText('2.5 h short of the 6-hour minimum')).toBeInTheDocument();
+    cleanup();
+
+    vi.mocked(workformsAPI.get).mockResolvedValue(
+      workform({
+        entries: [
+          {
+            id: 1,
+            department: 'Promotions',
+            hours: 6,
+            description: 'Ran the table',
+            work_date: null,
+            loa_flag: null,
+          },
+        ],
+      })
+    );
+    await renderAt('/workforms/');
+    expect(await screen.findByText(/6-hour minimum met/)).toBeInTheDocument();
+    cleanup();
+
+    vi.mocked(workformsAPI.get).mockResolvedValue(workform({ loa_overlaps_month: true }));
+    await renderAt('/workforms/');
+    expect(
+      await screen.findByText('No 6-hour minimum during leave of absence')
+    ).toBeInTheDocument();
   });
 
   it('checks hours before adding an entry', async () => {

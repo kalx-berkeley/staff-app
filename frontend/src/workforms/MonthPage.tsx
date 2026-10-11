@@ -5,6 +5,7 @@ import { formatLeave } from '../common/utils';
 import { workformsAPI } from './api';
 import DecisionBadge from './DecisionBadge';
 import EntryForm from './EntryForm';
+import RequiredHoursBadge from './RequiredHoursBadge';
 import type { Departments, Entry, EntryInput, Workform, WorkformSummary } from './types';
 import {
   errorMessage,
@@ -165,6 +166,7 @@ export default function MonthPage() {
         <span className="workforms-month-total">
           {formatHours(monthTotal)} {monthTotal === 1 ? 'hour' : 'hours'}
         </span>
+        <RequiredHoursBadge total={monthTotal} onLeave={workform.loa_overlaps_month} />
       </div>
 
       {notice && (

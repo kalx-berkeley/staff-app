@@ -75,6 +75,14 @@ export function totalHours(entries: { hours: number }[]): number {
   return entries.reduce((sum, e) => sum + e.hours, 0);
 }
 
+/** Staff members must work this many hours each month. */
+export const REQUIRED_MONTHLY_HOURS = 6;
+
+/** How many more hours a month needs to reach REQUIRED_MONTHLY_HOURS; 0 once it has. */
+export function hoursShort(total: number): number {
+  return Math.max(0, REQUIRED_MONTHLY_HOURS - total);
+}
+
 /** The next item without a decision after *index*, wrapping around; null if all are decided. */
 export function nextPendingIndex(
   items: Pick<ReviewItem, 'decision'>[],

@@ -40,6 +40,7 @@ export interface Workform {
   results: Record<string, DepartmentResult>;
   loa_start: string | null;
   loa_end: string | null;
+  loa_overlaps_month: boolean;
 }
 
 export interface WorkformSummary {
@@ -49,6 +50,7 @@ export interface WorkformSummary {
   is_late: boolean;
   total_hours: number;
   results: Record<string, DepartmentResult>;
+  loa_overlaps_month: boolean;
 }
 
 export interface MyWorkforms {

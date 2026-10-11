@@ -4546,6 +4546,11 @@ body.staging-active .directory-detail-close {
   background-color: #e9ecef;
 }
 
+.workforms-badge-short {
+  color: #92400e;
+  background-color: #fef3c7;
+}
+
 .workforms-entry-form label {
   display: flex;
   flex-direction: column;

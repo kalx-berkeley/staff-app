@@ -56,6 +56,9 @@ class WorkformResponse(BaseModel):
     results: Dict[str, DepartmentResult] = Field(default_factory=dict)
     loa_start: Optional[date] = None
     loa_end: Optional[date] = None
+    # True if a leave of absence overlaps the month, so the monthly hours
+    # minimum doesn't apply
+    loa_overlaps_month: bool = False
 
 
 class WorkformSummary(BaseModel):
@@ -65,6 +68,7 @@ class WorkformSummary(BaseModel):
     is_late: bool
     total_hours: float
     results: Dict[str, DepartmentResult] = Field(default_factory=dict)
+    loa_overlaps_month: bool = False
 
 
 class MyWorkformsResponse(BaseModel):

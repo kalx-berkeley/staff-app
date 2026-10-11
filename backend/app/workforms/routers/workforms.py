@@ -25,7 +25,7 @@ from app.workforms.schemas.workforms import (
 )
 from app.workforms.services import records, workform_service
 from app.workforms.services.departments import departments, is_department_head
-from app.workforms.services.loa import entry_flag
+from app.workforms.services.loa import entry_flag, month_overlaps
 from app.workforms.services.months import (
     deadline,
     format_month,
@@ -65,6 +65,21 @@ def _status(workform: Optional[Workform], record: Optional[WorkformAirtableRecor
     if workform is not None and workform.entries:
         return "draft"
     return "not_started"
+
+
+def _on_leave(
+    month: date,
+    staff: Staff,
+    workform: Optional[Workform],
+    record: Optional[WorkformAirtableRecord],
+) -> bool:
+    """Whether a leave overlaps *month*: the leave recorded at submit once
+    submitted (as department heads see it), else the staff member's current one."""
+    if record is not None and workform is not None:
+        loa_start, loa_end = workform.loa_start_at_submit, workform.loa_end_at_submit
+    else:
+        loa_start, loa_end = staff.loa_start, staff.loa_end
+    return month_overlaps(month, loa_start, loa_end)
 
 
 def _entry_response(
@@ -123,6 +138,7 @@ def my_workforms(staff: Staff = Depends(get_staff_member), db: Session = Depends
                 and is_late(month, record.created_time),
                 total_hours=total,
                 results=_results(record),
+                loa_overlaps_month=_on_leave(month, staff, workform, record),
             )
         )
     return MyWorkformsResponse(
@@ -158,6 +174,7 @@ def my_workform(
         results=_results(record),
         loa_start=staff.loa_start,
         loa_end=staff.loa_end,
+        loa_overlaps_month=_on_leave(month_date, staff, workform, record),
     )
 
 
