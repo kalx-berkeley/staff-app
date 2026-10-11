@@ -26,6 +26,20 @@ class Settings(BaseSettings):
     # that's backend/, so this is backend/data/staff_photos alongside the
     # database, which deploys leave in place.
     staff_photo_dir: str = "data/staff_photos"
+    # KALX Workforms: the table submitted workforms are written to. Staging uses
+    # "Testing Workforms"; production sets "Workforms" (same structure).
+    airtable_workforms_table_name: str = "Testing Workforms"
+    # Maps each department ("Department", linked to the departments table) to
+    # its heads ("Department Heads", linked to the staff table). Its
+    # departments are the departments a workform can report hours in.
+    airtable_department_heads_table_name: str = "Department Heads"
+
+    # KALX Workforms: a month's workform is due by the end of this day of the
+    # following month (Pacific time); later submissions are marked late.
+    workforms_deadline_day: int = 5
+    # The department whose heads review departments that have no head, and
+    # department heads' own hours.
+    workforms_operations_department: str = "Operations"
 
     # Spinitron
     spinitron_api_key: Optional[str] = None

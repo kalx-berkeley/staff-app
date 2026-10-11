@@ -24,6 +24,7 @@ from app.auth import (
 from app.config import settings
 from app.models.staff import Staff
 from app.models.impersonation_session import ImpersonationSession
+from app.models.workform_department import DepartmentHead
 from app.common.services.notification_service import send_email
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -198,6 +199,20 @@ def get_current_user(
                 loa_end=staff.loa_end,
             )
 
+    is_department_head = False
+    if role in ("promotions", "staff"):
+        record_id = (
+            db.query(Staff.airtable_record_id)
+            .filter(Staff.email == effective_email)
+            .scalar()
+        )
+        is_department_head = bool(record_id) and (
+            db.query(DepartmentHead)
+            .filter(DepartmentHead.staff_airtable_record_id == record_id)
+            .first()
+            is not None
+        )
+
     return UserInfo(
         email=effective_email,
         real_email=x_forwarded_user if imp_session else None,
@@ -209,6 +224,7 @@ def get_current_user(
         impersonating_email=impersonating_email,
         is_impersonating_dj_network=is_impersonating_dj_network,
         is_impersonating_station_office_network=is_impersonating_station_office_network,
+        is_department_head=is_department_head,
         profile=profile,
     )
 

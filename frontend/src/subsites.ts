@@ -31,6 +31,14 @@ export const SUBSITES: Subsite[] = [
     // which is what the directory API requires.
     isAvailable: (user) => user?.role === 'promotions' || user?.role === 'staff',
   },
+  {
+    basePath: '/workforms',
+    name: 'KALX Workforms',
+    description:
+      'Report the work you do each month, and see which departments approved it. Department heads review hours here.',
+    // Active staff, as the workforms API requires
+    isAvailable: (user) => user?.role === 'promotions' || user?.role === 'staff',
+  },
 ];
 
 export const HOME_TITLE = 'KALX Staff Portal';

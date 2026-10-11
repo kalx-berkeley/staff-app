@@ -4360,3 +4360,452 @@ body.staging-active .directory-detail-close {
     display: none;
   }
 }
+
+/* KALX Workforms */
+.workforms-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.workforms-header h1 {
+  font-size: 1.6rem;
+  margin: 0.5rem 0;
+}
+
+.workforms-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 1rem;
+}
+
+.workforms-tab {
+  padding: 0.5rem 0.9rem;
+  color: #444;
+  text-decoration: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+}
+
+.workforms-tab:hover {
+  color: #1a6fb0;
+}
+
+.workforms-tab-active {
+  color: #1a6fb0;
+  font-weight: 600;
+  border-bottom-color: var(--primary-color);
+}
+
+.workforms-loading,
+.workforms-empty {
+  color: #666;
+}
+
+.workforms-month-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.workforms-month-switch a {
+  display: flex;
+  flex-direction: column;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: #fff;
+  color: #333;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.workforms-month-switch a.workforms-month-link-active {
+  border-color: var(--primary-color);
+  box-shadow: inset 0 0 0 1px var(--primary-color);
+}
+
+.workforms-month-status {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.workforms-month-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.workforms-month-heading h2 {
+  margin: 0.25rem 0 0.5rem;
+}
+
+.workforms-month-total {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1a6fb0;
+}
+
+.workforms-deadline {
+  margin: 0 0 0.75rem;
+  color: #555;
+}
+
+.workforms-warning {
+  padding: 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  color: #92400e;
+  background-color: #fef3c7;
+  border: 1px solid #fcd34d;
+}
+
+.workforms-warning-text {
+  color: #92400e;
+}
+
+.workforms-loa-soft {
+  font-size: 0.75rem;
+  color: #92400e;
+  font-style: italic;
+  white-space: nowrap;
+}
+
+.workforms-card {
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.workforms-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.workforms-card-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.workforms-dept-total {
+  font-weight: 600;
+  color: #1a6fb0;
+}
+
+.workforms-status {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.workforms-hint {
+  margin: 0.25rem 0 0.75rem;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.workforms-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.workforms-badge-approved {
+  color: #155724;
+  background-color: #d4edda;
+}
+
+.workforms-badge-denied {
+  color: #721c24;
+  background-color: #f8d7da;
+}
+
+.workforms-badge-pending {
+  color: #555;
+  background-color: #e9ecef;
+}
+
+.workforms-entry-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #444;
+}
+
+.workforms-entry-form input,
+.workforms-entry-form select,
+.workforms-entry-form textarea {
+  font: inherit;
+  font-weight: 400;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.workforms-entry-fields {
+  display: grid;
+  grid-template-columns: minmax(10rem, 2fr) minmax(5rem, 1fr) minmax(9rem, 1.5fr);
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.workforms-recommended {
+  font-weight: 400;
+  color: #777;
+}
+
+.workforms-entry-description {
+  margin-bottom: 0.75rem;
+}
+
+.workforms-entry-description textarea {
+  resize: vertical;
+}
+
+.workforms-entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.workforms-entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.workforms-entries > li {
+  border-top: 1px solid #eee;
+  padding: 0.5rem 0;
+}
+
+.workforms-entry {
+  display: grid;
+  grid-template-columns: 5rem 4rem 1fr auto;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.workforms-entry-date {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.workforms-entry-hours {
+  font-weight: 600;
+}
+
+.workforms-entry-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.workforms-entry-buttons {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.workforms-airtable-text {
+  white-space: pre-wrap;
+  font-size: 0.9rem;
+  margin: 0.5rem 0 0;
+}
+
+.workforms-submit {
+  margin: 1.5rem 0;
+}
+
+.workforms-confirm {
+  background: #fff;
+  border: 2px solid var(--primary-color);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.workforms-confirm p {
+  margin: 0 0 0.75rem;
+}
+
+.workforms-results {
+  border-collapse: collapse;
+}
+
+.workforms-results th,
+.workforms-results td {
+  text-align: left;
+  padding: 0.25rem 1rem 0.25rem 0;
+  font-weight: 400;
+}
+
+.workforms-settings label {
+  display: block;
+  margin: 0.75rem 0;
+}
+
+.workforms-review-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.workforms-review-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.workforms-review-toolbar select {
+  font: inherit;
+  font-weight: 400;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.workforms-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.workforms-progress-bar {
+  flex: 0 1 16rem;
+  height: 0.6rem;
+  background: #e9ecef;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.workforms-progress-bar > div {
+  height: 100%;
+  background: var(--success-color);
+  transition: width 0.3s;
+}
+
+.workforms-review-panes {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1fr) 2fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.workforms-review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.workforms-review-person {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: none;
+  border-bottom: 1px solid #eee;
+  background: none;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.workforms-review-person:hover {
+  background: var(--light-bg);
+}
+
+.workforms-review-person-active {
+  background: #e8f1fb;
+  box-shadow: inset 3px 0 0 var(--primary-color);
+}
+
+.workforms-review-name {
+  flex: 1 1 auto;
+  font-weight: 600;
+}
+
+.workforms-review-hours {
+  color: #1a6fb0;
+  font-weight: 600;
+}
+
+.workforms-review-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.workforms-review-detail {
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.workforms-review-total {
+  font-size: 1.1rem;
+  margin: 0 0 0.25rem;
+}
+
+.workforms-review-total strong {
+  font-size: 1.8rem;
+  color: #1a6fb0;
+}
+
+.workforms-review-detail .workforms-entries {
+  margin-bottom: 1rem;
+}
+
+.workforms-review-detail .workforms-entry {
+  grid-template-columns: 5rem 4rem 1fr;
+}
+
+.btn-primary.workforms-approve {
+  background-color: var(--success-color);
+}
+
+.btn-primary.workforms-approve:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+@media (max-width: 700px) {
+  .workforms-page {
+    padding: 1rem;
+  }
+
+  .workforms-entry-fields,
+  .workforms-review-panes {
+    grid-template-columns: 1fr;
+  }
+
+  .workforms-entry {
+    grid-template-columns: 4.5rem 3.5rem 1fr;
+  }
+
+  .workforms-entry-buttons {
+    grid-column: 1 / -1;
+  }
+}

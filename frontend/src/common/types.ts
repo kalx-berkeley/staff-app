@@ -37,6 +37,8 @@ export interface UserResponse {
   impersonating_email?: string | null;
   is_impersonating_dj_network?: boolean;
   is_impersonating_station_office_network?: boolean;
+  /** Whether the user heads a department, and so can review KALX Workforms. */
+  is_department_head?: boolean;
   profile?: PromotionsStaffProfile | StaffProfile | null;
 }
 

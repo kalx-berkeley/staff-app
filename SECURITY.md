@@ -139,8 +139,8 @@ DJ studio guests can also:
 - see and dismiss spin matches;
 - remove their own pass pre-assignment.
 
-Guests cannot reach anything else, including the KALX Staff Directory, user profiles and
-preferences, promoters, the admin pages, or any create/edit/delete action for shows, venues and
+Guests cannot reach anything else, including the KALX Staff Directory, KALX Workforms, user
+profiles and preferences, promoters, the admin pages, or any create/edit/delete action for shows, venues and
 promoters. Those require a Google login, and the backend checks the role.
 
 The exact list of routes each kind of guest can reach is the allowlist in
@@ -233,6 +233,11 @@ If using Airtable sync:
 - Sync process can add/remove users automatically
 - Ensure Airtable access is properly secured
 - Monitor sync logs for unexpected changes
+- KALX Workforms writes to the base: the token needs write access to the workforms table
+  (`AIRTABLE_WORKFORMS_TABLE_NAME`). Every workforms endpoint requires a Google login and Active
+  status; review endpoints also require being a department head (from the "Department Heads"
+  table), and a head can't decide on their own hours unless they head Operations. Every
+  submission and decision is recorded in `audit_log`.
 
 ### Incident Response
 

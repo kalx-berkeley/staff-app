@@ -1,5 +1,37 @@
 # KALX Staff App
 
+- [KALX Staff App](#kalx-staff-app)
+  * [Before Deploying](#before-deploying)
+  * [Overview](#overview)
+  * [Features](#features)
+    + [Show & venue management](#show---venue-management)
+    + [Content safety: non-value-neutral language detection](#content-safety--non-value-neutral-language-detection)
+    + [Lottery system](#lottery-system)
+    + [Feature bin (new releases) matching](#feature-bin--new-releases--matching)
+    + [KALX Live! matching](#kalx-live--matching)
+    + [DJ on-air tools](#dj-on-air-tools)
+    + [Staff experience](#staff-experience)
+    + [Admin & operations](#admin---operations)
+    + [Auth & integrations](#auth---integrations)
+  * [Technology Stack](#technology-stack)
+  * [Local Development](#local-development)
+    + [Backend](#backend)
+    + [Frontend](#frontend)
+    + [Running Tests](#running-tests)
+  * [Deployment](#deployment)
+  * [Architecture](#architecture)
+  * [Configuration](#configuration)
+    + [Backend Environment Variables](#backend-environment-variables)
+    + [Airtable Schema](#airtable-schema)
+    + [GitHub Actions Secrets/Variables](#github-actions-secrets-variables)
+  * [Project Structure](#project-structure)
+  * [Maintenance](#maintenance)
+    + [Logs](#logs)
+    + [Restarting Services](#restarting-services)
+    + [Health Check](#health-check)
+    + [Database Migrations](#database-migrations)
+    + [Troubleshooting Authentication](#troubleshooting-authentication)
+
 The web application behind the KALX staff site. It hosts two sub-sites:
 
 - **Radio Pass Giveaway** (`/pass-giveaway/`), for managing radio station pass giveaways,

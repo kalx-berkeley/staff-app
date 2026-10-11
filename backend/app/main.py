@@ -11,6 +11,8 @@ import re
 
 from app.common.routers import users
 from app.directory.routers import directory
+from app.workforms.routers import review as workforms_review
+from app.workforms.routers import workforms
 from app.pass_giveaway.routers import (
     venues,
     shows,
@@ -28,6 +30,7 @@ from app.scheduler import (
     start_scheduler,
     shutdown_scheduler,
     bootstrap_users_if_empty,
+    bootstrap_workforms_if_empty,
     bootstrap_feature_bin_if_stale,
     bootstrap_kalx_live_if_stale,
     bootstrap_spinitron_schedule,
@@ -35,6 +38,13 @@ from app.scheduler import (
 from app.auth import check_apache_auth_layer
 from app.config import settings
 from app.rate_limiter import RateLimitExceeded
+from app.common.services.user_service import register_post_sync_hook
+from app.workforms.services.departments import (
+    after_staff_sync as workforms_after_staff_sync,
+)
+
+# Department heads and other workforms data are refreshed with the staff sync
+register_post_sync_hook(workforms_after_staff_sync)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -126,6 +136,7 @@ async def lifespan(app: FastAPI):
     check_network_config()
     start_scheduler()
     await bootstrap_users_if_empty()
+    await bootstrap_workforms_if_empty()
     await bootstrap_feature_bin_if_stale()
     await bootstrap_kalx_live_if_stale()
     await bootstrap_spinitron_schedule()
@@ -249,6 +260,8 @@ app.include_router(alternates.router, dependencies=_auth_check)
 app.include_router(specialty_shows.router, dependencies=_auth_check)
 app.include_router(on_air.router, dependencies=_auth_check)
 app.include_router(directory.router, dependencies=_auth_check)
+app.include_router(workforms_review.router, dependencies=_auth_check)
+app.include_router(workforms.router, dependencies=_auth_check)
 if settings.legacy_import_enabled:
     app.include_router(legacy_import_router.router, dependencies=_auth_check)
 
