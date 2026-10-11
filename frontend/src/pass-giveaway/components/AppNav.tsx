@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { impersonationAPI } from '../../common/api';
 import { useAuth } from '../../common/contexts/authHooks';
-import { adminAPI } from '../api';
 import { isStagingSublistDjStaff } from '../utils';
 import { HOME_TITLE, SUBSITES, subsiteForPath } from '../../subsites';
 import FeedbackModal from './FeedbackModal';
@@ -79,7 +79,7 @@ const AppNav = ({ showGoogleLogout = false }: AppNavProps) => {
   const [showFeedback, setShowFeedback] = useState(false);
 
   const handleEndImpersonation = async () => {
-    await adminAPI.endImpersonation();
+    await impersonationAPI.end();
     await refetchUser();
   };
 

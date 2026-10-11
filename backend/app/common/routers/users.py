@@ -18,6 +18,7 @@ from app.auth import (
     _get_promotions_staff_by_email,
     _is_promotions_staff,
     _staff_statuses,
+    is_admin,
     ACTIVE_STATUS,
     SUBLIST_DJ_STATUS,
 )
@@ -225,6 +226,9 @@ def get_current_user(
         is_impersonating_dj_network=is_impersonating_dj_network,
         is_impersonating_station_office_network=is_impersonating_station_office_network,
         is_department_head=is_department_head,
+        is_admin=is_admin(
+            db, db.query(Staff).filter(Staff.email == x_forwarded_user).first()
+        ),
         profile=profile,
     )
 

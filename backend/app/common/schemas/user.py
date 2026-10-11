@@ -52,6 +52,9 @@ class UserInfo(BaseModel):
     is_impersonating_station_office_network: bool = False
     # Whether the user heads a department, and so can review KALX Workforms
     is_department_head: bool = False
+    # Whether the signed-in user, not anyone they're impersonating, can use
+    # KALX Staff Admin
+    is_admin: bool = False
     profile: PromotionsStaffResponse | StaffResponse | None = None
 
 

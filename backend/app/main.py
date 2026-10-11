@@ -9,10 +9,13 @@ import ipaddress
 import logging
 import re
 
+from app.common import jobs as common_jobs
+from app.common.routers import admin as common_admin
 from app.common.routers import users
 from app.directory.routers import directory
 from app.workforms.routers import review as workforms_review
 from app.workforms.routers import workforms
+from app.workforms import jobs as workforms_jobs
 from app.pass_giveaway.routers import (
     venues,
     shows,
@@ -26,6 +29,7 @@ from app.pass_giveaway.routers import (
     preferences,
 )
 from app.pass_giveaway.routers import legacy_import as legacy_import_router
+from app.pass_giveaway import jobs as pass_giveaway_jobs
 from app.scheduler import (
     start_scheduler,
     shutdown_scheduler,
@@ -38,6 +42,7 @@ from app.scheduler import (
 from app.auth import check_apache_auth_layer
 from app.config import settings
 from app.rate_limiter import RateLimitExceeded
+from app.common.services.job_registry import register_job
 from app.common.services.user_service import register_post_sync_hook
 from app.workforms.services.departments import (
     after_staff_sync as workforms_after_staff_sync,
@@ -45,6 +50,12 @@ from app.workforms.services.departments import (
 
 # Department heads and other workforms data are refreshed with the staff sync
 register_post_sync_hook(workforms_after_staff_sync)
+
+# Every sub-site's scheduled jobs are listed in KALX Staff Admin
+for job in (
+    common_jobs.ADMIN_JOBS + pass_giveaway_jobs.ADMIN_JOBS + workforms_jobs.ADMIN_JOBS
+):
+    register_job(job)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -250,6 +261,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 _auth_check = [Depends(check_apache_auth_layer)]
 app.include_router(venues.router, dependencies=_auth_check)
 app.include_router(users.router, dependencies=_auth_check)
+app.include_router(common_admin.router, dependencies=_auth_check)
 app.include_router(preferences.router, dependencies=_auth_check)
 app.include_router(shows.router, dependencies=_auth_check)
 app.include_router(passes.router, dependencies=_auth_check)

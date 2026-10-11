@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
+import ImpersonationNotice from '../common/components/ImpersonationNotice';
 import { useAuth } from '../common/contexts/authHooks';
 import { HOME_TITLE, SUBSITES, subsiteForPath } from '../subsites';
 
@@ -32,9 +33,7 @@ export default function WorkformsLayout({ children }: { children: ReactNode }) {
           Workforms entered here don't count and don't replace the current process. Keep
           submitting your workforms the usual way.
         </div>
-        {user?.impersonating_email && (
-          <p className="directory-impersonating">Viewing as {user.impersonating_email}</p>
-        )}
+        <ImpersonationNotice />
         <nav className="workforms-tabs" aria-label="Workforms">
           <NavLink to="/" end className={tab}>
             My workform

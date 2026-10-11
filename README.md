@@ -195,13 +195,16 @@ two-month lookback, with no limit on future dates), complete with the performanc
 
 ### Admin & operations
 
-- **Job dashboards** for every scheduled task (Airtable sync, feature bin sync, KALX Live! calendar
-  sync, Spinitron on-air schedule sync, stale pre-assignment cleanup, unclosed-show notifications)
-  with manual "run now" buttons, plus dashboards of every pending auto-close and lottery job with
+- **KALX Staff Admin** (`/admin/`), for promotions staff and department heads, holds the admin
+  tools shared by every staff site: the job dashboard, the audit log and user impersonation.
+- **Job dashboard** for every scheduled task in every staff site (Airtable sync, feature bin sync,
+  KALX Live! calendar sync, Spinitron on-air schedule sync, stale pre-assignment cleanup,
+  unclosed-show notifications, workforms refresh and emails) with manual "run now" buttons. The
+  pass giveaway's own admin page has dashboards of every pending auto-close and lottery job with
   live countdowns.
 - **Audit log viewer**, paginated and filterable by event type, actor, and date range — every
   giveaway, release, upload, and email send is logged with full details.
-- **User impersonation** (staging only) — a promotions staff member can act as another user, or
+- **User impersonation** (staging only) — an admin can act as another user, or
   simulate the DJ studio network or station office network, to test role-specific views without
   borrowing real credentials.
 - **Test-data seeding** (staging only) for populating a staging environment with sample venues and

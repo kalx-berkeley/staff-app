@@ -10,8 +10,6 @@ import type {
   AlternateEntry,
   AlternateJoinRequest,
   AlternateQueue,
-  AuditLogFilters,
-  AuditLogItem,
   AutoCloseScheduleItem,
   ClaimData,
   DJLotteryEntryCreate,
@@ -20,9 +18,7 @@ import type {
   DjSuggestion,
   GenrePreferences,
   GiveawayData,
-  ImpersonateRequest,
   JobRunResult,
-  JobStatus,
   LotteryEntryResponse,
   LotteryScheduleItem,
   LotteryStatus,
@@ -55,7 +51,6 @@ import type {
   SpecialtyShowUpdate,
   SpinMatch,
   StaffLotteryEntryCreate,
-  UserListItem,
   VenueCreate,
   VenueResponse,
   VenueUpdate,
@@ -934,75 +929,23 @@ export const onAirAPI = {
 };
 
 /**
- * Admin API methods (staging-only).
+ * Pass giveaway admin API methods. The app-wide admin tools are in admin/api.ts.
  */
 export const adminAPI = {
+  /** Staging only. */
   getSeedStatus: async (): Promise<{ seeded: boolean }> => {
     try {
-      const response = await apiClient.get<{ seeded: boolean }>('/admin/seed-status');
+      const response = await apiClient.get<{ seeded: boolean }>('/pass-giveaway/admin/seed-status');
       return response.data;
     } catch (error) {
       return handleAPIError(error);
     }
   },
 
+  /** Staging only. */
   seedTestData: async (): Promise<SeedResult> => {
     try {
-      const response = await apiClient.post<SeedResult>('/admin/seed-test-data');
-      return response.data;
-    } catch (error) {
-      return handleAPIError(error);
-    }
-  },
-
-  getJobStatuses: async (): Promise<JobStatus[]> => {
-    try {
-      const response = await apiClient.get<JobStatus[]>('/admin/job-statuses');
-      return response.data;
-    } catch (error) {
-      return handleAPIError(error);
-    }
-  },
-
-  triggerJob: async (jobId: string): Promise<JobRunResult> => {
-    try {
-      const response = await apiClient.post<JobRunResult>(`/admin/jobs/${jobId}/run`);
-      return response.data;
-    } catch (error) {
-      return handleAPIError(error);
-    }
-  },
-
-  startImpersonation: async (request: ImpersonateRequest): Promise<void> => {
-    try {
-      await apiClient.post('/admin/impersonate', request);
-    } catch (error) {
-      return handleAPIError(error);
-    }
-  },
-
-  endImpersonation: async (): Promise<void> => {
-    try {
-      await apiClient.delete('/admin/impersonate');
-    } catch (error) {
-      return handleAPIError(error);
-    }
-  },
-
-  listUsers: async (): Promise<UserListItem[]> => {
-    try {
-      const response = await apiClient.get<UserListItem[]>('/admin/users');
-      return response.data;
-    } catch (error) {
-      return handleAPIError(error);
-    }
-  },
-
-  getAuditLog: async (filters: AuditLogFilters = {}): Promise<AuditLogItem[]> => {
-    try {
-      const response = await apiClient.get<AuditLogItem[]>('/admin/audit-log', {
-        params: filters,
-      });
+      const response = await apiClient.post<SeedResult>('/pass-giveaway/admin/seed-test-data');
       return response.data;
     } catch (error) {
       return handleAPIError(error);
@@ -1011,7 +954,7 @@ export const adminAPI = {
 
   getAutoCloseSchedules: async (): Promise<AutoCloseScheduleItem[]> => {
     try {
-      const response = await apiClient.get<AutoCloseScheduleItem[]>('/admin/auto-close-schedules');
+      const response = await apiClient.get<AutoCloseScheduleItem[]>('/pass-giveaway/admin/auto-close-schedules');
       return response.data;
     } catch (error) {
       return handleAPIError(error);
@@ -1020,7 +963,7 @@ export const adminAPI = {
 
   getLotterySchedules: async (): Promise<LotteryScheduleItem[]> => {
     try {
-      const response = await apiClient.get<LotteryScheduleItem[]>('/admin/lottery-schedules');
+      const response = await apiClient.get<LotteryScheduleItem[]>('/pass-giveaway/admin/lottery-schedules');
       return response.data;
     } catch (error) {
       return handleAPIError(error);
@@ -1029,7 +972,9 @@ export const adminAPI = {
 
   runLottery: async (showId: number): Promise<JobRunResult> => {
     try {
-      const response = await apiClient.post<JobRunResult>(`/admin/lottery-schedules/${showId}/run`);
+      const response = await apiClient.post<JobRunResult>(
+        `/pass-giveaway/admin/lottery-schedules/${showId}/run`,
+      );
       return response.data;
     } catch (error) {
       return handleAPIError(error);

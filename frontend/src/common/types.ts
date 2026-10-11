@@ -39,6 +39,11 @@ export interface UserResponse {
   is_impersonating_station_office_network?: boolean;
   /** Whether the user heads a department, and so can review KALX Workforms. */
   is_department_head?: boolean;
+  /**
+   * Whether the signed-in user can use KALX Staff Admin. Describes the real
+   * user, not anyone they're impersonating.
+   */
+  is_admin?: boolean;
   profile?: PromotionsStaffProfile | StaffProfile | null;
 }
 

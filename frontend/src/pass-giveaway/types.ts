@@ -553,14 +553,7 @@ export interface ShowSearchParams extends ShowListParams {
   genre?: string;
 }
 
-// Scheduled job status
-export interface JobStatus {
-  id: string;
-  name: string;
-  last_run_at: string | null;
-  next_run_at: string | null;
-}
-
+// Result of running a lottery draw now
 export interface JobRunResult {
   success: boolean;
   message: string;
@@ -622,46 +615,11 @@ export interface DjLeave {
   loa_end: string | null;
 }
 
-// Impersonation
-export interface ImpersonateRequest {
-  email: string | null;
-  is_dj_network: boolean;
-  is_station_office_network?: boolean;
-}
-
-// Admin user list
-export interface UserListItem {
-  email: string;
-  name: string;
-  role: 'promotions' | 'staff';
-}
-
 // Promotions staff option, for owner-picker autocompletes
 export interface PromotionsStaffOption {
   id: number;
   name: string;
   email: string;
-}
-
-// Audit log
-export interface AuditLogItem {
-  id: number;
-  occurred_at: string;
-  event_type: string;
-  actor_email: string | null;
-  actor_role: string | null;
-  entity_type: string | null;
-  entity_id: number | null;
-  details: Record<string, unknown> | null;
-}
-
-export interface AuditLogFilters {
-  event_type?: string;
-  actor_email?: string;
-  since?: string;
-  until?: string;
-  limit?: number;
-  offset?: number;
 }
 
 // On-air DJ schedule

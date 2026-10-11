@@ -1,35 +1,36 @@
-"""Admin API endpoints (staging-only)."""
+"""
+Pass giveaway admin API endpoints: auto-close and lottery schedules, and
+staging test data. The app-wide admin tools are in common/routers/admin.py.
+"""
 
 import csv
 import random
 from pathlib import Path
-from datetime import date, datetime, time, timedelta, timezone
-from typing import Any
+from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-
-from app.common.schemas.types import UtcDatetime
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.auth import get_promotions_staff, ACTIVE_STATUS
+from app.auth import get_promotions_staff
 from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
-from app.models.staff_status import StaffStatus
 from app.models.venue import Venue
 from app.models.venue_owner import VenueOwner
 from app.models.show import Show
-from app.models.job_log import JobLog
-from app.models.audit_log import AuditLog
-from app.models.impersonation_session import ImpersonationSession
 from app.pass_giveaway.services.pass_service import PassService
 from app.config import settings
 from app.scheduler import scheduler, schedule_auto_close_job
 from app.pass_giveaway.guest_redaction import GuestRedactingRoute
+from app.common.schemas.admin import JobRunResult
 
-router = APIRouter(prefix="/api/admin", tags=["admin"], route_class=GuestRedactingRoute)
+router = APIRouter(
+    prefix="/api/pass-giveaway/admin",
+    tags=["pass-giveaway-admin"],
+    route_class=GuestRedactingRoute,
+)
 
 TEST_DATA_DIR = Path(__file__).parent.parent.parent / "test_data"
 
@@ -40,18 +41,6 @@ class SeedResult(BaseModel):
     shows_added: int
     shows_skipped: int
     errors: list[str]
-
-
-class JobStatus(BaseModel):
-    id: str
-    name: str
-    last_run_at: str | None
-    next_run_at: str | None
-
-
-class JobRunResult(BaseModel):
-    success: bool
-    message: str
 
 
 class AutoCloseScheduleItem(BaseModel):
@@ -75,243 +64,12 @@ class LotteryScheduleItem(BaseModel):
     schedule_status: str  # "scheduled" | "past" | "complete"
 
 
-class ImpersonateRequest(BaseModel):
-    email: str | None = None
-    is_dj_network: bool = False
-    is_station_office_network: bool = False
-
-
-class UserListItem(BaseModel):
-    email: str
-    name: str
-    role: str  # "promotions" or "staff"
-
-
-class AuditLogItem(BaseModel):
-    id: int
-    occurred_at: UtcDatetime
-    event_type: str
-    actor_email: str | None
-    actor_role: str | None
-    entity_type: str | None
-    entity_id: int | None
-    details: Any | None
-
-
 def _require_staging():
     if settings.environment != "staging":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This endpoint is only available in the staging environment",
         )
-
-
-@router.get("/users", response_model=list[UserListItem])
-def list_all_users(
-    promotions: Staff = Depends(get_promotions_staff),
-    db: Session = Depends(get_db),
-) -> list[UserListItem]:
-    """List all known active users (promotions staff + staff) for the impersonation UI."""
-    _require_staging()
-
-    result: list[UserListItem] = []
-    promo_staff_ids: set[int] = set()
-
-    # Promotions department members
-    for s in (
-        db.query(Staff)
-        .join(StaffDepartment, Staff.id == StaffDepartment.staff_id)
-        .join(StaffStatus, Staff.id == StaffStatus.staff_id)
-        .filter(
-            StaffDepartment.department == "Promotions",
-            StaffStatus.status == ACTIVE_STATUS,
-        )
-        .order_by(Staff.name)
-        .all()
-    ):
-        promo_staff_ids.add(s.id)
-        result.append(UserListItem(email=s.email, name=s.name, role="promotions"))
-
-    # Non-promotions staff
-    for s in (
-        db.query(Staff)
-        .join(StaffStatus, Staff.id == StaffStatus.staff_id)
-        .filter(StaffStatus.status == ACTIVE_STATUS)
-        .order_by(Staff.name)
-        .all()
-    ):
-        if s.id not in promo_staff_ids:
-            result.append(UserListItem(email=s.email, name=s.name, role="staff"))
-
-    return result
-
-
-_KNOWN_JOBS = [
-    ("feature_bin_sync", "Sync feature bin from Google Sheet"),
-    ("kalx_live_sync", "Sync KALX Live calendar"),
-    ("airtable_user_sync", "Sync users from Airtable"),
-    ("expire_stale_dj_preassignments", "Expire stale DJ pre-assignments"),
-    ("notify_unclosed_past_shows", "Notify venue owners of unclosed past shows"),
-    ("spinitron_schedule_sync", "Sync Spinitron on-air schedule"),
-]
-
-
-@router.get("/job-statuses", response_model=list[JobStatus])
-def get_job_statuses(
-    promotions: Staff = Depends(get_promotions_staff),
-    db: Session = Depends(get_db),
-) -> list[JobStatus]:
-    """Return last-run and next-scheduled times for all known scheduled jobs."""
-    statuses = []
-    for job_id, name in _KNOWN_JOBS:
-        last_log = (
-            db.query(JobLog)
-            .filter(JobLog.job_id == job_id)
-            .order_by(JobLog.ran_at.desc())
-            .first()
-        )
-        last_run_at = (
-            last_log.ran_at.replace(tzinfo=timezone.utc).isoformat() if last_log else None
-        )
-
-        next_run_at = None
-        try:
-            job = scheduler.get_job(job_id)
-            if job and job.next_run_time:
-                next_run_at = job.next_run_time.isoformat()
-        except Exception:
-            pass
-
-        statuses.append(
-            JobStatus(
-                id=job_id, name=name, last_run_at=last_run_at, next_run_at=next_run_at
-            )
-        )
-    return statuses
-
-
-@router.post("/jobs/{job_id}/run", response_model=JobRunResult)
-async def run_job(
-    job_id: str,
-    promotions: Staff = Depends(get_promotions_staff),
-    db: Session = Depends(get_db),
-) -> JobRunResult:
-    """Manually trigger a scheduled job by ID."""
-    from app.common.services.user_service import UserService
-    from app.pass_giveaway.services.pass_service import PassService
-    from app.pass_giveaway.services.feature_bin_service import FeatureBinService
-    from app.pass_giveaway.services.kalx_live_service import KalxLiveService
-    from app.pass_giveaway.services.spinitron_schedule_service import (
-        SpinitronScheduleService,
-    )
-
-    if job_id == "feature_bin_sync":
-        if not FeatureBinService.is_configured():
-            return JobRunResult(
-                success=False,
-                message=(
-                    "Feature bin sheet not configured — set FEATURE_BIN_SHEET_ID and"
-                    " FEATURE_BIN_SHEET_GID"
-                ),
-            )
-        count = FeatureBinService.sync_feature_bin(db, trigger="manual")
-        return JobRunResult(success=True, message=f"Synced {count} feature bin release(s)")
-
-    if job_id == "kalx_live_sync":
-        if not KalxLiveService.is_configured():
-            return JobRunResult(
-                success=False,
-                message="KALX Live calendar not configured — set KALX_LIVE_CALENDAR_ID",
-            )
-        count = KalxLiveService.sync_kalx_live(db, trigger="manual")
-        return JobRunResult(success=True, message=f"Synced {count} KALX Live appearance(s)")
-
-    if job_id == "airtable_user_sync":
-        result = await UserService.sync_from_airtable(db, trigger="manual")
-        n_promo = len(result["promotions_upserted"])
-        n_staff = len(result["staff_upserted"])
-        n_deactivated = len(result["deactivated"])
-        n_err = len(result["errors"])
-        msg = f"Synced {n_promo} promotions, {n_staff} staff"
-        if n_deactivated:
-            msg += f", {n_deactivated} deactivated"
-        if n_err:
-            msg += f", {n_err} error(s)"
-        return JobRunResult(success=True, message=msg)
-
-    if job_id == "expire_stale_dj_preassignments":
-        expired = PassService.expire_stale_preassignments(db, trigger="manual")
-        n = len(expired)
-        return JobRunResult(
-            success=True,
-            message=f"Expired {n} pre-assignment(s)",
-        )
-
-    if job_id == "notify_unclosed_past_shows":
-        from app.pass_giveaway.services.show_service import ShowService
-
-        count = ShowService.notify_unclosed_past_shows(db, trigger="manual")
-        return JobRunResult(
-            success=True,
-            message=f"Notified venue owners for {count} unclosed past show(s)",
-        )
-
-    if job_id == "spinitron_schedule_sync":
-        if not settings.spinitron_api_key:
-            return JobRunResult(
-                success=False,
-                message="Spinitron not configured — set SPINITRON_API_KEY",
-            )
-        count = await SpinitronScheduleService.sync_schedule(db, trigger="manual")
-        return JobRunResult(
-            success=True, message=f"Cached {count} Spinitron show(s)/playlist(s)"
-        )
-
-    raise HTTPException(status_code=404, detail=f"Unknown job: {job_id}")
-
-
-@router.post("/impersonate")
-def start_impersonation(
-    request: ImpersonateRequest,
-    promotions: Staff = Depends(get_promotions_staff),
-    db: Session = Depends(get_db),
-):
-    """Begin impersonating another user (staging only)."""
-    _require_staging()
-
-    # Remove any existing impersonation session for this user
-    db.query(ImpersonationSession).filter(
-        ImpersonationSession.real_email == promotions.email
-    ).delete()
-
-    session = ImpersonationSession(
-        real_email=promotions.email,
-        impersonated_email=request.email,
-        impersonate_dj_network=request.is_dj_network,
-        impersonate_station_office_network=request.is_station_office_network,
-    )
-    db.add(session)
-    db.commit()
-    return {
-        "status": "ok",
-        "impersonating": request.email,
-        "is_dj_network": request.is_dj_network,
-        "is_station_office_network": request.is_station_office_network,
-    }
-
-
-@router.delete("/impersonate")
-def end_impersonation(
-    promotions: Staff = Depends(get_promotions_staff),
-    db: Session = Depends(get_db),
-):
-    """End impersonation and return to own identity (staging only)."""
-    _require_staging()
-    db.query(ImpersonationSession).filter(
-        ImpersonationSession.real_email == promotions.email
-    ).delete()
-    db.commit()
-    return {"status": "ok"}
 
 
 @router.get("/seed-status")
@@ -705,65 +463,3 @@ async def run_lottery_now(
         )
     except Exception as exc:
         return JobRunResult(success=False, message=str(exc))
-
-
-_LA = ZoneInfo("America/Los_Angeles")
-
-
-@router.get("/audit-log", response_model=list[AuditLogItem])
-def get_audit_log(
-    promotions: Staff = Depends(get_promotions_staff),
-    db: Session = Depends(get_db),
-    event_type: str | None = Query(None),
-    actor_email: str | None = Query(None),
-    entity_type: str | None = Query(None),
-    entity_id: int | None = Query(None),
-    since: date | None = Query(None),
-    until: date | None = Query(None),
-    limit: int = Query(100, ge=1, le=1000),
-    offset: int = Query(0, ge=0),
-) -> list[AuditLogItem]:
-    """
-    Query the audit log (promotions staff only).
-
-    Supports filtering by event_type, actor_email, entity_type/id, and date range.
-    since/until are interpreted as Pacific-time calendar dates (inclusive on both ends).
-    Returns entries newest-first.
-    """
-    query = db.query(AuditLog)
-    if event_type:
-        query = query.filter(AuditLog.event_type == event_type)
-    if actor_email:
-        query = query.filter(AuditLog.actor_email == actor_email)
-    if entity_type:
-        query = query.filter(AuditLog.entity_type == entity_type)
-    if entity_id is not None:
-        query = query.filter(AuditLog.entity_id == entity_id)
-    if since:
-        since_utc = (
-            datetime.combine(since, time.min, tzinfo=_LA)
-            .astimezone(timezone.utc)
-            .replace(tzinfo=None)
-        )
-        query = query.filter(AuditLog.occurred_at >= since_utc)
-    if until:
-        until_utc = (
-            datetime.combine(until, time.max, tzinfo=_LA)
-            .astimezone(timezone.utc)
-            .replace(tzinfo=None)
-        )
-        query = query.filter(AuditLog.occurred_at <= until_utc)
-    rows = query.order_by(AuditLog.occurred_at.desc()).offset(offset).limit(limit).all()
-    return [
-        AuditLogItem(
-            id=r.id,
-            occurred_at=r.occurred_at,
-            event_type=r.event_type,
-            actor_email=r.actor_email,
-            actor_role=r.actor_role,
-            entity_type=r.entity_type,
-            entity_id=r.entity_id,
-            details=r.details,
-        )
-        for r in rows
-    ]

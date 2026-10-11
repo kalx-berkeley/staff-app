@@ -18,6 +18,7 @@ import { HOME_TITLE, SUBSITES, subsiteForPath } from '../subsites';
 import type { DirectoryEntry } from './types';
 import { formatLeave } from '../common/utils';
 import MarkdownContent from '../common/components/MarkdownContent';
+import ImpersonationNotice from '../common/components/ImpersonationNotice';
 import DirectoryDetail from './DirectoryDetail';
 import DjNames from './DjNames';
 import FilterMenu from './FilterMenu';
@@ -246,9 +247,7 @@ export default function DirectoryPage() {
             <Link className="btn-secondary btn-small" to={`/${myId}${search}`}>My record</Link>
           )}
         </div>
-        {user?.impersonating_email && (
-          <p className="directory-impersonating">Viewing as {user.impersonating_email}</p>
-        )}
+        <ImpersonationNotice />
       </header>
 
       <div className="directory-toolbar">

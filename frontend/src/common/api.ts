@@ -138,6 +138,20 @@ export const usersAPI = {
 };
 
 /**
+ * Staging user impersonation, which applies to every sub-site. Starting it is
+ * in KALX Staff Admin (admin/api.ts); anyone can end their own.
+ */
+export const impersonationAPI = {
+  end: async (): Promise<void> => {
+    try {
+      await apiClient.delete('/admin/impersonate');
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+};
+
+/**
  * Feedback API for submitting user feedback and bug reports.
  */
 export const feedbackAPI = {
