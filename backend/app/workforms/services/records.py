@@ -7,6 +7,7 @@ from typing import Any, Dict, Iterable, Optional
 
 from sqlalchemy.orm import Session
 
+from app.models.job_log import JobLog
 from app.models.workform_airtable_record import WorkformAirtableRecord
 from app.workforms.services import airtable_client
 
@@ -147,15 +148,18 @@ def _replace(db: Session, records: Iterable[Dict[str, Any]], stale_query) -> int
     return removed
 
 
-async def refresh_all(db: Session) -> int:
+async def refresh_all(db: Session, trigger: str = "scheduled") -> int:
     """
     Copy the whole workforms table, removing records deleted in Airtable.
 
+    :param trigger: "scheduled" or "manual", recorded in the job log
     :returns: The number of records copied
     :raises HTTPException: If Airtable can't be read
     """
     records = await airtable_client.list_records()
     _replace(db, records, db.query(WorkformAirtableRecord).all())
+    db.add(JobLog(job_id="workform_records_refresh", trigger=trigger))
+    db.commit()
     logger.info("Refreshed %d workform records from Airtable", len(records))
     return len(records)
 

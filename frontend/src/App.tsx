@@ -4,6 +4,7 @@ import LoadingScreen from './common/components/LoadingScreen';
 import StagingBanner from './common/components/StagingBanner';
 import { useAuth } from './common/contexts/authHooks';
 import { isStagingEnvironment } from './common/utils';
+import AdminApp from './admin/AdminApp';
 import DirectoryApp from './directory/DirectoryApp';
 import HomeApp from './home/HomeApp';
 import PassGiveawayApp from './pass-giveaway/PassGiveawayApp';
@@ -89,6 +90,7 @@ const SUBSITE_APPS: Record<string, ComponentType> = {
   '/pass-giveaway': PassGiveawayApp,
   '/directory': DirectoryApp,
   '/workforms': WorkformsApp,
+  '/admin': AdminApp,
 };
 
 function App() {

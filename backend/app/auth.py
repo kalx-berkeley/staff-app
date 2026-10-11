@@ -268,6 +268,52 @@ def get_promotions_staff(
     return promotions
 
 
+def _is_department_head(db: Session, staff: Staff) -> bool:
+    """Return True if *staff* heads a department (from the Department Heads table)."""
+    from app.models.workform_department import DepartmentHead
+
+    return bool(staff.airtable_record_id) and (
+        db.query(DepartmentHead)
+        .filter(DepartmentHead.staff_airtable_record_id == staff.airtable_record_id)
+        .first()
+        is not None
+    )
+
+
+def is_admin(db: Session, staff: Staff | None) -> bool:
+    """
+    Return True if *staff* may use the app-wide admin tools (KALX Staff Admin).
+
+    Admins are promotions staff and active department heads.
+    """
+    if staff is None or ACTIVE_STATUS not in _staff_statuses(staff):
+        return False
+    return _is_promotions_staff(staff) or _is_department_head(db, staff)
+
+
+def get_admin_staff(
+    email: str = Depends(require_authentication), db: Session = Depends(get_db)
+) -> Staff:
+    """
+    Get the admin staff member making the request.
+
+    Checks the real, signed-in user rather than anyone they are impersonating,
+    so an admin keeps the admin tools while impersonating a non-admin.
+
+    :param email: User email from authentication
+    :param db: Database session
+    :returns: Staff record for the admin
+    :raises HTTPException: If the user is not an admin
+    """
+    staff = db.query(Staff).filter(Staff.email == email).first()
+    if not is_admin(db, staff):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can perform this action",
+        )
+    return staff
+
+
 def get_staff_member(
     email: str = Depends(require_authentication), db: Session = Depends(get_db)
 ) -> Staff:

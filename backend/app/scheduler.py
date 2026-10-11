@@ -179,12 +179,15 @@ async def send_workform_emails():
     """
     from app.config import settings
     from app.database import SessionLocal
+    from app.models.job_log import JobLog
     from app.workforms.services.notifications import send_reminders, send_review_emails
 
     if not settings.workforms_emails_enabled:
         return
     db = SessionLocal()
     try:
+        db.add(JobLog(job_id="workform_emails", trigger="scheduled"))
+        db.commit()
         await send_reminders(db)
     except Exception as e:
         logger.error(f"Workform reminders failed: {str(e)}", exc_info=True)

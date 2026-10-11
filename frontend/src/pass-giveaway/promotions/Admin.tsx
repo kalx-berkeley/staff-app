@@ -1,74 +1,21 @@
 import { useState, useEffect } from 'react';
 import { adminAPI, showsAPI, venuesAPI } from '../api';
-import type { JobStatus, JobRunResult, SeedResult, UserListItem, ImpersonateRequest, AuditLogItem, AutoCloseScheduleItem, LotteryScheduleItem, ShowResponse, VenueResponse } from '../types';
+import type { SeedResult, AutoCloseScheduleItem, LotteryScheduleItem, ShowResponse, VenueResponse } from '../types';
 import type { APIError } from '../../common/types';
 import { useAuth } from '../../common/contexts/authHooks';
-import { DatePicker } from '../components';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-
-const AUDIT_PAGE_SIZE = 50;
-
-const toDateInputValue = (d: Date): string =>
-  d.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
-
-const defaultSince = (): string => {
-  const d = new Date();
-  d.setDate(d.getDate() - 30);
-  return toDateInputValue(d);
-};
-
-const defaultUntil = (): string => toDateInputValue(new Date());
-
-const formatRelativeTime = (isoString: string | null): string => {
-  if (!isoString) return 'Never';
-  const then = new Date(isoString);
-  const now = new Date();
-  const diffMs = now.getTime() - then.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
-};
-
-const formatFutureTime = (isoString: string | null): string => {
-  if (!isoString) return 'Not scheduled';
-  const then = new Date(isoString);
-  const now = new Date();
-  const diffMs = then.getTime() - now.getTime();
-  if (diffMs <= 0) return 'Imminent';
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 60) return `in ${diffMins} minute${diffMins !== 1 ? 's' : ''}`;
-  const diffHours = Math.floor(diffMins / 60);
-  return `in ${diffHours} hour${diffHours !== 1 ? 's' : ''}`;
-};
+import { subsiteForPath } from '../../subsites';
 
 const Admin = () => {
   usePageTitle('Admin · Promotions');
   const { user } = useAuth();
   const isStaging = user?.is_staging ?? false;
-  const isImpersonating =
-    !!user?.impersonating_email ||
-    user?.is_impersonating_dj_network ||
-    user?.is_impersonating_station_office_network;
-
-  const [jobStatuses, setJobStatuses] = useState<JobStatus[]>([]);
-  const [jobRunning, setJobRunning] = useState<Record<string, boolean>>({});
-  const [jobResult, setJobResult] = useState<Record<string, JobRunResult | null>>({});
-  const [jobError, setJobError] = useState<Record<string, string | null>>({});
+  const staffAdmin = subsiteForPath('/admin');
 
   const [seeding, setSeeding] = useState(false);
   const [seedResult, setSeedResult] = useState<SeedResult | null>(null);
   const [seedError, setSeedError] = useState<string | null>(null);
   const [seedAlreadyLoaded, setSeedAlreadyLoaded] = useState(false);
-
-  const [userList, setUserList] = useState<UserListItem[]>([]);
-  const [selectedUserEmail, setSelectedUserEmail] = useState('');
-  const [impersonateError, setImpersonateError] = useState<string | null>(null);
-  const [impersonateLoading, setImpersonateLoading] = useState(false);
-  const [impersonateMode, setImpersonateMode] = useState<'user' | 'dj' | 'user_dj' | 'station_office'>('user');
 
   const [deletedShows, setDeletedShows] = useState<ShowResponse[]>([]);
   const [deletedShowsLoading, setDeletedShowsLoading] = useState(true);
@@ -90,19 +37,6 @@ const Admin = () => {
   const [lotterySchedulesError, setLotterySchedulesError] = useState<string | null>(null);
   const [lotteryRunning, setLotteryRunning] = useState<Record<number, boolean>>({});
   const [lotteryRunResult, setLotteryRunResult] = useState<Record<number, string | null>>({});
-
-  const [auditLog, setAuditLog] = useState<AuditLogItem[]>([]);
-  const [auditLogLoading, setAuditLogLoading] = useState(false);
-  const [auditLogError, setAuditLogError] = useState<string | null>(null);
-  const [auditLogOffset, setAuditLogOffset] = useState(0);
-  const [auditLogHasMore, setAuditLogHasMore] = useState(false);
-  const [auditEventType, setAuditEventType] = useState('');
-  const [auditActorEmail, setAuditActorEmail] = useState('');
-  const [auditSince, setAuditSince] = useState(defaultSince);
-  const [auditUntil, setAuditUntil] = useState(defaultUntil);
-  const refreshJobStatuses = () => {
-    adminAPI.getJobStatuses().then(setJobStatuses).catch(() => {});
-  };
 
   const loadDeletedShows = () => {
     setDeletedShowsLoading(true);
@@ -165,7 +99,6 @@ const Admin = () => {
   };
 
   useEffect(() => {
-    refreshJobStatuses();
     loadDeletedShows();
     loadDeletedVenues();
     adminAPI.getAutoCloseSchedules()
@@ -187,29 +120,9 @@ const Admin = () => {
       })
       .finally(() => setLotterySchedulesLoading(false));
     if (isStaging) {
-      adminAPI.listUsers().then(setUserList).catch(() => {});
       adminAPI.getSeedStatus().then((s) => setSeedAlreadyLoaded(s.seeded)).catch(() => {});
     }
   }, [isStaging]);
-
-  const handleRunJob = async (jobId: string) => {
-    setJobRunning((prev) => ({ ...prev, [jobId]: true }));
-    setJobResult((prev) => ({ ...prev, [jobId]: null }));
-    setJobError((prev) => ({ ...prev, [jobId]: null }));
-    try {
-      const result = await adminAPI.triggerJob(jobId);
-      setJobResult((prev) => ({ ...prev, [jobId]: result }));
-      refreshJobStatuses();
-    } catch (err) {
-      const apiError = err as APIError;
-      setJobError((prev) => ({
-        ...prev,
-        [jobId]: typeof apiError.detail === 'string' ? apiError.detail : 'Job failed',
-      }));
-    } finally {
-      setJobRunning((prev) => ({ ...prev, [jobId]: false }));
-    }
-  };
 
   const handleSeed = async () => {
     setSeeding(true);
@@ -228,52 +141,6 @@ const Admin = () => {
       );
     } finally {
       setSeeding(false);
-    }
-  };
-
-  const handleImpersonate = async (request: ImpersonateRequest) => {
-    setImpersonateLoading(true);
-    setImpersonateError(null);
-    try {
-      await adminAPI.startImpersonation(request);
-      window.location.reload();
-    } catch (err) {
-      const apiError = err as APIError;
-      setImpersonateError(
-        typeof apiError.detail === 'string' ? apiError.detail : 'Failed to start impersonation'
-      );
-      setImpersonateLoading(false);
-    }
-  };
-
-  const loadAuditLog = async (reset: boolean) => {
-    setAuditLogLoading(true);
-    setAuditLogError(null);
-    const offset = reset ? 0 : auditLogOffset;
-    try {
-      const entries = await adminAPI.getAuditLog({
-        event_type: auditEventType || undefined,
-        actor_email: auditActorEmail || undefined,
-        since: auditSince || undefined,
-        until: auditUntil || undefined,
-        limit: AUDIT_PAGE_SIZE,
-        offset,
-      });
-      if (reset) {
-        setAuditLog(entries);
-        setAuditLogOffset(entries.length);
-      } else {
-        setAuditLog((prev) => [...prev, ...entries]);
-        setAuditLogOffset((prev) => prev + entries.length);
-      }
-      setAuditLogHasMore(entries.length === AUDIT_PAGE_SIZE);
-    } catch (err) {
-      const apiError = err as APIError;
-      setAuditLogError(
-        typeof apiError.detail === 'string' ? apiError.detail : 'Failed to load audit log'
-      );
-    } finally {
-      setAuditLogLoading(false);
     }
   };
 
@@ -296,71 +163,15 @@ const Admin = () => {
     }
   };
 
-  const handleEndImpersonation = async () => {
-    setImpersonateLoading(true);
-    setImpersonateError(null);
-    try {
-      await adminAPI.endImpersonation();
-      window.location.reload();
-    } catch (err) {
-      const apiError = err as APIError;
-      setImpersonateError(
-        typeof apiError.detail === 'string' ? apiError.detail : 'Failed to end impersonation'
-      );
-      setImpersonateLoading(false);
-    }
-  };
-
   return (
     <div className="admin-container">
       <h2>Admin</h2>
-
-      <section className="admin-section">
-        <h3>Scheduled Jobs</h3>
-        {jobStatuses.length === 0 ? (
-          <p>Loading job statuses…</p>
-        ) : (
-          <table className="audit-log-table">
-            <thead>
-              <tr>
-                <th>Job</th>
-                <th>Last Run</th>
-                <th>Next Run</th>
-                <th>Action</th>
-                <th>Result</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobStatuses.map((job) => (
-                <tr key={job.id}>
-                  <td>{job.name}</td>
-                  <td className="audit-log-time">{formatRelativeTime(job.last_run_at)}</td>
-                  <td className="audit-log-time">{formatFutureTime(job.next_run_at)}</td>
-                  <td>
-                    <button
-                      className="btn-primary btn-small"
-                      onClick={() => handleRunJob(job.id)}
-                      disabled={!!jobRunning[job.id]}
-                    >
-                      {jobRunning[job.id] ? 'Running…' : 'Run Now'}
-                    </button>
-                  </td>
-                  <td>
-                    {jobError[job.id] && (
-                      <span className="error-message">{jobError[job.id]}</span>
-                    )}
-                    {jobResult[job.id] && (
-                      <span className={jobResult[job.id]!.success ? 'text-success' : 'error-message'}>
-                        {jobResult[job.id]!.message}
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+      {staffAdmin?.isAvailable(user) && (
+        <p className="field-hint">
+          Scheduled jobs, the audit log and user impersonation are in{' '}
+          <a href={`${staffAdmin.basePath}/`}>{staffAdmin.name}</a>.
+        </p>
+      )}
 
       <section className="admin-section">
         <h3>Auto-close Schedules</h3>
@@ -536,128 +347,6 @@ const Admin = () => {
 
       {isStaging && (
         <>
-          <section className="admin-section">
-            <h3>User Impersonation</h3>
-            <p className="field-hint">
-              Simulate different access contexts to test role-based behavior.
-            </p>
-
-            {isImpersonating && (
-              <div className="impersonate-active">
-                <p>
-                  <strong>Currently impersonating:</strong>{' '}
-                  {user?.impersonating_email ?? '(not logged in)'}
-                  {user?.is_impersonating_dj_network && ' + DJ studio network'}
-                  {user?.is_impersonating_station_office_network && ' + station office network'}
-                </p>
-                <button
-                  className="btn-danger"
-                  onClick={handleEndImpersonation}
-                  disabled={impersonateLoading}
-                >
-                  End Impersonation
-                </button>
-              </div>
-            )}
-
-            {impersonateError && <div className="error-message">{impersonateError}</div>}
-
-            <div className="impersonate-choices">
-              <label className={`impersonate-choice${impersonateMode === 'user' ? ' impersonate-choice--selected' : ''}`}>
-                <input
-                  type="radio"
-                  name="impersonateMode"
-                  value="user"
-                  checked={impersonateMode === 'user'}
-                  onChange={() => setImpersonateMode('user')}
-                  disabled={impersonateLoading}
-                />
-                <span className="impersonate-choice-title">Impersonate a user</span>
-                <span className="impersonate-choice-desc">Logged in as a selected user, outside the DJ studio</span>
-              </label>
-
-              <label className={`impersonate-choice${impersonateMode === 'dj' ? ' impersonate-choice--selected' : ''}`}>
-                <input
-                  type="radio"
-                  name="impersonateMode"
-                  value="dj"
-                  checked={impersonateMode === 'dj'}
-                  onChange={() => setImpersonateMode('dj')}
-                  disabled={impersonateLoading}
-                />
-                <span className="impersonate-choice-title">Impersonate DJ studio (not logged in)</span>
-                <span className="impersonate-choice-desc">Request appears to come from the DJ studio network, but no user is logged in</span>
-              </label>
-
-              <label className={`impersonate-choice${impersonateMode === 'user_dj' ? ' impersonate-choice--selected' : ''}`}>
-                <input
-                  type="radio"
-                  name="impersonateMode"
-                  value="user_dj"
-                  checked={impersonateMode === 'user_dj'}
-                  onChange={() => setImpersonateMode('user_dj')}
-                  disabled={impersonateLoading}
-                />
-                <span className="impersonate-choice-title">Impersonate a user in the DJ studio</span>
-                <span className="impersonate-choice-desc">Logged in as a selected user and on the DJ studio network</span>
-              </label>
-
-              <label className={`impersonate-choice${impersonateMode === 'station_office' ? ' impersonate-choice--selected' : ''}`}>
-                <input
-                  type="radio"
-                  name="impersonateMode"
-                  value="station_office"
-                  checked={impersonateMode === 'station_office'}
-                  onChange={() => setImpersonateMode('station_office')}
-                  disabled={impersonateLoading}
-                />
-                <span className="impersonate-choice-title">Impersonate station office (not logged in)</span>
-                <span className="impersonate-choice-desc">Request appears to come from the station office network (not DJ studio), but no user is logged in</span>
-              </label>
-            </div>
-
-            {(impersonateMode === 'user' || impersonateMode === 'user_dj') && userList.length > 0 && (
-              <div className="impersonate-user-row">
-                <select
-                  value={selectedUserEmail}
-                  onChange={(e) => setSelectedUserEmail(e.target.value)}
-                  disabled={impersonateLoading}
-                  className="impersonate-select"
-                >
-                  <option value="">— Select a user —</option>
-                  {userList.map((u) => (
-                    <option key={u.email} value={u.email}>
-                      {u.name} ({u.role})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <div className="impersonate-action">
-              <button
-                className="btn-secondary"
-                onClick={() => {
-                  if (impersonateMode === 'dj') {
-                    handleImpersonate({ email: null, is_dj_network: true });
-                  } else if (impersonateMode === 'station_office') {
-                    handleImpersonate({ email: null, is_dj_network: false, is_station_office_network: true });
-                  } else if (impersonateMode === 'user' && selectedUserEmail) {
-                    handleImpersonate({ email: selectedUserEmail, is_dj_network: false });
-                  } else if (impersonateMode === 'user_dj' && selectedUserEmail) {
-                    handleImpersonate({ email: selectedUserEmail, is_dj_network: true });
-                  }
-                }}
-                disabled={
-                  impersonateLoading ||
-                  ((impersonateMode === 'user' || impersonateMode === 'user_dj') && !selectedUserEmail)
-                }
-              >
-                {impersonateLoading ? 'Starting…' : 'Start Impersonation'}
-              </button>
-            </div>
-          </section>
-
           <section className={`admin-section${seedAlreadyLoaded ? ' admin-section--disabled' : ''}`}>
             <h3>Seed Test Data</h3>
             <p>
@@ -787,99 +476,6 @@ const Admin = () => {
               ))}
             </tbody>
           </table>
-        )}
-      </section>
-
-      <section className="admin-section">
-        <h3>Audit Log</h3>
-        <div className="audit-log-filters">
-          <label className="audit-log-filter-label">
-            From
-            <DatePicker value={auditSince} onChange={setAuditSince} />
-          </label>
-          <label className="audit-log-filter-label">
-            To
-            <DatePicker value={auditUntil} onChange={setAuditUntil} />
-          </label>
-          <input
-            type="text"
-            placeholder="Event type"
-            value={auditEventType}
-            onChange={(e) => setAuditEventType(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && loadAuditLog(true)}
-          />
-          <input
-            type="text"
-            placeholder="Actor email"
-            value={auditActorEmail}
-            onChange={(e) => setAuditActorEmail(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && loadAuditLog(true)}
-          />
-          <button
-            className="btn-primary"
-            onClick={() => loadAuditLog(true)}
-            disabled={auditLogLoading}
-          >
-            {auditLogLoading && auditLog.length === 0 ? 'Loading…' : 'Load'}
-          </button>
-        </div>
-        {auditLogError && <div className="error-message">{auditLogError}</div>}
-        {auditLog.length === 0 && !auditLogLoading && !auditLogError && (
-          <p className="field-help">Use the filters above and click Load to fetch entries.</p>
-        )}
-        {auditLog.length > 0 && (
-          <>
-            <div className="audit-log-table-wrapper">
-              <table className="audit-log-table">
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>Event</th>
-                    <th>Actor</th>
-                    <th>Role</th>
-                    <th>Entity</th>
-                    <th>Details</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {auditLog.map((entry) => (
-                    <tr key={entry.id}>
-                      <td className="audit-log-time">
-                        {new Date(entry.occurred_at).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}
-                      </td>
-                      <td>
-                        <code>{entry.event_type}</code>
-                      </td>
-                      <td>{entry.actor_email ?? '—'}</td>
-                      <td>{entry.actor_role ?? '—'}</td>
-                      <td>
-                        {entry.entity_type
-                          ? `${entry.entity_type}${entry.entity_id != null ? ` #${entry.entity_id}` : ''}`
-                          : '—'}
-                      </td>
-                      <td className="audit-log-details">
-                        {entry.details ? (
-                          <details>
-                            <summary>{JSON.stringify(entry.details)}</summary>
-                            <pre>{JSON.stringify(entry.details, null, 2)}</pre>
-                          </details>
-                        ) : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {auditLogHasMore && (
-              <button
-                className="btn-secondary"
-                onClick={() => loadAuditLog(false)}
-                disabled={auditLogLoading}
-              >
-                {auditLogLoading ? 'Loading…' : 'Load More'}
-              </button>
-            )}
-          </>
         )}
       </section>
     </div>

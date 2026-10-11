@@ -11,9 +11,6 @@ vi.mock('../api', () => ({
     update: vi.fn(),
     listPromotionsStaff: vi.fn().mockResolvedValue([]),
   },
-  adminAPI: {
-    listUsers: vi.fn().mockResolvedValue([]),
-  },
   promotersAPI: {
     list: vi.fn().mockResolvedValue([]),
   },

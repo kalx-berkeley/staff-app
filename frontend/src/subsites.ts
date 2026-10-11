@@ -39,6 +39,15 @@ export const SUBSITES: Subsite[] = [
     // Active staff, as the workforms API requires
     isAvailable: (user) => user?.role === 'promotions' || user?.role === 'staff',
   },
+  {
+    basePath: '/admin',
+    name: 'KALX Staff Admin',
+    description:
+      'Scheduled jobs, the audit log and, on staging, user impersonation, for every staff site.',
+    // Promotions staff and department heads. is_admin describes the real user,
+    // so an admin keeps it while impersonating someone who isn't one.
+    isAvailable: (user) => !!user?.is_admin,
+  },
 ];
 
 export const HOME_TITLE = 'KALX Staff Portal';
