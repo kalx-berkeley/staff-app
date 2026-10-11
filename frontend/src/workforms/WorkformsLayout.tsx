@@ -1,0 +1,53 @@
+import type { ReactNode } from 'react';
+import { NavLink } from 'react-router-dom';
+import { useAuth } from '../common/contexts/authHooks';
+import { HOME_TITLE, SUBSITES, subsiteForPath } from '../subsites';
+
+export const WORKFORMS_TITLE = 'KALX Workforms';
+
+// The header shared by every workforms page: links to the other staff sites,
+// the title, and the sub-site's own navigation.
+export default function WorkformsLayout({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const otherSubsites = SUBSITES.filter(
+    (subsite) => subsite !== subsiteForPath('/workforms') && subsite.isAvailable(user)
+  );
+  const tab = ({ isActive }: { isActive: boolean }) =>
+    isActive ? 'workforms-tab workforms-tab-active' : 'workforms-tab';
+
+  return (
+    <div className="workforms-page">
+      <header className="workforms-header">
+        <nav className="directory-subsites" aria-label="Staff sites">
+          <a href="/">{HOME_TITLE}</a>
+          {otherSubsites.map((subsite) => (
+            <a key={subsite.basePath} href={`${subsite.basePath}/`}>
+              {subsite.name}
+            </a>
+          ))}
+        </nav>
+        <h1>{WORKFORMS_TITLE}</h1>
+        {user?.impersonating_email && (
+          <p className="directory-impersonating">Viewing as {user.impersonating_email}</p>
+        )}
+        <nav className="workforms-tabs" aria-label="Workforms">
+          <NavLink to="/" end className={tab}>
+            My workform
+          </NavLink>
+          <NavLink to="/history" className={tab}>
+            Past workforms
+          </NavLink>
+          {user?.is_department_head && (
+            <NavLink to="/review" className={tab}>
+              Review
+            </NavLink>
+          )}
+          <NavLink to="/settings" className={tab}>
+            Settings
+          </NavLink>
+        </nav>
+      </header>
+      <main>{children}</main>
+    </div>
+  );
+}

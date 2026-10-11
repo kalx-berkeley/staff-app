@@ -150,6 +150,48 @@ async def sync_spinitron_schedule():
         db.close()
 
 
+async def refresh_workform_records():
+    """
+    Scheduled task to refresh the local copy of the Airtable workforms table.
+    Runs every 15 minutes.
+    """
+    from app.config import settings
+    from app.database import SessionLocal
+    from app.workforms.services.records import refresh_all
+
+    if not settings.airtable_api_key or not settings.airtable_base_id:
+        return
+    db = SessionLocal()
+    try:
+        await refresh_all(db)
+    except Exception as e:
+        logger.error(f"Workform records refresh failed: {str(e)}", exc_info=True)
+    finally:
+        db.close()
+
+
+async def send_workform_emails():
+    """
+    Scheduled task to send KALX Workforms emails: reminders to submit (last
+    day of the month and the 3rd) and the review email to heads (the 6th).
+    Runs daily at 9 AM; each kind of email checks whether today is its day.
+    """
+    from app.database import SessionLocal
+    from app.workforms.services.notifications import send_reminders, send_review_emails
+
+    db = SessionLocal()
+    try:
+        await send_reminders(db)
+    except Exception as e:
+        logger.error(f"Workform reminders failed: {str(e)}", exc_info=True)
+    try:
+        await send_review_emails(db)
+    except Exception as e:
+        logger.error(f"Workform review emails failed: {str(e)}", exc_info=True)
+    finally:
+        db.close()
+
+
 async def bootstrap_users_if_empty():
     """
     On startup, check if user tables are empty and sync from Airtable if so.
@@ -181,6 +223,34 @@ async def bootstrap_users_if_empty():
             )
     finally:
         db.close()
+
+
+async def bootstrap_workforms_if_empty():
+    """
+    On startup, copy the department heads and the workforms table from
+    Airtable if there's no copy yet, rather than waiting for the nightly staff
+    sync and the next 15-minute refresh.
+    """
+    if os.getenv("TESTING") == "1":
+        return
+
+    from app.database import SessionLocal
+    from app.models.workform_department import WorkformDepartment
+    from app.workforms.services.departments import sync_department_heads
+
+    db = SessionLocal()
+    try:
+        if db.query(WorkformDepartment).count() == 0:
+            logger.info("No workform departments on startup - syncing department heads")
+            result = {"errors": []}
+            await sync_department_heads(db, result)
+            if result["errors"]:
+                logger.error(f"Department heads bootstrap failed: {result['errors']}")
+    except Exception as e:
+        logger.error(f"Department heads bootstrap failed: {str(e)}", exc_info=True)
+    finally:
+        db.close()
+    await refresh_workform_records()
 
 
 async def bootstrap_feature_bin_if_stale():
@@ -533,11 +603,30 @@ def start_scheduler():
         replace_existing=True,
     )
 
+    # Refresh the local copy of the Airtable workforms table every 15 minutes
+    scheduler.add_job(
+        refresh_workform_records,
+        trigger=CronTrigger(minute="*/15", timezone=_PT),
+        id="workform_records_refresh",
+        name="Refresh workforms from Airtable",
+        replace_existing=True,
+    )
+
+    # Send KALX Workforms reminder and review emails daily at 9 AM Pacific
+    scheduler.add_job(
+        send_workform_emails,
+        trigger=CronTrigger(hour=9, minute=0, timezone=_PT),
+        id="workform_emails",
+        name="Send workform reminder and review emails",
+        replace_existing=True,
+    )
+
     scheduler.start()
     logger.info(
         "Scheduler started - Feature bin sync at 1 AM PT, KALX Live sync at 1:30 AM PT,"
         " Airtable sync at 2 AM PT, stale preassignment expiry at 3 AM PT, unclosed past"
-        " show notifications at 4 AM PT, Spinitron schedule sync every 6 hours"
+        " show notifications at 4 AM PT, Spinitron schedule sync every 6 hours, workforms"
+        " refresh every 15 minutes, workform emails at 9 AM PT"
     )
     _reschedule_pending_auto_close_jobs()
     _reschedule_pending_lottery_jobs()

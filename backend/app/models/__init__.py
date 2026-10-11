@@ -31,6 +31,10 @@ from .spinitron_show import SpinitronShow
 from .spinitron_playlist import SpinitronPlaylist
 from .spinitron_spin_cache import SpinitronSpinCache
 from .dismissed_spin_match import DismissedSpinMatch
+from .workform import Workform, WorkformEntry
+from .workform_airtable_record import WorkformAirtableRecord
+from .workform_department import DepartmentHead, WorkformDepartment
+from .workform_preferences import WorkformPreferences
 
 __all__ = [
     "AuditLog",
@@ -64,4 +68,10 @@ __all__ = [
     "SpinitronPlaylist",
     "SpinitronSpinCache",
     "DismissedSpinMatch",
+    "Workform",
+    "WorkformEntry",
+    "WorkformAirtableRecord",
+    "WorkformDepartment",
+    "DepartmentHead",
+    "WorkformPreferences",
 ]

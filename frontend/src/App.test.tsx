@@ -504,6 +504,10 @@ describe('App - Role-Based UI Elements', () => {
         'href',
         '/directory/'
       );
+      expect(screen.getByRole('link', { name: /KALX Workforms/i })).toHaveAttribute(
+        'href',
+        '/workforms/'
+      );
       expect(document.title).toBe('KALX Staff Portal');
     });
 

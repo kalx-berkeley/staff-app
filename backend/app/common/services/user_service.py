@@ -3,7 +3,7 @@
 import logging
 import re
 from datetime import date
-from typing import List, Optional, Dict, Any
+from typing import Any, Awaitable, Callable, Dict, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
@@ -65,6 +65,19 @@ def _date_field(fields: Dict[str, Any], name: str) -> Optional[date]:
 def _extract_spinitron_ids(raw: str) -> List[int]:
     """Extract Spinitron persona IDs from Spinitron DJ profile URLs in a markdown string."""
     return [int(m.group(1)) for m in _SPINITRON_URL_RE.finditer(raw)]
+
+
+# Run after each staff sync, with the database session and the sync result.
+# Sub-sites register these (in main.py) for data that depends on staff, so
+# common code needn't import them. A hook reports problems in result["errors"].
+PostSyncHook = Callable[[Session, Dict[str, Any]], Awaitable[None]]
+_post_sync_hooks: List[PostSyncHook] = []
+
+
+def register_post_sync_hook(hook: PostSyncHook) -> None:
+    """Run *hook* after every Airtable staff sync."""
+    if hook not in _post_sync_hooks:
+        _post_sync_hooks.append(hook)
 
 
 class UserService:
@@ -549,6 +562,16 @@ class UserService:
 
         # Phase 3: Bring the staff directory photos on disk up to date
         await UserService._sync_photos(db, photo_updates, result)
+
+        # Phase 4: Sub-site data that depends on staff
+        for hook in _post_sync_hooks:
+            try:
+                await hook(db, result)
+            except Exception as e:
+                db.rollback()
+                error_msg = f"Post-sync step {hook.__qualname__} failed: {str(e)}"
+                logger.error(error_msg, exc_info=True)
+                result["errors"].append(error_msg)
 
         # Record sync event for admin display
         try:

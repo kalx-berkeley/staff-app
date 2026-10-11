@@ -7,6 +7,7 @@ import { isStagingEnvironment } from './common/utils';
 import DirectoryApp from './directory/DirectoryApp';
 import HomeApp from './home/HomeApp';
 import PassGiveawayApp from './pass-giveaway/PassGiveawayApp';
+import WorkformsApp from './workforms/WorkformsApp';
 import { subsiteForPath } from './subsites';
 
 // The app shell: waits for the signed-in user, then hands the page to the
@@ -87,6 +88,7 @@ function ErrorScreen({ message }: { message: string }) {
 const SUBSITE_APPS: Record<string, ComponentType> = {
   '/pass-giveaway': PassGiveawayApp,
   '/directory': DirectoryApp,
+  '/workforms': WorkformsApp,
 };
 
 function App() {
