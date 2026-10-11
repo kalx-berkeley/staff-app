@@ -175,10 +175,14 @@ async def send_workform_emails():
     Scheduled task to send KALX Workforms emails: reminders to submit (last
     day of the month and the 3rd) and the review email to heads (the 6th).
     Runs daily at 9 AM; each kind of email checks whether today is its day.
+    Does nothing unless WORKFORMS_EMAILS_ENABLED is set.
     """
+    from app.config import settings
     from app.database import SessionLocal
     from app.workforms.services.notifications import send_reminders, send_review_emails
 
+    if not settings.workforms_emails_enabled:
+        return
     db = SessionLocal()
     try:
         await send_reminders(db)

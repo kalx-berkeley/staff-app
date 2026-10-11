@@ -133,6 +133,7 @@ describe('KALX Workforms month page', () => {
     expect(screen.getByLabelText(/^Date/)).toHaveAttribute('min', '2026-10-01');
     expect(screen.getByLabelText(/^Date/)).toHaveAttribute('max', '2026-10-31');
     expect(screen.getByRole('link', { name: /September 2026/ })).toBeInTheDocument();
+    expect(screen.getByRole('note')).toHaveTextContent(/not the official way to submit workforms/);
   });
 
   it('checks hours before adding an entry', async () => {

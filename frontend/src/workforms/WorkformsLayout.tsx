@@ -27,6 +27,11 @@ export default function WorkformsLayout({ children }: { children: ReactNode }) {
           ))}
         </nav>
         <h1>{WORKFORMS_TITLE}</h1>
+        <div className="workforms-preview-notice" role="note">
+          <strong>Under construction — this is not the official way to submit workforms.</strong>{' '}
+          Workforms entered here don't count and don't replace the current process. Keep
+          submitting your workforms the usual way.
+        </div>
         {user?.impersonating_email && (
           <p className="directory-impersonating">Viewing as {user.impersonating_email}</p>
         )}

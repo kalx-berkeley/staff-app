@@ -237,7 +237,9 @@ workforms, but `department_heads` is a shared model, so
   longer Active (Q20).
 - `refresh_workform_records` runs every 15 minutes (Q2). It's skipped when
   Airtable isn't configured.
-- `send_workform_emails` runs at 9 AM Pacific every day:
+- `send_workform_emails` runs at 9 AM Pacific every day, but only when
+  `WORKFORMS_EMAILS_ENABLED` is set. It's off by default while the sub-site
+  is under construction and not the official way to submit workforms:
   - `send_reminders` sends only on the last day of the month (for this
     month) and on the 3rd (for last month). It goes to Active staff who
     aren't heads, haven't submitted, and haven't opted out (Q27, Q28).

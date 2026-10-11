@@ -187,3 +187,15 @@ async def test_review_emails_on_the_6th(db: Session, airtable, sent, departments
     assert by_email["mel@example.com"]["subject"].startswith("1 KALX workform submission")
     # Special Events (no head) and Mel's own Music hours
     assert by_email["ola@example.com"]["subject"].startswith("2 KALX workform submissions")
+
+
+async def test_scheduled_emails_are_off_unless_enabled(monkeypatch):
+    from app import scheduler
+    from app.config import settings
+
+    reminders = AsyncMock()
+    monkeypatch.setattr(notifications, "send_reminders", reminders)
+    monkeypatch.setattr(notifications, "send_review_emails", AsyncMock())
+    monkeypatch.setattr(settings, "workforms_emails_enabled", False)
+    await scheduler.send_workform_emails()
+    reminders.assert_not_awaited()

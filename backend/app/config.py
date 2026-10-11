@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     # KALX Workforms: a month's workform is due by the end of this day of the
     # following month (Pacific time); later submissions are marked late.
     workforms_deadline_day: int = 5
+    # Whether to send the workforms reminder and review emails. Off while the
+    # sub-site is under construction and not the official way to submit.
+    workforms_emails_enabled: bool = False
     # The department whose heads review departments that have no head, and
     # department heads' own hours.
     workforms_operations_department: str = "Operations"

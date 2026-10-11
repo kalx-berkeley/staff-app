@@ -4373,6 +4373,17 @@ body.staging-active .directory-detail-close {
   margin: 0.5rem 0;
 }
 
+.workforms-preview-notice {
+  padding: 0.75rem;
+  margin: 0 0 0.75rem;
+  border-radius: 4px;
+  border: 1px solid #f5c6cb;
+  border-left: 5px solid var(--danger-color);
+  background-color: #fdecea;
+  color: #721c24;
+  font-size: 0.9rem;
+}
+
 .workforms-tabs {
   display: flex;
   flex-wrap: wrap;

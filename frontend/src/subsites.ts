@@ -35,7 +35,7 @@ export const SUBSITES: Subsite[] = [
     basePath: '/workforms',
     name: 'KALX Workforms',
     description:
-      'Report the work you do each month, and see which departments approved it. Department heads review hours here.',
+      'Under construction, not yet the official way to submit workforms. A preview of reporting your monthly work and having department heads review it.',
     // Active staff, as the workforms API requires
     isAvailable: (user) => user?.role === 'promotions' || user?.role === 'staff',
   },
