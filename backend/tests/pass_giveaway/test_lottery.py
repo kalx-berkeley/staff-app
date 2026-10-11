@@ -1326,3 +1326,48 @@ class TestDJShowPage:
 
         pair_passes = [p for p in passes if p["pass_type"] == "pair"]
         assert all(p["preassigned_dj"] is not None for p in pair_passes)
+
+
+class TestStartupMissedLottery:
+    """Startup only re-runs lotteries whose deadline passed with entries still pending."""
+
+    @pytest.fixture
+    def run_startup(self, db, monkeypatch):
+        from app import scheduler
+
+        monkeypatch.delenv("TESTING")
+        monkeypatch.setattr("app.database.SessionLocal", lambda: db)
+        monkeypatch.setattr(scheduler, "schedule_lottery_job", lambda *args: None)
+
+        def _run():
+            with patch.object(LotteryService, "run_lottery") as run_lottery:
+                scheduler._reschedule_pending_lottery_jobs()
+            return [c.args[1] for c in run_lottery.call_args_list]
+
+        return _run
+
+    def _close_window(self, db: Session, show: Show) -> None:
+        show.published_at = datetime.now(timezone.utc) - timedelta(hours=48)
+        db.commit()
+
+    def test_runs_lottery_when_entries_pending(self, db, venue, joe, run_startup):
+        show = _make_lottery_show(db, venue, num_staff_passes=1)
+        _make_staff_entry(db, show, joe)
+        self._close_window(db, show)
+        show_id = show.id
+
+        assert run_startup() == [show_id]
+
+    def test_skips_show_already_drawn(self, db, venue, joe, run_startup):
+        show = _make_lottery_show(db, venue, num_staff_passes=1)
+        _make_staff_entry(db, show, joe)
+        self._close_window(db, show)
+        _run_lottery(db, show)
+
+        assert run_startup() == []
+
+    def test_skips_show_with_no_entries(self, db, venue, run_startup):
+        show = _make_lottery_show(db, venue, num_staff_passes=1)
+        self._close_window(db, show)
+
+        assert run_startup() == []

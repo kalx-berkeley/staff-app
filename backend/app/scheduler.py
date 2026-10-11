@@ -495,12 +495,14 @@ def unschedule_lottery_job(show_id: int) -> None:
 def _reschedule_pending_lottery_jobs() -> None:
     """
     On startup, re-register DateTrigger lottery jobs for published shows with an active
-    lottery window. Shows whose window already passed have the lottery run immediately.
+    lottery window. Shows whose window already passed with entries still pending have
+    the lottery run immediately.
     """
     if os.getenv("TESTING") == "1":
         return
 
     from app.database import SessionLocal
+    from app.models.lottery_entry import LotteryEntry
     from app.models.show import Show
     from app.pass_giveaway.services.lottery_service import LotteryService
     from datetime import timedelta, timezone
@@ -528,6 +530,20 @@ def _reschedule_pending_lottery_jobs() -> None:
             if deadline > now:
                 schedule_lottery_job(show.id, deadline)
             else:
+                # Running the lottery doesn't change anything this query filters on,
+                # so shows drawn long ago come back on every restart. Only a show
+                # with entries still pending actually missed its draw.
+                has_pending = (
+                    db.query(LotteryEntry.id)
+                    .filter(
+                        LotteryEntry.show_id == show.id,
+                        LotteryEntry.status == "pending",
+                    )
+                    .first()
+                    is not None
+                )
+                if not has_pending:
+                    continue
                 logger.warning(
                     f"Lottery deadline for show {show.id} already passed ({deadline}); "
                     "running lottery now"
