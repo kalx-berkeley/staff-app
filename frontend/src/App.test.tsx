@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, cleanup } from '@testing-library/react';
+import { screen, waitFor, cleanup } from '@testing-library/react';
 import App from './App';
-import { AuthProvider } from './common/contexts/AuthContext';
+import { renderWithAuth } from './test/render';
 import { usersAPI } from './common/api';
 import type { UserResponse } from './common/types';
 
@@ -58,11 +58,7 @@ describe('App - Role-Based UI Elements', () => {
   const renderAppWithUser = async (user: UserResponse) => {
     vi.mocked(usersAPI.getMe).mockResolvedValue(user);
 
-    render(
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    );
+    await renderWithAuth(<App />);
 
     // Wait for loading to complete
     await waitFor(() => {
@@ -437,11 +433,7 @@ describe('App - Role-Based UI Elements', () => {
         }), 100))
       );
 
-      render(
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      );
+      await renderWithAuth(<App />);
 
       // Should show loading initially
       expect(screen.getByText('Loading...')).toBeInTheDocument();
@@ -458,11 +450,7 @@ describe('App - Role-Based UI Elements', () => {
 
       vi.mocked(usersAPI.getMe).mockRejectedValue(new Error('Network error'));
 
-      render(
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      );
+      await renderWithAuth(<App />);
 
       // Wait for error to appear
       await waitFor(() => {

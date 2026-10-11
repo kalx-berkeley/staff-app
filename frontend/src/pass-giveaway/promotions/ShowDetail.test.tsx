@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+import { renderAndSettle } from '../../test/render';
 import ShowDetail from './ShowDetail';
 import { showsAPI, passesAPI, autocompleteAPI, specialtyShowsAPI, lotteryAPI, alternatesAPI } from '../api';
 import type { ShowResponse, PassResponse, DjSuggestion } from '../types';
@@ -143,7 +144,7 @@ const makeShow = (passes: PassResponse[]): ShowResponse => ({
 });
 
 const renderShowDetail = () =>
-  render(
+  renderAndSettle(
     <BrowserRouter>
       <ShowDetail />
     </BrowserRouter>
@@ -178,7 +179,7 @@ describe('Promotions ShowDetail — Suggest DJs', () => {
     const show = makeShow([{ ...basePass, id: 1 }]);
     vi.mocked(showsAPI.get).mockResolvedValue(show);
 
-    renderShowDetail();
+    await renderShowDetail();
     await openPreassignForm(1);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Suggest…' }));
@@ -204,7 +205,7 @@ describe('Promotions ShowDetail — Suggest DJs', () => {
       preassigned_date: '2099-12-20',
     });
 
-    renderShowDetail();
+    await renderShowDetail();
     await openPreassignForm(1);
 
     // Set a date up front so the accepted genre suggestion can be auto-saved.
@@ -255,7 +256,7 @@ describe('Promotions ShowDetail — Suggest DJs', () => {
       preassigned_date: '2099-12-20',
     });
 
-    renderShowDetail();
+    await renderShowDetail();
     await openPreassignForm(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Suggest…' }));
@@ -296,7 +297,7 @@ describe('Promotions ShowDetail — Suggest DJs', () => {
     ];
     vi.mocked(passesAPI.getSuggestionsByGenre).mockResolvedValue(suggestions);
 
-    renderShowDetail();
+    await renderShowDetail();
     await openPreassignForm(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Suggest…' }));
@@ -332,7 +333,7 @@ describe('Promotions ShowDetail — leave of absence', () => {
     };
     vi.mocked(showsAPI.get).mockResolvedValue(makeShow([staffPass]));
 
-    renderShowDetail();
+    await renderShowDetail();
 
     expect(await screen.findByText('On leave from Dec 1, 2099')).toBeInTheDocument();
   });
@@ -351,7 +352,7 @@ describe('Promotions ShowDetail — leave of absence', () => {
       },
     ]);
 
-    renderShowDetail();
+    await renderShowDetail();
     await openPreassignForm(1);
     fireEvent.click(screen.getByRole('button', { name: 'Suggest…' }));
     fireEvent.click(screen.getByRole('button', { name: 'Suggest DJs by genre' }));
@@ -406,7 +407,7 @@ describe('Promotions ShowDetail — alternates', () => {
       });
     vi.mocked(alternatesAPI.remove).mockResolvedValue(undefined);
 
-    renderShowDetail();
+    await renderShowDetail();
 
     expect(await screen.findByText('Alternate #1')).toBeInTheDocument();
     expect(screen.getByText('Wanda Waiting')).toBeInTheDocument();

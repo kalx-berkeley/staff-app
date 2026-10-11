@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, within } from '@testing-library/react';
 import App from '../App';
-import { AuthProvider } from '../common/contexts/AuthContext';
+import { renderWithAuth } from '../test/render';
 import { usersAPI } from '../common/api';
 import type { UserResponse } from '../common/types';
 import { SUBSITES } from '../subsites';
@@ -35,14 +35,10 @@ const user = (overrides: Partial<UserResponse> = {}): UserResponse => ({
   ...overrides,
 });
 
-const renderAdmin = (me: UserResponse = user()) => {
+const renderAdmin = async (me: UserResponse = user()) => {
   window.history.pushState({}, '', '/admin/');
   vi.mocked(usersAPI.getMe).mockResolvedValue(me);
-  render(
-    <AuthProvider>
-      <App />
-    </AuthProvider>
-  );
+  await renderWithAuth(<App />);
 };
 
 describe('KALX Staff Admin', () => {
@@ -83,7 +79,7 @@ describe('KALX Staff Admin', () => {
 
   it("lists every sub-site's jobs and runs one", async () => {
     vi.mocked(adminAPI.triggerJob).mockResolvedValue({ success: true, message: 'Synced 3 staff' });
-    renderAdmin();
+    await renderAdmin();
 
     const row = (await screen.findByText('Sync users from Airtable')).closest('tr')!;
     expect(within(row).getByText('Common')).toBeInTheDocument();
@@ -97,17 +93,17 @@ describe('KALX Staff Admin', () => {
   });
 
   it('offers impersonation only on staging', async () => {
-    renderAdmin();
+    await renderAdmin();
     await screen.findByText('Sync users from Airtable');
     expect(screen.queryByRole('heading', { name: 'User Impersonation' })).not.toBeInTheDocument();
     cleanup();
 
-    renderAdmin(user({ is_staging: true }));
+    await renderAdmin(user({ is_staging: true }));
     expect(await screen.findByRole('heading', { name: 'User Impersonation' })).toBeInTheDocument();
   });
 
   it('shows who an admin is impersonating, with a way to end it', async () => {
-    renderAdmin(user({ is_staging: true, email: 'amy@example.com', impersonating_email: 'amy@example.com' }));
+    await renderAdmin(user({ is_staging: true, email: 'amy@example.com', impersonating_email: 'amy@example.com' }));
 
     expect(await screen.findByText(/Viewing as amy@example.com/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'End impersonation' })).toBeInTheDocument();

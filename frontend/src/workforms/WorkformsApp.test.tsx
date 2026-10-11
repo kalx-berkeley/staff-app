@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import App from '../App';
-import { AuthProvider } from '../common/contexts/AuthContext';
+import { renderWithAuth } from '../test/render';
 import { usersAPI } from '../common/api';
 import type { UserResponse } from '../common/types';
 import { reviewAPI, workformsAPI } from './api';
@@ -81,11 +81,7 @@ const workform = (overrides: Partial<Workform> = {}): Workform => ({
 const renderAt = async (path: string, me: UserResponse = user()) => {
   window.history.pushState({}, '', path);
   vi.mocked(usersAPI.getMe).mockResolvedValue(me);
-  render(
-    <AuthProvider>
-      <App />
-    </AuthProvider>
-  );
+  await renderWithAuth(<App />);
 };
 
 describe('KALX Workforms month page', () => {

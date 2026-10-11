@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, within, cleanup, fireEvent } from '@testing-library/react';
+import { screen, waitFor, within, cleanup, fireEvent } from '@testing-library/react';
 import App from '../App';
-import { AuthProvider } from '../common/contexts/AuthContext';
+import { renderWithAuth } from '../test/render';
 import { directoryAPI } from './api';
 import { usersAPI } from '../common/api';
 import type { DirectoryEntry } from './types';
@@ -88,11 +88,7 @@ const renderDirectory = async (path = '/directory') => {
   window.history.pushState({}, '', path);
   vi.mocked(usersAPI.getMe).mockResolvedValue(staffUser);
   vi.mocked(directoryAPI.list).mockResolvedValue(ENTRIES);
-  render(
-    <AuthProvider>
-      <App />
-    </AuthProvider>,
-  );
+  await renderWithAuth(<App />);
   await screen.findByRole('table');
 };
 
@@ -241,11 +237,7 @@ describe('DirectoryPage', () => {
     vi.mocked(directoryAPI.list).mockResolvedValue([
       entry({ id: 1, name: 'Amy Adams', email: 'amy@example.com', loa_start: '2030-03-01' }),
     ]);
-    render(
-      <AuthProvider>
-        <App />
-      </AuthProvider>,
-    );
+    await renderWithAuth(<App />);
 
     const panel = await screen.findByRole('dialog', { name: /Amy Adams/ });
     expect(
@@ -269,11 +261,7 @@ describe('DirectoryPage', () => {
     vi.mocked(directoryAPI.list).mockResolvedValue([
       entry({ id: 4, name: 'Dee Diaz', dj_name: 'DJ Dee', dj_personas: [{ id: 8, name: 'DJ Dee' }] }),
     ]);
-    render(
-      <AuthProvider>
-        <App />
-      </AuthProvider>,
-    );
+    await renderWithAuth(<App />);
 
     const panel = await screen.findByRole('dialog', { name: /Dee Diaz/ });
     const row = screen.getByRole('link', { name: 'Dee Diaz' }).closest('tr')!;
@@ -312,11 +300,7 @@ describe('DirectoryPage', () => {
         loa_end: '2000-02-01',
       }),
     ]);
-    render(
-      <AuthProvider>
-        <App />
-      </AuthProvider>,
-    );
+    await renderWithAuth(<App />);
 
     const panel = await screen.findByRole('dialog', { name: /Eve Ellis/ });
     const row = screen.getByRole('link', { name: 'Eve Ellis' }).closest('tr')!;
@@ -335,11 +319,7 @@ describe('DirectoryPage', () => {
     vi.mocked(directoryAPI.list).mockResolvedValue([
       entry({ id: 5, name: 'Eve Ellis', statuses: ['Active', 'On leave'] }),
     ]);
-    render(
-      <AuthProvider>
-        <App />
-      </AuthProvider>,
-    );
+    await renderWithAuth(<App />);
 
     const panel = await screen.findByRole('dialog', { name: /Eve Ellis/ });
     expect(
