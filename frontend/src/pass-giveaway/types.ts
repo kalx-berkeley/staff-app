@@ -45,6 +45,7 @@ export interface PromoterContactResponse extends PromoterContactCreate {
 
 export interface PromoterCreate {
   name: string;
+  show_sourcing_instructions?: string | null;
   pass_call_instructions?: string | null;
   requires_phone_number?: boolean;
   requires_email_address?: boolean;
@@ -55,6 +56,7 @@ export interface PromoterCreate {
 
 export interface PromoterUpdate {
   name?: string;
+  show_sourcing_instructions?: string | null;
   pass_call_instructions?: string | null;
   requires_phone_number?: boolean;
   requires_email_address?: boolean;
@@ -66,6 +68,7 @@ export interface PromoterUpdate {
 export interface PromoterResponse {
   id: number;
   name: string;
+  show_sourcing_instructions: string | null;
   pass_call_instructions: string | null;
   requires_phone_number: boolean;
   requires_email_address: boolean;
@@ -90,6 +93,7 @@ export interface VenueContactResponse extends VenueContactCreate {
 export interface VenueCreate {
   name: string;
   address: string;
+  show_sourcing_instructions?: string | null;
   pass_call_instructions?: string | null;
   win_frequency_days?: number | null;
   default_wheelchair_accessible?: boolean | null;
@@ -111,6 +115,7 @@ export interface VenueCreate {
 export interface VenueUpdate {
   name?: string;
   address?: string;
+  show_sourcing_instructions?: string | null;
   pass_call_instructions?: string | null;
   win_frequency_days?: number | null;
   default_wheelchair_accessible?: boolean | null;
@@ -133,6 +138,7 @@ export interface VenueResponse {
   id: number;
   name: string;
   address: string;
+  show_sourcing_instructions: string | null;
   pass_call_instructions: string | null;
   win_frequency_days: number | null;
   default_wheelchair_accessible: boolean | null;

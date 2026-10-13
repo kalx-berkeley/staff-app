@@ -53,6 +53,7 @@ class PromoterService:
 
             promoter = Promoter(
                 name=promoter_data.name,
+                show_sourcing_instructions=promoter_data.show_sourcing_instructions,
                 pass_call_instructions=promoter_data.pass_call_instructions,
                 requires_phone_number=promoter_data.requires_phone_number,
                 requires_email_address=promoter_data.requires_email_address,
@@ -137,7 +138,11 @@ class PromoterService:
             if promoter_data.name is not None:
                 promoter.name = promoter_data.name
 
-            if promoter_data.pass_call_instructions is not None:
+            if "show_sourcing_instructions" in promoter_data.model_fields_set:
+                promoter.show_sourcing_instructions = (
+                    promoter_data.show_sourcing_instructions
+                )
+            if "pass_call_instructions" in promoter_data.model_fields_set:
                 promoter.pass_call_instructions = promoter_data.pass_call_instructions
             if promoter_data.requires_phone_number is not None:
                 promoter.requires_phone_number = promoter_data.requires_phone_number

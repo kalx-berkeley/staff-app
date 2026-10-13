@@ -30,6 +30,7 @@ class VenueCreate(BaseModel):
     address: str = Field(
         ..., min_length=1, max_length=500, description="Venue postal address"
     )
+    show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     win_frequency_days: int | None = None
     default_wheelchair_accessible: bool | None = None
@@ -55,6 +56,7 @@ class VenueUpdate(BaseModel):
 
     name: str | None = Field(None, min_length=1, max_length=200)
     address: str | None = Field(None, min_length=1, max_length=500)
+    show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     win_frequency_days: int | None = None
     default_wheelchair_accessible: bool | None = None
@@ -81,6 +83,7 @@ class VenueResponse(BaseModel):
     id: int
     name: str
     address: str
+    show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     win_frequency_days: int | None = None
     default_wheelchair_accessible: bool | None = None
@@ -107,6 +110,7 @@ class VenueResponse(BaseModel):
             id=venue.id,
             name=venue.name,
             address=venue.address,
+            show_sourcing_instructions=venue.show_sourcing_instructions,
             pass_call_instructions=venue.pass_call_instructions,
             win_frequency_days=venue.win_frequency_days,
             default_wheelchair_accessible=venue.default_wheelchair_accessible,

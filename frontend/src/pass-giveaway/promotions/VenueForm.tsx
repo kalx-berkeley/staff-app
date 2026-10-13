@@ -24,6 +24,7 @@ const emptyContact = (): VenueContactCreate => ({
 const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: VenueFormProps) => {
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  const [showSourcingInstructions, setShowSourcingInstructions] = useState('');
   const [passCallInstructions, setPassCallInstructions] = useState('');
   const [winFrequencyDays, setWinFrequencyDays] = useState('');
   const [defaultWheelchair, setDefaultWheelchair] = useState<'' | 'true' | 'false'>('');
@@ -60,6 +61,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
     if (venue) {
       setName(venue.name);
       setAddress(venue.address);
+      setShowSourcingInstructions(venue.show_sourcing_instructions || '');
       setPassCallInstructions(venue.pass_call_instructions || '');
       setWinFrequencyDays(venue.win_frequency_days != null ? String(venue.win_frequency_days) : '');
       setDefaultWheelchair(
@@ -194,6 +196,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
     setSubmitting(true);
 
     const winDays = winFrequencyDays.trim() ? Number(winFrequencyDays) : null;
+    const sourcingInstructions = showSourcingInstructions.trim() || null;
     const instructions = passCallInstructions.trim() || null;
     const defaultWheelchairValue = defaultWheelchair === 'true' ? true : defaultWheelchair === 'false' ? false : null;
     const defaultAgeValue = (defaultAgeRestriction || null) as AgeRestriction | null;
@@ -211,6 +214,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
         const updateData: VenueUpdate = {
           name: name.trim(),
           address: address.trim(),
+          show_sourcing_instructions: sourcingInstructions,
           pass_call_instructions: instructions,
           win_frequency_days: winDays,
           default_wheelchair_accessible: defaultWheelchairValue,
@@ -233,6 +237,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
         const createData: VenueCreate = {
           name: name.trim(),
           address: address.trim(),
+          show_sourcing_instructions: sourcingInstructions,
           pass_call_instructions: instructions,
           win_frequency_days: winDays,
           default_wheelchair_accessible: defaultWheelchairValue,
@@ -392,6 +397,21 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
               When checked, a promoter selection field appears in the new show form whenever this
               venue is selected, allowing individual shows to be assigned a different promoter.
             </span>
+          </div>
+
+          <div className="form-group">
+            <div className="label-with-help">
+              <label htmlFor="venue-sourcing-instructions">Venue Show Sourcing Instructions</label>
+              <Tooltip text="Notes for promotions staff on how to find out which shows this venue will give us passes for, and how many: when to check, where to look and who to ask." />
+            </div>
+            <textarea
+              id="venue-sourcing-instructions"
+              value={showSourcingInstructions}
+              onChange={(e) => setShowSourcingInstructions(e.target.value)}
+              disabled={submitting}
+              rows={3}
+              placeholder="How to find out which shows this venue has passes for..."
+            />
           </div>
 
           <div className="form-group">

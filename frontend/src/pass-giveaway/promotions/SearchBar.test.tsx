@@ -14,6 +14,7 @@ const makeVenue = (overrides: Partial<VenueResponse> = {}): VenueResponse => ({
   id: 1,
   name: 'Venue A',
   address: '123 Main St',
+  show_sourcing_instructions: null,
   pass_call_instructions: null,
   win_frequency_days: null,
   default_wheelchair_accessible: null,

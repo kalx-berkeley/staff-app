@@ -14,6 +14,7 @@ class Venue(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False, index=True)
     address = Column(String, nullable=False)
+    show_sourcing_instructions = Column(Text, nullable=True)
     pass_call_instructions = Column(Text, nullable=True)
     win_frequency_days = Column(Integer, nullable=True)
     default_wheelchair_accessible = Column(Boolean, nullable=True)

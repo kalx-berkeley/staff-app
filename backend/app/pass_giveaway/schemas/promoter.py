@@ -26,6 +26,7 @@ class PromoterCreate(BaseModel):
     name: str = Field(
         ..., min_length=1, max_length=200, description="Promoter name (must be unique)"
     )
+    show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     requires_phone_number: bool = False
     requires_email_address: bool = False
@@ -38,6 +39,7 @@ class PromoterUpdate(BaseModel):
     """Schema for updating an existing promoter."""
 
     name: str | None = Field(None, min_length=1, max_length=200)
+    show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     requires_phone_number: bool | None = None
     requires_email_address: bool | None = None
@@ -53,6 +55,7 @@ class PromoterResponse(BaseModel):
 
     id: int
     name: str
+    show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     requires_phone_number: bool = False
     requires_email_address: bool = False
@@ -66,6 +69,7 @@ class PromoterResponse(BaseModel):
         return cls(
             id=promoter.id,
             name=promoter.name,
+            show_sourcing_instructions=promoter.show_sourcing_instructions,
             pass_call_instructions=promoter.pass_call_instructions,
             requires_phone_number=promoter.requires_phone_number,
             requires_email_address=promoter.requires_email_address,

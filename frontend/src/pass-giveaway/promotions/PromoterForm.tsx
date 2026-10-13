@@ -21,6 +21,7 @@ const emptyContact = (): PromoterContactCreate => ({
 
 const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }: PromoterFormProps) => {
   const [name, setName] = useState('');
+  const [showSourcingInstructions, setShowSourcingInstructions] = useState('');
   const [passCallInstructions, setPassCallInstructions] = useState('');
   const [requiresPhoneNumber, setRequiresPhoneNumber] = useState(false);
   const [requiresEmailAddress, setRequiresEmailAddress] = useState(false);
@@ -39,6 +40,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
   useEffect(() => {
     if (promoter) {
       setName(promoter.name);
+      setShowSourcingInstructions(promoter.show_sourcing_instructions || '');
       setPassCallInstructions(promoter.pass_call_instructions || '');
       setRequiresPhoneNumber(promoter.requires_phone_number ?? false);
       setRequiresEmailAddress(promoter.requires_email_address ?? false);
@@ -125,6 +127,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
       if (promoter) {
         const updateData: PromoterUpdate = {
           name: name.trim(),
+          show_sourcing_instructions: showSourcingInstructions.trim() || null,
           pass_call_instructions: passCallInstructions.trim() || null,
           requires_phone_number: requiresPhoneNumber,
           requires_email_address: requiresEmailAddress,
@@ -136,6 +139,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
       } else {
         const createData: PromoterCreate = {
           name: name.trim(),
+          show_sourcing_instructions: showSourcingInstructions.trim() || null,
           pass_call_instructions: passCallInstructions.trim() || null,
           requires_phone_number: requiresPhoneNumber,
           requires_email_address: requiresEmailAddress,
@@ -219,6 +223,18 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
           disabled={submitting}
         />
         {errors.name && <span className="field-error">{errors.name}</span>}
+      </div>
+
+      <div className="form-group">
+        <label htmlFor="promoter-sourcing-instructions">Promoter Show Sourcing Instructions</label>
+        <textarea
+          id="promoter-sourcing-instructions"
+          value={showSourcingInstructions}
+          onChange={(e) => setShowSourcingInstructions(e.target.value)}
+          disabled={submitting}
+          rows={3}
+          placeholder="How to find out which shows this promoter has passes for..."
+        />
       </div>
 
       <div className="form-group">

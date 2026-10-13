@@ -68,6 +68,7 @@ class VenueService:
             venue = Venue(
                 name=venue_data.name,
                 address=venue_data.address,
+                show_sourcing_instructions=venue_data.show_sourcing_instructions,
                 pass_call_instructions=venue_data.pass_call_instructions,
                 win_frequency_days=venue_data.win_frequency_days,
                 default_wheelchair_accessible=venue_data.default_wheelchair_accessible,
@@ -161,7 +162,9 @@ class VenueService:
                 venue.name = venue_data.name
             if venue_data.address is not None:
                 venue.address = venue_data.address
-            if venue_data.pass_call_instructions is not None:
+            if "show_sourcing_instructions" in venue_data.model_fields_set:
+                venue.show_sourcing_instructions = venue_data.show_sourcing_instructions
+            if "pass_call_instructions" in venue_data.model_fields_set:
                 venue.pass_call_instructions = venue_data.pass_call_instructions
             if venue_data.win_frequency_days is not None:
                 venue.win_frequency_days = venue_data.win_frequency_days

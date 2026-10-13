@@ -13,6 +13,7 @@ class Promoter(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False, index=True)
+    show_sourcing_instructions = Column(Text, nullable=True)
     pass_call_instructions = Column(Text, nullable=True)
     requires_phone_number = Column(
         Boolean, nullable=False, default=False, server_default="false"

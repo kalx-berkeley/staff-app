@@ -67,3 +67,28 @@ def test_only_promotions_staff_can_read_promoters(
         response = client.get(url, headers=headers)
         assert response.status_code in (401, 403), url
         assert "pat@example.com" not in response.text
+
+
+@pytest.mark.parametrize("field", ["show_sourcing_instructions", "pass_call_instructions"])
+def test_instructions_can_be_set_and_cleared(
+    client: TestClient, db: Session, promoter, field
+):
+    """Instructions are saved on update and can be cleared again."""
+    _staff(db, "promo@example.com", department="Promotions")
+    headers = {"X-Forwarded-User": "promo@example.com"}
+
+    set_response = client.put(
+        f"/api/promoters/{promoter.id}",
+        json={field: "They email a list on the 1st."},
+        headers=headers,
+    )
+    cleared_response = client.put(
+        f"/api/promoters/{promoter.id}",
+        json={field: None},
+        headers=headers,
+    )
+
+    assert set_response.status_code == 200
+    assert set_response.json()[field] == "They email a list on the 1st."
+    assert cleared_response.status_code == 200
+    assert cleared_response.json()[field] is None

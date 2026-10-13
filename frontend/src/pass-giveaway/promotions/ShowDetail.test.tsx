@@ -95,6 +95,7 @@ const makeShow = (passes: PassResponse[]): ShowResponse => ({
     id: 1,
     name: 'Test Venue',
     address: '123 Main St',
+    show_sourcing_instructions: null,
     pass_call_instructions: null,
     win_frequency_days: null,
     default_wheelchair_accessible: null,

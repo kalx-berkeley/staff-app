@@ -20,6 +20,7 @@ const makeVenue = (overrides: Partial<VenueResponse> = {}): VenueResponse => ({
   id: 1,
   name: 'Existing Venue',
   address: '456 Old St',
+  show_sourcing_instructions: null,
   pass_call_instructions: null,
   win_frequency_days: null,
   default_wheelchair_accessible: null,
@@ -214,6 +215,36 @@ describe('VenueForm', () => {
           address: '456 Old St',
         }));
       });
+    });
+  });
+
+  describe('Show Sourcing Instructions', () => {
+    it('should load and save show sourcing instructions', async () => {
+      const existingVenue = makeVenue({ show_sourcing_instructions: 'Check in mid-month.' });
+
+      vi.mocked(venuesAPI.update).mockResolvedValue(existingVenue);
+
+      render(
+        <VenueForm
+          venue={existingVenue}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+
+      const sourcingInput = screen.getByLabelText(/show sourcing instructions/i);
+      expect(sourcingInput).toHaveValue('Check in mid-month.');
+      fireEvent.change(sourcingInput, { target: { value: '  ' } });
+
+      fireEvent.click(screen.getByRole('button', { name: /update/i }));
+
+      await waitFor(() => {
+        expect(venuesAPI.update).toHaveBeenCalledWith(1, expect.objectContaining({
+          show_sourcing_instructions: null,
+        }));
+      });
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalled());
     });
   });
 

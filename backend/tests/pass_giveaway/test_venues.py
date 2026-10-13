@@ -111,6 +111,34 @@ def test_update_venue(client: TestClient, test_promotions_staff):
     assert data["address"] == "Updated Address"
 
 
+@pytest.mark.parametrize("field", ["show_sourcing_instructions", "pass_call_instructions"])
+def test_instructions_can_be_set_and_cleared(
+    client: TestClient, test_promotions_staff, field
+):
+    """Instructions are saved on create and can be cleared on update."""
+    headers = {"X-Forwarded-User": test_promotions_staff.email}
+    create_response = client.post(
+        "/api/venues",
+        json={
+            "name": "Ivy Room",
+            "address": "860 San Pablo Ave, Albany, CA",
+            field: "Check the calendar and ask the booker.",
+        },
+        headers=headers,
+    )
+    assert create_response.status_code == 201
+    venue = create_response.json()
+    assert venue[field] == "Check the calendar and ask the booker."
+
+    response = client.put(
+        f"/api/venues/{venue['id']}",
+        json={field: None},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()[field] is None
+
+
 def test_create_duplicate_venue_name(client: TestClient, test_promotions_staff):
     """Test that creating a venue with duplicate name fails."""
     # Create first venue

@@ -274,6 +274,7 @@ def update_venue(
         before = {
             "name": existing.name,
             "address": existing.address,
+            "show_sourcing_instructions": existing.show_sourcing_instructions,
             "pass_call_instructions": existing.pass_call_instructions,
             "win_frequency_days": existing.win_frequency_days,
         }
@@ -283,6 +284,7 @@ def update_venue(
     after = {
         "name": venue.name,
         "address": venue.address,
+        "show_sourcing_instructions": venue.show_sourcing_instructions,
         "pass_call_instructions": venue.pass_call_instructions,
         "win_frequency_days": venue.win_frequency_days,
     }
