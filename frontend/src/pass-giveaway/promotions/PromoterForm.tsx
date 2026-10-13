@@ -222,14 +222,14 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
       </div>
 
       <div className="form-group">
-        <label htmlFor="promoter-pass-instructions">Pass Call Instructions</label>
+        <label htmlFor="promoter-pass-instructions">Promoter Call-In Instructions</label>
         <textarea
           id="promoter-pass-instructions"
           value={passCallInstructions}
           onChange={(e) => setPassCallInstructions(e.target.value)}
           disabled={submitting}
           rows={3}
-          placeholder="Instructions for DJs when calling in pass claims..."
+          placeholder="How to call in the guest list to this promoter..."
         />
       </div>
 

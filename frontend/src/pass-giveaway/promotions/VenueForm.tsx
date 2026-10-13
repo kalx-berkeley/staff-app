@@ -396,8 +396,8 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
 
           <div className="form-group">
             <div className="label-with-help">
-            <label htmlFor="venue-pass-instructions">Pass Call Instructions</label>
-            <Tooltip text="These instructions are shown to DJs on the giveaway page for shows at this venue — e.g. how winners should claim their passes at the door." />
+            <label htmlFor="venue-pass-instructions">Venue Call-In Instructions</label>
+            <Tooltip text="Notes for promotions staff on how to call in the guest list to this venue. Shown on the promotions page for a show at this venue once the giveaway closes." />
           </div>
             <textarea
               id="venue-pass-instructions"
@@ -405,7 +405,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
               onChange={(e) => setPassCallInstructions(e.target.value)}
               disabled={submitting}
               rows={3}
-              placeholder="Instructions for DJs when calling in pass claims..."
+              placeholder="How to call in the guest list to this venue..."
             />
           </div>
 
