@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { promotersAPI, venuesAPI } from '../api';
-import { PersonAutocomplete, extractPersonEmail } from '../components';
+import { Tooltip, PersonAutocomplete, extractPersonEmail } from '../components';
 import type { PromoterResponse, PromoterCreate, PromoterUpdate, PromoterContactCreate, PromotionsStaffOption } from '../types';
 import type { APIError, ValidationError } from '../../common/types';
 
@@ -226,7 +226,10 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
       </div>
 
       <div className="form-group">
-        <label htmlFor="promoter-sourcing-instructions">Promoter Show Sourcing Instructions</label>
+        <div className="label-with-help">
+          <label htmlFor="promoter-sourcing-instructions">Promoter Show Sourcing Instructions</label>
+          <Tooltip text="Notes for promotions staff on how to find out which shows this promoter will give us passes for, and how many: when to check, where to look and who to ask." />
+        </div>
         <textarea
           id="promoter-sourcing-instructions"
           value={showSourcingInstructions}
@@ -238,7 +241,10 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
       </div>
 
       <div className="form-group">
-        <label htmlFor="promoter-pass-instructions">Promoter Call-In Instructions</label>
+        <div className="label-with-help">
+          <label htmlFor="promoter-pass-instructions">Promoter Call-In Instructions</label>
+          <Tooltip text="Notes for promotions staff on how to call in the guest list to this promoter. Shown only on this form." />
+        </div>
         <textarea
           id="promoter-pass-instructions"
           value={passCallInstructions}
