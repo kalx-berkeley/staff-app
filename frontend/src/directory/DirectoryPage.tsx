@@ -256,6 +256,8 @@ export default function DirectoryPage() {
           className="directory-search"
           placeholder="Search names, emails, phone numbers, titles…"
           aria-label="Search the staff directory"
+          // A detail panel opened from its URL takes focus from this after mount.
+          autoFocus
           value={view.query}
           onChange={(event) => table.setGlobalFilter(event.target.value)}
         />

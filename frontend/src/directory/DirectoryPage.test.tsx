@@ -131,6 +131,19 @@ describe('DirectoryPage', () => {
     expect(document.title).toBe('KALX Staff Directory');
   });
 
+  it('puts the cursor in the search box on arrival', async () => {
+    await renderDirectory();
+
+    expect(screen.getByRole('searchbox', { name: /search the staff directory/i })).toHaveFocus();
+  });
+
+  it('focuses the detail panel, not the search box, when arriving at a staff member', async () => {
+    await renderDirectory('/directory/2');
+
+    const panel = await screen.findByRole('dialog', { name: /Bea Brown/ });
+    expect(panel).toContainElement(document.activeElement as HTMLElement);
+  });
+
   it('searches, including by phone digits and titles, and keeps the query in the URL', async () => {
     await renderDirectory();
     const search = screen.getByRole('searchbox', { name: /search the staff directory/i });
