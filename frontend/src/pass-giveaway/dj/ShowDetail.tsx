@@ -5,6 +5,7 @@ import { DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, KalxLiveBa
 import MarkdownContent from '../../common/components/MarkdownContent';
 import { formatPhone } from '../../common/utils';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
+import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, findRecentDjGiveaway } from '../utils';
 import type { ShowResponse, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 
@@ -115,6 +116,7 @@ const ShowDetail = () => {
   const availablePasses = sortAvailablePasses(passPairs.filter((p) => p.status === 'available'));
   const givenAwayPasses = passPairs.filter((p) => p.status === 'given_away');
   const hasPreviousActivity = givenAwayPasses.length > 0 || show.attempts.length > 0;
+  const recentDjGiveaway = findRecentDjGiveaway(givenAwayPasses, djName);
   const age = show.age_restriction;
 
   return (
@@ -194,6 +196,19 @@ const ShowDetail = () => {
           </span>
         </div>
       </div>
+
+      {recentDjGiveaway && (
+        <div className="dj-show-limit-warning" role="alert">
+          <p>
+            <strong>You've already given away a pass pair to this show this DJ shift</strong>
+            {recentDjGiveaway.given_away_at && ` (at ${formatDateTime(recentDjGiveaway.given_away_at)})`}.
+          </p>
+          <p>
+            DJs are limited to 1 pair of passes for each show within{' '}
+            {DJ_SHOW_GIVEAWAY_WINDOW_HOURS} hours, so please pick a different show.
+          </p>
+        </div>
+      )}
 
       {availablePasses.length > 0 && (
         <div className="kalx-winner-cta">

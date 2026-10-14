@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isStagingSublistDjStaff } from './utils';
+import { findRecentDjGiveaway, isStagingSublistDjStaff } from './utils';
 import type { UserResponse } from '../common/types';
 
 describe('isStagingSublistDjStaff', () => {
@@ -34,5 +34,38 @@ describe('isStagingSublistDjStaff', () => {
   it('denies a missing user', () => {
     expect(isStagingSublistDjStaff(null)).toBe(false);
     expect(isStagingSublistDjStaff(undefined)).toBe(false);
+  });
+});
+
+describe('findRecentDjGiveaway', () => {
+  const now = new Date('2026-10-14T20:00:00Z');
+  const pass = (given_away_by_dj: string | null, given_away_at: string | null) => ({
+    given_away_by_dj,
+    given_away_at,
+  });
+
+  it('finds a giveaway by the same DJ within the last 4 hours', () => {
+    const passes = [pass('DJ Test', '2026-10-14T17:30:00Z')];
+    expect(findRecentDjGiveaway(passes, 'DJ Test', now)).toBe(passes[0]);
+  });
+
+  it('ignores case and surrounding spaces in the DJ name', () => {
+    const passes = [pass('DJ Test', '2026-10-14T19:00:00Z')];
+    expect(findRecentDjGiveaway(passes, '  dj test ', now)).toBe(passes[0]);
+  });
+
+  it('ignores giveaways older than 4 hours', () => {
+    const passes = [pass('DJ Test', '2026-10-14T15:59:00Z')];
+    expect(findRecentDjGiveaway(passes, 'DJ Test', now)).toBeUndefined();
+  });
+
+  it('ignores giveaways by other DJs', () => {
+    const passes = [pass('DJ Other', '2026-10-14T19:00:00Z')];
+    expect(findRecentDjGiveaway(passes, 'DJ Test', now)).toBeUndefined();
+  });
+
+  it('finds nothing when no DJ name is entered', () => {
+    const passes = [pass(null, null), pass('DJ Test', '2026-10-14T19:00:00Z')];
+    expect(findRecentDjGiveaway(passes, ' ', now)).toBeUndefined();
   });
 });

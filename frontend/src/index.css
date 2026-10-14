@@ -1810,6 +1810,20 @@ fieldset.radio-group legend {
   margin-top: 1rem;
 }
 
+/* Shown when this DJ already gave away a pair for the show this shift */
+.dj-show-limit-warning {
+  background: #fff3cd;
+  border: 1px solid var(--warning-color);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  font-size: 1.1rem;
+}
+
+.dj-show-limit-warning p {
+  margin: 0.25rem 0;
+}
+
 /* Winner CTA — now floated above the pass list */
 .kalx-winner-cta {
   margin: 1rem 0;
