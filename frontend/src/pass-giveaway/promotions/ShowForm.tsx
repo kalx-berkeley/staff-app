@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { showsAPI, venuesAPI, venuesMyAPI, promotersAPI } from '../api';
-import { Tooltip, BandAnnotator, DatePicker } from '../components';
+import { Tooltip, BandAnnotator, DatePicker, DescriptionCheckFeedback, useDescriptionCheck } from '../components';
 import { formatPhone } from '../../common/utils';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import type { DescriptionAnalysis, DescriptionFindingCategory, ShowCreate, ShowUpdate, ShowBand, MusicBrainzArtist, VenueResponse, AgeRestriction, PassResponse, PromoterResponse, PassAdjustmentResult } from '../types';
+import type { ShowCreate, ShowUpdate, ShowBand, MusicBrainzArtist, VenueResponse, AgeRestriction, PassResponse, PromoterResponse, PassAdjustmentResult } from '../types';
 import type { APIError, ValidationError } from '../../common/types';
 
 interface DeleteConfirmModalProps {
@@ -139,17 +139,6 @@ const PassAdjustmentModal = ({ eventName, adjustment, onClose }: PassAdjustmentM
   </div>
 );
 
-/** Short label shown beside each finding in the on-air description warning. */
-const FINDING_CATEGORY_LABELS: Record<DescriptionFindingCategory, string> = {
-  terminology: 'Wrong term',
-  call_to_action: 'Call to action',
-  comparative: 'Comparative claim',
-  endorsement: 'Endorsement',
-  hype: 'Station hype',
-  emphasis: 'Emphasis',
-  subjective: 'Opinion',
-};
-
 const ShowForm = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -169,14 +158,7 @@ const ShowForm = () => {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const venueToggleMounted = useRef(false);
 
-  const [descriptionAnalysis, setDescriptionAnalysis] = useState<DescriptionAnalysis | null>(
-    null
-  );
-  const [analyzingDescription, setAnalyzingDescription] = useState(false);
-  const [analysisDismissed, setAnalysisDismissed] = useState(false);
-  // The exact text last sent for analysis, so leaving the field without
-  // changing anything does not re-run the check.
-  const analyzedText = useRef<string | null>(null);
+  const descriptionCheck = useDescriptionCheck();
 
   const [genreLookupInProgress, setGenreLookupInProgress] = useState(false);
   const [knownGenres, setKnownGenres] = useState<string[]>([]);
@@ -237,6 +219,8 @@ const ShowForm = () => {
           if (only.default_num_pass_pairs != null) {
             setNumPassPairs(only.default_num_pass_pairs);
           }
+          setOnAirDescription(only.default_on_air_description ?? '');
+          setCallerSpecialInstructions(only.default_caller_special_instructions ?? '');
           setLotteryEnabled(only.default_lottery_enabled ?? false);
           setLotteryWindowHours(String(only.default_lottery_window_hours ?? 24));
           setDjPreassignProhibitionDays(
@@ -353,11 +337,34 @@ const ShowForm = () => {
     }
   };
 
+  // Fill the on-air description and caller special instructions from the
+  // venue's defaults, but only when the field is empty or still holds the
+  // previous venue's default, so text the user wrote is kept.
+  const applyVenueTextDefaults = (
+    previous: VenueResponse | undefined,
+    selected: VenueResponse | undefined
+  ) => {
+    const pick = (current: string, oldDefault?: string | null, newDefault?: string | null) =>
+      !current.trim() || current === (oldDefault ?? '') ? (newDefault ?? '') : current;
+    setOnAirDescription((current) =>
+      pick(current, previous?.default_on_air_description, selected?.default_on_air_description)
+    );
+    setCallerSpecialInstructions((current) =>
+      pick(
+        current,
+        previous?.default_caller_special_instructions,
+        selected?.default_caller_special_instructions
+      )
+    );
+  };
+
   const handleVenueChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newId = e.target.value ? parseInt(e.target.value) : '';
+    const previous = venueId !== '' ? venues.find((v) => v.id === venueId) : undefined;
     setVenueId(newId);
     if (newId !== '') {
       const selected = venues.find((v) => v.id === newId);
+      applyVenueTextDefaults(previous, selected);
       setPromoterId(selected?.promoter_id ?? null);
       if (selected?.default_wheelchair_accessible !== null && selected?.default_wheelchair_accessible !== undefined) {
         setWheelchairAccessible(selected.default_wheelchair_accessible);
@@ -420,31 +427,6 @@ const ShowForm = () => {
       // silently ignore genre lookup failures
     } finally {
       setGenreLookupInProgress(false);
-    }
-  };
-
-  const handleOnAirDescriptionBlur = async () => {
-    const text = onAirDescription.trim();
-    if (text === analyzedText.current) return;
-    analyzedText.current = text;
-    setAnalysisDismissed(false);
-    if (!text) {
-      setDescriptionAnalysis(null);
-      return;
-    }
-    setAnalyzingDescription(true);
-    try {
-      const analysis = await showsAPI.analyzeDescription(text);
-      // Drop the result if the description changed while we were waiting.
-      if (analyzedText.current === text) {
-        setDescriptionAnalysis(analysis);
-      }
-    } catch {
-      // The check is advisory, so a failure must never get in the way of
-      // writing or saving the show.
-      setDescriptionAnalysis(null);
-    } finally {
-      setAnalyzingDescription(false);
     }
   };
 
@@ -632,21 +614,6 @@ const ShowForm = () => {
       setSubmitting(false);
     }
   };
-
-  // Overall enthusiasm counts as a warning on its own: the wording can read as
-  // promotional even when no single phrase is quotable.
-  const hasLanguageWarning =
-    !!descriptionAnalysis &&
-    (descriptionAnalysis.findings.length > 0 || descriptionAnalysis.reads_promotional);
-
-  // Several findings usually share one piece of advice, so only spell it out
-  // the first time it comes up.
-  const seenSuggestions = new Set<string>();
-  const languageFindings = (descriptionAnalysis?.findings ?? []).map((finding) => {
-    const showSuggestion = !seenSuggestions.has(finding.suggestion);
-    seenSuggestions.add(finding.suggestion);
-    return { finding, showSuggestion };
-  });
 
   if (loading) {
     return <div className="loading">Loading...</div>;
@@ -915,63 +882,12 @@ const ShowForm = () => {
             id="on_air_description"
             value={onAirDescription}
             onChange={(e) => setOnAirDescription(e.target.value)}
-            onBlur={handleOnAirDescriptionBlur}
+            onBlur={() => descriptionCheck.check(onAirDescription)}
             disabled={submitting}
             rows={3}
             placeholder="Optional on-air description of the show..."
           />
-          {analyzingDescription && (
-            <span className="field-help">
-              Checking the description for non-value-neutral language...
-            </span>
-          )}
-          {!analyzingDescription && descriptionAnalysis && !hasLanguageWarning && (
-            <span className="field-help">
-              No non-value-neutral language detected.
-            </span>
-          )}
-          {descriptionAnalysis && hasLanguageWarning && !analysisDismissed && (
-            <div className="description-warning" role="status">
-              <div className="description-warning-header">
-                <strong>This description may not be value neutral</strong>
-                <button
-                  type="button"
-                  className="description-warning-dismiss"
-                  onClick={() => setAnalysisDismissed(true)}
-                  aria-label="Dismiss description warning"
-                >
-                  &times;
-                </button>
-              </div>
-              <p className="description-warning-summary">{descriptionAnalysis.summary}</p>
-              {languageFindings.length > 0 && (
-                <ul className="description-warning-findings">
-                  {languageFindings.map(({ finding, showSuggestion }) => (
-                    <li key={`${finding.start}-${finding.category}`}>
-                      <span className={`finding-tag finding-${finding.category}`}>
-                        {FINDING_CATEGORY_LABELS[finding.category]}
-                      </span>{' '}
-                      {finding.message}
-                      {showSuggestion && (
-                        <>
-                          {' '}
-                          <span className="description-warning-suggestion">
-                            {finding.suggestion}
-                          </span>
-                        </>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="description-warning-disclaimer">
-                This assessment is automated and it can be wrong &mdash; band names,
-                genre words and plain factual wording sometimes trip it. If the
-                description reads fine as written, ignore this warning. It does not
-                stop you from saving the show.
-              </p>
-            </div>
-          )}
+          <DescriptionCheckFeedback check={descriptionCheck} savedItem="show" />
         </div>
 
         <div className="form-group">

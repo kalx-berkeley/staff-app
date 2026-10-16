@@ -37,8 +37,8 @@ vi.mock('react-router-dom', async () => {
 
 describe('ShowForm', () => {
   const mockVenues: VenueResponse[] = [
-    { id: 1, name: 'Venue A', address: '123 Main St', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, default_age_restriction: null, default_num_pass_pairs: null, requires_phone_number: false, requires_email_address: false, staff_guest_requires_name: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, has_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], contacts: [] },
-    { id: 2, name: 'Venue B', address: '456 Oak Ave', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, default_age_restriction: null, default_num_pass_pairs: null, requires_phone_number: false, requires_email_address: false, staff_guest_requires_name: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, has_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], contacts: [] },
+    { id: 1, name: 'Venue A', address: '123 Main St', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, default_age_restriction: null, default_num_pass_pairs: null, requires_phone_number: false, requires_email_address: false, staff_guest_requires_name: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, default_on_air_description: null, default_caller_special_instructions: null, has_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], contacts: [] },
+    { id: 2, name: 'Venue B', address: '456 Oak Ave', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, default_age_restriction: null, default_num_pass_pairs: null, requires_phone_number: false, requires_email_address: false, staff_guest_requires_name: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, default_on_air_description: null, default_caller_special_instructions: null, has_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], contacts: [] },
   ];
 
   beforeEach(() => {
@@ -587,6 +587,70 @@ describe('ShowForm', () => {
       expect(
         screen.queryByText('This description may not be value neutral')
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Venue Text Defaults', () => {
+    const venuesWithText: VenueResponse[] = [
+      {
+        ...mockVenues[0],
+        default_on_air_description: 'Venue A description',
+        default_caller_special_instructions: 'Venue A instructions',
+      },
+      {
+        ...mockVenues[1],
+        default_on_air_description: 'Venue B description',
+        default_caller_special_instructions: null,
+      },
+    ];
+
+    const renderAndSelectVenue = async (venueId: string) => {
+      vi.mocked(venuesMyAPI.listMy).mockResolvedValue(venuesWithText);
+      renderShowForm();
+      await waitFor(() => {
+        expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+      });
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), {
+        target: { value: venueId },
+      });
+    };
+
+    it('fills the description and caller instructions from the venue', async () => {
+      await renderAndSelectVenue('1');
+
+      expect(await screen.findByLabelText(/on-air description/i)).toHaveValue(
+        'Venue A description'
+      );
+      expect(screen.getByLabelText(/caller special instructions/i)).toHaveValue(
+        'Venue A instructions'
+      );
+    });
+
+    it("replaces the previous venue's untouched defaults when the venue changes", async () => {
+      await renderAndSelectVenue('1');
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), {
+        target: { value: '2' },
+      });
+
+      expect(await screen.findByLabelText(/on-air description/i)).toHaveValue(
+        'Venue B description'
+      );
+      expect(screen.getByLabelText(/caller special instructions/i)).toHaveValue('');
+    });
+
+    it('keeps text the user wrote when the venue changes', async () => {
+      await renderAndSelectVenue('1');
+      fireEvent.change(screen.getByLabelText(/caller special instructions/i), {
+        target: { value: 'Bring ID' },
+      });
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), {
+        target: { value: '2' },
+      });
+
+      expect(await screen.findByLabelText(/on-air description/i)).toHaveValue(
+        'Venue B description'
+      );
+      expect(screen.getByLabelText(/caller special instructions/i)).toHaveValue('Bring ID');
     });
   });
 });

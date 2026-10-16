@@ -111,11 +111,19 @@ def test_update_venue(client: TestClient, test_promotions_staff):
     assert data["address"] == "Updated Address"
 
 
-@pytest.mark.parametrize("field", ["show_sourcing_instructions", "pass_call_instructions"])
-def test_instructions_can_be_set_and_cleared(
+@pytest.mark.parametrize(
+    "field",
+    [
+        "show_sourcing_instructions",
+        "pass_call_instructions",
+        "default_on_air_description",
+        "default_caller_special_instructions",
+    ],
+)
+def test_text_fields_can_be_set_and_cleared(
     client: TestClient, test_promotions_staff, field
 ):
-    """Instructions are saved on create and can be cleared on update."""
+    """Venue text fields are saved on create and can be cleared on update."""
     headers = {"X-Forwarded-User": test_promotions_staff.email}
     create_response = client.post(
         "/api/venues",

@@ -38,6 +38,8 @@ class Venue(Base):
     )
     default_dj_preassign_prohibition_days = Column(Integer, nullable=True)
     default_close_hours_before_show = Column(Integer, nullable=True)
+    default_on_air_description = Column(Text, nullable=True)
+    default_caller_special_instructions = Column(Text, nullable=True)
     promoter_id = Column(Integer, ForeignKey("promoters.id"), nullable=True)
     shows_have_external_promoter = Column(
         Boolean, nullable=False, default=False, server_default="false"

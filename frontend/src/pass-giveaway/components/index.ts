@@ -17,3 +17,6 @@ export { default as PersonAutocomplete } from './PersonAutocomplete';
 export type { PersonOption } from './PersonAutocomplete';
 export { extractPersonEmail } from './personUtils';
 export { AlternateQueueList, AlternateGuestForm } from './AlternateQueue';
+export { default as DescriptionCheckFeedback } from './DescriptionCheckFeedback';
+export { useDescriptionCheck } from './useDescriptionCheck';
+export type { DescriptionCheck } from './useDescriptionCheck';

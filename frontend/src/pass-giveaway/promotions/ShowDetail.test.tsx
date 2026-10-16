@@ -108,6 +108,8 @@ const makeShow = (passes: PassResponse[]): ShowResponse => ({
     default_lottery_window_hours: 24,
     default_dj_preassign_prohibition_days: null,
     default_close_hours_before_show: null,
+    default_on_air_description: null,
+    default_caller_special_instructions: null,
     has_logo: false,
     deleted: false,
     shows_have_external_promoter: false,

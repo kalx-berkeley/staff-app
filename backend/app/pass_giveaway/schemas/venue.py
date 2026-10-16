@@ -43,6 +43,8 @@ class VenueCreate(BaseModel):
     default_lottery_window_hours: int = 24
     default_dj_preassign_prohibition_days: int | None = None
     default_close_hours_before_show: int | None = None
+    default_on_air_description: str | None = Field(None, max_length=2000)
+    default_caller_special_instructions: str | None = Field(None, max_length=1000)
     promoter_id: int | None = Field(
         None, description="Default promoter for shows at this venue"
     )
@@ -69,6 +71,8 @@ class VenueUpdate(BaseModel):
     default_lottery_window_hours: int | None = None
     default_dj_preassign_prohibition_days: int | None = None
     default_close_hours_before_show: int | None = None
+    default_on_air_description: str | None = Field(None, max_length=2000)
+    default_caller_special_instructions: str | None = Field(None, max_length=1000)
     promoter_id: int | None = None
     shows_have_external_promoter: bool | None = None
     owner_emails: list[str] | None = None
@@ -96,6 +100,8 @@ class VenueResponse(BaseModel):
     default_lottery_window_hours: int = 24
     default_dj_preassign_prohibition_days: int | None = None
     default_close_hours_before_show: int | None = None
+    default_on_air_description: str | None = None
+    default_caller_special_instructions: str | None = None
     has_logo: bool = False
     deleted: bool = False
     promoter_id: int | None = None
@@ -123,6 +129,8 @@ class VenueResponse(BaseModel):
             default_lottery_window_hours=venue.default_lottery_window_hours,
             default_dj_preassign_prohibition_days=venue.default_dj_preassign_prohibition_days,
             default_close_hours_before_show=venue.default_close_hours_before_show,
+            default_on_air_description=venue.default_on_air_description,
+            default_caller_special_instructions=venue.default_caller_special_instructions,
             has_logo=bool(venue.logo_filename),
             promoter_id=venue.promoter_id,
             promoter=(

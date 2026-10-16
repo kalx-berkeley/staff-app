@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { venuesAPI, promotersAPI } from '../api';
-import { Tooltip, PersonAutocomplete, extractPersonEmail } from '../components';
+import { Tooltip, PersonAutocomplete, extractPersonEmail, DescriptionCheckFeedback, useDescriptionCheck } from '../components';
 import type { VenueResponse, VenueCreate, VenueUpdate, VenueContactCreate, AgeRestriction, PromoterResponse, PromotionsStaffOption } from '../types';
 import type { APIError, ValidationError } from '../../common/types';
 
@@ -37,6 +37,9 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   const [defaultLotteryWindowHours, setDefaultLotteryWindowHours] = useState('24');
   const [defaultDjPreassignProhibitionDays, setDefaultDjPreassignProhibitionDays] = useState('');
   const [defaultCloseHoursBeforeShow, setDefaultCloseHoursBeforeShow] = useState('');
+  const [defaultOnAirDescription, setDefaultOnAirDescription] = useState('');
+  const [defaultCallerSpecialInstructions, setDefaultCallerSpecialInstructions] = useState('');
+  const descriptionCheck = useDescriptionCheck();
   const [promoterId, setPromoterId] = useState<number | null>(null);
   const [showsHaveExternalPromoter, setShowsHaveExternalPromoter] = useState(false);
   const [promotersList, setPromotersList] = useState<PromoterResponse[]>([]);
@@ -63,6 +66,8 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
       setAddress(venue.address);
       setShowSourcingInstructions(venue.show_sourcing_instructions || '');
       setPassCallInstructions(venue.pass_call_instructions || '');
+      setDefaultOnAirDescription(venue.default_on_air_description || '');
+      setDefaultCallerSpecialInstructions(venue.default_caller_special_instructions || '');
       setWinFrequencyDays(venue.win_frequency_days != null ? String(venue.win_frequency_days) : '');
       setDefaultWheelchair(
         venue.default_wheelchair_accessible === true ? 'true'
@@ -227,6 +232,8 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           default_lottery_window_hours: defaultLotteryEnabled ? (parseInt(defaultLotteryWindowHours) || 24) : 24,
           default_dj_preassign_prohibition_days: defaultDjPreassignProhibitionDaysValue,
           default_close_hours_before_show: defaultCloseHoursBeforeShowValue,
+          default_on_air_description: defaultOnAirDescription.trim() || null,
+          default_caller_special_instructions: defaultCallerSpecialInstructions.trim() || null,
           promoter_id: promoterId,
           shows_have_external_promoter: showsHaveExternalPromoter,
           owner_emails: ownerEmails,
@@ -250,6 +257,8 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           default_lottery_window_hours: defaultLotteryEnabled ? (parseInt(defaultLotteryWindowHours) || 24) : 24,
           default_dj_preassign_prohibition_days: defaultDjPreassignProhibitionDaysValue,
           default_close_hours_before_show: defaultCloseHoursBeforeShowValue,
+          default_on_air_description: defaultOnAirDescription.trim() || null,
+          default_caller_special_instructions: defaultCallerSpecialInstructions.trim() || null,
           promoter_id: promoterId,
           shows_have_external_promoter: showsHaveExternalPromoter,
           owner_emails: ownerEmails,
@@ -502,6 +511,38 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
                 Default number of on-air pass pairs pre-filled when creating a new show at this venue (1–5).
               </span>
             </div>
+          </div>
+
+          <div className="form-group">
+            <div className="label-with-help">
+              <label htmlFor="venue-default-on-air-description">Default On-Air Description</label>
+              <Tooltip text="Pre-filled as the On-Air Description when creating a new show at this venue. Shown to DJs on the show detail page while they are on-air. Describe the show in a factual, value-neutral way. Supports Markdown formatting: headers, paragraphs, lists, blockquotes, bold/italic, and inline or block code. Links and images are not supported." />
+            </div>
+            <textarea
+              id="venue-default-on-air-description"
+              value={defaultOnAirDescription}
+              onChange={(e) => setDefaultOnAirDescription(e.target.value)}
+              onBlur={() => descriptionCheck.check(defaultOnAirDescription)}
+              disabled={submitting}
+              rows={3}
+              placeholder="Optional on-air description of the show..."
+            />
+            <DescriptionCheckFeedback check={descriptionCheck} savedItem="venue" />
+          </div>
+
+          <div className="form-group">
+            <div className="label-with-help">
+              <label htmlFor="venue-default-caller-instructions">Default Caller Special Instructions</label>
+              <Tooltip text="Pre-filled as the Caller Special Instructions when creating a new show at this venue. Shown to DJs on the give away page when recording a winner — e.g. age requirements, ID at door, or venue parking info. Supports Markdown formatting: headers, paragraphs, lists, blockquotes, bold/italic, and inline or block code. Links and images are not supported." />
+            </div>
+            <textarea
+              id="venue-default-caller-instructions"
+              value={defaultCallerSpecialInstructions}
+              onChange={(e) => setDefaultCallerSpecialInstructions(e.target.value)}
+              disabled={submitting}
+              rows={3}
+              placeholder="Optional instructions for DJs when recording the winner..."
+            />
           </div>
 
           <div className="form-section">

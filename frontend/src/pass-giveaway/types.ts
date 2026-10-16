@@ -106,6 +106,8 @@ export interface VenueCreate {
   default_lottery_window_hours?: number;
   default_dj_preassign_prohibition_days?: number | null;
   default_close_hours_before_show?: number | null;
+  default_on_air_description?: string | null;
+  default_caller_special_instructions?: string | null;
   promoter_id?: number | null;
   shows_have_external_promoter?: boolean;
   owner_emails?: string[];
@@ -128,6 +130,8 @@ export interface VenueUpdate {
   default_lottery_window_hours?: number;
   default_dj_preassign_prohibition_days?: number | null;
   default_close_hours_before_show?: number | null;
+  default_on_air_description?: string | null;
+  default_caller_special_instructions?: string | null;
   promoter_id?: number | null;
   shows_have_external_promoter?: boolean;
   owner_emails?: string[];
@@ -151,6 +155,8 @@ export interface VenueResponse {
   default_lottery_window_hours: number;
   default_dj_preassign_prohibition_days: number | null;
   default_close_hours_before_show: number | null;
+  default_on_air_description: string | null;
+  default_caller_special_instructions: string | null;
   has_logo: boolean;
   deleted: boolean;
   promoter_id?: number | null;

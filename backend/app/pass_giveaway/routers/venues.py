@@ -276,6 +276,8 @@ def update_venue(
             "address": existing.address,
             "show_sourcing_instructions": existing.show_sourcing_instructions,
             "pass_call_instructions": existing.pass_call_instructions,
+            "default_on_air_description": existing.default_on_air_description,
+            "default_caller_special_instructions": existing.default_caller_special_instructions,
             "win_frequency_days": existing.win_frequency_days,
         }
 
@@ -286,6 +288,8 @@ def update_venue(
         "address": venue.address,
         "show_sourcing_instructions": venue.show_sourcing_instructions,
         "pass_call_instructions": venue.pass_call_instructions,
+        "default_on_air_description": venue.default_on_air_description,
+        "default_caller_special_instructions": venue.default_caller_special_instructions,
         "win_frequency_days": venue.win_frequency_days,
     }
     changed_fields = {

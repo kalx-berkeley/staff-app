@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import VenueForm from './VenueForm';
-import { venuesAPI } from '../api';
+import { showsAPI, venuesAPI } from '../api';
 import type { VenueResponse } from '../types';
 
 // Mock the API
@@ -13,6 +13,9 @@ vi.mock('../api', () => ({
   },
   promotersAPI: {
     list: vi.fn().mockResolvedValue([]),
+  },
+  showsAPI: {
+    analyzeDescription: vi.fn(),
   },
 }));
 
@@ -33,6 +36,8 @@ const makeVenue = (overrides: Partial<VenueResponse> = {}): VenueResponse => ({
   default_lottery_window_hours: 24,
   default_dj_preassign_prohibition_days: null,
   default_close_hours_before_show: null,
+  default_on_air_description: null,
+  default_caller_special_instructions: null,
   has_logo: false,
   deleted: false,
   shows_have_external_promoter: false,
@@ -245,6 +250,82 @@ describe('VenueForm', () => {
         }));
       });
       await waitFor(() => expect(mockOnSuccess).toHaveBeenCalled());
+    });
+  });
+
+  describe('Default Show Text', () => {
+    it('should load and save the default on-air description and caller instructions', async () => {
+      const existingVenue = makeVenue({
+        default_on_air_description: 'An evening of jazz.',
+        default_caller_special_instructions: 'Bring ID.',
+      });
+
+      vi.mocked(venuesAPI.update).mockResolvedValue(existingVenue);
+
+      render(
+        <VenueForm
+          venue={existingVenue}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+
+      const descriptionInput = screen.getByLabelText(/default on-air description/i);
+      const instructionsInput = screen.getByLabelText(/default caller special instructions/i);
+      expect(descriptionInput).toHaveValue('An evening of jazz.');
+      expect(instructionsInput).toHaveValue('Bring ID.');
+      fireEvent.change(descriptionInput, { target: { value: '  ' } });
+      fireEvent.change(instructionsInput, { target: { value: '21+ only, ID at door.' } });
+
+      fireEvent.click(screen.getByRole('button', { name: /update/i }));
+
+      await waitFor(() => {
+        expect(venuesAPI.update).toHaveBeenCalledWith(1, expect.objectContaining({
+          default_on_air_description: null,
+          default_caller_special_instructions: '21+ only, ID at door.',
+        }));
+      });
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalled());
+    });
+
+    it('should check the default on-air description for non-value-neutral language', async () => {
+      vi.mocked(showsAPI.analyzeDescription).mockResolvedValue({
+        findings: [
+          {
+            category: 'endorsement',
+            severity: 'high',
+            phrase: 'legendary',
+            start: 4,
+            end: 13,
+            message: '"legendary" praises the act rather than describing it.',
+            suggestion: 'Say what the act is instead of how good it is.',
+          },
+        ],
+        sentiment_compound: 0.6,
+        sentiment_positive: 0.3,
+        reads_promotional: true,
+        summary: '1 phrase may not be value neutral.',
+      });
+
+      render(
+        <VenueForm
+          venue={makeVenue()}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+
+      const descriptionInput = screen.getByLabelText(/default on-air description/i);
+      fireEvent.change(descriptionInput, { target: { value: 'The legendary house band.' } });
+      fireEvent.blur(descriptionInput);
+
+      expect(
+        await screen.findByText('This description may not be value neutral')
+      ).toBeInTheDocument();
+      expect(showsAPI.analyzeDescription).toHaveBeenCalledWith('The legendary house band.');
+      expect(screen.getByText(/stop you from saving the venue/)).toBeInTheDocument();
     });
   });
 
