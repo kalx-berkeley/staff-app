@@ -250,6 +250,8 @@ describe('ShowForm', () => {
         age_restriction: 'all_ages',
         wheelchair_accessible: true,
         num_pass_pairs: 1,
+        extra_staff_passes: 0,
+        num_staff_passes: 1,
         promotions_contacts: [],
         attempts: [],
         status: 'draft',
@@ -299,6 +301,43 @@ describe('ShowForm', () => {
       await waitFor(() => {
         expect(mockNavigate).toHaveBeenCalledWith('/promotions/shows');
       });
+    });
+
+    it('should send extra staff passes and show the total', async () => {
+      vi.mocked(showsAPI.create).mockResolvedValue(
+        { id: 1 } as Awaited<ReturnType<typeof showsAPI.create>>,
+      );
+
+      renderShowForm();
+
+      await waitFor(() => {
+        expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+      });
+
+      const eventNameInput = screen.getByLabelText(/event name/i);
+      eventNameInput.textContent = 'Test Event';
+      fireEvent.input(eventNameInput);
+      fireEvent.change(screen.getByLabelText(/genre/i), { target: { value: 'Rock' } });
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), { target: { value: '1' } });
+      fireEvent.change(screen.getByLabelText(/show date/i), { target: { value: '2024-12-31' } });
+      fireEvent.change(screen.getByLabelText(/show time/i), { target: { value: '20:00' } });
+      fireEvent.change(screen.getByLabelText(/close date/i), { target: { value: '2024-12-31' } });
+      fireEvent.change(screen.getByLabelText(/close time/i), { target: { value: '18:00' } });
+
+      fireEvent.change(screen.getByLabelText(/number of pass pairs/i), { target: { value: '3' } });
+      expect(screen.queryByLabelText(/extra staff passes/i)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /advanced/i }));
+      fireEvent.change(screen.getByLabelText(/extra staff passes/i), { target: { value: '2' } });
+      expect(screen.getByText(/5 staff passes in total/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('/promotions/shows');
+      });
+      expect(showsAPI.create).toHaveBeenCalledWith(
+        expect.objectContaining({ num_pass_pairs: 3, extra_staff_passes: 2 }),
+      );
     });
   });
 

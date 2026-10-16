@@ -1394,7 +1394,7 @@ const ShowDetail = () => {
 
       <div className="passes-section">
         <h3>
-          Staff Passes ({show.available_staff_count}/{show.num_pass_pairs} available)
+          Staff Passes ({show.available_staff_count}/{show.num_staff_passes} available)
           <Tooltip text="Staff passes allow KALX staff to attend the show. These are separate from the on-air giveaway pairs and claimed directly by staff members." />
         </h3>
         <div className="passes-list">

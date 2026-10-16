@@ -198,6 +198,7 @@ const ShowForm = () => {
   const [ageRestriction, setAgeRestriction] = useState<AgeRestriction>('all_ages');
   const [wheelchairAccessible, setWheelchairAccessible] = useState(true);
   const [numPassPairs, setNumPassPairs] = useState<number>(1);
+  const [extraStaffPasses, setExtraStaffPasses] = useState<number>(0);
   const [plannedCloseDate, setPlannedCloseDate] = useState('');
   const [plannedCloseTime, setPlannedCloseTime] = useState('');
   const [autoClose, setAutoClose] = useState(true);
@@ -266,6 +267,7 @@ const ShowForm = () => {
           setAgeRestriction(show.age_restriction);
           setWheelchairAccessible(show.wheelchair_accessible);
           setNumPassPairs(show.num_pass_pairs);
+          setExtraStaffPasses(show.extra_staff_passes);
           setPlannedCloseDate(show.planned_close_date ?? '');
           setPlannedCloseTime(show.planned_close_time ?? '');
           setAutoClose(show.auto_close ?? false);
@@ -481,6 +483,10 @@ const ShowForm = () => {
       newErrors.num_pass_pairs = 'Number of pass pairs must be between 1 and 5';
     }
 
+    if (extraStaffPasses < 0 || extraStaffPasses > 10) {
+      newErrors.extra_staff_passes = 'Extra staff passes must be between 0 and 10';
+    }
+
     if (!plannedCloseDate || !plannedCloseTime) {
       newErrors.planned_close_date = 'Planned close date and time are required';
     }
@@ -535,6 +541,7 @@ const ShowForm = () => {
           age_restriction: ageRestriction,
           wheelchair_accessible: wheelchairAccessible,
           num_pass_pairs: numPassPairs,
+          extra_staff_passes: extraStaffPasses,
           planned_close_date: plannedCloseDate || null,
           planned_close_time: plannedCloseTime || null,
           auto_close: autoClose,
@@ -569,6 +576,7 @@ const ShowForm = () => {
           age_restriction: ageRestriction,
           wheelchair_accessible: wheelchairAccessible,
           num_pass_pairs: numPassPairs,
+          extra_staff_passes: extraStaffPasses,
           planned_close_date: plannedCloseDate || null,
           planned_close_time: plannedCloseTime || null,
           auto_close: autoClose,
@@ -1003,7 +1011,7 @@ const ShowForm = () => {
               <label htmlFor="num_pass_pairs">
                 Number of Pass Pairs <span className="required">*</span>
               </label>
-              <Tooltip text="How many pass pairs to create for on-air giveaways. Each pair admits 2 people. Maximum 5 per show. An equal number of staff passes is also created." />
+              <Tooltip text="How many pass pairs to create for on-air giveaways. Each pair admits 2 people. Maximum 5 per show. One staff pass is also created for each pair. Add more under Advanced → Extra Staff Passes." />
             </div>
             <input
               type="number"
@@ -1167,6 +1175,31 @@ const ShowForm = () => {
                     ? 'Requires a planned close date and time to be set.'
                     : 'DJs cannot reserve passes for a shift date within this many days of the planned close date. Leave blank for no restriction.'}
                 </span>
+              </div>
+
+              <div className="form-group">
+                <div className="label-with-help">
+                  <label htmlFor="extra_staff_passes">Extra Staff Passes</label>
+                  <Tooltip text="Staff passes the venue or promoter gives us beyond the usual one per pass pair. Usually 0. Maximum 10." />
+                </div>
+                <input
+                  type="number"
+                  id="extra_staff_passes"
+                  value={extraStaffPasses}
+                  onChange={(e) => setExtraStaffPasses(parseInt(e.target.value) || 0)}
+                  min={0}
+                  max={10}
+                  className={errors.extra_staff_passes ? 'input-error' : ''}
+                  disabled={submitting}
+                  style={{ width: '6rem' }}
+                />
+                <span className="field-hint" style={{ display: 'block', marginTop: '0.25rem' }}>
+                  {numPassPairs + extraStaffPasses} staff pass{numPassPairs + extraStaffPasses === 1 ? '' : 'es'} in total
+                  ({numPassPairs} for the pass pair{numPassPairs === 1 ? '' : 's'}, plus {extraStaffPasses} extra).
+                </span>
+                {errors.extra_staff_passes && (
+                  <span className="field-error">{errors.extra_staff_passes}</span>
+                )}
               </div>
             </div>
           )}

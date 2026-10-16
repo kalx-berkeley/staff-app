@@ -65,6 +65,7 @@ class ShowService:
                 age_restriction=show_data.age_restriction,
                 wheelchair_accessible=show_data.wheelchair_accessible,
                 num_pass_pairs=show_data.num_pass_pairs,
+                extra_staff_passes=show_data.extra_staff_passes,
                 planned_close_date=show_data.planned_close_date,
                 planned_close_time=show_data.planned_close_time,
                 auto_close=show_data.auto_close,
@@ -80,7 +81,9 @@ class ShowService:
             db.refresh(show)
 
             # Automatically create passes for the show
-            PassService.create_passes_for_show(db, show.id, show.num_pass_pairs)
+            PassService.create_passes_for_show(
+                db, show.id, show.num_pass_pairs, show.extra_staff_passes
+            )
 
             return show
         except HTTPException:
@@ -187,6 +190,8 @@ class ShowService:
                 show.wheelchair_accessible = show_data.wheelchair_accessible
             if show_data.num_pass_pairs is not None:
                 show.num_pass_pairs = show_data.num_pass_pairs
+            if show_data.extra_staff_passes is not None:
+                show.extra_staff_passes = show_data.extra_staff_passes
             if "planned_close_date" in show_data.model_fields_set:
                 show.planned_close_date = show_data.planned_close_date
             if "planned_close_time" in show_data.model_fields_set:

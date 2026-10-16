@@ -294,6 +294,8 @@ def _build_show_response(
         "age_restriction": show.age_restriction,
         "wheelchair_accessible": show.wheelchair_accessible,
         "num_pass_pairs": show.num_pass_pairs,
+        "extra_staff_passes": show.extra_staff_passes,
+        "num_staff_passes": show.num_staff_passes,
         "promotions_contacts": _build_promotions_contacts(show),
         "status": show.status,
         "planned_close_date": show.planned_close_date,
@@ -396,6 +398,8 @@ def _build_show_summary(
         "wheelchair_accessible": show.wheelchair_accessible,
         "status": show.status,
         "num_pass_pairs": show.num_pass_pairs,
+        "extra_staff_passes": show.extra_staff_passes,
+        "num_staff_passes": show.num_staff_passes,
         "available_pair_count": pair_count,
         "available_staff_count": staff_count,
         "guest_hold_staff_count": guest_hold_count,
@@ -841,6 +845,7 @@ def update_show(
             )
 
     old_num_pass_pairs = existing.num_pass_pairs
+    old_extra_staff_passes = existing.extra_staff_passes
     _tracked_fields = [
         "event_name",
         "genre",
@@ -853,6 +858,7 @@ def update_show(
         "age_restriction",
         "wheelchair_accessible",
         "num_pass_pairs",
+        "extra_staff_passes",
         "planned_close_date",
         "planned_close_time",
         "auto_close",
@@ -868,11 +874,11 @@ def update_show(
         db.commit()
         db.refresh(show)
 
-    # Adjust physical pass records when num_pass_pairs changes
+    # Adjust physical pass records when the pair or staff pass count changes
     pass_adjustment = None
     if (
-        show_data.num_pass_pairs is not None
-        and show_data.num_pass_pairs != old_num_pass_pairs
+        show.num_pass_pairs != old_num_pass_pairs
+        or show.extra_staff_passes != old_extra_staff_passes
     ):
         result = PassService.adjust_passes_for_show(db, show, show.num_pass_pairs)
         if result["affected_djs"] or result["affected_staff"]:

@@ -75,6 +75,9 @@ class ShowCreate(BaseModel):
         ..., description="Whether the venue is wheelchair accessible"
     )
     num_pass_pairs: int = Field(..., ge=1, le=5, description="Number of pass pairs (1-5)")
+    extra_staff_passes: int = Field(
+        0, ge=0, le=10, description="Staff passes beyond one per pass pair (0-10)"
+    )
     planned_close_date: date | None = Field(None, description="Date to close the show")
     planned_close_time: time | None = Field(
         None, description="Time to close the show (Pacific)"
@@ -175,6 +178,9 @@ class ShowUpdate(BaseModel):
     )
     num_pass_pairs: int | None = Field(
         None, ge=1, le=5, description="Number of pass pairs (1-5)"
+    )
+    extra_staff_passes: int | None = Field(
+        None, ge=0, le=10, description="Staff passes beyond one per pass pair (0-10)"
     )
     planned_close_date: date | None = Field(None, description="Date to close the show")
     planned_close_time: time | None = Field(
@@ -324,6 +330,8 @@ class ShowResponse(BaseModel):
     age_restriction: str
     wheelchair_accessible: bool
     num_pass_pairs: int
+    extra_staff_passes: int = 0
+    num_staff_passes: int = 0
     promotions_contacts: list[PromotionsContact] = Field(
         default_factory=list,
         description="Promotions staff contacts (effective promoter owners)",
@@ -397,6 +405,8 @@ class ShowSummary(BaseModel):
     wheelchair_accessible: bool
     status: str
     num_pass_pairs: int
+    extra_staff_passes: int = 0
+    num_staff_passes: int = 0
     available_pair_count: int = 0
     available_staff_count: int = 0
     guest_hold_staff_count: int = 0

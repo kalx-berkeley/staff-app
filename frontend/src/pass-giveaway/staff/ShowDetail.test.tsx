@@ -111,6 +111,8 @@ describe('Staff ShowDetail', () => {
     age_restriction: '21+',
     wheelchair_accessible: true,
     num_pass_pairs: 2,
+    extra_staff_passes: 0,
+    num_staff_passes: 2,
     promotions_contacts: [],
     attempts: [],
     status: 'published',

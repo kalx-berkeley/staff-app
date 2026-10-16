@@ -45,6 +45,8 @@ const makeShow = (overrides: Partial<ShowSummary> = {}): ShowSummary => ({
   age_restriction: 'all_ages',
   wheelchair_accessible: true,
   num_pass_pairs: 2,
+  extra_staff_passes: 0,
+  num_staff_passes: 2,
   status: 'published',
   available_pair_count: 2,
   available_staff_count: 2,

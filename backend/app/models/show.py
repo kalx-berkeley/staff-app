@@ -40,6 +40,10 @@ class Show(Base):
     age_restriction = Column(String, nullable=False)  # "all_ages", "18+", "21+"
     wheelchair_accessible = Column(Boolean, nullable=False)
     num_pass_pairs = Column(Integer, nullable=False)
+    # Staff passes the venue or promoter gives us beyond the usual one per pair
+    extra_staff_passes = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     status = Column(
         String, nullable=False, default="draft"
     )  # "draft", "published", "closed", "deleted"
@@ -83,6 +87,11 @@ class Show(Base):
     alternates = relationship(
         "StaffPassAlternate", back_populates="show", cascade="all, delete-orphan"
     )
+
+    @property
+    def num_staff_passes(self) -> int:
+        """Total staff passes for this show: one per pair plus any extras."""
+        return self.num_pass_pairs + (self.extra_staff_passes or 0)
 
     @property
     def effective_promoter(self) -> "Promoter | None":

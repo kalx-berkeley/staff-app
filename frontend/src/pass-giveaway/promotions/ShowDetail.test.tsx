@@ -122,6 +122,8 @@ const makeShow = (passes: PassResponse[]): ShowResponse => ({
   age_restriction: '21+',
   wheelchair_accessible: true,
   num_pass_pairs: passes.length,
+  extra_staff_passes: 0,
+  num_staff_passes: passes.length,
   promotions_contacts: [],
   attempts: [],
   status: 'published',

@@ -281,7 +281,7 @@ const ShowList = () => {
                   <td>{show.venue.name}</td>
                   <td>{show.show_start_date ? formatDateRange(show.show_start_date, show.show_date) : formatDateShort(show.show_date)}</td>
                   <td>{show.available_pair_count}/{show.num_pass_pairs}</td>
-                  <td>{show.available_staff_count}/{show.num_pass_pairs}</td>
+                  <td>{show.available_staff_count}/{show.num_staff_passes}</td>
                   <td>
                     <Link to={`/promotions/shows/${show.id}`} className="btn-primary btn-small">
                       View
@@ -336,7 +336,7 @@ const ShowList = () => {
                     Pass Pairs: {show.available_pair_count}/{show.num_pass_pairs}
                   </span>
                   <span title="Available / total staff passes (one per staff member)">
-                    Staff Passes: {show.available_staff_count}/{show.num_pass_pairs}
+                    Staff Passes: {show.available_staff_count}/{show.num_staff_passes}
                   </span>
                 </div>
               </div>

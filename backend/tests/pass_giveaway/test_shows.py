@@ -343,6 +343,129 @@ def test_pass_pair_validation(client: TestClient, test_venue, test_promotions_st
     assert response.status_code == 422
 
 
+def _new_show_data(venue_id: int, **overrides) -> dict:
+    data = {
+        "event_name": "Test Concert",
+        "genre": ["Rock"],
+        "venue_id": venue_id,
+        "show_date": "2024-12-31",
+        "show_time": "20:00:00",
+        "age_restriction": "all_ages",
+        "wheelchair_accessible": True,
+        "num_pass_pairs": 2,
+    }
+    data.update(overrides)
+    return data
+
+
+def _pass_counts(db: Session, show_id: int) -> tuple[int, int]:
+    from app.models.pass_model import Pass
+
+    passes = db.query(Pass).filter(Pass.show_id == show_id).all()
+    return (
+        sum(1 for p in passes if p.pass_type == "pair"),
+        sum(1 for p in passes if p.pass_type == "staff"),
+    )
+
+
+def test_create_show_defaults_to_one_staff_pass_per_pair(
+    client: TestClient, test_venue, test_promotions_staff, db: Session
+):
+    response = client.post(
+        "/api/shows",
+        json=_new_show_data(test_venue.id, num_pass_pairs=3),
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["extra_staff_passes"] == 0
+    assert data["num_staff_passes"] == 3
+    assert _pass_counts(db, data["id"]) == (3, 3)
+
+
+def test_create_show_with_extra_staff_passes(
+    client: TestClient, test_venue, test_promotions_staff, db: Session
+):
+    response = client.post(
+        "/api/shows",
+        json=_new_show_data(test_venue.id, num_pass_pairs=3, extra_staff_passes=2),
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["extra_staff_passes"] == 2
+    assert data["num_staff_passes"] == 5
+    assert data["available_staff_count"] == 5
+    assert _pass_counts(db, data["id"]) == (3, 5)
+
+
+@pytest.mark.parametrize("extra", [-1, 11])
+def test_extra_staff_passes_validation(
+    client: TestClient, test_venue, test_promotions_staff, extra: int
+):
+    response = client.post(
+        "/api/shows",
+        json=_new_show_data(test_venue.id, extra_staff_passes=extra),
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+    assert response.status_code == 422
+
+
+def test_update_extra_staff_passes_resizes_staff_passes(
+    client: TestClient, test_venue, test_promotions_staff, db: Session
+):
+    from app.models.pass_model import Pass
+
+    headers = {"X-Forwarded-User": test_promotions_staff.email}
+    show_id = client.post(
+        "/api/shows", json=_new_show_data(test_venue.id), headers=headers
+    ).json()["id"]
+
+    response = client.put(
+        f"/api/shows/{show_id}", json={"extra_staff_passes": 4}, headers=headers
+    )
+    assert response.status_code == 200
+    assert response.json()["num_staff_passes"] == 6
+    assert _pass_counts(db, show_id) == (2, 6)
+
+    # A claimed staff pass survives a reduction while unclaimed ones remain.
+    claimed = (
+        db.query(Pass).filter(Pass.show_id == show_id, Pass.pass_type == "staff").first()
+    )
+    claimed.status = "claimed"
+    claimed.staff_id = test_promotions_staff.id
+    db.commit()
+
+    response = client.put(
+        f"/api/shows/{show_id}", json={"extra_staff_passes": 0}, headers=headers
+    )
+    assert response.status_code == 200
+    assert response.json()["num_staff_passes"] == 2
+    assert _pass_counts(db, show_id) == (2, 2)
+    db.expire_all()
+    assert db.get(Pass, claimed.id).status == "claimed"
+
+
+def test_update_num_pass_pairs_keeps_extra_staff_passes(
+    client: TestClient, test_venue, test_promotions_staff, db: Session
+):
+    headers = {"X-Forwarded-User": test_promotions_staff.email}
+    show_id = client.post(
+        "/api/shows",
+        json=_new_show_data(test_venue.id, extra_staff_passes=2),
+        headers=headers,
+    ).json()["id"]
+
+    response = client.put(
+        f"/api/shows/{show_id}", json={"num_pass_pairs": 4}, headers=headers
+    )
+    assert response.status_code == 200
+    assert response.json()["num_staff_passes"] == 6
+    assert _pass_counts(db, show_id) == (4, 6)
+
+
 def test_role_based_show_visibility(
     client: TestClient, test_venue, test_promotions_staff, db: Session
 ):

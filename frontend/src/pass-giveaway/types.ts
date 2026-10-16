@@ -221,6 +221,7 @@ export interface ShowCreate {
   age_restriction: AgeRestriction;
   wheelchair_accessible: boolean;
   num_pass_pairs: number; // 1-5
+  extra_staff_passes?: number; // 0-10, defaults to 0
   planned_close_date?: string | null;
   planned_close_time?: string | null;
   auto_close?: boolean;
@@ -244,6 +245,7 @@ export interface ShowUpdate {
   age_restriction?: AgeRestriction;
   wheelchair_accessible?: boolean;
   num_pass_pairs?: number;
+  extra_staff_passes?: number;
   planned_close_date?: string | null;
   planned_close_time?: string | null;
   auto_close?: boolean;
@@ -415,6 +417,8 @@ export interface ShowResponse {
   age_restriction: AgeRestriction;
   wheelchair_accessible: boolean;
   num_pass_pairs: number;
+  extra_staff_passes: number;
+  num_staff_passes: number;
   promotions_contacts: PromotionsContact[];
   status: ShowStatus;
   passes: PassResponse[];
@@ -456,6 +460,8 @@ export interface ShowSummary {
   wheelchair_accessible: boolean;
   status: ShowStatus;
   num_pass_pairs: number;
+  extra_staff_passes: number;
+  num_staff_passes: number;
   available_pair_count: number;
   available_staff_count: number;
   guest_hold_staff_count: number;
