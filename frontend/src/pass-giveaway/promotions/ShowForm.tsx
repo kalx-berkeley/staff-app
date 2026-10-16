@@ -980,6 +980,7 @@ const ShowForm = () => {
                 id="planned_close_date"
                 value={plannedCloseDate}
                 onChange={setPlannedCloseDate}
+                max={(isMultiDay && showStartDate ? showStartDate : showDate) || undefined}
                 className={errors.planned_close_date ? 'input-error' : ''}
                 disabled={submitting}
               />

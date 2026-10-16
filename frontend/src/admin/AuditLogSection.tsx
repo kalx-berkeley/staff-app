@@ -8,7 +8,7 @@ const PAGE_SIZE = 50;
 
 const defaultSince = (): string => {
   const d = new Date();
-  d.setDate(d.getDate() - 30);
+  d.setDate(d.getDate() - 7);
   return toPacificDateInputValue(d);
 };
 
