@@ -277,7 +277,9 @@ def update_venue(
             "show_sourcing_instructions": existing.show_sourcing_instructions,
             "pass_call_instructions": existing.pass_call_instructions,
             "default_on_air_description": existing.default_on_air_description,
-            "default_caller_special_instructions": existing.default_caller_special_instructions,
+            "default_caller_special_instructions": (
+                existing.default_caller_special_instructions
+            ),
             "win_frequency_days": existing.win_frequency_days,
         }
 
