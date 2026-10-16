@@ -228,7 +228,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
       <div className="form-group">
         <div className="label-with-help">
           <label htmlFor="promoter-sourcing-instructions">Promoter Show Sourcing Instructions</label>
-          <Tooltip text="Notes for promotions staff on how to find out which shows this promoter will give us passes for, and how many: when to check, where to look and who to ask." />
+          <Tooltip text="How the KALX promotions rep decides which of this promoter's shows KALX will promote. For example, we may be free to pick any shows we like, or the promoter may email the rep a month ahead with the shows they want promoted. Include when to check, where to look and who to ask." />
         </div>
         <textarea
           id="promoter-sourcing-instructions"
@@ -236,7 +236,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
           onChange={(e) => setShowSourcingInstructions(e.target.value)}
           disabled={submitting}
           rows={3}
-          placeholder="How to find out which shows this promoter has passes for..."
+          placeholder="e.g. We can pick any shows we want, or the promoter emails us a month ahead with the shows to promote..."
         />
       </div>
 
@@ -256,9 +256,10 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
       </div>
 
       <div className="form-section">
-        <h4>Guest List Requirements</h4>
+        <h4>Guest List Requirements (optional)</h4>
         <p className="field-hint">
           These settings control what information appears in the guest list when a show with this promoter closes.
+          They're all optional. Leave every box unchecked if the promoter doesn't need any of them.
         </p>
         <div className="form-group form-group-checkbox">
           <label>

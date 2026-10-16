@@ -402,7 +402,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           <div className="form-group">
             <div className="label-with-help">
               <label htmlFor="venue-sourcing-instructions">Venue Show Sourcing Instructions</label>
-              <Tooltip text="Notes for promotions staff on how to find out which shows this venue will give us passes for, and how many: when to check, where to look and who to ask." />
+              <Tooltip text="How the KALX promotions rep decides which of this venue's shows KALX will promote. For example, we may be free to pick any shows we like, or the venue may email the rep a month ahead with the shows they want promoted. Include when to check, where to look and who to ask." />
             </div>
             <textarea
               id="venue-sourcing-instructions"
@@ -410,7 +410,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
               onChange={(e) => setShowSourcingInstructions(e.target.value)}
               disabled={submitting}
               rows={3}
-              placeholder="How to find out which shows this venue has passes for..."
+              placeholder="e.g. We can pick any shows we want, or the venue emails us a month ahead with the shows to promote..."
             />
           </div>
 
@@ -480,7 +480,10 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
             </div>
 
             <div className="form-group">
-              <label htmlFor="venue-default-num-pass-pairs">Default Pass Pairs</label>
+              <div className="label-with-help">
+                <label htmlFor="venue-default-num-pass-pairs">Default On-Air Pass Pairs</label>
+                <Tooltip text="How many on-air pass pairs a new show at this venue starts with. Each pair admits 2 people. A new show also gets one individual staff pass for each on-air pass pair, so this sets the number of staff passes too. Each staff pass admits 1 person." />
+              </div>
               <input
                 type="number"
                 id="venue-default-num-pass-pairs"
@@ -496,15 +499,16 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
                 <span className="field-error">{errors.defaultNumPassPairs}</span>
               )}
               <span className="field-hint">
-                Default number of pass pairs pre-filled when creating a new show at this venue (1–5).
+                Default number of on-air pass pairs pre-filled when creating a new show at this venue (1–5).
               </span>
             </div>
           </div>
 
           <div className="form-section">
-            <h4>Guest List Requirements</h4>
+            <h4>Guest List Requirements (optional)</h4>
             <p className="field-hint">
               These settings control what information appears in the guest list sent to this venue when a show closes.
+              They're all optional. Leave every box unchecked if the venue doesn't need any of them.
             </p>
             <div className="form-group form-group-checkbox">
               <label>
