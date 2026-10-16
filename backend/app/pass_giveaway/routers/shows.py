@@ -846,6 +846,11 @@ def update_show(
 
     old_num_pass_pairs = existing.num_pass_pairs
     old_extra_staff_passes = existing.extra_staff_passes
+
+    def _auto_close_settings(s: Show) -> tuple:
+        return (s.status, s.auto_close, s.planned_close_date, s.planned_close_time)
+
+    old_auto_close_settings = _auto_close_settings(existing)
     _tracked_fields = [
         "event_name",
         "genre",
@@ -906,27 +911,29 @@ def update_show(
         details={"event_name": show.event_name, "changed_fields": changed_fields},
     )
 
-    if (
-        show.status == "published"
-        and show.auto_close
-        and show.planned_close_date
-        and show.planned_close_time
-    ):
-        from datetime import datetime
-        from zoneinfo import ZoneInfo
+    # Only touch the auto-close job when a setting it depends on changed.
+    if _auto_close_settings(show) != old_auto_close_settings:
+        if (
+            show.status == "published"
+            and show.auto_close
+            and show.planned_close_date
+            and show.planned_close_time
+        ):
+            from datetime import datetime
+            from zoneinfo import ZoneInfo
 
-        _LA = ZoneInfo("America/Los_Angeles")
-        close_dt = datetime.combine(
-            show.planned_close_date, show.planned_close_time, tzinfo=_LA
-        )
-        if close_dt > datetime.now(_LA):
-            schedule_auto_close_job(show.id, close_dt)
+            _LA = ZoneInfo("America/Los_Angeles")
+            close_dt = datetime.combine(
+                show.planned_close_date, show.planned_close_time, tzinfo=_LA
+            )
+            if close_dt > datetime.now(_LA):
+                schedule_auto_close_job(show.id, close_dt)
+            else:
+                unschedule_auto_close_job(show.id)
         else:
+            # Draft/closed shows (or auto_close disabled) should never have a
+            # live scheduler job.
             unschedule_auto_close_job(show.id)
-    else:
-        # Draft/closed shows (or auto_close disabled) should never have a
-        # live scheduler job.
-        unschedule_auto_close_job(show.id)
     return _build_show_response(show, pass_adjustment=pass_adjustment)
 
 

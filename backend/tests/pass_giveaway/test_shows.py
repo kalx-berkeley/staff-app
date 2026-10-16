@@ -1012,3 +1012,94 @@ def test_show_detail_completeness(
     assert len(data["attempts"]) == 1
     assert data["attempts"][0]["dj_name"] == "DJ Retry"
     assert data["attempts"][0]["attempted_at"] is not None
+
+
+@pytest.fixture
+def auto_close_calls(monkeypatch):
+    """Record auto-close job (un)scheduling done by the show update route."""
+    import app.pass_giveaway.routers.shows as shows_router
+
+    calls: list[tuple[str, int]] = []
+    monkeypatch.setattr(
+        shows_router,
+        "schedule_auto_close_job",
+        lambda show_id, run_date: calls.append(("schedule", show_id)),
+    )
+    monkeypatch.setattr(
+        shows_router,
+        "unschedule_auto_close_job",
+        lambda show_id: calls.append(("unschedule", show_id)),
+    )
+    return calls
+
+
+@pytest.fixture
+def published_auto_close_show(db: Session, test_venue):
+    from datetime import timedelta
+    from app.models.show import Show
+
+    show = Show(
+        event_name="Auto Close Show",
+        genre=["Rock"],
+        venue_id=test_venue.id,
+        show_date=date.today() + timedelta(days=30),
+        show_time=time(20, 0),
+        age_restriction="all_ages",
+        wheelchair_accessible=True,
+        num_pass_pairs=2,
+        status="published",
+        auto_close=True,
+        planned_close_date=date.today() + timedelta(days=20),
+        planned_close_time=time(12, 0),
+    )
+    db.add(show)
+    db.commit()
+    db.refresh(show)
+    return show
+
+
+@pytest.mark.parametrize(
+    "update",
+    [{"extra_staff_passes": 1}, {"event_name": "Renamed"}, {}],
+)
+def test_update_show_leaves_auto_close_job_alone_when_its_settings_are_unchanged(
+    client: TestClient,
+    test_promotions_staff,
+    published_auto_close_show,
+    auto_close_calls,
+    update: dict,
+):
+    response = client.put(
+        f"/api/shows/{published_auto_close_show.id}",
+        json=update,
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.status_code == 200
+    assert auto_close_calls == []
+
+
+def test_update_show_reschedules_auto_close_job_when_close_time_changes(
+    client: TestClient, test_promotions_staff, published_auto_close_show, auto_close_calls
+):
+    response = client.put(
+        f"/api/shows/{published_auto_close_show.id}",
+        json={"planned_close_time": "13:00:00"},
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.status_code == 200
+    assert auto_close_calls == [("schedule", published_auto_close_show.id)]
+
+
+def test_update_show_unschedules_auto_close_job_when_auto_close_turned_off(
+    client: TestClient, test_promotions_staff, published_auto_close_show, auto_close_calls
+):
+    response = client.put(
+        f"/api/shows/{published_auto_close_show.id}",
+        json={"auto_close": False},
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.status_code == 200
+    assert auto_close_calls == [("unschedule", published_auto_close_show.id)]
