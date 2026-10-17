@@ -22,6 +22,7 @@ vi.mock('./api', () => ({
     startImpersonation: vi.fn(),
     listUsers: vi.fn(),
     getAuditLog: vi.fn(),
+    listShortLinks: vi.fn(),
   },
 }));
 
@@ -86,6 +87,7 @@ describe('KALX Staff Admin', () => {
       },
     ]);
     vi.mocked(adminAPI.listUsers).mockResolvedValue([]);
+    vi.mocked(adminAPI.listShortLinks).mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -153,6 +155,17 @@ describe('KALX Staff Admin', () => {
 
     expect(await within(row).findByText('Synced 3 staff')).toBeInTheDocument();
     expect(adminAPI.triggerJob).toHaveBeenCalledWith('airtable_user_sync');
+  });
+
+  it('shows the short links only to site admins', async () => {
+    await renderAdmin();
+    expect(await screen.findByRole('heading', { name: 'Short Links' })).toBeInTheDocument();
+    cleanup();
+
+    await renderAdmin(promotionsAdmin());
+    await screen.findByText('Sync users from Airtable');
+    expect(screen.queryByRole('heading', { name: 'Short Links' })).not.toBeInTheDocument();
+    expect(adminAPI.listShortLinks).toHaveBeenCalledTimes(1);
   });
 
   it('offers impersonation only on staging', async () => {

@@ -12,6 +12,11 @@ export default defineConfig({
         target: 'http://localhost:8420',
         changeOrigin: true,
       },
+      // Short links. A regex, so it doesn't also catch paths like /google
+      '^/go/': {
+        target: 'http://localhost:8420',
+        changeOrigin: true,
+      },
     },
   },
   test: {

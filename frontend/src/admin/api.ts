@@ -5,6 +5,8 @@ import type {
   ImpersonateRequest,
   JobRunResult,
   JobStatus,
+  ShortLink,
+  ShortLinkRequest,
   UserListItem,
 } from './types';
 
@@ -56,6 +58,42 @@ export const adminAPI = {
         params: filters,
       });
       return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /** Short links, for site admins. */
+  listShortLinks: async (): Promise<ShortLink[]> => {
+    try {
+      const response = await apiClient.get<ShortLink[]>('/short-links');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  createShortLink: async (request: ShortLinkRequest): Promise<ShortLink> => {
+    try {
+      const response = await apiClient.post<ShortLink>('/short-links', request);
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  updateShortLink: async (id: number, request: ShortLinkRequest): Promise<ShortLink> => {
+    try {
+      const response = await apiClient.put<ShortLink>(`/short-links/${id}`, request);
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  deleteShortLink: async (id: number): Promise<void> => {
+    try {
+      await apiClient.delete(`/short-links/${id}`);
     } catch (error) {
       return handleAPIError(error);
     }

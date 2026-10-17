@@ -1,7 +1,7 @@
 // TypeScript types matching the KALX Staff Admin API (backend common/schemas/admin.py).
 
 /** The parts of the app that jobs and audit log entries belong to (backend common/areas.py). */
-export const AREAS = ['Common', 'Radio Pass Giveaway', 'KALX Workforms'];
+export const AREAS = ['Common', 'Radio Pass Giveaway', 'KALX Workforms', 'Short Links'];
 
 export interface JobStatus {
   id: string;
@@ -52,4 +52,22 @@ export interface AuditLogFilters {
   until?: string;
   limit?: number;
   offset?: number;
+}
+
+/** A /go/<slug> short link (backend short_links/schemas/short_links.py). */
+export interface ShortLink {
+  id: number;
+  /** Lowercase, as stored. */
+  slug: string;
+  target_url: string;
+  note: string | null;
+  created_by_email: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ShortLinkRequest {
+  slug: string;
+  target_url: string;
+  note: string | null;
 }

@@ -35,6 +35,7 @@ from .workform import Workform, WorkformEntry
 from .workform_airtable_record import WorkformAirtableRecord
 from .workform_department import DepartmentHead, WorkformDepartment
 from .workform_preferences import WorkformPreferences
+from .short_link import ShortLink
 
 __all__ = [
     "AuditLog",
@@ -74,4 +75,5 @@ __all__ = [
     "WorkformDepartment",
     "DepartmentHead",
     "WorkformPreferences",
+    "ShortLink",
 ]

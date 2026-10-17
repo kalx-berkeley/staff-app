@@ -13,6 +13,8 @@ from app.common import jobs as common_jobs
 from app.common.routers import admin as common_admin
 from app.common.routers import users
 from app.directory.routers import directory
+from app.short_links.routers import admin as short_links_admin
+from app.short_links.routers import redirect as short_links_redirect
 from app.workforms.routers import review as workforms_review
 from app.workforms.routers import workforms
 from app.workforms import jobs as workforms_jobs
@@ -274,6 +276,9 @@ app.include_router(on_air.router, dependencies=_auth_check)
 app.include_router(directory.router, dependencies=_auth_check)
 app.include_router(workforms_review.router, dependencies=_auth_check)
 app.include_router(workforms.router, dependencies=_auth_check)
+app.include_router(short_links_admin.router, dependencies=_auth_check)
+# /go/ is proxied by Apache like /api/, so it gets the same check
+app.include_router(short_links_redirect.router, dependencies=_auth_check)
 if settings.legacy_import_enabled:
     app.include_router(legacy_import_router.router, dependencies=_auth_check)
 

@@ -5,14 +5,15 @@ import { HOME_TITLE, SUBSITES, subsiteForPath } from '../subsites';
 import AuditLogSection from './AuditLogSection';
 import ImpersonationSection from './ImpersonationSection';
 import JobsSection from './JobsSection';
+import ShortLinksSection from './ShortLinksSection';
 
 export const ADMIN_TITLE = 'KALX Staff Admin';
 
 // KALX Staff Admin: the admin tools that apply to every sub-site. Each
 // sub-site's own admin tools stay in that sub-site (for example the pass
-// giveaway's Promotions → Admin page). Site admins can use all of it;
-// promotions admins can see the jobs without running them, and the pass
-// giveaway's audit log entries.
+// giveaway's Promotions → Admin page), plus the /go/ short links. Site admins
+// can use all of it; promotions admins can see the jobs without running them,
+// and the pass giveaway's audit log entries.
 export default function AdminPage() {
   usePageTitle(null, ADMIN_TITLE);
   const { user } = useAuth();
@@ -37,6 +38,7 @@ export default function AdminPage() {
       <main>
         <JobsSection />
         {user?.is_staging && user.is_site_admin && <ImpersonationSection />}
+        {user?.is_site_admin && <ShortLinksSection />}
         <AuditLogSection />
       </main>
     </div>

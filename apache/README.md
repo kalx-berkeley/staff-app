@@ -4,7 +4,8 @@ Apache configuration for the KALX staff portal at `staff.kalx.berkeley.edu`.
 
 The staff VirtualHost serves the staff-app frontend (this repo's `frontend/`) at `/`: a home
 page linking to each sub-site, and the sub-sites themselves (such as the Radio Pass Giveaway at
-`/pass-giveaway/`). It proxies `/api/` to the staff-app backend.
+`/pass-giveaway/`). It proxies `/api/` to the staff-app backend, and `/go/` (short links,
+managed in KALX Staff Admin) too.
 
 ## Directory structure
 
