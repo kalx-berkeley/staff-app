@@ -6,6 +6,44 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.7.0] - 2026-10-17
+
+### Changed
+
+- Move scheduled jobs, the audit log and staging impersonation out of the pass giveaway's Admin page into the new KALX Staff Admin sub-site at `/admin/`. Sub-sites register their own scheduled jobs, so the KALX Workforms jobs are listed there too, and the Directory and Workforms get a button to end an impersonation ([8b4e7ae](https://github.com/kalx-berkeley/staff-app/commit/8b4e7ae), [2e88cd2](https://github.com/kalx-berkeley/staff-app/commit/2e88cd2))
+- Split admins into two groups, both checked against the real signed-in user rather than anyone they're impersonating. Site admins (department heads, Paid Staff and the emails in the new `SITE_ADMIN_EMAILS` setting, all Active) can use everything. Promotions admins (the Promotions department) can use the pass giveaway's Admin page, see scheduled jobs without running them, and see only the pass giveaway's audit log entries. Every audit log entry now records which area it belongs to ([79880b7](https://github.com/kalx-berkeley/staff-app/commit/79880b7))
+- Default the audit log to the last 7 days ([f1eae25](https://github.com/kalx-berkeley/staff-app/commit/f1eae25))
+- Rename "Pass Call Instructions" to "call-in instructions" on the venue and promoter forms, and correct the help text, which said DJs see them ([1a5ec07](https://github.com/kalx-berkeley/staff-app/commit/1a5ec07))
+- Clarify the venue and promoter form fields for show sourcing, default pass pairs and guest list requirements, and add tooltips to the promoter form's instruction fields ([cac344b](https://github.com/kalx-berkeley/staff-app/commit/cac344b), [e7996f5](https://github.com/kalx-berkeley/staff-app/commit/e7996f5))
+- Simplify the staff and DJ My Passes pages: hide passes for shows more than 3 days past, drop winners' names and phone numbers from Given Away, and list only published shows under Pre-assigned to You ([8ef21da](https://github.com/kalx-berkeley/staff-app/commit/8ef21da), [b87b346](https://github.com/kalx-berkeley/staff-app/commit/b87b346), [8baeedb](https://github.com/kalx-berkeley/staff-app/commit/8baeedb))
+- Leave FREEFORM and OVERNIGHTS out of DJ name suggestions and autocompletes (configurable with `SPINITRON_NON_DJ_SHOW_TITLES`) ([8ef21da](https://github.com/kalx-berkeley/staff-app/commit/8ef21da))
+- Show staff +1 guest holds as guest holds, not second claims, on the promotions show page ([8ef21da](https://github.com/kalx-berkeley/staff-app/commit/8ef21da))
+- Open the new show's page after publishing it, and open the next pass pair with a blank pre-assign form after saving a suggestion ([8ef21da](https://github.com/kalx-berkeley/staff-app/commit/8ef21da))
+- Show the Winner Phone tooltip only for venues with a win frequency limit ([8ef21da](https://github.com/kalx-berkeley/staff-app/commit/8ef21da))
+- Limit the show close date picker to dates up to the show date ([f1eae25](https://github.com/kalx-berkeley/staff-app/commit/f1eae25))
+- Put the cursor in the staff directory search box when the page opens ([c16ca5c](https://github.com/kalx-berkeley/staff-app/commit/c16ca5c))
+- Compress JSON, web manifests, icons and fonts with Apache's mod_deflate. Apache's `staff.conf` and `staff.stage.conf` must be updated and `a2enmod deflate` run when this is deployed ([8ef21da](https://github.com/kalx-berkeley/staff-app/commit/8ef21da))
+
+### Added
+
+- Add the KALX Workforms sub-site at `/workforms/`, marked as under construction and not yet the official way to submit workforms. Staff build each month's workform from entries (hours, description and an optional date) per department and submit it to the Airtable workforms table; it shows whether the 6-hour monthly minimum is met, except in months a leave of absence overlaps. Department heads, from the Airtable "Department Heads" table, approve or deny each department's hours. Reminder and review emails, with per-user email settings, are sent only when `WORKFORMS_EMAILS_ENABLED` is set, which defaults to off ([1e9a35d](https://github.com/kalx-berkeley/staff-app/commit/1e9a35d), [1850c44](https://github.com/kalx-berkeley/staff-app/commit/1850c44), [58544d5](https://github.com/kalx-berkeley/staff-app/commit/58544d5))
+- Add Short Links: site admins manage `/go/<slug>` links in KALX Staff Admin, and only active staff can follow them. Apache's `staff.conf` and `staff.stage.conf` must be updated when this is deployed, to proxy `/go/` to the backend ([0089a82](https://github.com/kalx-berkeley/staff-app/commit/0089a82))
+- Let promotions add extra staff passes to a show, beyond the usual one per pass pair, under Advanced on the show form ([fa3ed68](https://github.com/kalx-berkeley/staff-app/commit/fa3ed68))
+- Add a default on-air description and caller special instructions to venues, which a new show at that venue starts with. Changing the show's venue replaces the text only if it's empty or still the previous venue's default. The venue's on-air description gets the same value-neutral language check as the show form's ([8c83912](https://github.com/kalx-berkeley/staff-app/commit/8c83912))
+- Add show sourcing instructions to venues and promoters: notes for promotions staff on how to find out which shows a venue or promoter will give passes for, and how many ([ad18335](https://github.com/kalx-berkeley/staff-app/commit/ad18335))
+- Warn DJs on the show page when they've already given away a pair for that show this shift ([bfbee8f](https://github.com/kalx-berkeley/staff-app/commit/bfbee8f))
+- Add an email link for promotions contacts on the staff show page ([8ef21da](https://github.com/kalx-berkeley/staff-app/commit/8ef21da))
+- Add a Tag button for band selections made by touch or keyboard ([8ef21da](https://github.com/kalx-berkeley/staff-app/commit/8ef21da))
+- Add staff name autocomplete to Legacy Import's claimant fields and to staging impersonation, and DJ name autocomplete and field tooltips to Legacy Import ([313e019](https://github.com/kalx-berkeley/staff-app/commit/313e019), [8ef21da](https://github.com/kalx-berkeley/staff-app/commit/8ef21da))
+- Apply the value-neutral description check and the venue's winner email and guest name rules in Legacy Import ([8ef21da](https://github.com/kalx-berkeley/staff-app/commit/8ef21da))
+
+### Fixed
+
+- Fix emptying a venue's or promoter's call-in instructions keeping the old text ([ad18335](https://github.com/kalx-berkeley/staff-app/commit/ad18335))
+- Fix every edit to a published auto-close show rescheduling its auto-close job; the job now changes only when the show's status or close settings do ([3f954cc](https://github.com/kalx-berkeley/staff-app/commit/3f954cc))
+- Fix restarts re-running already-drawn lotteries and logging a "deadline already passed" warning for each ([24de2a5](https://github.com/kalx-berkeley/staff-app/commit/24de2a5))
+- Widen the KALX Staff Admin page so the audit log's Details column fits ([2e88cd2](https://github.com/kalx-berkeley/staff-app/commit/2e88cd2))
+
 ## [1.6.1] - 2026-10-10
 
 ### Changed
@@ -178,6 +216,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.7.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/kalx-berkeley/staff-app/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.4.0...v1.5.0
