@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { passesAPI, lotteryAPI, alternatesAPI } from '../api';
 import type { PassResponse, MyLotteryEntryResponse, MyAlternateEntry } from '../types';
 import type { APIError } from '../../common/types';
-import { formatDateValue } from '../../common/utils';
+import { isRecentShow } from '../utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 
@@ -30,17 +30,6 @@ const formatDate = (dateStr: string) => {
     month: 'short',
     day: 'numeric',
   });
-};
-
-// Passes for shows more than this many days in the past are hidden.
-const PAST_SHOW_DAYS = 3;
-
-/** Whether a show is recent or upcoming enough to list on this page. */
-const isRecentShow = (showDate: string | null | undefined): boolean => {
-  if (!showDate) return true;
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - PAST_SHOW_DAYS);
-  return showDate >= formatDateValue(cutoff);
 };
 
 const MyPasses = () => {
@@ -426,7 +415,7 @@ const MyPasses = () => {
 
           {loaded && !loading && recentPasses.length === 0 && (
             <div className="no-passes">
-              <p>No giveaways found{djName ? <> for <strong>{djName}</strong></> : null}.</p>
+              <p>No recent or upcoming giveaways found{djName ? <> for <strong>{djName}</strong></> : null}.</p>
             </div>
           )}
 

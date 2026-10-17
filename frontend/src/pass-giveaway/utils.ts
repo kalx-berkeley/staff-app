@@ -1,10 +1,22 @@
 import type { UserResponse } from '../common/types';
+import { formatDateValue } from '../common/utils';
 import type { PassResponse } from './types';
 
 // Staging-only: lets a staff member with active Sublist DJ status access the
 // DJ view, ahead of this being rolled out to production.
 export function isStagingSublistDjStaff(user: Pick<UserResponse, 'role' | 'is_staging' | 'profile'> | null | undefined): boolean {
   return !!user?.is_staging && user.role === 'staff' && !!user.profile?.is_sublist_dj;
+}
+
+// My Passes pages hide passes for shows more than this many days in the past.
+export const MY_PASSES_PAST_SHOW_DAYS = 3;
+
+/** Whether a show (`YYYY-MM-DD`) is recent or upcoming enough to list on a My Passes page. */
+export function isRecentShow(showDate: string | null | undefined): boolean {
+  if (!showDate) return true;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - MY_PASSES_PAST_SHOW_DAYS);
+  return showDate >= formatDateValue(cutoff);
 }
 
 // The backend allows each DJ one on-air pass pair giveaway per show within

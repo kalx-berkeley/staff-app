@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { findRecentDjGiveaway, isStagingSublistDjStaff } from './utils';
+import { findRecentDjGiveaway, isRecentShow, isStagingSublistDjStaff } from './utils';
+import { formatDateValue } from '../common/utils';
 import type { UserResponse } from '../common/types';
 
 describe('isStagingSublistDjStaff', () => {
@@ -67,5 +68,27 @@ describe('findRecentDjGiveaway', () => {
   it('finds nothing when no DJ name is entered', () => {
     const passes = [pass(null, null), pass('DJ Test', '2026-10-14T19:00:00Z')];
     expect(findRecentDjGiveaway(passes, ' ', now)).toBeUndefined();
+  });
+});
+
+describe('isRecentShow', () => {
+  const daysFromToday = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return formatDateValue(d);
+  };
+
+  it('keeps upcoming shows and shows up to 3 days ago', () => {
+    expect(isRecentShow(daysFromToday(5))).toBe(true);
+    expect(isRecentShow(daysFromToday(0))).toBe(true);
+    expect(isRecentShow(daysFromToday(-3))).toBe(true);
+  });
+
+  it('drops shows more than 3 days ago', () => {
+    expect(isRecentShow(daysFromToday(-4))).toBe(false);
+  });
+
+  it('keeps passes with no show date', () => {
+    expect(isRecentShow(null)).toBe(true);
   });
 });

@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import MyPasses from './MyPasses';
 import { passesAPI, autocompleteAPI } from '../api';
 import type { PassResponse } from '../types';
+import { formatDateValue } from '../../common/utils';
 
 // Mock the API
 vi.mock('../api', () => ({
@@ -97,6 +98,22 @@ describe('MyPasses', () => {
   };
 
   describe('MyPasses Display', () => {
+    it('should hide passes for shows more than 3 days ago', async () => {
+      const daysAgo = (days: number) => {
+        const d = new Date();
+        d.setDate(d.getDate() - days);
+        return formatDateValue(d);
+      };
+      vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([
+        { ...mockPasses[0], show_event_name: 'Old Show', show_date: daysAgo(4) },
+        { ...mockPasses[1], show_event_name: 'Recent Show', show_date: daysAgo(3) },
+      ]);
+      renderWithDJName();
+
+      expect(await screen.findByText('Recent Show')).toBeInTheDocument();
+      expect(screen.queryByText('Old Show')).not.toBeInTheDocument();
+    });
+
     it('should display all passes given away by the DJ', async () => {
       vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue(mockPasses);
       renderWithDJName();
@@ -107,16 +124,15 @@ describe('MyPasses', () => {
       });
     });
 
-    it('should display winner information for each pass', async () => {
+    it("should not display the winners' names or phone numbers", async () => {
       vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue(mockPasses);
       renderWithDJName();
 
-      await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
-        expect(screen.getByText('(555) 123-4567')).toBeInTheDocument();
-        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
-        expect(screen.getByText('(555) 567-8901')).toBeInTheDocument();
-      });
+      expect(await screen.findAllByText('Pass Pair')).toHaveLength(2);
+      expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
+      expect(screen.queryByText('(555) 123-4567')).not.toBeInTheDocument();
+      expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
+      expect(screen.queryByText('(555) 567-8901')).not.toBeInTheDocument();
     });
 
     it('should display DJ name for each pass', async () => {
@@ -174,7 +190,7 @@ describe('MyPasses', () => {
       renderWithDJName();
 
       await waitFor(() => {
-        expect(screen.getByText(/no giveaways found for/i)).toBeInTheDocument();
+        expect(screen.getByText(/no recent or upcoming giveaways found for/i)).toBeInTheDocument();
       });
     });
   });
@@ -274,18 +290,6 @@ describe('MyPasses', () => {
       await waitFor(() => {
         const passCards = screen.getAllByText('Pass Pair');
         expect(passCards.length).toBe(2);
-      });
-    });
-
-    it('should display all required information for each pass', async () => {
-      vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue(mockPasses);
-      renderWithDJName();
-
-      await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
-        expect(screen.getByText('(555) 123-4567')).toBeInTheDocument();
-        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
-        expect(screen.getByText('(555) 567-8901')).toBeInTheDocument();
       });
     });
   });
