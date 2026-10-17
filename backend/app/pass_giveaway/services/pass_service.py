@@ -240,7 +240,8 @@ class PassService:
         Get all passes given away by or pre-assigned to a specific DJ.
 
         Returns given_away passes where DJ is the giver, plus available passes
-        that are currently pre-assigned to this DJ.
+        that are currently pre-assigned to this DJ on published shows (a closed,
+        draft or deleted show's pre-assignments can no longer be given away).
 
         Args:
             db: Database session
@@ -253,10 +254,13 @@ class PassService:
 
         return (
             db.query(Pass)
+            .join(Show, Pass.show_id == Show.id)
             .filter(
                 or_(
                     (Pass.given_away_by_dj == dj_name) & (Pass.status == "given_away"),
-                    (Pass.preassigned_dj == dj_name) & (Pass.status == "available"),
+                    (Pass.preassigned_dj == dj_name)
+                    & (Pass.status == "available")
+                    & (Show.status == "published"),
                 )
             )
             .all()
