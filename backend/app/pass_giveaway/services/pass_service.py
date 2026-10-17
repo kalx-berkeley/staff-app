@@ -20,6 +20,7 @@ from app.models.on_air_winner import OnAirWinner
 from app.models.job_log import JobLog
 from app.models.specialty_show import SpecialtyShow
 from app.pass_giveaway.schemas.pass_schema import GiveawayData
+from app.pass_giveaway.services.spinitron_schedule_service import SpinitronScheduleService
 
 import re
 
@@ -425,6 +426,9 @@ class PassService:
         Returns the union of:
         - DJ names from the staff table (sourced from Airtable)
         - Distinct names of DJs who have given away passes (on_air_winners)
+        - Specialty show names
+
+        Show titles that never name a DJ, like "FREEFORM", are left out.
 
         Args:
             db: Database session
@@ -449,7 +453,11 @@ class PassService:
                 .all()
             )
         }
-        return sorted(staff_names | winner_names | specialty_names)
+        return sorted(
+            name
+            for name in staff_names | winner_names | specialty_names
+            if name and not SpinitronScheduleService.is_non_dj_show_title(name)
+        )
 
     @staticmethod
     def find_dj_leave(db: Session, name: str) -> Staff | None:

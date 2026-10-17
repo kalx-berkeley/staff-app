@@ -303,6 +303,38 @@ describe('ShowForm', () => {
       });
     });
 
+    it("should go to the new show's page after publishing it", async () => {
+      vi.mocked(showsAPI.create).mockResolvedValue(
+        { id: 42 } as Awaited<ReturnType<typeof showsAPI.create>>,
+      );
+      vi.mocked(showsAPI.publish).mockResolvedValue(
+        { id: 42 } as Awaited<ReturnType<typeof showsAPI.publish>>,
+      );
+
+      renderShowForm();
+
+      await waitFor(() => {
+        expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+      });
+
+      const eventNameInput = screen.getByLabelText(/event name/i);
+      eventNameInput.textContent = 'Test Event';
+      fireEvent.input(eventNameInput);
+      fireEvent.change(screen.getByLabelText(/genre/i), { target: { value: 'Rock' } });
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), { target: { value: '1' } });
+      fireEvent.change(screen.getByLabelText(/show date/i), { target: { value: '2024-12-31' } });
+      fireEvent.change(screen.getByLabelText(/show time/i), { target: { value: '20:00' } });
+      fireEvent.change(screen.getByLabelText(/close date/i), { target: { value: '2024-12-31' } });
+      fireEvent.change(screen.getByLabelText(/close time/i), { target: { value: '18:00' } });
+
+      fireEvent.click(screen.getByRole('button', { name: /publish show/i }));
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('/promotions/shows/42');
+      });
+      expect(showsAPI.publish).toHaveBeenCalledWith(42);
+    });
+
     it('should send extra staff passes and show the total', async () => {
       vi.mocked(showsAPI.create).mockResolvedValue(
         { id: 1 } as Awaited<ReturnType<typeof showsAPI.create>>,

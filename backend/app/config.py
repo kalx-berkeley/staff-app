@@ -56,6 +56,12 @@ class Settings(BaseSettings):
     # KALX Overnights (169919), Sports Staff (195674), Campus Podcasts (176342),
     # Rotating Dj (193517).
     spinitron_placeholder_persona_ids: str = "176287,186839,169919,195674,176342,193517"
+    # Spinitron show titles that aren't a DJ or specialty show anyone could be
+    # pre-assigned passes for — comma-separated, matched case-insensitively.
+    # FREEFORM is the default title of every regular DJ's show, and OVERNIGHTS
+    # is pre-recorded with no live DJ. They're left out of every DJ name
+    # suggestion and autocomplete.
+    spinitron_non_dj_show_titles: str = "FREEFORM,OVERNIGHTS"
 
     # Authentication
     dj_studio_network: str = "192.168.1.0/24"

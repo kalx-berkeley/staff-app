@@ -234,15 +234,50 @@ describe('Promotions ShowDetail — Suggest DJs', () => {
       });
     });
 
-    // Advances to the second pass pair's suggest-by-genre panel, with Wolfman
-    // no longer offered there (already used, though still shown as the first
-    // pass pair's "Pre-assigned to" name) — only the specialty show remains.
-    await waitFor(() => {
-      expect(document.querySelector('.suggestion-list')).not.toBeNull();
+    // Advances to the second pass pair with a fresh form: no suggestion
+    // mode, date or DJ carried over from the first.
+    expect(await screen.findByRole('button', { name: 'Suggest…' })).toBeInTheDocument();
+    expect(document.querySelector('.suggestion-list')).toBeNull();
+    expect(screen.getByPlaceholderText('MM/DD/YYYY')).toHaveValue('');
+  });
+
+  it('suggests by date, then advances to the next pass pair with a fresh form', async () => {
+    const passA = { ...basePass, id: 1 };
+    const passB = { ...basePass, id: 2 };
+    const show = makeShow([passA, passB]);
+    vi.mocked(showsAPI.get).mockResolvedValue(show);
+
+    vi.mocked(passesAPI.getSuggestionsByDate).mockResolvedValue([
+      { name: 'Nightowl', is_specialty: false, matched_genres: [] },
+      { name: 'Wolfman', is_specialty: false, matched_genres: [] },
+    ]);
+    vi.mocked(passesAPI.setPreassignment).mockResolvedValue({
+      ...passA,
+      preassigned_dj: 'Nightowl',
+      preassigned_date: '2099-12-20',
     });
-    const suggestionList = document.querySelector('.suggestion-list') as HTMLElement;
-    expect(within(suggestionList).getByText('Sunday Jazz Brunch')).toBeInTheDocument();
-    expect(within(suggestionList).queryByText('Wolfman')).not.toBeInTheDocument();
+
+    await renderShowDetail();
+    await openPreassignForm(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest…' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest DJs by date' }));
+    fireEvent.change(screen.getByPlaceholderText('MM/DD/YYYY'), {
+      target: { value: '12/20/2099' },
+    });
+    fireEvent.click(await screen.findByText('Nightowl'));
+
+    await waitFor(() => {
+      expect(passesAPI.setPreassignment).toHaveBeenCalledWith(1, {
+        dj_name: 'Nightowl',
+        assignment_date: '2099-12-20',
+      });
+    });
+
+    expect(await screen.findByRole('button', { name: 'Suggest…' })).toBeInTheDocument();
+    expect(document.querySelector('.suggestion-list')).toBeNull();
+    expect(screen.queryByText('Wolfman')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('MM/DD/YYYY')).toHaveValue('');
   });
 
   it('suggests by date, prompting for a date first when none is set, then saves and closes when no more pass pairs are available', async () => {
@@ -366,6 +401,29 @@ describe('Promotions ShowDetail — leave of absence', () => {
       await screen.findByText('On leave Nov 1, 2099 – Dec 31, 2099'),
     ).toBeInTheDocument();
     expect(screen.getAllByText(/On leave/)).toHaveLength(1);
+  });
+});
+
+describe('Promotions ShowDetail — staff +1 guests', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('shows a +1 guest hold as the claimant\'s guest, not a second claim', async () => {
+    const claimed = { ...basePass, pass_type: 'staff' as const, status: 'claimed' as const, staff_id: 7, staff_name: 'John Doe' };
+    vi.mocked(showsAPI.get).mockResolvedValue(
+      makeShow([
+        { ...claimed, id: 1, has_guest: true },
+        { ...claimed, id: 2, guest_of_pass_id: 1 },
+      ]),
+    );
+
+    await renderShowDetail();
+
+    expect(await screen.findByText(/\+1 guest reserved/)).toBeInTheDocument();
+    expect(screen.getAllByText('Claimed by:')).toHaveLength(1);
+    expect(screen.getByText('+1 guest hold')).toBeInTheDocument();
+    expect(screen.getByText('+1 guest of:').parentElement).toHaveTextContent('+1 guest of: John Doe');
   });
 });
 

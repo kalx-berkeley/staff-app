@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { legacyImportAPI, venuesAPI, showsAPI } from '../api';
+import { legacyImportAPI, venuesAPI, showsAPI, autocompleteAPI, specialtyShowsAPI } from '../api';
 import type { VenueResponse, AgeRestriction, ShowSummary } from '../types';
-import { DatePicker } from '../components';
+import { DatePicker, Tooltip, DescriptionCheckFeedback, useDescriptionCheck } from '../components';
+import DjNameAutocomplete from '../components/DjNameAutocomplete';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 
 type Mode = 'new' | 'existing';
@@ -55,6 +56,9 @@ const LegacyImport = () => {
   const [venues, setVenues] = useState<VenueResponse[]>([]);
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [knownGenres, setKnownGenres] = useState<string[]>([]);
+  const [djNames, setDjNames] = useState<string[]>([]);
+  const [specialtyShowNames, setSpecialtyShowNames] = useState<Set<string>>(new Set());
+  const descriptionCheck = useDescriptionCheck();
 
   // Venue is at the top and persists across imports
   const [venueId, setVenueId] = useState<number | ''>('');
@@ -93,6 +97,10 @@ const LegacyImport = () => {
     () => (selectedShow ? venues.find((v) => v.id === selectedShow.venue.id) ?? null : null),
     [selectedShow, venues]
   );
+  // The venue whose guest list rules apply to the winners and claims below.
+  const targetVenue = mode === 'new' ? selectedVenue : selectedShowVenue;
+  const requiresEmail = !!targetVenue?.requires_email_address;
+  const guestRequiresName = !!targetVenue?.staff_guest_requires_name;
 
   useEffect(() => {
     const init = async () => {
@@ -111,6 +119,12 @@ const LegacyImport = () => {
         setVenues(venueList);
         setKnownGenres(genreList);
         setStaffList(staffMembers);
+        // DJ name suggestions are a convenience, so a failure here is ignored.
+        autocompleteAPI.getDJNames().then(setDjNames).catch(() => {});
+        specialtyShowsAPI
+          .list()
+          .then((shows) => setSpecialtyShowNames(new Set(shows.map((s) => s.name.toLowerCase()))))
+          .catch(() => {});
         if (venueList.length === 1) {
           setVenueId(venueList[0].id);
           setSelectedVenue(venueList[0]);
@@ -259,15 +273,21 @@ const LegacyImport = () => {
     }
 
     onAirWinners.forEach((w, i) => {
-      const hasAny = w.recipient_name || w.recipient_phone;
+      const hasAny = w.recipient_name || w.recipient_phone || w.recipient_email;
       if (hasAny) {
         if (!w.recipient_name.trim()) newErrors[`winner_${i}_name`] = 'Name required';
         if (!w.recipient_phone.trim()) newErrors[`winner_${i}_phone`] = 'Phone required';
+        if (requiresEmail && !w.recipient_email.trim()) {
+          newErrors[`winner_${i}_email`] = 'This venue requires an email address';
+        }
       }
     });
 
     staffClaims.forEach((c, i) => {
       if (c.staff_id === '') newErrors[`staff_${i}`] = 'Select a staff member';
+      if (guestRequiresName && c.has_guest && !c.guest_name.trim()) {
+        newErrors[`staff_${i}_guest`] = 'This venue requires a guest name';
+      }
     });
 
     setErrors(newErrors);
@@ -623,18 +643,26 @@ const LegacyImport = () => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="li_on_air_description">On-Air Description</label>
+              <div className="label-with-help">
+                <label htmlFor="li_on_air_description">On-Air Description</label>
+                <Tooltip text="Shown to DJs on the show detail page while they are on-air. Describe the show in a factual, value-neutral way. Supports Markdown formatting: headers, paragraphs, lists, blockquotes, bold/italic, and inline or block code. Links and images are not supported." />
+              </div>
               <textarea
                 id="li_on_air_description"
                 value={onAirDescription}
                 onChange={(e) => setOnAirDescription(e.target.value)}
+                onBlur={() => descriptionCheck.check(onAirDescription)}
                 rows={3}
                 disabled={submitting}
               />
+              <DescriptionCheckFeedback check={descriptionCheck} savedItem="show" />
             </div>
 
             <div className="form-group">
-              <label htmlFor="li_caller_special_instructions">Caller Special Instructions</label>
+              <div className="label-with-help">
+                <label htmlFor="li_caller_special_instructions">Caller Special Instructions</label>
+                <Tooltip text="Shown to DJs on the give away page when recording a winner — e.g. age requirements, ID at door, or venue parking info. Supports Markdown formatting: headers, paragraphs, lists, blockquotes, bold/italic, and inline or block code. Links and images are not supported." />
+              </div>
               <textarea
                 id="li_caller_special_instructions"
                 value={callerSpecialInstructions}
@@ -810,25 +838,32 @@ const LegacyImport = () => {
                     )}
                   </div>
                 </div>
-                {selectedShowVenue?.requires_email_address && (
+                {requiresEmail && (
                   <div className="form-group">
-                    <label htmlFor={`li_w${i}_email`}>Email</label>
+                    <label htmlFor={`li_w${i}_email`}>
+                      Email <span className="required">*</span>
+                    </label>
                     <input
                       id={`li_w${i}_email`}
                       type="email"
                       value={winner.recipient_email}
                       onChange={(e) => updateWinner(i, 'recipient_email', e.target.value)}
+                      className={errors[`winner_${i}_email`] ? 'input-error' : ''}
                       disabled={submitting}
                     />
+                    {errors[`winner_${i}_email`] && (
+                      <span className="field-error">{errors[`winner_${i}_email`]}</span>
+                    )}
                   </div>
                 )}
                 <div className="form-group">
                   <label htmlFor={`li_w${i}_dj`}>Given Away By (DJ)</label>
-                  <input
+                  <DjNameAutocomplete
                     id={`li_w${i}_dj`}
-                    type="text"
                     value={winner.given_away_by_dj}
-                    onChange={(e) => updateWinner(i, 'given_away_by_dj', e.target.value)}
+                    onChange={(name) => updateWinner(i, 'given_away_by_dj', name)}
+                    djNames={djNames}
+                    specialtyShowNames={specialtyShowNames}
                     disabled={submitting}
                   />
                 </div>
@@ -906,15 +941,21 @@ const LegacyImport = () => {
                 </div>
                 {claim.has_guest && (
                   <div className="form-group">
-                    <label htmlFor={`li_staff_${i}_guest`}>Guest Name</label>
+                    <label htmlFor={`li_staff_${i}_guest`}>
+                      Guest Name {guestRequiresName && <span className="required">*</span>}
+                    </label>
                     <input
                       id={`li_staff_${i}_guest`}
                       type="text"
                       value={claim.guest_name}
                       onChange={(e) => updateStaffClaim(i, { guest_name: e.target.value })}
+                      className={errors[`staff_${i}_guest`] ? 'input-error' : ''}
                       disabled={submitting}
-                      placeholder={selectedShowVenue?.staff_guest_requires_name ? 'Required' : 'Optional'}
+                      placeholder={guestRequiresName ? 'Required' : 'Optional'}
                     />
+                    {errors[`staff_${i}_guest`] && (
+                      <span className="field-error">{errors[`staff_${i}_guest`]}</span>
+                    )}
                   </div>
                 )}
               </div>

@@ -79,6 +79,23 @@ class TestGetUpcomingTitles:
 
         assert titles == ["Sunday Jazz Brunch", "The Howl"]
 
+    async def test_leaves_out_non_dj_show_titles(self, db: Session, monkeypatch):
+        now = datetime.now(timezone.utc)
+
+        async def fake_fetch_shows(end):
+            return [
+                _show(1, now, now + timedelta(hours=1), 1, "FREEFORM"),
+                _show(2, now, now + timedelta(hours=1), None, "OVERNIGHTS"),
+                _show(3, now, now + timedelta(hours=1), 2, "Sunday Jazz Brunch"),
+            ]
+
+        monkeypatch.setattr(f"{_MODULE}.SpinitronService.fetch_shows", fake_fetch_shows)
+        _patch_no_playlists(monkeypatch, _MODULE)
+
+        titles = await SpinitronShowTitlesService.get_upcoming_titles(db)
+
+        assert titles == ["Sunday Jazz Brunch"]
+
     async def test_includes_titles_from_past_and_future_playlists(
         self, db: Session, monkeypatch
     ):

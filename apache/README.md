@@ -34,7 +34,7 @@ unmodified regardless of domain suffix.
 
 ```bash
 sudo apt install libapache2-mod-auth-openidc
-sudo a2enmod auth_openidc proxy proxy_http headers remoteip ssl rewrite alias
+sudo a2enmod auth_openidc proxy proxy_http headers remoteip ssl rewrite alias deflate
 ```
 
 ### Deploy configs

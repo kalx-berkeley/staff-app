@@ -288,6 +288,34 @@ def test_get_dj_autocomplete(client, show, promotions_staff, db):
     assert len(dj_names) == 2
 
 
+def test_dj_autocomplete_leaves_out_non_dj_show_titles(client, promotions_staff, db):
+    """FREEFORM and OVERNIGHTS are show titles, not DJs, so they're never
+    suggested even if one turns up as a DJ name."""
+    db.add(
+        Staff(email="dj-gamma@test.com", name="Gamma", phone="555-0101", dj_name="DJ Gamma")
+    )
+    db.add(
+        Staff(
+            email="overnights@test.com",
+            name="Overnights",
+            phone="555-0102",
+            dj_name="OVERNIGHTS",
+        )
+    )
+    db.add(
+        Staff(
+            email="freeform@test.com", name="Freeform", phone="555-0103", dj_name="Freeform"
+        )
+    )
+    db.commit()
+
+    response = client.get(
+        "/api/autocomplete/djs", headers={"X-Forwarded-User": promotions_staff.email}
+    )
+    assert response.status_code == 200
+    assert response.json() == ["DJ Gamma"]
+
+
 def test_cannot_give_away_closed_show_pass(client, show, promotions_staff, db):
     """Test that passes cannot be given away for closed shows."""
     # Close the show

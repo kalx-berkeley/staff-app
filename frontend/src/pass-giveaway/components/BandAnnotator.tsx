@@ -134,9 +134,16 @@ export default function BandAnnotator({
   const [pasteError, setPasteError] = useState('');
   const [showNoMbInput, setShowNoMbInput] = useState(false);
   const [noMbName, setNoMbName] = useState('');
+  // A selection made without a mouse (a touch long-press, or Shift+arrow
+  // keys). Phones and tablets don't fire mouseup when you finish adjusting a
+  // selection, so instead of opening the search straight away we offer a
+  // "Tag" button for it.
+  const [pendingSelection, setPendingSelection] = useState<SelectionState | null>(null);
   const editableRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const tagButtonRef = useRef<HTMLButtonElement>(null);
   const isComposingRef = useRef(false);
+  const mouseDownRef = useRef(false);
 
   // Sync innerHTML when eventName or bands change from outside
   useEffect(() => {
@@ -155,12 +162,15 @@ export default function BandAnnotator({
   // Close panel on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
+      const target = e.target as Node;
       if (
-        panelRef.current &&
-        !panelRef.current.contains(e.target as Node) &&
-        editableRef.current &&
-        !editableRef.current.contains(e.target as Node)
+        tagButtonRef.current?.contains(target) ||
+        editableRef.current?.contains(target)
       ) {
+        return;
+      }
+      setPendingSelection(null);
+      if (panelRef.current && !panelRef.current.contains(target)) {
         setSelection(null);
         setResults([]);
         setPasteUrl('');
@@ -201,25 +211,58 @@ export default function BandAnnotator({
     document.execCommand('insertText', false, text);
   }, []);
 
-  const handleMouseUp = useCallback(async () => {
-    if (disabled) return;
+  /** The current selection in the event name, if it can be tagged as a band. */
+  const readSelection = useCallback((): SelectionState | null => {
     const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !editableRef.current) return;
-    if (!editableRef.current.contains(sel.anchorNode)) return;
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed || !editableRef.current) return null;
+    if (!editableRef.current.contains(sel.anchorNode)) return null;
 
     const offsets = getSelectionOffsets(editableRef.current, sel);
-    if (!offsets) return;
+    if (!offsets) return null;
 
     const selectedText = eventName.slice(offsets.start, offsets.end).trim();
-    if (!selectedText) return;
+    if (!selectedText) return null;
 
     const overlaps = bands.some(
       (b) => offsets.start < b.end_pos && offsets.end > b.start_pos
     );
-    if (overlaps) return;
+    if (overlaps) return null;
 
     const anchorRect = sel.getRangeAt(0).getBoundingClientRect();
-    setSelection({ start: offsets.start, end: offsets.end, text: selectedText, anchorRect });
+    return { start: offsets.start, end: offsets.end, text: selectedText, anchorRect };
+  }, [eventName, bands]);
+
+  // Watch for selections made without a mouse. A selection that moves out of
+  // the event name (for example when tapping the "Tag" button moves focus)
+  // keeps the pending one, so the tap still has something to tag.
+  useEffect(() => {
+    if (disabled) return;
+    const handleSelectionChange = () => {
+      if (mouseDownRef.current) return;
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) {
+        setPendingSelection(null);
+        return;
+      }
+      if (!editableRef.current?.contains(sel.anchorNode)) return;
+      setPendingSelection(readSelection());
+    };
+    // A mouse drag can end outside the event name, where its onMouseUp
+    // doesn't fire.
+    const handleMouseUp = () => {
+      mouseDownRef.current = false;
+    };
+    document.addEventListener('selectionchange', handleSelectionChange);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [disabled, readSelection]);
+
+  const openSearch = useCallback(async (selected: SelectionState) => {
+    setPendingSelection(null);
+    setSelection(selected);
     setResults([]);
     setPasteUrl('');
     setPasteError('');
@@ -228,14 +271,27 @@ export default function BandAnnotator({
 
     setSearching(true);
     try {
-      const artists = await showsAPI.searchMusicBrainz(selectedText);
+      const artists = await showsAPI.searchMusicBrainz(selected.text);
       setResults(artists);
     } catch {
       setResults([]);
     } finally {
       setSearching(false);
     }
-  }, [disabled, eventName, bands]);
+  }, []);
+
+  const handleMouseDown = useCallback(() => {
+    mouseDownRef.current = true;
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    mouseDownRef.current = false;
+    if (disabled) return;
+    const selected = readSelection();
+    if (selected) {
+      openSearch(selected);
+    }
+  }, [disabled, readSelection, openSearch]);
 
   const addBand = (artist: MusicBrainzArtist) => {
     if (!selection) return;
@@ -353,11 +409,25 @@ export default function BandAnnotator({
         onInput={handleInput}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
+        onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
         onBlur={onBlur}
         onCompositionStart={() => { isComposingRef.current = true; }}
         onCompositionEnd={() => { isComposingRef.current = false; handleInput(); }}
       />
+
+      {pendingSelection && !selection && !disabled && (
+        <button
+          ref={tagButtonRef}
+          type="button"
+          className="btn-secondary btn-small band-annotator-tag-button"
+          // Keep the selection from collapsing before the click lands.
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => openSearch(pendingSelection)}
+        >
+          Tag &ldquo;{pendingSelection.text}&rdquo; as an artist
+        </button>
+      )}
 
       {/* Floating search results panel */}
       {selection && (

@@ -9,6 +9,21 @@ import { usePageTitle } from '../../common/hooks/usePageTitle';
 import type { ShowResponse, ClaimData, LotteryStatus, SpecialtyShowResponse, AlternateQueue, AlternateJoinRequest } from '../types';
 import type { StaffProfile, APIError } from '../../common/types';
 
+const EmailIcon = () => (
+  <svg
+    width="14"
+    height="11"
+    viewBox="0 0 14 11"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+    className="email-icon"
+  >
+    <rect x="0.75" y="0.75" width="12.5" height="9.5" rx="1" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M1 1.5l6 4.5 6-4.5" stroke="currentColor" strokeWidth="1.5" />
+  </svg>
+);
+
 const ShowDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -757,6 +772,15 @@ const ShowDetail = () => {
                 <div className="info-item">
                   <span className="info-label">Phone:</span>
                   <span className="info-value">{contact.phone}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Email:</span>
+                  <span className="info-value">
+                    <a href={`mailto:${contact.email}`} className="email-link">
+                      <EmailIcon />
+                      {contact.email}
+                    </a>
+                  </span>
                 </div>
               </div>
             ))}

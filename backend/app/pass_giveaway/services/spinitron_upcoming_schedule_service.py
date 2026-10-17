@@ -66,13 +66,16 @@ class SpinitronUpcomingScheduleService:
 
         Reverse of `get_dates_for_name`: each entry on that date contributes
         its resolved DJ name if it has one, else its Spinitron show title (a
-        specialty show's exact title, for an unresolved persona).
+        specialty show's exact title, for an unresolved persona). Titles
+        that never name a DJ, like "FREEFORM", are left out.
         """
         entries = await SpinitronUpcomingScheduleService._get_entries(db)
         names = {
-            (entry["dj_name"] or entry["title"])
+            name
             for entry in entries
-            if entry["date"] == date and (entry["dj_name"] or entry["title"])
+            if entry["date"] == date
+            and (name := entry["dj_name"] or entry["title"])
+            and not SpinitronScheduleService.is_non_dj_show_title(name)
         }
         return sorted(names)
 

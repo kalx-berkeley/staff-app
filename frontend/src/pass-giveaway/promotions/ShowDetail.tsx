@@ -445,16 +445,15 @@ const ShowDetail = () => {
       fetchSuggestionsByGenre(show.id);
     }
     // `show` is deliberately excluded: it gets a new object identity on every
-    // pass-preassignment save (see saveSuggestionAndAdvance), and refetching
-    // then would clobber the suggestion list we just filtered down locally.
+    // pass-preassignment save, and the suggestions only need loading when
+    // genre mode is entered.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [suggestMode]);
 
   /**
    * Save a suggestion's DJ/specialty-show name and date to `pass`, then open the
-   * next available (unassigned) pass pair with the same suggestion pool minus
-   * the one just used — so suggesting for several pass pairs in a row doesn't
-   * require re-opening the "Suggest" flow each time.
+   * next available (unassigned) pass pair with a fresh form, so the next pair
+   * starts from the beginning rather than from the last suggestion's date.
    */
   const saveSuggestionAndAdvance = async (
     pass: PassResponse,
@@ -470,27 +469,15 @@ const ShowDetail = () => {
         show?.passes.map((p) => (p.id === updatedPass.id ? updatedPass : p)) ?? [];
       setShow((prev) => (prev ? { ...prev, passes: updatedPasses } : prev));
 
-      const remainingSuggestions = (suggestions ?? []).filter((s) => s.name !== djName);
-      setSuggestions(remainingSuggestions);
-
       const pairs = updatedPasses.filter((p) => p.pass_type === 'pair');
       const currentIndex = pairs.findIndex((p) => p.id === pass.id);
       const next = pairs
         .slice(currentIndex + 1)
         .find((p) => p.status === 'available' && !p.preassigned_dj);
 
+      resetPreassignForm();
       if (next) {
         setPreassignPassId(next.id);
-        setPreassignDj('');
-        // Deliberately keep preassignDate and suggestMode/suggestions as-is —
-        // the same on-air date and suggestion pool usually apply to the next
-        // pass pair too, minus the DJ we just used.
-        setScheduleDates(null);
-        setPreassignLeave(null);
-        lastScheduleFetchNameRef.current = null;
-      } else {
-        // No more available pass pairs to suggest for — close out the form.
-        resetPreassignForm();
       }
     } catch (err) {
       const apiError = err as APIError;
@@ -1398,46 +1385,74 @@ const ShowDetail = () => {
           <Tooltip text="Staff passes allow KALX staff to attend the show. These are separate from the on-air giveaway pairs and claimed directly by staff members." />
         </h3>
         <div className="passes-list">
-          {staffPasses.map((pass) => (
-            <div key={pass.id} className="pass-card">
-              <div className="pass-header">
-                <span className="pass-status">{pass.status}</span>
-              </div>
+          {staffPasses.map((pass) => {
+            // A +1 guest hold is claimed in the staff member's name, but it's
+            // their guest's tentative spot, not a second pass for them.
+            const isGuestHold = pass.status === 'claimed' && pass.guest_of_pass_id != null;
+            const guestOf = isGuestHold
+              ? staffPasses.find((p) => p.id === pass.guest_of_pass_id) ?? null
+              : null;
+            return (
+              <div key={pass.id} className="pass-card">
+                <div className="pass-header">
+                  <span className="pass-status">{isGuestHold ? '+1 guest hold' : pass.status}</span>
+                </div>
 
-              {pass.status === 'claimed' && (
-                <div className="pass-details">
-                  <p>
-                    <strong>Claimed by:</strong> {pass.staff_name}
-                    {pass.staff_on_leave && (
-                      <>
-                        {' '}
-                        <span
-                          className="leave-badge"
-                          title="Their leave of absence covers this show, so they may not attend."
-                        >
-                          On leave{' '}
-                          {formatLeave({ loa_start: pass.staff_loa_start, loa_end: pass.staff_loa_end })}
-                        </span>
-                      </>
+                {isGuestHold && (
+                  <div className="pass-details">
+                    <p>
+                      <strong>+1 guest of:</strong> {guestOf?.staff_name ?? pass.staff_name}
+                      {guestOf?.guest_name ? ` (${guestOf.guest_name})` : ''}
+                    </p>
+                    <p className="pass-guest-note">
+                      <em>Not confirmed until the show closes</em>
+                    </p>
+                  </div>
+                )}
+
+                {pass.status === 'claimed' && !isGuestHold && (
+                  <div className="pass-details">
+                    <p>
+                      <strong>Claimed by:</strong> {pass.staff_name}
+                      {pass.staff_on_leave && (
+                        <>
+                          {' '}
+                          <span
+                            className="leave-badge"
+                            title="Their leave of absence covers this show, so they may not attend."
+                          >
+                            On leave{' '}
+                            {formatLeave({ loa_start: pass.staff_loa_start, loa_end: pass.staff_loa_end })}
+                          </span>
+                        </>
+                      )}
+                    </p>
+                    {pass.has_guest && (
+                      <p className="pass-guest-note">
+                        +1 guest reserved
+                        {pass.guest_name ? `: ${pass.guest_name}` : ''}
+                        {pass.only_attend_with_guest ? " (staff will release if guest can't attend)" : ''}
+                        {' '}— <em>not confirmed until show closes</em>
+                      </p>
                     )}
-                  </p>
-                  <p>
-                    <strong>Phone:</strong> {formatPhone(pass.staff_phone)}
-                  </p>
-                  <p>
-                    <strong>Claimed:</strong>{' '}
-                    {pass.claimed_at && formatDateTime(pass.claimed_at)}
-                  </p>
-                </div>
-              )}
+                    <p>
+                      <strong>Phone:</strong> {formatPhone(pass.staff_phone)}
+                    </p>
+                    <p>
+                      <strong>Claimed:</strong>{' '}
+                      {pass.claimed_at && formatDateTime(pass.claimed_at)}
+                    </p>
+                  </div>
+                )}
 
-              {pass.status === 'available' && (
-                <div className="pass-details">
-                  <p>{show.status === 'closed' ? 'Unavailable' : 'Available for staff to claim'}</p>
-                </div>
-              )}
-            </div>
-          ))}
+                {pass.status === 'available' && (
+                  <div className="pass-details">
+                    <p>{show.status === 'closed' ? 'Unavailable' : 'Available for staff to claim'}</p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
         <AlternateQueueList
           entries={alternates}

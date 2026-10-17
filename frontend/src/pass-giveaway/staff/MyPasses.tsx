@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { passesAPI, lotteryAPI, alternatesAPI } from '../api';
 import type { PassResponse, MyLotteryEntryResponse, MyAlternateEntry } from '../types';
 import type { APIError } from '../../common/types';
-import { formatPhone } from '../../common/utils';
+import { formatDateValue } from '../../common/utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 
@@ -30,6 +30,17 @@ const formatDate = (dateStr: string) => {
     month: 'short',
     day: 'numeric',
   });
+};
+
+// Passes for shows more than this many days in the past are hidden.
+const PAST_SHOW_DAYS = 3;
+
+/** Whether a show is recent or upcoming enough to list on this page. */
+const isRecentShow = (showDate: string | null | undefined): boolean => {
+  if (!showDate) return true;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - PAST_SHOW_DAYS);
+  return showDate >= formatDateValue(cutoff);
 };
 
 const MyPasses = () => {
@@ -171,8 +182,12 @@ const MyPasses = () => {
     return map[status] ?? status;
   };
 
-  const givenAwayPasses = passes.filter((p) => p.status === 'given_away');
-  const preassignedPasses = passes.filter((p) => p.status === 'available' && p.preassigned_dj);
+  const recentClaimedPasses = claimedPasses.filter((p) => isRecentShow(p.show_date));
+  const recentPasses = passes.filter((p) => isRecentShow(p.show_date));
+  const givenAwayPasses = recentPasses.filter((p) => p.status === 'given_away');
+  const preassignedPasses = recentPasses.filter(
+    (p) => p.status === 'available' && p.preassigned_dj
+  );
 
   return (
     <div className="my-passes">
@@ -191,15 +206,15 @@ const MyPasses = () => {
           </div>
         )}
 
-        {claimedLoaded && !claimedLoading && claimedPasses.length === 0 && (
+        {claimedLoaded && !claimedLoading && recentClaimedPasses.length === 0 && (
           <div className="no-passes">
-            <p>You haven't claimed any staff passes.</p>
+            <p>You don't have any claimed staff passes for recent or upcoming shows.</p>
           </div>
         )}
 
-        {claimedPasses.length > 0 && (
+        {recentClaimedPasses.length > 0 && (
           <div className="passes-list">
-            {claimedPasses.map((pass) => (
+            {recentClaimedPasses.map((pass) => (
               <div key={pass.id} className="pass-card">
                 <div className="pass-header">
                   <h3>{pass.show_event_name || 'Show'}</h3>
@@ -409,7 +424,7 @@ const MyPasses = () => {
             </div>
           )}
 
-          {loaded && !loading && passes.length === 0 && (
+          {loaded && !loading && recentPasses.length === 0 && (
             <div className="no-passes">
               <p>No giveaways found{djName ? <> for <strong>{djName}</strong></> : null}.</p>
             </div>
@@ -481,14 +496,6 @@ const MyPasses = () => {
                             <span className="info-value">{pass.show_event_name}</span>
                           </div>
                         )}
-                        <div className="info-row">
-                          <span className="info-label">Winner:</span>
-                          <span className="info-value">{pass.recipient_name}</span>
-                        </div>
-                        <div className="info-row">
-                          <span className="info-label">Phone:</span>
-                          <span className="info-value">{formatPhone(pass.recipient_phone)}</span>
-                        </div>
                         <div className="info-row">
                           <span className="info-label">Given Away By:</span>
                           <span className="info-value">{pass.given_away_by_dj}</span>

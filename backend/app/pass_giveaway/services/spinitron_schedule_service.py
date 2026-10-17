@@ -189,6 +189,23 @@ class SpinitronScheduleService:
         return {int(persona_id): name for persona_id, name in data["personas"].items()}
 
     @staticmethod
+    def is_non_dj_show_title(name: str | None) -> bool:
+        """
+        Whether *name* is a show title that never names a DJ (e.g. "FREEFORM").
+
+        Matches SPINITRON_NON_DJ_SHOW_TITLES case-insensitively, ignoring
+        surrounding whitespace.
+        """
+        if not name:
+            return False
+        non_dj_titles = {
+            title.strip().lower()
+            for title in settings.spinitron_non_dj_show_titles.split(",")
+            if title.strip()
+        }
+        return name.strip().lower() in non_dj_titles
+
+    @staticmethod
     def _placeholder_persona_ids() -> Set[int]:
         """Parse SPINITRON_PLACEHOLDER_PERSONA_IDS into a set of persona IDs."""
         return {

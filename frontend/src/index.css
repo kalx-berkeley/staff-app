@@ -1238,6 +1238,16 @@ fieldset.radio-group legend {
   color: #333;
 }
 
+.email-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.email-icon {
+  flex-shrink: 0;
+}
+
 /* Passes */
 .passes-section {
   margin-bottom: 1.5rem;
@@ -3293,6 +3303,14 @@ fieldset.radio-group legend {
   font-size: 0.8rem;
   color: #666;
   margin: 0;
+}
+
+.band-annotator-tag-button {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Floating search panel */

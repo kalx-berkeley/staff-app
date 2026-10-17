@@ -40,6 +40,7 @@ class SpinitronShowTitlesService:
         past `/playlists`, and pre-provisioned future `/playlists` together,
         so a new specialty show that's only been pre-provisioned as a
         playlist (and hasn't aired or reached `/shows` yet) still shows up.
+        Titles that never name a DJ, like "FREEFORM", are left out.
         """
 
         async def producer() -> dict:
@@ -58,7 +59,11 @@ class SpinitronShowTitlesService:
         data = await cache_service.fetch_cached_async(
             db, _UPCOMING_TITLES_CACHE_KEY, producer, ttl_days=1
         )
-        return data["titles"]
+        return [
+            title
+            for title in data["titles"]
+            if not SpinitronScheduleService.is_non_dj_show_title(title)
+        ]
 
     @staticmethod
     async def get_dj_history_for_title(db: Session, title: str) -> List[str]:

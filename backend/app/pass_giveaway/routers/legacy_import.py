@@ -41,6 +41,33 @@ router = APIRouter(
 )
 
 
+def _check_venue_rules(
+    venue: Venue,
+    on_air_winners: list[OnAirWinnerImport],
+    staff_passes: list[StaffPassImport],
+) -> None:
+    """Reject winners and claims that break the venue's guest list rules.
+
+    The same rules apply when DJs record winners and staff claim passes in
+    the app: some venues need each on-air winner's email address, and some
+    need the name of a staff member's +1 guest.
+    """
+    if venue.requires_email_address and any(
+        not (w.recipient_email or "").strip() for w in on_air_winners
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"{venue.name} requires an email address for every on-air winner",
+        )
+    if venue.staff_guest_requires_name and any(
+        p.has_guest and not (p.guest_name or "").strip() for p in staff_passes
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"{venue.name} requires a name for every staff +1 guest",
+        )
+
+
 def _assign_winners_and_claims(
     db: Session,
     show: Show,
@@ -135,6 +162,7 @@ def import_legacy_show(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Venue with id {data.venue_id} not found",
         )
+    _check_venue_rules(venue, data.on_air_winners, data.staff_passes)
 
     if len(data.on_air_winners) > data.num_pass_pairs:
         raise HTTPException(
@@ -273,6 +301,7 @@ def merge_legacy_show(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Cannot merge into a show with status '{show.status}'",
         )
+    _check_venue_rules(show.venue, data.on_air_winners, data.staff_passes)
 
     pair_pool = (
         db.query(Pass)

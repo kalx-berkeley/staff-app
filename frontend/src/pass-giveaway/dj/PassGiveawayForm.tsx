@@ -230,7 +230,9 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName: propDjName, winFre
         <div className="form-group">
           <div className="label-with-help">
             <label htmlFor="recipient_phone">Winner Phone *</label>
-            <Tooltip text="The phone number is checked against this venue's win history. If this caller won recently, a warning will appear and you may need to override." />
+            {winFrequencyDays ? (
+              <Tooltip text="The phone number is checked against this venue's win history. If this caller won recently, a warning will appear and you may need to override." />
+            ) : null}
           </div>
           <input
             type="tel"

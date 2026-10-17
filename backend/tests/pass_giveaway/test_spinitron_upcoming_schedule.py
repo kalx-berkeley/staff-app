@@ -350,6 +350,40 @@ class TestGetNamesForDate:
 
         assert names == ["Sunday Jazz Brunch", "Wolfman"]
 
+    async def test_leaves_out_non_dj_show_titles(self, db: Session, monkeypatch):
+        """
+        FREEFORM and OVERNIGHTS have no specific DJ behind them, so their
+        titles must not be suggested even when no DJ name resolves.
+        """
+        now = _ANCHOR
+        day = now + timedelta(days=3)
+
+        async def fake_fetch_shows(end):
+            return [
+                _show(1, day, day + timedelta(hours=1), None, "FREEFORM"),
+                _show(2, day, day + timedelta(hours=2), None, "Overnights"),
+                _show(3, day, day + timedelta(hours=3), 1, "FREEFORM"),
+            ]
+
+        async def fake_resolve_dj_names(db, shows):
+            return {1: "Wolfman"}
+
+        monkeypatch.setattr(
+            f"{UPCOMING_SERVICE}.SpinitronService.fetch_shows",
+            fake_fetch_shows,
+        )
+        _patch_no_future_playlists(monkeypatch)
+        monkeypatch.setattr(
+            f"{UPCOMING_SERVICE}.SpinitronScheduleService.resolve_dj_names",
+            fake_resolve_dj_names,
+        )
+
+        names = await SpinitronUpcomingScheduleService.get_names_for_date(
+            db, day.date().isoformat()
+        )
+
+        assert names == ["Wolfman"]
+
     async def test_no_shows_on_date_returns_empty(self, db: Session, monkeypatch):
         now = _ANCHOR
 

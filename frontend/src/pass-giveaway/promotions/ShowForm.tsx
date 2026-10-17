@@ -575,6 +575,8 @@ const ShowForm = () => {
         const newShow = await showsAPI.create(createData);
         if (publish) {
           await showsAPI.publish(newShow.id);
+          navigate(`/promotions/shows/${newShow.id}`);
+          return;
         }
       }
       navigate('/promotions/shows');
@@ -640,7 +642,7 @@ const ShowForm = () => {
             Event Name <span className="required">*</span>
           </label>
           <p className="band-annotator-hint" style={{ margin: '0 0 0.35rem' }}>
-            Type the show name here. Select any band or artist name to link it to a MusicBrainz record.
+            Type the show name here. Select any band or artist name to link it to a MusicBrainz record. On a phone, press and hold a word to select it, then tap Tag.
           </p>
           <BandAnnotator
             id="event_name"
