@@ -5,6 +5,7 @@ from unittest.mock import patch, MagicMock
 
 from sqlalchemy.orm import Session
 
+from app.common.areas import COMMON_AREA, PASS_GIVEAWAY_AREA
 from app.models.audit_log import AuditLog
 
 
@@ -30,7 +31,7 @@ def test_send_email_staging_logs_not_sends(caplog):
         ):
             from app.common.services.notification_service import send_email
 
-            send_email("user@example.com", "Test Subject", "Test body")
+            send_email("user@example.com", "Test Subject", "Test body", area=COMMON_AREA)
 
     assert any("suppressed" in r.message for r in caplog.records)
     assert any("user@example.com" in r.message for r in caplog.records)
@@ -61,6 +62,7 @@ def test_send_email_staging_tags_subject_and_body_for_webmaster():
             "Test Subject",
             "Test body",
             body_html="<p>Test body</p>",
+            area=COMMON_AREA,
         )
 
     call_kwargs = mock_client.send.call_args.kwargs
@@ -90,7 +92,7 @@ def test_send_email_no_api_key_uses_local_smtp():
 
         from app.common.services.notification_service import send_email
 
-        send_email("user@example.com", "Test Subject", "Test body")
+        send_email("user@example.com", "Test Subject", "Test body", area=COMMON_AREA)
 
     mock_smtp_cls.assert_called_once_with("localhost", 25)
     mock_smtp_instance.sendmail.assert_called_once()
@@ -114,7 +116,7 @@ def test_send_email_production_calls_smtp2go():
 
         from app.common.services.notification_service import send_email
 
-        send_email("user@example.com", "Subject", "Body")
+        send_email("user@example.com", "Subject", "Body", area=COMMON_AREA)
 
     mock_client.send.assert_called_once()
     call_kwargs = mock_client.send.call_args.kwargs
@@ -145,10 +147,11 @@ def test_send_email_smtp2go_success_audits_response_details(db: Session):
 
         from app.common.services.notification_service import send_email
 
-        send_email("user@example.com", "Subject", "Body", db=db)
+        send_email("user@example.com", "Subject", "Body", db=db, area=PASS_GIVEAWAY_AREA)
 
     entry = _last_audit_entry(db)
     assert entry is not None
+    assert entry.area == PASS_GIVEAWAY_AREA
     assert entry.details["sent"] is True
     assert entry.details["response"] == {
         "status_code": 200,
@@ -180,7 +183,7 @@ def test_send_email_smtp2go_failure_is_audited(db: Session):
 
         from app.common.services.notification_service import send_email
 
-        send_email("user@example.com", "Subject", "Body", db=db)
+        send_email("user@example.com", "Subject", "Body", db=db, area=COMMON_AREA)
 
     entry = _last_audit_entry(db)
     assert entry is not None
@@ -213,7 +216,7 @@ def test_send_email_local_smtp_success_audits_response_details(db: Session):
 
         from app.common.services.notification_service import send_email
 
-        send_email("user@example.com", "Test Subject", "Test body", db=db)
+        send_email("user@example.com", "Test Subject", "Test body", db=db, area=COMMON_AREA)
 
     entry = _last_audit_entry(db)
     assert entry is not None
@@ -242,7 +245,7 @@ def test_send_email_local_smtp_failure_is_audited(db: Session):
 
         from app.common.services.notification_service import send_email
 
-        send_email("user@example.com", "Test Subject", "Test body", db=db)
+        send_email("user@example.com", "Test Subject", "Test body", db=db, area=COMMON_AREA)
 
     entry = _last_audit_entry(db)
     assert entry is not None
@@ -264,7 +267,7 @@ def test_send_email_staging_suppressed_is_audited_with_reason(db: Session):
 
         from app.common.services.notification_service import send_email
 
-        send_email("user@example.com", "Test Subject", "Test body", db=db)
+        send_email("user@example.com", "Test Subject", "Test body", db=db, area=COMMON_AREA)
 
     entry = _last_audit_entry(db)
     assert entry is not None

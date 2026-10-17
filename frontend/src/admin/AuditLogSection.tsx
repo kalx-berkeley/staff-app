@@ -1,7 +1,8 @@
 import { useState, type KeyboardEvent } from 'react';
+import { useAuth } from '../common/contexts/authHooks';
 import type { APIError } from '../common/types';
 import { adminAPI } from './api';
-import type { AuditLogItem } from './types';
+import { AREAS, type AuditLogItem } from './types';
 import { toPacificDateInputValue } from './utils';
 
 const PAGE_SIZE = 50;
@@ -12,8 +13,13 @@ const defaultSince = (): string => {
   return toPacificDateInputValue(d);
 };
 
-// The audit log of every sub-site, filtered by date, event type and actor.
+// The audit log of every sub-site, filtered by date, area, event type and
+// actor. Promotions admins who aren't site admins get only the pass
+// giveaway's entries, so they aren't shown the area.
 export default function AuditLogSection() {
+  const { user } = useAuth();
+  const showArea = !!user?.is_site_admin;
+  const [area, setArea] = useState('');
   const [entries, setEntries] = useState<AuditLogItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +37,7 @@ export default function AuditLogSection() {
     try {
       const page = await adminAPI.getAuditLog({
         event_type: eventType || undefined,
+        area: area || undefined,
         actor_email: actorEmail || undefined,
         since: since || undefined,
         until: until || undefined,
@@ -64,6 +71,16 @@ export default function AuditLogSection() {
           To
           <input type="date" value={until} onChange={(e) => setUntil(e.target.value)} />
         </label>
+        {showArea && (
+          <select aria-label="Area" value={area} onChange={(e) => setArea(e.target.value)}>
+            <option value="">All areas</option>
+            {AREAS.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+        )}
         <input
           type="text"
           placeholder="Event type"
@@ -95,6 +112,7 @@ export default function AuditLogSection() {
               <thead>
                 <tr>
                   <th>Time</th>
+                  {showArea && <th>Area</th>}
                   <th>Event</th>
                   <th>Actor</th>
                   <th>Role</th>
@@ -110,6 +128,7 @@ export default function AuditLogSection() {
                         timeZone: 'America/Los_Angeles',
                       })}
                     </td>
+                    {showArea && <td>{entry.area}</td>}
                     <td>
                       <code>{entry.event_type}</code>
                     </td>

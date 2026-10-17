@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { findRecentDjGiveaway, isRecentShow, isStagingSublistDjStaff } from './utils';
+import {
+  canUsePassGiveawayAdmin,
+  findRecentDjGiveaway,
+  isRecentShow,
+  isStagingSublistDjStaff,
+  showsPassGiveawayAdminLink,
+} from './utils';
 import { formatDateValue } from '../common/utils';
 import type { UserResponse } from '../common/types';
 
@@ -90,5 +96,29 @@ describe('isRecentShow', () => {
 
   it('keeps passes with no show date', () => {
     expect(isRecentShow(null)).toBe(true);
+  });
+});
+
+describe('showsPassGiveawayAdminLink', () => {
+  const admin: UserResponse = {
+    email: 'head@test.com',
+    role: 'staff',
+    is_dj_network: false,
+    is_station_office_network: false,
+    is_site_admin: true,
+  };
+
+  it('links site admins and promotions admins to the Admin page', () => {
+    expect(showsPassGiveawayAdminLink(admin)).toBe(true);
+    expect(showsPassGiveawayAdminLink({ ...admin, is_site_admin: false, is_promotions_admin: true })).toBe(true);
+    expect(showsPassGiveawayAdminLink({ ...admin, is_site_admin: false })).toBe(false);
+    expect(showsPassGiveawayAdminLink(null)).toBe(false);
+  });
+
+  it('hides the link while impersonating, though the page still works', () => {
+    const impersonating = { ...admin, is_staging: true, impersonating_email: 'staff@test.com' };
+    expect(showsPassGiveawayAdminLink(impersonating)).toBe(false);
+    expect(showsPassGiveawayAdminLink({ ...admin, is_impersonating_dj_network: true })).toBe(false);
+    expect(canUsePassGiveawayAdmin(impersonating)).toBe(true);
   });
 });

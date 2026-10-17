@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
+from app.common.areas import PASS_GIVEAWAY_AREA
 from app.database import get_db
 from app.pass_giveaway.schemas.promoter import (
     PromoterCreate,
@@ -54,6 +55,7 @@ def create_promoter(
     audit_service.log_event(
         db,
         event_type="promoter_created",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="promoter",
@@ -85,6 +87,7 @@ def update_promoter(
     audit_service.log_event(
         db,
         event_type="promoter_updated",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="promoter",
@@ -107,6 +110,7 @@ def delete_promoter(
     audit_service.log_event(
         db,
         event_type="promoter_deleted",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="promoter",
@@ -126,6 +130,7 @@ def undelete_promoter(
     audit_service.log_event(
         db,
         event_type="promoter_undeleted",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="promoter",

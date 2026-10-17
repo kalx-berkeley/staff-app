@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAuth } from '../common/contexts/authHooks';
 import type { APIError } from '../common/types';
 import { adminAPI } from './api';
 import type { JobRunResult, JobStatus } from './types';
@@ -10,8 +11,10 @@ const errorDetail = (err: unknown, fallback: string): string => {
 };
 
 // Every sub-site's scheduled jobs, when they last ran and next run, with a
-// button to run each one now.
+// button for site admins to run each one now.
 export default function JobsSection() {
+  const { user } = useAuth();
+  const canRun = !!user?.is_site_admin;
   const [jobs, setJobs] = useState<JobStatus[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [running, setRunning] = useState<Record<string, boolean>>({});
@@ -58,8 +61,12 @@ export default function JobsSection() {
                 <th>Job</th>
                 <th>Last Run</th>
                 <th>Next Run</th>
-                <th>Action</th>
-                <th>Result</th>
+                {canRun && (
+                  <>
+                    <th>Action</th>
+                    <th>Result</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -71,26 +78,30 @@ export default function JobsSection() {
                   </td>
                   <td className="audit-log-time">{formatRelativeTime(job.last_run_at)}</td>
                   <td className="audit-log-time">{formatFutureTime(job.next_run_at)}</td>
-                  <td>
-                    {job.can_run ? (
-                      <button
-                        className="btn-primary btn-small"
-                        onClick={() => handleRun(job.id)}
-                        disabled={!!running[job.id]}
-                      >
-                        {running[job.id] ? 'Running…' : 'Run Now'}
-                      </button>
-                    ) : (
-                      <span className="field-hint">Scheduled only</span>
-                    )}
-                  </td>
-                  <td>
-                    {results[job.id] && (
-                      <span className={results[job.id]!.success ? 'text-success' : 'error-message'}>
-                        {results[job.id]!.message}
-                      </span>
-                    )}
-                  </td>
+                  {canRun && (
+                    <>
+                      <td>
+                        {job.can_run ? (
+                          <button
+                            className="btn-primary btn-small"
+                            onClick={() => handleRun(job.id)}
+                            disabled={!!running[job.id]}
+                          >
+                            {running[job.id] ? 'Running…' : 'Run Now'}
+                          </button>
+                        ) : (
+                          <span className="field-hint">Scheduled only</span>
+                        )}
+                      </td>
+                      <td>
+                        {results[job.id] && (
+                          <span className={results[job.id]!.success ? 'text-success' : 'error-message'}>
+                            {results[job.id]!.message}
+                          </span>
+                        )}
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>

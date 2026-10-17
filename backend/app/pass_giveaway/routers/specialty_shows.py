@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
+from app.common.areas import PASS_GIVEAWAY_AREA
 from app.database import get_db
 from app.pass_giveaway.schemas.specialty_show import (
     SpecialtyShowCreate,
@@ -209,6 +210,7 @@ def create_specialty_show(
     audit_service.log_event(
         db,
         event_type="specialty_show_created",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="specialty_show",
@@ -287,6 +289,7 @@ def update_specialty_show(
     audit_service.log_event(
         db,
         event_type="specialty_show_updated",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=actor.email,
         actor_role=role,
         entity_type="specialty_show",
@@ -314,6 +317,7 @@ def delete_specialty_show(
     audit_service.log_event(
         db,
         event_type="specialty_show_deleted",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="specialty_show",

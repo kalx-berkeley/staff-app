@@ -215,6 +215,7 @@ jobs:
         DATABASE_URL=sqlite:///${{ env.DEPLOY_PATH }}/backend/data/staff-app.db
         DJ_STUDIO_NETWORK=${{ env.DJ_STUDIO_NETWORK }}
         STATION_OFFICE_NETWORK=${{ env.STATION_OFFICE_NETWORK }}
+        SITE_ADMIN_EMAILS=${{ vars.SITE_ADMIN_EMAILS }}
         AIRTABLE_API_KEY=${{ secrets.AIRTABLE_API_KEY }}
         AIRTABLE_BASE_ID=${{ secrets.AIRTABLE_BASE_ID }}
         SPINITRON_API_KEY=${{ secrets.SPINITRON_API_KEY }}

@@ -13,8 +13,6 @@ from sqlalchemy.orm import Session
 
 from app.common.schemas.admin import JobRunResult
 
-COMMON_AREA = "Common"
-
 
 @dataclass(frozen=True)
 class AdminJob:
@@ -23,9 +21,10 @@ class AdminJob:
     # The APScheduler job ID, which is also the JobLog job_id of its runs
     id: str
     name: str
-    # Which part of the app the job belongs to, e.g. "Radio Pass Giveaway"
+    # The part of the app the job belongs to, one of `app.common.areas`
     area: str
-    # Runs the job now. None for jobs that are unsafe to run by hand.
+    # Runs the job now (site admins only). None for jobs that are unsafe to
+    # run by hand.
     run: Optional[Callable[[Session], Awaitable[JobRunResult]]] = None
 
 

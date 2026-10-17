@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from fastapi import HTTPException, status
 import logging
 
+from app.common.areas import PASS_GIVEAWAY_AREA
 from app.models.show import Show
 from app.models.show_attempt import ShowAttempt
 from app.models.venue import Venue
@@ -585,6 +586,7 @@ class ShowService:
                     subject=subject,
                     body_text=body,
                     db=db,
+                    area=PASS_GIVEAWAY_AREA,
                 )
 
     @staticmethod
@@ -640,6 +642,7 @@ class ShowService:
                     subject=subject,
                     body_text=body,
                     db=db,
+                    area=PASS_GIVEAWAY_AREA,
                 )
 
     @staticmethod
@@ -844,6 +847,7 @@ class ShowService:
                     subject=subject,
                     body_text=body,
                     db=db,
+                    area=PASS_GIVEAWAY_AREA,
                 )
 
     @staticmethod
@@ -886,6 +890,7 @@ class ShowService:
                         subject=subject,
                         body_text=body,
                         db=db,
+                        area=PASS_GIVEAWAY_AREA,
                     )
                     sent_to_anyone = True
             if sent_to_anyone:

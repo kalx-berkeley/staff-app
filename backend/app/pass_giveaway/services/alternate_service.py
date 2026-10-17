@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.common.areas import PASS_GIVEAWAY_AREA
 from app.config import settings
 from app.models.notification_preferences import NotificationPreferences
 from app.models.pass_model import Pass
@@ -573,6 +574,7 @@ class AlternateService:
             audit_service.log_event(
                 db,
                 event_type="alternate_promoted",
+                area=PASS_GIVEAWAY_AREA,
                 actor_email=promotion.actor_email,
                 actor_role="system",
                 entity_type="pass",
@@ -722,6 +724,7 @@ class AlternateService:
         audit_service.log_event(
             db,
             event_type=event_type,
+            area=PASS_GIVEAWAY_AREA,
             actor_role="system",
             entity_type="show",
             entity_id=show.id,
@@ -761,6 +764,7 @@ class AlternateService:
             subject=subject,
             body_text="\n".join(lines),
             db=db,
+            area=PASS_GIVEAWAY_AREA,
         )
 
     @staticmethod

@@ -126,6 +126,8 @@ def test_get_show_flags_matched_show(
 def test_manual_sync_reports_not_configured_when_calendar_unset(
     client: TestClient, test_promotions_staff, monkeypatch
 ):
+    # Running jobs by hand is for site admins
+    monkeypatch.setattr(settings, "site_admin_emails", test_promotions_staff.email)
     monkeypatch.setattr(settings, "kalx_live_calendar_id", None)
 
     response = client.post(
@@ -141,6 +143,8 @@ def test_manual_sync_reports_not_configured_when_calendar_unset(
 def test_manual_sync_runs_when_configured(
     client: TestClient, test_promotions_staff, monkeypatch
 ):
+    # Running jobs by hand is for site admins
+    monkeypatch.setattr(settings, "site_admin_emails", test_promotions_staff.email)
     monkeypatch.setattr(settings, "kalx_live_calendar_id", "some-calendar-id")
     monkeypatch.setattr(
         KalxLiveService,

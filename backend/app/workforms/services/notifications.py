@@ -6,6 +6,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from app.common.areas import WORKFORMS_AREA
 from app.auth import ACTIVE_STATUS, _staff_statuses
 from app.common.services.notification_service import send_email
 from app.config import settings
@@ -126,6 +127,7 @@ async def send_reminders(
             subject=f"Reminder: submit your KALX workform for {month_name}",
             body_text=body,
             db=db,
+            area=WORKFORMS_AREA,
         )
         sent += 1
     db.add(JobLog(job_id="workform_reminders", trigger=trigger))
@@ -180,6 +182,7 @@ async def send_review_emails(
             subject=f"{count} KALX workform {noun} to review for {month_name}",
             body_text=body,
             db=db,
+            area=WORKFORMS_AREA,
         )
         sent += 1
     db.add(JobLog(job_id="workform_review_emails", trigger=trigger))

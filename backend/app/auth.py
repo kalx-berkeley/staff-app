@@ -280,36 +280,87 @@ def _is_department_head(db: Session, staff: Staff) -> bool:
     )
 
 
-def is_admin(db: Session, staff: Staff | None) -> bool:
-    """
-    Return True if *staff* may use the app-wide admin tools (KALX Staff Admin).
+def _site_admin_emails() -> set[str]:
+    """The emails listed in SITE_ADMIN_EMAILS, lowercased."""
+    return {e.strip().lower() for e in settings.site_admin_emails.split(",") if e.strip()}
 
-    Admins are promotions staff and active department heads.
+
+def is_site_admin(db: Session, staff: Staff | None) -> bool:
+    """
+    Return True if *staff* is a site admin.
+
+    Site admins are Active staff who head a department, have the Paid Staff
+    status, or are listed in SITE_ADMIN_EMAILS. They can use all of KALX Staff
+    Admin and the pass giveaway's admin tools.
+    """
+    if staff is None:
+        return False
+    statuses = _staff_statuses(staff)
+    if ACTIVE_STATUS not in statuses:
+        return False
+    return (
+        PAID_STAFF_STATUS in statuses
+        or staff.email.lower() in _site_admin_emails()
+        or _is_department_head(db, staff)
+    )
+
+
+def is_promotions_admin(staff: Staff | None) -> bool:
+    """
+    Return True if *staff* is a promotions admin: an Active member of the
+    Promotions department.
+
+    Promotions admins can use the pass giveaway's admin tools, and in KALX Staff
+    Admin can see the scheduled jobs (without running them) and the pass
+    giveaway's audit log entries.
     """
     if staff is None or ACTIVE_STATUS not in _staff_statuses(staff):
         return False
-    return _is_promotions_staff(staff) or _is_department_head(db, staff)
+    return PROMOTIONS_DEPARTMENT in _staff_departments(staff)
 
 
-def get_admin_staff(
+def get_site_admin(
     email: str = Depends(require_authentication), db: Session = Depends(get_db)
 ) -> Staff:
     """
-    Get the admin staff member making the request.
+    Get the site admin making the request.
 
     Checks the real, signed-in user rather than anyone they are impersonating,
-    so an admin keeps the admin tools while impersonating a non-admin.
+    so a site admin keeps the admin tools while impersonating someone else.
+
+    :param email: User email from authentication
+    :param db: Database session
+    :returns: Staff record for the site admin
+    :raises HTTPException: If the user is not a site admin
+    """
+    staff = db.query(Staff).filter(Staff.email == email).first()
+    if not is_site_admin(db, staff):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only site admins can perform this action",
+        )
+    return staff
+
+
+def get_site_or_promotions_admin(
+    email: str = Depends(require_authentication), db: Session = Depends(get_db)
+) -> Staff:
+    """
+    Get the site admin or promotions admin making the request.
+
+    Checks the real, signed-in user rather than anyone they are impersonating,
+    like `get_site_admin`.
 
     :param email: User email from authentication
     :param db: Database session
     :returns: Staff record for the admin
-    :raises HTTPException: If the user is not an admin
+    :raises HTTPException: If the user is neither a site admin nor a promotions admin
     """
     staff = db.query(Staff).filter(Staff.email == email).first()
-    if not is_admin(db, staff):
+    if not (is_site_admin(db, staff) or is_promotions_admin(staff)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admins can perform this action",
+            detail="Only site admins and promotions admins can perform this action",
         )
     return staff
 

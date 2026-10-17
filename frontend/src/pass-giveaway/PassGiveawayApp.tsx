@@ -1,11 +1,11 @@
 import { Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import LoadingScreen from '../common/components/LoadingScreen';
 import UnauthorizedPage from '../common/components/UnauthorizedPage';
 import { useAuth } from '../common/contexts/authHooks';
 import { lazySection } from '../common/lazySection';
 import ProfileSettings from './components/ProfileSettings';
-import { isStagingSublistDjStaff } from './utils';
+import { canUsePassGiveawayAdmin, isStagingSublistDjStaff } from './utils';
 
 // Each role's section (promotions, staff, dj) is its own lazily loaded chunk;
 // see lazySection.
@@ -82,6 +82,22 @@ function ProtectedRoute({
   return <>{children}</>;
 }
 
+// The Promotions section: promotions staff, plus admins who aren't promotions
+// staff, who can use only its Admin page.
+function PromotionsSectionRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (user?.role === 'promotions' || canUsePassGiveawayAdmin(user)) return <>{children}</>;
+  return <RoleBasedRedirect />;
+}
+
+// The Promotions → Admin page: site admins and promotions admins, judged by the
+// real user, so it still works while impersonating someone who can't use it.
+function PassGiveawayAdminRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (canUsePassGiveawayAdmin(user)) return <>{children}</>;
+  return <RoleBasedRedirect />;
+}
+
 // Shown when accessing the DJ view without the right network access or role
 function DJAccessDenied() {
   return (
@@ -152,28 +168,43 @@ export default function PassGiveawayApp() {
         <Route path="/" element={<RoleBasedRedirect />} />
 
         {/* Promotions staff routes */}
-        <Route 
-          path="/promotions" 
+        <Route
+          path="/promotions"
           element={
-            <ProtectedRoute allowedRoles={['promotions']}>
+            <PromotionsSectionRoute>
               <PromotionsLayout />
-            </ProtectedRoute>
+            </PromotionsSectionRoute>
           }
         >
-          <Route index element={<Navigate to="/promotions/shows" replace />} />
-          <Route path="shows" element={<ShowList />} />
-          <Route path="shows/new" element={<ShowForm />} />
-          <Route path="shows/:id" element={<PromotionsShowDetail />} />
-          <Route path="shows/:id/edit" element={<ShowForm />} />
-          <Route path="venues/new" element={<VenueNew />} />
-          <Route path="venues/:id/edit" element={<VenueEdit />} />
-          <Route path="venues" element={<VenueList />} />
-          <Route path="promoters/new" element={<PromoterNew />} />
-          <Route path="promoters/:id/edit" element={<PromoterEdit />} />
-          <Route path="promoters" element={<PromoterList />} />
-          <Route path="profile" element={<ProfileSettings section="Promotions" />} />
-          <Route path="admin" element={<Admin />} />
-          <Route path="legacy-import" element={<LegacyImport />} />
+          <Route
+            element={
+              <ProtectedRoute allowedRoles={['promotions']}>
+                <Outlet />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Navigate to="/promotions/shows" replace />} />
+            <Route path="shows" element={<ShowList />} />
+            <Route path="shows/new" element={<ShowForm />} />
+            <Route path="shows/:id" element={<PromotionsShowDetail />} />
+            <Route path="shows/:id/edit" element={<ShowForm />} />
+            <Route path="venues/new" element={<VenueNew />} />
+            <Route path="venues/:id/edit" element={<VenueEdit />} />
+            <Route path="venues" element={<VenueList />} />
+            <Route path="promoters/new" element={<PromoterNew />} />
+            <Route path="promoters/:id/edit" element={<PromoterEdit />} />
+            <Route path="promoters" element={<PromoterList />} />
+            <Route path="profile" element={<ProfileSettings section="Promotions" />} />
+            <Route path="legacy-import" element={<LegacyImport />} />
+          </Route>
+          <Route
+            path="admin"
+            element={
+              <PassGiveawayAdminRoute>
+                <Admin />
+              </PassGiveawayAdminRoute>
+            }
+          />
         </Route>
 
         {/* Staff member routes */}

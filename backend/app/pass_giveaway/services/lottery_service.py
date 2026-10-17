@@ -7,6 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.common.areas import PASS_GIVEAWAY_AREA
 from app.models.lottery_entry import LotteryEntry
 from app.models.notification_preferences import NotificationPreferences
 from app.models.pass_model import Pass
@@ -263,6 +264,7 @@ class LotteryService:
                 subject=f"Lottery entry cancelled — {show.event_name} has been unpublished",
                 body_text=body,
                 db=db,
+                area=PASS_GIVEAWAY_AREA,
             )
 
     @staticmethod
@@ -615,6 +617,7 @@ class LotteryService:
                 subject=subject,
                 body_text=body,
                 db=db,
+                area=PASS_GIVEAWAY_AREA,
             )
 
         winners_count = sum(1 for e in entries if e.id in staff_pass)
@@ -707,6 +710,7 @@ class LotteryService:
                 ),
                 body_text=body,
                 db=db,
+                area=PASS_GIVEAWAY_AREA,
             )
 
         for entry in losers:
@@ -735,6 +739,7 @@ class LotteryService:
                 subject=f"Lottery result for {show.event_name} — DJ passes",
                 body_text=body,
                 db=db,
+                area=PASS_GIVEAWAY_AREA,
             )
 
         return {"winners": len(winners), "losers": len(losers)}

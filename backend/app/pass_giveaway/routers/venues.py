@@ -10,12 +10,14 @@ from PIL import Image
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.common.routers.users import determine_user_role
+from app.common.areas import PASS_GIVEAWAY_AREA
 from app.config import settings
 from app.database import get_db
 from app.pass_giveaway.schemas.venue import VenueCreate, VenueResponse, VenueUpdate
 from app.pass_giveaway.services.venue_service import VenueService
 from app.common.services import audit_service
-from app.auth import get_promotions_staff
+from app.auth import get_promotions_staff, get_site_or_promotions_admin
 from app.models.staff import Staff
 from app.models.venue import Venue
 from app.pass_giveaway.guest_redaction import GuestRedactingRoute
@@ -56,10 +58,10 @@ def list_promotions_staff(
 
 @router.get("/deleted", response_model=list[VenueResponse])
 def list_deleted_venues(
-    promotions: Staff = Depends(get_promotions_staff),
+    admin: Staff = Depends(get_site_or_promotions_admin),
     db: Session = Depends(get_db),
 ):
-    """List all soft-deleted venues (promotions staff only)."""
+    """List all soft-deleted venues (site and promotions admins only)."""
     return [_venue_response(v) for v in VenueService.list_deleted_venues(db)]
 
 
@@ -92,6 +94,7 @@ def create_venue(
     audit_service.log_event(
         db,
         event_type="venue_created",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="venue",
@@ -120,6 +123,7 @@ def delete_venue(
     audit_service.log_event(
         db,
         event_type="venue_deleted",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="venue",
@@ -131,16 +135,17 @@ def delete_venue(
 @router.post("/{venue_id}/undelete", response_model=VenueResponse)
 def undelete_venue(
     venue_id: int,
-    promotions: Staff = Depends(get_promotions_staff),
+    admin: Staff = Depends(get_site_or_promotions_admin),
     db: Session = Depends(get_db),
 ):
-    """Restore a soft-deleted venue (promotions staff only)."""
+    """Restore a soft-deleted venue (site and promotions admins only)."""
     venue = VenueService.undelete_venue(db, venue_id)
     audit_service.log_event(
         db,
         event_type="venue_undeleted",
-        actor_email=promotions.email,
-        actor_role="promotions",
+        area=PASS_GIVEAWAY_AREA,
+        actor_email=admin.email,
+        actor_role=determine_user_role(db, admin.email),
         entity_type="venue",
         entity_id=venue_id,
         details={"name": venue.name},
@@ -217,6 +222,7 @@ def upload_venue_logo(
     audit_service.log_event(
         db,
         event_type="venue_logo_uploaded",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="venue",
@@ -250,6 +256,7 @@ def delete_venue_logo(
     audit_service.log_event(
         db,
         event_type="venue_logo_deleted",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="venue",
@@ -302,6 +309,7 @@ def update_venue(
     audit_service.log_event(
         db,
         event_type="venue_updated",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="venue",

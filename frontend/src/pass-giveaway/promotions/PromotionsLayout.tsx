@@ -1,15 +1,20 @@
 import { useState, useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
+import { useAuth } from '../../common/contexts/authHooks';
 import { AppNav, BuildInfo, ViewBadge } from '../components';
 import { legacyImportAPI } from '../api';
+import { showsPassGiveawayAdminLink } from '../utils';
 
 const PromotionsLayout = () => {
+  const { user } = useAuth();
   const [navOpen, setNavOpen] = useState(false);
   const [legacyImportEnabled, setLegacyImportEnabled] = useState(false);
+  // Admins who aren't promotions staff can use only the Admin page
+  const isPromotions = user?.role === 'promotions';
 
   useEffect(() => {
-    legacyImportAPI.checkEnabled().then(setLegacyImportEnabled);
-  }, []);
+    if (isPromotions) legacyImportAPI.checkEnabled().then(setLegacyImportEnabled);
+  }, [isPromotions]);
 
   useEffect(() => {
     if (!navOpen) return;
@@ -50,22 +55,28 @@ const PromotionsLayout = () => {
         </div>
         <div className="nav-section-label nav-section-label-promotions">Promotions</div>
         <ul className="nav-links nav-sub-links" onClick={() => setNavOpen(false)}>
-          <li>
-            <NavLink to="/promotions/shows">Shows</NavLink>
-          </li>
-          <li>
-            <NavLink to="/promotions/venues">Venues</NavLink>
-          </li>
-          <li>
-            <NavLink to="/promotions/promoters">Promoters</NavLink>
-          </li>
-          <li>
-            <NavLink to="/promotions/profile">Profile</NavLink>
-          </li>
-          <li>
-            <NavLink to="/promotions/admin">Admin</NavLink>
-          </li>
-          {legacyImportEnabled && (
+          {isPromotions && (
+            <>
+              <li>
+                <NavLink to="/promotions/shows">Shows</NavLink>
+              </li>
+              <li>
+                <NavLink to="/promotions/venues">Venues</NavLink>
+              </li>
+              <li>
+                <NavLink to="/promotions/promoters">Promoters</NavLink>
+              </li>
+              <li>
+                <NavLink to="/promotions/profile">Profile</NavLink>
+              </li>
+            </>
+          )}
+          {showsPassGiveawayAdminLink(user) && (
+            <li>
+              <NavLink to="/promotions/admin">Admin</NavLink>
+            </li>
+          )}
+          {isPromotions && legacyImportEnabled && (
             <li>
               <NavLink to="/promotions/legacy-import">Legacy Import</NavLink>
             </li>

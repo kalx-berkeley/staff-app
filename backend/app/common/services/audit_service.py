@@ -16,6 +16,8 @@ def log_event(
     entity_type: str | None = None,
     entity_id: int | None = None,
     details: dict | None = None,
+    *,
+    area: str,
 ) -> None:
     """
     Write an audit log entry.
@@ -29,10 +31,13 @@ def log_event(
     :param entity_type: Type of the primary entity involved (``pass``, ``show``, ``venue``, etc.).
     :param entity_id: Database ID of the primary entity.
     :param details: Arbitrary key/value pairs with event-specific context.
+    :param area: The part of the app the event belongs to, one of
+        `app.common.areas`. Promotions admins see only the pass giveaway's.
     """
     try:
         entry = AuditLog(
             event_type=event_type,
+            area=area,
             actor_email=actor_email,
             actor_role=actor_role,
             entity_type=entity_type,

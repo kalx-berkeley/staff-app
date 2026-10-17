@@ -40,10 +40,16 @@ export interface UserResponse {
   /** Whether the user heads a department, and so can review KALX Workforms. */
   is_department_head?: boolean;
   /**
-   * Whether the signed-in user can use KALX Staff Admin. Describes the real
+   * Whether the signed-in user is a site admin, who can use all of KALX Staff
+   * Admin. Describes the real user, not anyone they're impersonating.
+   */
+  is_site_admin?: boolean;
+  /**
+   * Whether the signed-in user is a promotions admin, who can see KALX Staff
+   * Admin's jobs and the pass giveaway's audit log entries. Describes the real
    * user, not anyone they're impersonating.
    */
-  is_admin?: boolean;
+  is_promotions_admin?: boolean;
   profile?: PromotionsStaffProfile | StaffProfile | null;
 }
 

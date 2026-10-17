@@ -1,11 +1,14 @@
 // TypeScript types matching the KALX Staff Admin API (backend common/schemas/admin.py).
 
+/** The parts of the app that jobs and audit log entries belong to (backend common/areas.py). */
+export const AREAS = ['Common', 'Radio Pass Giveaway', 'KALX Workforms'];
+
 export interface JobStatus {
   id: string;
   name: string;
-  /** Which part of the app the job belongs to, e.g. "Radio Pass Giveaway". */
+  /** Which part of the app the job belongs to, one of AREAS. */
   area: string;
-  /** Whether the job can be run by hand. */
+  /** Whether the job can be run by hand (by site admins). */
   can_run: boolean;
   last_run_at: string | null;
   next_run_at: string | null;
@@ -32,6 +35,8 @@ export interface AuditLogItem {
   id: number;
   occurred_at: string;
   event_type: string;
+  /** Which part of the app the event belongs to, one of AREAS. */
+  area: string;
   actor_email: string | null;
   actor_role: string | null;
   entity_type: string | null;
@@ -41,6 +46,7 @@ export interface AuditLogItem {
 
 export interface AuditLogFilters {
   event_type?: string;
+  area?: string;
   actor_email?: string;
   since?: string;
   until?: string;

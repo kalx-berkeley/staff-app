@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from fastapi import HTTPException, status
 import logging
 
+from app.common.areas import PASS_GIVEAWAY_AREA
 from app.config import settings
 from app.models.pass_model import Pass
 from app.models.show import Show
@@ -337,6 +338,7 @@ class PassService:
         audit_service.log_event(
             db,
             event_type="winner_released",
+            area=PASS_GIVEAWAY_AREA,
             actor_email=actor_email,
             actor_role="dj",
             entity_type="pass",
@@ -760,6 +762,7 @@ class PassService:
             subject=subject,
             body_text=body,
             db=db,
+            area=PASS_GIVEAWAY_AREA,
         )
 
     @staticmethod
@@ -1121,6 +1124,7 @@ class PassService:
             log_event(
                 db,
                 event_type="preassignment_expired",
+                area=PASS_GIVEAWAY_AREA,
                 actor_role="system",
                 entity_type="pass",
                 entity_id=pass_id,
