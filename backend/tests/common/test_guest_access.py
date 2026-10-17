@@ -1,11 +1,12 @@
 """
 Guard the routes an unauthenticated network guest can reach.
 
-Apache lets two kinds of client reach /api/ without a Google login: DJ studio
-network computers (the Radio Pass Giveaway DJ view) and station office network
-computers (winner search). The backend is the real access boundary, so this
-test calls every API route as each kind of guest and fails if the set of
-routes that answer differs from the allowlists below, in either direction:
+Apache lets two kinds of client reach /api/ and /go/ without a Google login:
+DJ studio network computers (the Radio Pass Giveaway DJ view) and station
+office network computers (winner search). The backend is the real access
+boundary, so this test calls every API and short link route as each kind of
+guest and fails if the set of routes that answer differs from the allowlists
+below, in either direction:
 
 - A route missing from an allowlist answers a guest: an endpoint was opened to
   unauthenticated clients, perhaps by using a network-aware auth dependency.
@@ -159,13 +160,13 @@ def no_outbound_requests(monkeypatch):
 
 
 def _guest_responses(client: TestClient, headers: dict[str, str]) -> dict:
-    """Call every API route as a guest; map "METHOD /path" to its response."""
+    """Call every API and /go/ route as a guest; map "METHOD /path" to its response."""
     # A route that crashes still got past the access checks, so count a 500 as
     # an answer rather than letting the exception fail the test.
     client = TestClient(client.app, raise_server_exceptions=False)
     responses = {}
     for path, operations in app.openapi()["paths"].items():
-        if not path.startswith("/api/"):
+        if not path.startswith(("/api/", "/go/")):
             continue
         concrete = re.sub(r"\{[^}]+\}", "1", path)
         for method in operations:

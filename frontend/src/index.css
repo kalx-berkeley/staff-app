@@ -3981,6 +3981,48 @@ fieldset.radio-group legend {
   white-space: nowrap;
 }
 
+.short-links-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.short-links-form input,
+.short-links-table input {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  min-width: 0;
+}
+
+.short-links-slug {
+  flex: 0 1 12rem;
+}
+
+.short-links-wide {
+  flex: 1 1 16rem;
+}
+
+.short-links-table input {
+  width: 100%;
+  min-width: 8rem;
+}
+
+.short-links-target {
+  max-width: 28rem;
+  overflow-wrap: anywhere;
+}
+
+.short-links-actions {
+  white-space: nowrap;
+}
+
+.short-links-actions button + button {
+  margin-left: 0.35rem;
+}
+
 @media (max-width: 700px) {
   .staff-admin-page {
     padding: 1rem;
