@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.common.areas import WORKFORMS_AREA
 from app.common.services.audit_service import log_event
 from app.models.staff import Staff
 from app.models.workform import Workform, WorkformEntry
@@ -297,6 +298,7 @@ async def submit(db: Session, staff: Staff, month: date) -> Workform:
     log_event(
         db,
         event_type="workform_resubmitted" if resubmitted else "workform_submitted",
+        area=WORKFORMS_AREA,
         actor_email=staff.email,
         actor_role="staff",
         entity_type="workform",

@@ -6,6 +6,7 @@ import { usersAPI } from '../common/api';
 import type { UserResponse } from '../common/types';
 import { SUBSITES } from '../subsites';
 import { adminAPI } from './api';
+import type { AuditLogItem } from './types';
 
 vi.mock('../common/api', () => ({
   AUTH_DIAG_KEY: 'kalx_auth_diag',
@@ -30,10 +31,32 @@ const user = (overrides: Partial<UserResponse> = {}): UserResponse => ({
   is_dj_network: false,
   is_station_office_network: false,
   is_department_head: true,
-  is_admin: true,
+  is_site_admin: true,
   profile: { id: 1, name: 'Hal Head', phone: '', dj_name: null, is_sublist_dj: false },
   ...overrides,
 });
+
+const promotionsAdmin = (overrides: Partial<UserResponse> = {}): UserResponse =>
+  user({
+    email: 'promo@example.com',
+    role: 'promotions',
+    is_department_head: false,
+    is_site_admin: false,
+    is_promotions_admin: true,
+    ...overrides,
+  });
+
+const auditEntry: AuditLogItem = {
+  id: 1,
+  occurred_at: '2026-10-17T12:00:00Z',
+  event_type: 'workform_decision',
+  area: 'KALX Workforms',
+  actor_email: 'head@example.com',
+  actor_role: 'staff',
+  entity_type: null,
+  entity_id: null,
+  details: null,
+};
 
 const renderAdmin = async (me: UserResponse = user()) => {
   window.history.pushState({}, '', '/admin/');
@@ -70,11 +93,51 @@ describe('KALX Staff Admin', () => {
     window.history.pushState({}, '', '/');
   });
 
-  it('is offered only to admins', () => {
+  it('is offered only to site admins and promotions admins', () => {
     const admin = SUBSITES.find((subsite) => subsite.basePath === '/admin')!;
     expect(admin.isAvailable(user())).toBe(true);
-    expect(admin.isAvailable(user({ is_admin: false }))).toBe(false);
+    expect(admin.isAvailable(user({ is_site_admin: false, is_promotions_admin: true }))).toBe(true);
+    expect(admin.isAvailable(user({ is_site_admin: false }))).toBe(false);
     expect(admin.isAvailable(null)).toBe(false);
+  });
+
+  it('shows promotions admins the jobs without a way to run them', async () => {
+    await renderAdmin(promotionsAdmin({ is_staging: true }));
+
+    const row = (await screen.findByText('Sync users from Airtable')).closest('tr')!;
+    expect(within(row).queryByRole('button', { name: 'Run Now' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Action' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'User Impersonation' })).not.toBeInTheDocument();
+  });
+
+  it('lets site admins filter the audit log by area', async () => {
+    vi.mocked(adminAPI.getAuditLog).mockResolvedValue([auditEntry]);
+    await renderAdmin();
+    await screen.findByText('Sync users from Airtable');
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Area' }), {
+      target: { value: 'KALX Workforms' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Load' }));
+
+    expect(await screen.findByRole('columnheader', { name: 'Area' })).toBeInTheDocument();
+    expect(adminAPI.getAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({ area: 'KALX Workforms' }),
+    );
+  });
+
+  it("doesn't show promotions admins the audit log's area", async () => {
+    vi.mocked(adminAPI.getAuditLog).mockResolvedValue([
+      { ...auditEntry, area: 'Radio Pass Giveaway', event_type: 'show_created' },
+    ]);
+    await renderAdmin(promotionsAdmin());
+    await screen.findByText('Sync users from Airtable');
+
+    expect(screen.queryByRole('combobox', { name: 'Area' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Load' }));
+
+    expect(await screen.findByText('show_created')).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Area' })).not.toBeInTheDocument();
   });
 
   it("lists every sub-site's jobs and runs one", async () => {
@@ -107,5 +170,31 @@ describe('KALX Staff Admin', () => {
 
     expect(await screen.findByText(/Viewing as amy@example.com/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'End impersonation' })).toBeInTheDocument();
+  });
+
+  it('picks the user to impersonate by typing part of their name', async () => {
+    vi.mocked(adminAPI.listUsers).mockResolvedValue([
+      { email: 'amy@example.com', name: 'Amy Adams', role: 'staff' },
+      { email: 'bob@example.com', name: 'Bob Brown', role: 'promotions' },
+    ]);
+    // Rejecting keeps the component from reloading the page, which jsdom can't do
+    vi.mocked(adminAPI.startImpersonation).mockRejectedValue({ detail: 'Stopped for test' });
+    await renderAdmin(user({ is_staging: true }));
+
+    const start = screen.getByRole('button', { name: 'Start Impersonation' });
+    const input = await screen.findByRole('textbox', { name: 'User to impersonate' });
+    fireEvent.change(input, { target: { value: 'amy' } });
+    expect(start).toBeDisabled();
+    fireEvent.mouseDown(screen.getByText('Amy Adams (amy@example.com)'));
+    expect(input).toHaveValue('Amy Adams (amy@example.com)');
+
+    fireEvent.click(start);
+
+    expect(await screen.findByText('Stopped for test')).toBeInTheDocument();
+    expect(adminAPI.startImpersonation).toHaveBeenCalledWith({
+      email: 'amy@example.com',
+      is_dj_network: false,
+      is_station_office_network: false,
+    });
   });
 });

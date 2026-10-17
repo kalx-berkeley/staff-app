@@ -44,9 +44,9 @@ export const SUBSITES: Subsite[] = [
     name: 'KALX Staff Admin',
     description:
       'Scheduled jobs, the audit log and, on staging, user impersonation, for every staff site.',
-    // Promotions staff and department heads. is_admin describes the real user,
-    // so an admin keeps it while impersonating someone who isn't one.
-    isAvailable: (user) => !!user?.is_admin,
+    // Site admins and promotions admins. Both flags describe the real user, so
+    // an admin keeps them while impersonating someone who isn't one.
+    isAvailable: (user) => !!user?.is_site_admin || !!user?.is_promotions_admin,
   },
 ];
 

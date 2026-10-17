@@ -8,6 +8,29 @@ export function isStagingSublistDjStaff(user: Pick<UserResponse, 'role' | 'is_st
   return !!user?.is_staging && user.role === 'staff' && !!user.profile?.is_sublist_dj;
 }
 
+// Whether the signed-in user can use the Promotions → Admin page: site admins
+// and promotions admins. Like the backend's check, this describes the real
+// user, not anyone they're impersonating.
+export function canUsePassGiveawayAdmin(user: Pick<UserResponse, 'is_site_admin' | 'is_promotions_admin'> | null | undefined): boolean {
+  return !!user?.is_site_admin || !!user?.is_promotions_admin;
+}
+
+// Whether the signed-in user is impersonating someone, or a network (staging).
+export function isImpersonating(user: Pick<UserResponse, 'impersonating_email' | 'is_impersonating_dj_network' | 'is_impersonating_station_office_network'> | null | undefined): boolean {
+  return (
+    !!user?.impersonating_email ||
+    !!user?.is_impersonating_dj_network ||
+    !!user?.is_impersonating_station_office_network
+  );
+}
+
+// Whether to link to the Promotions → Admin page. Hidden while impersonating,
+// so the navigation matches what the impersonated person sees, though the page
+// itself still works.
+export function showsPassGiveawayAdminLink(user: UserResponse | null | undefined): boolean {
+  return canUsePassGiveawayAdmin(user) && !isImpersonating(user);
+}
+
 // My Passes pages hide passes for shows more than this many days in the past.
 export const MY_PASSES_PAST_SHOW_DAYS = 3;
 

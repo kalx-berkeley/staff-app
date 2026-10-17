@@ -5,6 +5,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.common.areas import PASS_GIVEAWAY_AREA
 from app.auth import get_promotions_staff, require_promotions_or_staff
 from app.database import get_db
 from app.models.pass_model import Pass
@@ -147,6 +148,7 @@ def join_alternate_queue(
     audit_service.log_event(
         db,
         event_type="alternate_joined",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=staff.email,
         actor_role=role,
         entity_type="staff_pass_alternate",
@@ -183,6 +185,7 @@ def update_my_alternate_entry(
     audit_service.log_event(
         db,
         event_type="alternate_updated",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=staff.email,
         actor_role=role,
         entity_type="staff_pass_alternate",
@@ -214,6 +217,7 @@ def leave_alternate_queue(
     audit_service.log_event(
         db,
         event_type="alternate_left",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=staff.email,
         actor_role=role,
         entity_type="staff_pass_alternate",
@@ -248,6 +252,7 @@ def remove_alternate(
     audit_service.log_event(
         db,
         event_type="alternate_removed",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="staff_pass_alternate",

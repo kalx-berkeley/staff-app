@@ -10,9 +10,9 @@ from app.common.schemas.types import UtcDatetime
 class JobStatus(BaseModel):
     id: str
     name: str
-    # Which part of the app the job belongs to, e.g. "Radio Pass Giveaway"
+    # The part of the app the job belongs to, one of `app.common.areas`
     area: str
-    # Whether admins can run the job by hand
+    # Whether the job can be run by hand (by site admins)
     can_run: bool
     last_run_at: str | None
     next_run_at: str | None
@@ -39,6 +39,8 @@ class AuditLogItem(BaseModel):
     id: int
     occurred_at: UtcDatetime
     event_type: str
+    # The part of the app the event belongs to, one of `app.common.areas`
+    area: str
     actor_email: str | None
     actor_role: str | None
     entity_type: str | None

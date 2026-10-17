@@ -13,6 +13,8 @@ from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
 from app.models.staff_status import StaffStatus
 from app.models.on_air_winner import OnAirWinner
+from app.models.workform_department import DepartmentHead
+from app.common.areas import PASS_GIVEAWAY_AREA
 from app.common.services import audit_service
 from app.pass_giveaway.services.pass_service import PassService
 
@@ -85,6 +87,7 @@ def test_log_event_creates_row(db: Session):
     audit_service.log_event(
         db,
         event_type="test_event",
+        area=PASS_GIVEAWAY_AREA,
         actor_email="user@example.com",
         actor_role="promotions",
         entity_type="show",
@@ -94,6 +97,7 @@ def test_log_event_creates_row(db: Session):
     row = db.query(AuditLog).filter(AuditLog.event_type == "test_event").first()
     assert row is not None
     assert row.actor_email == "user@example.com"
+    assert row.area == PASS_GIVEAWAY_AREA
     assert row.entity_id == 42
     assert row.details == {"foo": "bar"}
 
@@ -106,7 +110,7 @@ def test_log_event_does_not_raise_on_bad_db(db: Session, monkeypatch):
 
     monkeypatch.setattr(db, "add", _boom)
     # Should not raise
-    audit_service.log_event(db, event_type="will_fail")
+    audit_service.log_event(db, event_type="will_fail", area=PASS_GIVEAWAY_AREA)
 
 
 # ---------------------------------------------------------------------------
@@ -172,6 +176,7 @@ def test_admin_audit_log_endpoint(client: TestClient, db: Session, promotions_st
     audit_service.log_event(
         db,
         event_type="show_created",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions_staff.email,
         actor_role="promotions",
         entity_type="show",
@@ -180,6 +185,7 @@ def test_admin_audit_log_endpoint(client: TestClient, db: Session, promotions_st
     audit_service.log_event(
         db,
         event_type="venue_created",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions_staff.email,
         actor_role="promotions",
         entity_type="venue",
@@ -388,3 +394,50 @@ def test_notification_preferences_update_audit(
     assert row is not None
     assert row.actor_email == staff_member.email
     assert row.details["email_enabled"] is False
+
+
+# ---------------------------------------------------------------------------
+# Integration: admin tools record the admin's own role
+# ---------------------------------------------------------------------------
+
+
+def test_department_head_undeleting_a_venue_is_audited_with_their_role(
+    client: TestClient, db: Session, venue
+):
+    # A site admin who isn't promotions staff can use the pass giveaway's admin
+    # tools, and is recorded with their real role
+    head = Staff(
+        email="head@audit.test", name="Head", phone="555-3333", airtable_record_id="recH"
+    )
+    db.add(head)
+    db.flush()
+    db.add(StaffStatus(staff_id=head.id, status="Active"))
+    db.add(DepartmentHead(department="Music", staff_airtable_record_id="recH"))
+    venue.deleted = True
+    db.commit()
+
+    deleted = client.get("/api/venues/deleted", headers={"X-Forwarded-User": head.email})
+    response = client.post(
+        f"/api/venues/{venue.id}/undelete", headers={"X-Forwarded-User": head.email}
+    )
+
+    assert [v["id"] for v in deleted.json()] == [venue.id]
+    assert response.status_code == 200
+    row = db.query(AuditLog).filter(AuditLog.event_type == "venue_undeleted").one()
+    assert row.actor_email == head.email
+    assert row.actor_role == "staff"
+    assert row.area == PASS_GIVEAWAY_AREA
+
+
+def test_staff_cannot_undelete_a_venue(
+    client: TestClient, db: Session, venue, staff_member
+):
+    venue.deleted = True
+    db.commit()
+
+    response = client.post(
+        f"/api/venues/{venue.id}/undelete",
+        headers={"X-Forwarded-User": staff_member.email},
+    )
+
+    assert response.status_code == 403

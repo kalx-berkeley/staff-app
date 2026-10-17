@@ -7,6 +7,7 @@ export interface PersonOption {
 
 interface PersonAutocompleteProps {
   id?: string;
+  ariaLabel?: string;
   value: string;
   onChange: (value: string) => void;
   /** Called with the raw committed text (Enter) or a suggestion's email (click/Tab). Apply `extractPersonEmail` to normalize it. */
@@ -21,6 +22,7 @@ interface PersonAutocompleteProps {
 /** Type-ahead input for picking a person by name or email from a known list (e.g. owner pickers). */
 const PersonAutocomplete = ({
   id,
+  ariaLabel,
   value,
   onChange,
   onSubmit,
@@ -70,6 +72,7 @@ const PersonAutocomplete = ({
     <div className={`autocomplete-wrapper${className ? ` ${className}` : ''}`} style={style}>
       <input
         id={id}
+        aria-label={ariaLabel}
         type="text"
         value={value}
         onChange={(e) => handleChange(e.target.value)}

@@ -6,6 +6,7 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
+from app.common.areas import PASS_GIVEAWAY_AREA
 from app.auth import get_sublist_dj_staff, require_promotions_or_staff
 from app.database import get_db
 from app.models.lottery_entry import LotteryEntry
@@ -169,6 +170,7 @@ def enter_staff_lottery(
     audit_service.log_event(
         db,
         event_type="lottery_entered",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=user.email,
         actor_role=role,
         entity_type="lottery_entry",
@@ -261,6 +263,7 @@ def enter_dj_lottery(
     audit_service.log_event(
         db,
         event_type="lottery_entered",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=staff.email,
         actor_role="staff",
         entity_type="lottery_entry",
@@ -290,6 +293,7 @@ def withdraw_staff_entry(
     audit_service.log_event(
         db,
         event_type="lottery_withdrawn",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=user.email,
         actor_role=role,
         entity_type="show",
@@ -309,6 +313,7 @@ def withdraw_dj_entry(
     audit_service.log_event(
         db,
         event_type="lottery_withdrawn",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=staff.email,
         actor_role="staff",
         entity_type="show",

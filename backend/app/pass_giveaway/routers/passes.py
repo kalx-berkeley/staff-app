@@ -5,6 +5,7 @@ from datetime import date as date_type
 from fastapi import APIRouter, Depends, HTTPException, Header, Query, status
 from sqlalchemy.orm import Session
 
+from app.common.areas import PASS_GIVEAWAY_AREA
 from app.database import get_db
 from app.pass_giveaway.schemas.pass_schema import (
     ClaimData,
@@ -99,6 +100,7 @@ def _notify_venue_owners_of_winner_release(
                 subject=subject,
                 body_text=body,
                 db=db,
+                area=PASS_GIVEAWAY_AREA,
             )
 
 
@@ -190,6 +192,7 @@ def give_away_pass(
     audit_service.log_event(
         db,
         event_type="pass_given_away",
+        area=PASS_GIVEAWAY_AREA,
         actor_role="dj",
         entity_type="pass",
         entity_id=pass_item.id,
@@ -205,6 +208,7 @@ def give_away_pass(
         audit_service.log_event(
             db,
             event_type="venue_frequency_override",
+            area=PASS_GIVEAWAY_AREA,
             actor_role="dj",
             entity_type="pass",
             entity_id=pass_item.id,
@@ -279,6 +283,7 @@ def claim_pass(
     audit_service.log_event(
         db,
         event_type="pass_claimed",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=user.email,
         actor_role=role,
         entity_type="pass",
@@ -333,6 +338,7 @@ def release_claim(
     audit_service.log_event(
         db,
         event_type="pass_released",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=user.email,
         actor_role=role,
         entity_type="pass",
@@ -660,6 +666,7 @@ def set_preassignment(
     audit_service.log_event(
         db,
         event_type="pass_preassigned",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="pass",
@@ -814,6 +821,7 @@ def set_self_preassignment(
     audit_service.log_event(
         db,
         event_type="pass_preassigned",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=staff.email,
         actor_role="staff",
         entity_type="pass",
@@ -886,6 +894,7 @@ def check_winner_eligibility(
         audit_service.log_event(
             db,
             event_type="winner_frequency_warning",
+            area=PASS_GIVEAWAY_AREA,
             actor_role="dj",
             entity_type="venue",
             entity_id=venue_id,
@@ -1033,6 +1042,7 @@ def remove_preassignment(
     audit_service.log_event(
         db,
         event_type="pass_preassignment_removed",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=actor_email,
         actor_role=actor_role,
         entity_type="pass",

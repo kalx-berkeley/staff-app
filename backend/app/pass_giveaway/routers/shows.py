@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
+from app.common.routers.users import determine_user_role
+from app.common.areas import PASS_GIVEAWAY_AREA
 from app.database import get_db
 from app.pass_giveaway.schemas.show import (
     DescriptionAnalysisRequest,
@@ -27,6 +29,7 @@ from app.pass_giveaway.services.feature_bin_service import (
 )
 from app.pass_giveaway.services.kalx_live_service import KalxLiveService, KalxLiveIndex
 from app.auth import (
+    get_site_or_promotions_admin,
     get_user_role,
     get_user_role_or_dj,
     get_current_user_email,
@@ -97,6 +100,7 @@ def _notify_staff_guests_confirmed(db, show) -> None:
             subject=f"Your guest is confirmed: {show.event_name}",
             body_text=body,
             db=db,
+            area=PASS_GIVEAWAY_AREA,
         )
 
 
@@ -571,6 +575,7 @@ def create_show(
     audit_service.log_event(
         db,
         event_type="show_created",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="show",
@@ -602,10 +607,10 @@ def analyze_on_air_description(
 
 @router.get("/deleted", response_model=list[ShowResponse])
 def list_deleted_shows(
-    promotions: Staff = Depends(get_promotions_staff),
+    admin: Staff = Depends(get_site_or_promotions_admin),
     db: Session = Depends(get_db),
 ):
-    """List all soft-deleted shows (promotions staff only)."""
+    """List all soft-deleted shows (site and promotions admins only)."""
     shows = ShowService.list_deleted_shows(db)
     feature_bin_index = FeatureBinService.build_index(db)
     kalx_live_index = KalxLiveService.build_index(db)
@@ -904,6 +909,7 @@ def update_show(
     audit_service.log_event(
         db,
         event_type="show_updated",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="show",
@@ -981,6 +987,7 @@ def publish_show(
     audit_service.log_event(
         db,
         event_type="show_published",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="show",
@@ -1003,6 +1010,7 @@ def close_show(
     audit_service.log_event(
         db,
         event_type="show_closed",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="show",
@@ -1043,6 +1051,7 @@ def unpublish_show(
     audit_service.log_event(
         db,
         event_type="show_unpublished",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="show",
@@ -1083,6 +1092,7 @@ def reopen_show(
     audit_service.log_event(
         db,
         event_type="show_reopened",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="show",
@@ -1111,6 +1121,7 @@ def delete_show(
     audit_service.log_event(
         db,
         event_type="show_deleted",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=promotions.email,
         actor_role="promotions",
         entity_type="show",
@@ -1122,16 +1133,17 @@ def delete_show(
 @router.post("/{show_id}/undelete", response_model=ShowResponse)
 def undelete_show(
     show_id: int,
-    promotions: Staff = Depends(get_promotions_staff),
+    admin: Staff = Depends(get_site_or_promotions_admin),
     db: Session = Depends(get_db),
 ):
-    """Restore a soft-deleted show to draft status (promotions staff only)."""
+    """Restore a soft-deleted show to draft status (site and promotions admins only)."""
     show = ShowService.undelete_show(db, show_id)
     audit_service.log_event(
         db,
         event_type="show_undeleted",
-        actor_email=promotions.email,
-        actor_role="promotions",
+        area=PASS_GIVEAWAY_AREA,
+        actor_email=admin.email,
+        actor_role=determine_user_role(db, admin.email),
         entity_type="show",
         entity_id=show.id,
         details={"event_name": show.event_name},

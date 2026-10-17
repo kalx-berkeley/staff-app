@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     # Authentication
     dj_studio_network: str = "192.168.1.0/24"
     station_office_network: str = "192.168.0.0/16"
+    # Extra site admins, besides department heads and Paid Staff: a
+    # comma-separated list of emails, matched case-insensitively. They must
+    # still be Active staff. Set per environment via SITE_ADMIN_EMAILS.
+    site_admin_emails: str = ""
 
     # CORS - comma-separated list of allowed origins
     # For production, set to your actual domain(s)

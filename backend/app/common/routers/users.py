@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Header
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.common.areas import COMMON_AREA
 from app.database import get_db
 from app.common.schemas.user import (
     PromotionsStaffResponse,
@@ -18,7 +19,8 @@ from app.auth import (
     _get_promotions_staff_by_email,
     _is_promotions_staff,
     _staff_statuses,
-    is_admin,
+    is_promotions_admin,
+    is_site_admin,
     ACTIVE_STATUS,
     SUBLIST_DJ_STATUS,
 )
@@ -117,6 +119,12 @@ def get_current_user(
     effective_is_station_office = is_station_office
     imp_session = None
     real_name = None
+    # The admin flags describe the real, signed-in user, even while impersonating
+    real_staff = db.query(Staff).filter(Staff.email == x_forwarded_user).first()
+    admin_flags = {
+        "is_site_admin": is_site_admin(db, real_staff),
+        "is_promotions_admin": is_promotions_admin(real_staff),
+    }
     if is_staging:
         imp_session = (
             db.query(ImpersonationSession)
@@ -124,7 +132,6 @@ def get_current_user(
             .first()
         )
         if imp_session:
-            real_staff = db.query(Staff).filter(Staff.email == x_forwarded_user).first()
             real_name = real_staff.name if real_staff else None
             impersonating_email = imp_session.impersonated_email
             is_impersonating_dj_network = imp_session.impersonate_dj_network
@@ -148,6 +155,7 @@ def get_current_user(
                         real_email=x_forwarded_user,
                         real_name=real_name,
                         is_impersonating_dj_network=True,
+                        **admin_flags,
                     )
             if is_impersonating_station_office_network:
                 effective_is_station_office = True
@@ -163,6 +171,7 @@ def get_current_user(
                         real_email=x_forwarded_user,
                         real_name=real_name,
                         is_impersonating_station_office_network=True,
+                        **admin_flags,
                     )
 
     role = determine_user_role(db, effective_email)
@@ -226,9 +235,7 @@ def get_current_user(
         is_impersonating_dj_network=is_impersonating_dj_network,
         is_impersonating_station_office_network=is_impersonating_station_office_network,
         is_department_head=is_department_head,
-        is_admin=is_admin(
-            db, db.query(Staff).filter(Staff.email == x_forwarded_user).first()
-        ),
+        **admin_flags,
         profile=profile,
     )
 
@@ -336,5 +343,6 @@ def submit_feedback(
         body_text=body,
         body_html=f"<pre>{body}</pre>",
         db=db,
+        area=COMMON_AREA,
     )
     return {"success": True}

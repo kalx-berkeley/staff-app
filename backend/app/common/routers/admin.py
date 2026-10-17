@@ -1,7 +1,10 @@
 """
 App-wide admin API endpoints (KALX Staff Admin): scheduled jobs, the audit
-log and staging user impersonation. Admins are promotions staff and
-department heads (see `get_admin_staff`).
+log and staging user impersonation.
+
+Site admins (`get_site_admin`) can use all of it. Promotions admins can also
+see the scheduled jobs, without running them, and the pass giveaway's audit
+log entries (`get_site_or_promotions_admin`).
 """
 
 from datetime import date, datetime, time, timezone
@@ -13,9 +16,12 @@ from sqlalchemy.orm import Session
 from app.auth import (
     ACTIVE_STATUS,
     _is_promotions_staff,
-    get_admin_staff,
+    get_site_admin,
+    get_site_or_promotions_admin,
+    is_site_admin,
     require_authentication,
 )
+from app.common.areas import PASS_GIVEAWAY_AREA
 from app.common.schemas.admin import (
     AuditLogItem,
     ImpersonateRequest,
@@ -48,7 +54,7 @@ def _require_staging():
 
 @router.get("/users", response_model=list[UserListItem])
 def list_all_users(
-    admin: Staff = Depends(get_admin_staff),
+    admin: Staff = Depends(get_site_admin),
     db: Session = Depends(get_db),
 ) -> list[UserListItem]:
     """List all active users, promotions staff first, for the impersonation UI."""
@@ -70,7 +76,7 @@ def list_all_users(
 
 @router.get("/job-statuses", response_model=list[JobStatus])
 def get_job_statuses(
-    admin: Staff = Depends(get_admin_staff),
+    admin: Staff = Depends(get_site_or_promotions_admin),
     db: Session = Depends(get_db),
 ) -> list[JobStatus]:
     """Return last-run and next-scheduled times for every registered job."""
@@ -110,7 +116,7 @@ def get_job_statuses(
 @router.post("/jobs/{job_id}/run", response_model=JobRunResult)
 async def run_job(
     job_id: str,
-    admin: Staff = Depends(get_admin_staff),
+    admin: Staff = Depends(get_site_admin),
     db: Session = Depends(get_db),
 ) -> JobRunResult:
     """Run a registered job now."""
@@ -128,7 +134,7 @@ async def run_job(
 @router.post("/impersonate")
 def start_impersonation(
     request: ImpersonateRequest,
-    admin: Staff = Depends(get_admin_staff),
+    admin: Staff = Depends(get_site_admin),
     db: Session = Depends(get_db),
 ):
     """Begin impersonating another user (staging only)."""
@@ -174,9 +180,10 @@ def end_impersonation(
 
 @router.get("/audit-log", response_model=list[AuditLogItem])
 def get_audit_log(
-    admin: Staff = Depends(get_admin_staff),
+    admin: Staff = Depends(get_site_or_promotions_admin),
     db: Session = Depends(get_db),
     event_type: str | None = Query(None),
+    area: str | None = Query(None),
     actor_email: str | None = Query(None),
     entity_type: str | None = Query(None),
     entity_id: int | None = Query(None),
@@ -188,13 +195,18 @@ def get_audit_log(
     """
     Query the audit log.
 
-    Supports filtering by event_type, actor_email, entity_type/id, and date range.
+    Supports filtering by event_type, area, actor_email, entity_type/id, and date range.
     since/until are interpreted as Pacific-time calendar dates (inclusive on both ends).
-    Returns entries newest-first.
+    Returns entries newest-first. Promotions admins who aren't site admins only
+    get the pass giveaway's entries.
     """
     query = db.query(AuditLog)
+    if not is_site_admin(db, admin):
+        query = query.filter(AuditLog.area == PASS_GIVEAWAY_AREA)
     if event_type:
         query = query.filter(AuditLog.event_type == event_type)
+    if area:
+        query = query.filter(AuditLog.area == area)
     if actor_email:
         query = query.filter(AuditLog.actor_email == actor_email)
     if entity_type:
@@ -221,6 +233,7 @@ def get_audit_log(
             id=r.id,
             occurred_at=r.occurred_at,
             event_type=r.event_type,
+            area=r.area,
             actor_email=r.actor_email,
             actor_role=r.actor_role,
             entity_type=r.entity_type,

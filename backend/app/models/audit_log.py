@@ -18,6 +18,8 @@ class AuditLog(Base):
         index=True,
     )
     event_type = Column(String, nullable=False, index=True)
+    # The part of the app the event belongs to, one of `app.common.areas`
+    area = Column(String, nullable=False, index=True)
     actor_email = Column(String, nullable=True)
     actor_role = Column(String, nullable=True)
     entity_type = Column(String, nullable=True)

@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { impersonationAPI } from '../common/api';
+import PersonAutocomplete from '../common/components/PersonAutocomplete';
+import { extractPersonEmail } from '../common/components/personUtils';
 import { useAuth } from '../common/contexts/authHooks';
 import type { APIError } from '../common/types';
 import { adminAPI } from './api';
@@ -43,6 +45,7 @@ export default function ImpersonationSection() {
     user?.is_impersonating_station_office_network;
 
   const [userList, setUserList] = useState<UserListItem[]>([]);
+  const [userInput, setUserInput] = useState('');
   const [selectedEmail, setSelectedEmail] = useState('');
   const [mode, setMode] = useState<ImpersonateMode>('user');
   const [loading, setLoading] = useState(false);
@@ -51,6 +54,28 @@ export default function ImpersonationSection() {
   useEffect(() => {
     adminAPI.listUsers().then(setUserList).catch(() => {});
   }, []);
+
+  const userOptions = useMemo(
+    () => userList.map((u) => ({ email: u.email, name: u.name })),
+    [userList]
+  );
+
+  // Match autocomplete text ("Name (email)" or a bare email) to a listed user
+  const resolveUser = (text: string): UserListItem | undefined => {
+    const email = extractPersonEmail(text);
+    return userList.find((u) => u.email.toLowerCase() === email);
+  };
+
+  const handleUserInputChange = (text: string) => {
+    setUserInput(text);
+    setSelectedEmail(resolveUser(text)?.email ?? '');
+  };
+
+  const handleUserInputSubmit = (text: string) => {
+    const match = resolveUser(text);
+    setUserInput(match ? `${match.name} (${match.email})` : text);
+    setSelectedEmail(match?.email ?? '');
+  };
 
   const run = async (action: () => Promise<void>, fallback: string) => {
     setLoading(true);
@@ -123,20 +148,15 @@ export default function ImpersonationSection() {
 
       {needsUser(mode) && userList.length > 0 && (
         <div className="impersonate-user-row">
-          <select
-            value={selectedEmail}
-            onChange={(e) => setSelectedEmail(e.target.value)}
+          <PersonAutocomplete
+            ariaLabel="User to impersonate"
+            value={userInput}
+            onChange={handleUserInputChange}
+            onSubmit={handleUserInputSubmit}
+            options={userOptions}
+            placeholder="Name or email"
             disabled={loading}
-            className="impersonate-select"
-            aria-label="User to impersonate"
-          >
-            <option value="">— Select a user —</option>
-            {userList.map((u) => (
-              <option key={u.email} value={u.email}>
-                {u.name} ({u.role})
-              </option>
-            ))}
-          </select>
+          />
         </div>
       )}
 

@@ -2,12 +2,11 @@
 
 from sqlalchemy.orm import Session
 
+from app.common.areas import WORKFORMS_AREA
 from app.common.schemas.admin import JobRunResult
 from app.common.services.job_registry import AdminJob
 from app.config import settings
 from app.workforms.services.records import refresh_all
-
-AREA = "KALX Workforms"
 
 
 async def _run_workform_records_refresh(db: Session) -> JobRunResult:
@@ -24,7 +23,7 @@ ADMIN_JOBS = [
     AdminJob(
         id="workform_records_refresh",
         name="Refresh workforms from Airtable",
-        area=AREA,
+        area=WORKFORMS_AREA,
         run=_run_workform_records_refresh,
     ),
     # Not runnable by hand: a second run on a reminder day would email every
@@ -32,6 +31,6 @@ ADMIN_JOBS = [
     AdminJob(
         id="workform_emails",
         name="Send workform reminder and review emails",
-        area=AREA,
+        area=WORKFORMS_AREA,
     ),
 ]

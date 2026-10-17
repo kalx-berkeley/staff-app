@@ -186,6 +186,8 @@ def test_show_flags_matched_show_without_musicbrainz_id(
 def test_manual_sync_reports_not_configured_when_sheet_unset(
     client: TestClient, test_promotions_staff, monkeypatch
 ):
+    # Running jobs by hand is for site admins
+    monkeypatch.setattr(settings, "site_admin_emails", test_promotions_staff.email)
     monkeypatch.setattr(settings, "feature_bin_sheet_id", None)
     monkeypatch.setattr(settings, "feature_bin_sheet_gid", None)
 
@@ -202,6 +204,8 @@ def test_manual_sync_reports_not_configured_when_sheet_unset(
 def test_manual_sync_runs_when_configured(
     client: TestClient, test_promotions_staff, monkeypatch
 ):
+    # Running jobs by hand is for site admins
+    monkeypatch.setattr(settings, "site_admin_emails", test_promotions_staff.email)
     monkeypatch.setattr(settings, "feature_bin_sheet_id", "some-id")
     monkeypatch.setattr(settings, "feature_bin_sheet_gid", "some-gid")
     monkeypatch.setattr(

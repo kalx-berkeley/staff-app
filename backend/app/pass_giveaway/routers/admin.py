@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.auth import get_promotions_staff
+from app.auth import get_site_or_promotions_admin
 from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
 from app.models.venue import Venue
@@ -74,7 +74,7 @@ def _require_staging():
 
 @router.get("/seed-status")
 def get_seed_status(
-    _: Staff = Depends(get_promotions_staff),
+    _: Staff = Depends(get_site_or_promotions_admin),
     db: Session = Depends(get_db),
 ) -> dict[str, bool]:
     """Return whether test seed data has already been loaded."""
@@ -96,7 +96,7 @@ def get_seed_status(
 
 @router.post("/seed-test-data", response_model=SeedResult)
 def seed_test_data(
-    promotions: Staff = Depends(get_promotions_staff),
+    admin: Staff = Depends(get_site_or_promotions_admin),
     db: Session = Depends(get_db),
 ) -> SeedResult:
     """
@@ -293,7 +293,7 @@ def seed_test_data(
 
 @router.get("/auto-close-schedules", response_model=list[AutoCloseScheduleItem])
 def get_auto_close_schedules(
-    promotions: Staff = Depends(get_promotions_staff),
+    admin: Staff = Depends(get_site_or_promotions_admin),
     db: Session = Depends(get_db),
 ) -> list[AutoCloseScheduleItem]:
     """List all shows with auto_close=True and their schedule status."""
@@ -351,7 +351,7 @@ def get_auto_close_schedules(
 
 @router.get("/lottery-schedules", response_model=list[LotteryScheduleItem])
 def get_lottery_schedules(
-    promotions: Staff = Depends(get_promotions_staff),
+    admin: Staff = Depends(get_site_or_promotions_admin),
     db: Session = Depends(get_db),
 ) -> list[LotteryScheduleItem]:
     """List all shows with lottery_enabled=True that are published and their schedule status."""
@@ -432,10 +432,10 @@ def get_lottery_schedules(
 @router.post("/lottery-schedules/{show_id}/run", response_model=JobRunResult)
 async def run_lottery_now(
     show_id: int,
-    promotions: Staff = Depends(get_promotions_staff),
+    admin: Staff = Depends(get_site_or_promotions_admin),
     db: Session = Depends(get_db),
 ) -> JobRunResult:
-    """Immediately execute the lottery draw for a show (promotions staff only)."""
+    """Immediately execute the lottery draw for a show (site and promotions admins only)."""
     from app.pass_giveaway.services.lottery_service import LotteryService
 
     show = db.query(Show).filter(Show.id == show_id).first()

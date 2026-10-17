@@ -728,6 +728,8 @@ class TestManualSyncJob:
     def test_reports_not_configured_when_no_api_key(
         self, client: TestClient, test_promotions_staff, monkeypatch
     ):
+        # Running jobs by hand is for site admins
+        monkeypatch.setattr(settings, "site_admin_emails", test_promotions_staff.email)
         monkeypatch.setattr(settings, "spinitron_api_key", None)
 
         response = client.post(
@@ -743,6 +745,8 @@ class TestManualSyncJob:
     def test_runs_when_configured(
         self, client: TestClient, test_promotions_staff, monkeypatch
     ):
+        # Running jobs by hand is for site admins
+        monkeypatch.setattr(settings, "site_admin_emails", test_promotions_staff.email)
         monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
         now = datetime.now(timezone.utc)
 

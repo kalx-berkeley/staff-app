@@ -52,9 +52,11 @@ class UserInfo(BaseModel):
     is_impersonating_station_office_network: bool = False
     # Whether the user heads a department, and so can review KALX Workforms
     is_department_head: bool = False
-    # Whether the signed-in user, not anyone they're impersonating, can use
-    # KALX Staff Admin
-    is_admin: bool = False
+    # Whether the signed-in user, not anyone they're impersonating, is a site
+    # admin (all of KALX Staff Admin) or a promotions admin (part of it). Either
+    # can use the pass giveaway's admin tools.
+    is_site_admin: bool = False
+    is_promotions_admin: bool = False
     profile: PromotionsStaffResponse | StaffResponse | None = None
 
 

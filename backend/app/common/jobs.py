@@ -3,7 +3,8 @@
 from sqlalchemy.orm import Session
 
 from app.common.schemas.admin import JobRunResult
-from app.common.services.job_registry import COMMON_AREA, AdminJob
+from app.common.areas import COMMON_AREA
+from app.common.services.job_registry import AdminJob
 from app.common.services.user_service import UserService
 
 

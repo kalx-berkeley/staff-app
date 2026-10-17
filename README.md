@@ -195,14 +195,17 @@ two-month lookback, with no limit on future dates), complete with the performanc
 
 ### Admin & operations
 
-- **KALX Staff Admin** (`/admin/`), for promotions staff and department heads, holds the admin
-  tools shared by every staff site: the job dashboard, the audit log and user impersonation.
+- **KALX Staff Admin** (`/admin/`) holds the admin tools shared by every staff site: the job
+  dashboard, the audit log and user impersonation. Site admins (department heads, Paid Staff and
+  anyone in `SITE_ADMIN_EMAILS`) can use all of it. Promotions admins (the Promotions department)
+  can see the jobs without running them, and the pass giveaway's audit log entries. Both can use
+  the pass giveaway's own admin page.
 - **Job dashboard** for every scheduled task in every staff site (Airtable sync, feature bin sync,
   KALX Live! calendar sync, Spinitron on-air schedule sync, stale pre-assignment cleanup,
   unclosed-show notifications, workforms refresh and emails) with manual "run now" buttons. The
   pass giveaway's own admin page has dashboards of every pending auto-close and lottery job with
   live countdowns.
-- **Audit log viewer**, paginated and filterable by event type, actor, and date range — every
+- **Audit log viewer**, paginated and filterable by event type, area, actor, and date range — every
   giveaway, release, upload, and email send is logged with full details.
 - **User impersonation** (staging only) — an admin can act as another user, or
   simulate the DJ studio network or station office network, to test role-specific views without
@@ -351,6 +354,7 @@ Client
 | `LOCAL_SMTP_HOST` | Hostname of the local SMTP relay used when `SMTP2GO_API_KEY` is unset | `localhost` |
 | `LOCAL_SMTP_PORT` | Port of the local SMTP relay used when `SMTP2GO_API_KEY` is unset | `25` |
 | `WEBMASTER_EMAIL` | Recipient for in-app feedback and bug reports | — |
+| `SITE_ADMIN_EMAILS` | Comma-separated emails of extra site admins, besides department heads and Paid Staff (they must still be Active staff) | — |
 | `FEATURE_BIN_SHEET_ID` | Google Sheet ID for the KALX feature bin (new-arrivals) list | — (feature bin sync is disabled if unset) |
 | `FEATURE_BIN_SHEET_GID` | Worksheet `gid` of the sheet's "Current Active A-Z" tab | — (feature bin sync is disabled if unset) |
 | `KALX_LIVE_CALENDAR_ID` | Google Calendar ID for the KALX Live! performance schedule | — (KALX Live! sync is disabled if unset) |
@@ -396,6 +400,7 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 - `NETBIRD_HOSTNAME` (the bare Netbird peer hostname, not the FQDN)
 - `EMAIL_FROM_ADDRESS` (optional — defaults to `noreply@kalx.berkeley.edu`)
 - `WEBMASTER_EMAIL` (optional — in-app feedback is disabled if unset; in staging, this is the only address that receives real email)
+- `SITE_ADMIN_EMAILS` (optional — comma-separated emails of extra site admins; set it separately in the `staging` and `production` environments)
 - `KALX_LIVE_CALENDAR_ID` (not secret, just not worth hardcoding in a public repo — see the maintainers for the value; KALX Live! sync is disabled if unset)
 
 ## Project Structure

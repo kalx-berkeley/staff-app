@@ -10,7 +10,9 @@ export const ADMIN_TITLE = 'KALX Staff Admin';
 
 // KALX Staff Admin: the admin tools that apply to every sub-site. Each
 // sub-site's own admin tools stay in that sub-site (for example the pass
-// giveaway's Promotions → Admin page).
+// giveaway's Promotions → Admin page). Site admins can use all of it;
+// promotions admins can see the jobs without running them, and the pass
+// giveaway's audit log entries.
 export default function AdminPage() {
   usePageTitle(null, ADMIN_TITLE);
   const { user } = useAuth();
@@ -34,7 +36,7 @@ export default function AdminPage() {
       </header>
       <main>
         <JobsSection />
-        {user?.is_staging && <ImpersonationSection />}
+        {user?.is_staging && user.is_site_admin && <ImpersonationSection />}
         <AuditLogSection />
       </main>
     </div>

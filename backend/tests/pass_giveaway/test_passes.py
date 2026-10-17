@@ -244,6 +244,40 @@ def test_get_dj_history(client, show, promotions_staff, db):
     assert passes[0]["given_away_by_dj"] == "DJ Test"
 
 
+@pytest.mark.parametrize("show_status", ["closed", "draft", "deleted"])
+def test_get_dj_history_omits_preassigned_passes_on_unpublished_shows(
+    client, show, promotions_staff, db, show_status
+):
+    """Pre-assigned passes are listed only while their show is published."""
+    pass_item = (
+        db.query(Pass)
+        .filter(
+            Pass.show_id == show.id,
+            Pass.pass_type == "pair",
+            Pass.status == "available",
+        )
+        .first()
+    )
+    pass_item.preassigned_dj = "DJ Test"
+    pass_item.preassigned_date = show.show_date
+    db.commit()
+
+    def history():
+        response = client.get(
+            "/api/passes/my-giveaways?dj_name=DJ Test",
+            headers={"X-Forwarded-User": promotions_staff.email},
+        )
+        assert response.status_code == 200
+        return response.json()
+
+    assert [p["id"] for p in history()] == [pass_item.id]
+
+    show.status = show_status
+    db.commit()
+
+    assert history() == []
+
+
 def test_get_dj_autocomplete(client, show, promotions_staff, db):
     """Test DJ name autocomplete."""
     # Give away passes with different DJs

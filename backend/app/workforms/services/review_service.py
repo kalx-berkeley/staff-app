@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.common.areas import WORKFORMS_AREA
 from app.common.services.audit_service import log_event
 from app.models.staff import Staff
 from app.models.workform import Workform
@@ -260,6 +261,7 @@ async def decide(
     log_event(
         db,
         event_type="workform_decision",
+        area=WORKFORMS_AREA,
         actor_email=reviewer.email,
         actor_role="department_head",
         entity_type="workform",

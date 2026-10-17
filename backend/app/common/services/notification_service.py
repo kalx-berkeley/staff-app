@@ -25,6 +25,8 @@ def send_email(
     body_text: str,
     body_html: str | None = None,
     db: "Session | None" = None,
+    *,
+    area: str,
 ) -> None:
     """
     Send an email notification.
@@ -35,6 +37,8 @@ def send_email(
     :param body_html: Optional HTML body.
     :param db: Optional database session; when provided, every send attempt (success or
         failure) is audit-logged, including response/error details.
+    :param area: The part of the app sending the email, one of `app.common.areas`,
+        recorded in the audit log.
 
     Uses smtp2go when SMTP2GO_API_KEY is set; falls back to the local mail server otherwise.
     In staging mode, suppresses delivery to non-webmaster recipients, and tags any email
@@ -67,14 +71,15 @@ def send_email(
             body_text,
             body_html,
             sent=False,
+            area=area,
             response_details={"reason": "staging_suppressed"},
         )
         return
 
     if settings.smtp2go_api_key:
-        _send_via_smtp2go(to_email, subject, body_text, body_html, db)
+        _send_via_smtp2go(to_email, subject, body_text, body_html, db, area)
     else:
-        _send_via_local_smtp(to_email, subject, body_text, body_html, db)
+        _send_via_local_smtp(to_email, subject, body_text, body_html, db, area)
 
 
 def _send_via_smtp2go(
@@ -83,6 +88,7 @@ def _send_via_smtp2go(
     body_text: str,
     body_html: str | None,
     db: "Session | None",
+    area: str,
 ) -> None:
     if Smtp2goClient is None:
         logger.error("smtp2go package is not installed; cannot send email to %s", to_email)
@@ -93,6 +99,7 @@ def _send_via_smtp2go(
             body_text,
             body_html,
             sent=False,
+            area=area,
             response_details={"error": "smtp2go package is not installed"},
         )
         return
@@ -119,6 +126,7 @@ def _send_via_smtp2go(
             body_text,
             body_html,
             sent=False,
+            area=area,
             response_details={
                 "status_code": response.status_code,
                 "request_id": response.request_id,
@@ -134,6 +142,7 @@ def _send_via_smtp2go(
             body_text,
             body_html,
             sent=True,
+            area=area,
             response_details={
                 "status_code": response.status_code,
                 "request_id": response.request_id,
@@ -148,6 +157,7 @@ def _send_via_local_smtp(
     body_text: str,
     body_html: str | None,
     db: "Session | None",
+    area: str,
 ) -> None:
     if body_html is not None:
         msg: MIMEMultipart | MIMEText = MIMEMultipart("alternative")
@@ -174,6 +184,7 @@ def _send_via_local_smtp(
             body_text,
             body_html,
             sent=True,
+            area=area,
             response_details={
                 "smtp_host": settings.local_smtp_host,
                 "smtp_port": settings.local_smtp_port,
@@ -189,6 +200,7 @@ def _send_via_local_smtp(
             body_text,
             body_html,
             sent=False,
+            area=area,
             response_details={
                 "smtp_host": settings.local_smtp_host,
                 "smtp_port": settings.local_smtp_port,
@@ -204,6 +216,7 @@ def _audit_email(
     body_text: str,
     body_html: str | None,
     sent: bool,
+    area: str,
     response_details: dict | None = None,
 ) -> None:
     if db is None:
@@ -224,6 +237,7 @@ def _audit_email(
     log_event(
         db,
         event_type="email_sent",
+        area=area,
         actor_role="system",
         details=details,
     )

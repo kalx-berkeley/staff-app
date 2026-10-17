@@ -6,6 +6,7 @@ gets pass emails, and which genres they like (used to suggest DJs for passes).
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.common.areas import PASS_GIVEAWAY_AREA
 from app.auth import require_authentication, resolve_effective_email
 from app.common.routers.users import determine_user_role
 from app.common.services import audit_service
@@ -82,6 +83,7 @@ def update_notification_preferences(
     audit_service.log_event(
         db,
         event_type="notification_preferences_updated",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=effective_email,
         actor_role=determine_user_role(db, effective_email),
         entity_type="staff",
@@ -147,6 +149,7 @@ def update_genre_preferences(
     audit_service.log_event(
         db,
         event_type="genre_preferences_updated",
+        area=PASS_GIVEAWAY_AREA,
         actor_email=effective_email,
         actor_role=determine_user_role(db, effective_email),
         entity_type="staff",

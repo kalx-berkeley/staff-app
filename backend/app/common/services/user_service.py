@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
 import httpx2 as httpx
 
+from app.common.areas import COMMON_AREA
 from app.auth import ACTIVE_STATUS
 from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
@@ -468,6 +469,7 @@ class UserService:
                     log_event(
                         db,
                         event_type="airtable_sync_added",
+                        area=COMMON_AREA,
                         actor_role="system",
                         entity_type="staff",
                         entity_id=staff_record.id,
@@ -477,6 +479,7 @@ class UserService:
                     log_event(
                         db,
                         event_type="airtable_sync_changed",
+                        area=COMMON_AREA,
                         actor_role="system",
                         entity_type="staff",
                         entity_id=staff_record.id,
@@ -515,6 +518,7 @@ class UserService:
                     log_event(
                         db,
                         event_type="airtable_sync_deactivated",
+                        area=COMMON_AREA,
                         actor_role="system",
                         entity_type="staff",
                         entity_id=staff_record.id,

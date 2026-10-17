@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { impersonationAPI } from '../../common/api';
 import { useAuth } from '../../common/contexts/authHooks';
-import { isStagingSublistDjStaff } from '../utils';
+import { isImpersonating, isStagingSublistDjStaff, showsPassGiveawayAdminLink } from '../utils';
 import { HOME_TITLE, SUBSITES, subsiteForPath } from '../../subsites';
 import FeedbackModal from './FeedbackModal';
 import { useCurrentView, VIEW_LABELS } from './currentView';
@@ -95,7 +95,9 @@ const AppNav = ({ showGoogleLogout = false }: AppNavProps) => {
     }, 3000);
   };
 
-  const canAccessPromotions = user?.role === 'promotions';
+  // Admins who aren't promotions staff get only the Promotions → Admin page
+  const canAccessPromotions = user?.role === 'promotions' || showsPassGiveawayAdminLink(user);
+  const promotionsHome = user?.role === 'promotions' ? '/promotions/shows' : '/promotions/admin';
   const canAccessStaff = user?.role === 'staff' || user?.role === 'promotions';
   const canAccessDJ =
     user?.role === 'dj' ||
@@ -106,11 +108,6 @@ const AppNav = ({ showGoogleLogout = false }: AppNavProps) => {
   const email = user?.email ?? 'DJ Guest';
   const displayName = user?.profile?.name || email;
   const roleLabel = (user?.role && ROLE_LABELS[user.role]) ?? 'Guest';
-
-  const isImpersonating =
-    !!user?.impersonating_email ||
-    user?.is_impersonating_dj_network ||
-    user?.is_impersonating_station_office_network;
 
   // Links to the home page and the other sub-sites. Hidden from guests and from
   // anyone really on the DJ studio network, whom Apache keeps on the DJ view.
@@ -132,7 +129,7 @@ const AppNav = ({ showGoogleLogout = false }: AppNavProps) => {
         </div>
       )}
       <div className="app-nav-user">
-        {isImpersonating ? (
+        {isImpersonating(user) ? (
           <div className="impersonation-block">
             <div className="impersonation-block-header">
               <span className="impersonation-tag">Impersonating</span>
@@ -180,9 +177,9 @@ const AppNav = ({ showGoogleLogout = false }: AppNavProps) => {
       <ul className="app-nav-views">
         <li>
           {canAccessPromotions ? (
-            <ViewLink view="promotions" to="/promotions/shows" isCurrent={currentView === 'promotions'} />
+            <ViewLink view="promotions" to={promotionsHome} isCurrent={currentView === 'promotions'} />
           ) : (
-            <LockedView label="Promotions" tooltip="Only accessible to users with the Promotions Staff role." />
+            <LockedView label="Promotions" tooltip="Only accessible to users with the Promotions Staff role, and to admins." />
           )}
         </li>
         <li>

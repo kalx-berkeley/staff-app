@@ -66,6 +66,16 @@ This application implements several security best practices:
   networks can reach without a login.
 - **Role-Based Access Control (RBAC)**: Three distinct roles (promotions, staff, DJ) enforced by
   the backend.
+- **Admin groups**: the admin tools check two groups, both worked out from the real signed-in user
+  (never anyone they're impersonating) and both requiring Active status:
+  - *Site admins* (`auth.get_site_admin`): department heads (from the "Department Heads" table),
+    Paid Staff, and anyone listed in `SITE_ADMIN_EMAILS`. They can use all of KALX Staff Admin
+    (`/admin/`), including running jobs and staging impersonation, and the pass giveaway's admin
+    page.
+  - *Promotions admins*: Promotions department members. They can use the pass giveaway's admin
+    page, and in KALX Staff Admin can see the scheduled jobs (without running them) and the pass
+    giveaway's audit log entries only (`auth.get_site_or_promotions_admin`, with the audit log
+    filtered by its `area` column).
 - **Defense-in-depth authentication check**: the backend independently verifies that every `/api/`
   request carries a Google identity (`X-Forwarded-User`) or comes from the DJ studio or station
   office network. If neither is present, the request is rejected with HTTP 400 and a CRITICAL
@@ -186,7 +196,8 @@ route returns them.
 #### Access Review
 - Regularly review Google Workspace/Airtable user accounts
 - Remove accounts for departed staff in Airtable (Airtable sync will revoke access)
-- Audit role assignments
+- Audit role assignments, including the site admins listed in `SITE_ADMIN_EMAILS` for each
+  GitHub environment
 
 ### Security Checklist
 

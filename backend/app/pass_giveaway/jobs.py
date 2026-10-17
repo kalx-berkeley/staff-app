@@ -2,6 +2,7 @@
 
 from sqlalchemy.orm import Session
 
+from app.common.areas import PASS_GIVEAWAY_AREA
 from app.common.schemas.admin import JobRunResult
 from app.common.services.job_registry import AdminJob
 from app.config import settings
@@ -12,8 +13,6 @@ from app.pass_giveaway.services.show_service import ShowService
 from app.pass_giveaway.services.spinitron_schedule_service import (
     SpinitronScheduleService,
 )
-
-AREA = "Radio Pass Giveaway"
 
 
 async def _run_feature_bin_sync(db: Session) -> JobRunResult:
@@ -68,31 +67,31 @@ ADMIN_JOBS = [
     AdminJob(
         id="feature_bin_sync",
         name="Sync feature bin from Google Sheet",
-        area=AREA,
+        area=PASS_GIVEAWAY_AREA,
         run=_run_feature_bin_sync,
     ),
     AdminJob(
         id="kalx_live_sync",
         name="Sync KALX Live calendar",
-        area=AREA,
+        area=PASS_GIVEAWAY_AREA,
         run=_run_kalx_live_sync,
     ),
     AdminJob(
         id="expire_stale_dj_preassignments",
         name="Expire stale DJ pre-assignments",
-        area=AREA,
+        area=PASS_GIVEAWAY_AREA,
         run=_run_expire_stale_dj_preassignments,
     ),
     AdminJob(
         id="notify_unclosed_past_shows",
         name="Notify venue owners of unclosed past shows",
-        area=AREA,
+        area=PASS_GIVEAWAY_AREA,
         run=_run_notify_unclosed_past_shows,
     ),
     AdminJob(
         id="spinitron_schedule_sync",
         name="Sync Spinitron on-air schedule",
-        area=AREA,
+        area=PASS_GIVEAWAY_AREA,
         run=_run_spinitron_schedule_sync,
     ),
 ]
