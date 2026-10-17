@@ -674,6 +674,10 @@ button:disabled {
   border-color: var(--danger-color) !important;
 }
 
+.autocomplete-wrapper.input-error input {
+  border-color: var(--danger-color) !important;
+}
+
 .field-error {
   display: block;
   color: var(--danger-color);

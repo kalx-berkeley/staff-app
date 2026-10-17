@@ -108,4 +108,30 @@ describe('KALX Staff Admin', () => {
     expect(await screen.findByText(/Viewing as amy@example.com/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'End impersonation' })).toBeInTheDocument();
   });
+
+  it('picks the user to impersonate by typing part of their name', async () => {
+    vi.mocked(adminAPI.listUsers).mockResolvedValue([
+      { email: 'amy@example.com', name: 'Amy Adams', role: 'staff' },
+      { email: 'bob@example.com', name: 'Bob Brown', role: 'promotions' },
+    ]);
+    // Rejecting keeps the component from reloading the page, which jsdom can't do
+    vi.mocked(adminAPI.startImpersonation).mockRejectedValue({ detail: 'Stopped for test' });
+    await renderAdmin(user({ is_staging: true }));
+
+    const start = screen.getByRole('button', { name: 'Start Impersonation' });
+    const input = await screen.findByRole('textbox', { name: 'User to impersonate' });
+    fireEvent.change(input, { target: { value: 'amy' } });
+    expect(start).toBeDisabled();
+    fireEvent.mouseDown(screen.getByText('Amy Adams (amy@example.com)'));
+    expect(input).toHaveValue('Amy Adams (amy@example.com)');
+
+    fireEvent.click(start);
+
+    expect(await screen.findByText('Stopped for test')).toBeInTheDocument();
+    expect(adminAPI.startImpersonation).toHaveBeenCalledWith({
+      email: 'amy@example.com',
+      is_dj_network: false,
+      is_station_office_network: false,
+    });
+  });
 });

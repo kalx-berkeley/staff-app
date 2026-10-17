@@ -2,7 +2,14 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { legacyImportAPI, venuesAPI, showsAPI, autocompleteAPI, specialtyShowsAPI } from '../api';
 import type { VenueResponse, AgeRestriction, ShowSummary } from '../types';
-import { DatePicker, Tooltip, DescriptionCheckFeedback, useDescriptionCheck } from '../components';
+import {
+  DatePicker,
+  Tooltip,
+  DescriptionCheckFeedback,
+  useDescriptionCheck,
+  PersonAutocomplete,
+  extractPersonEmail,
+} from '../components';
 import DjNameAutocomplete from '../components/DjNameAutocomplete';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 
@@ -23,6 +30,8 @@ interface OnAirWinnerRow {
 
 interface StaffClaimRow {
   staff_id: number | '';
+  /** Text in the staff member autocomplete; staff_id is set once it matches a staff member */
+  staff_input: string;
   has_guest: boolean;
   guest_name: string;
 }
@@ -36,6 +45,7 @@ const emptyWinner = (): OnAirWinnerRow => ({
 
 const emptyStaffClaim = (): StaffClaimRow => ({
   staff_id: '',
+  staff_input: '',
   has_guest: false,
   guest_name: '',
 });
@@ -248,6 +258,36 @@ const LegacyImport = () => {
     });
   };
 
+  const staffOptions = useMemo(
+    () => staffList.map((s) => ({ email: s.email, name: s.name })),
+    [staffList]
+  );
+
+  // Match autocomplete text to a staff member by email ("Name (email)" or a bare
+  // email), falling back to an exact name match when only one person has that name
+  const resolveStaff = (text: string): StaffMember | undefined => {
+    const email = extractPersonEmail(text);
+    const byEmail = staffList.find((s) => s.email.toLowerCase() === email);
+    if (byEmail) return byEmail;
+    const name = text.trim().toLowerCase();
+    const byName = staffList.filter((s) => s.name.toLowerCase() === name);
+    return byName.length === 1 ? byName[0] : undefined;
+  };
+
+  const handleStaffInputChange = (index: number, text: string) => {
+    updateStaffClaim(index, { staff_input: text, staff_id: resolveStaff(text)?.id ?? '' });
+  };
+
+  const handleStaffInputSubmit = (index: number, text: string) => {
+    const staff = resolveStaff(text);
+    updateStaffClaim(
+      index,
+      staff
+        ? { staff_input: `${staff.name} (${staff.email})`, staff_id: staff.id }
+        : { staff_input: text, staff_id: '' }
+    );
+  };
+
   // How many staff pass slots the current claims consume (guests each take an extra slot)
   const staffSlotsUsed = staffClaims.reduce(
     (sum, c) => sum + 1 + (c.has_guest ? 1 : 0),
@@ -284,7 +324,7 @@ const LegacyImport = () => {
     });
 
     staffClaims.forEach((c, i) => {
-      if (c.staff_id === '') newErrors[`staff_${i}`] = 'Select a staff member';
+      if (c.staff_id === '') newErrors[`staff_${i}`] = 'Pick a staff member from the list';
       if (guestRequiresName && c.has_guest && !c.guest_name.trim()) {
         newErrors[`staff_${i}_guest`] = 'This venue requires a guest name';
       }
@@ -907,22 +947,16 @@ const LegacyImport = () => {
                 <div className="form-row">
                   <div className="form-group">
                     <label htmlFor={`li_staff_${i}`}>Staff Member</label>
-                    <select
+                    <PersonAutocomplete
                       id={`li_staff_${i}`}
-                      value={claim.staff_id}
-                      onChange={(e) =>
-                        updateStaffClaim(i, {
-                          staff_id: e.target.value === '' ? '' : parseInt(e.target.value),
-                        })
-                      }
-                      className={errors[`staff_${i}`] ? 'input-error' : ''}
+                      value={claim.staff_input}
+                      onChange={(text) => handleStaffInputChange(i, text)}
+                      onSubmit={(text) => handleStaffInputSubmit(i, text)}
+                      options={staffOptions}
+                      placeholder="Staff name or email"
+                      className={errors[`staff_${i}`] ? 'input-error' : undefined}
                       disabled={submitting}
-                    >
-                      <option value="">— Select staff member —</option>
-                      {staffList.map((s) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
+                    />
                     {errors[`staff_${i}`] && (
                       <span className="field-error">{errors[`staff_${i}`]}</span>
                     )}
