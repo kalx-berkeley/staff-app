@@ -321,6 +321,23 @@ def test_only_active_staff_can_follow(client: TestClient, people, email):
     assert "example.com/give" not in response.text
 
 
+def test_forbidden_page_offers_to_switch_google_account(client: TestClient, people):
+    _create(client)
+
+    response = client.get(
+        "/go/fundraiser",
+        headers={**_as("stranger@example.com"), "Host": "staff.kalx.example"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 403
+    assert "stranger@example.com" in response.text
+    assert (
+        "https://auth.kalx.example/redirect_uri?logout=https://auth.kalx.example/"
+        in response.text
+    )
+
+
 def test_redirect_without_apache_layer_is_refused(client: TestClient, people):
     response = client.get("/go/fundraiser", follow_redirects=False)
 
