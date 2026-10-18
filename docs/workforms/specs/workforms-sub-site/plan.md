@@ -30,7 +30,7 @@ submitted hours, descriptions and approvals, and the app keeps a local copy.
 | # | Decision |
 |---|----------|
 | Q1 | Drafts, and their separate entries, are stored in the app's database. Airtable sees only submitted workforms. |
-| Q2 | After submission, Airtable is the source of truth. A local copy is refreshed every 15 minutes, after each write, and when a head opens the review view. Hand edits in Airtable show up in the app. |
+| Q2 | After submission, Airtable is the source of truth. A local copy is refreshed nightly, after each write, and when a head opens the review view. Hand edits in Airtable show up in the app. |
 | Q3 | A submitted workform can be edited and resubmitted until any department has a decision (Approved or Denied). After that it is locked. |
 | Q4 | Denied is final: those hours don't count. Heads tell the staff member outside the app. There is no denial reason. |
 | Q5 | Drafts are only for the current month. Submitting is allowed any time during the month, up to the end of the 5th of the next month (deadline day set in config). After the deadline, last month can still be submitted, with a warning that late hours might not count. Older months and future months are not allowed. Months are calendar months in America/Los_Angeles. |
@@ -235,7 +235,7 @@ workforms, but `department_heads` is a shared model, so
 - The staff sync runs `after_staff_sync` through the post-sync hook. That
   syncs department heads and deletes unsubmitted drafts of staff who are no
   longer Active (Q20).
-- `refresh_workform_records` runs every 15 minutes (Q2). It's skipped when
+- `refresh_workform_records` runs at 2:30 AM Pacific every day (Q2). It's skipped when
   Airtable isn't configured.
 - `send_workform_emails` runs at 9 AM Pacific every day, but only when
   `WORKFORMS_EMAILS_ENABLED` is set. It's off by default while the sub-site

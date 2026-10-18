@@ -10,7 +10,7 @@ class WorkformAirtableRecord(Base):
     A record of the Airtable workforms table (KALX Workforms).
 
     Airtable is the source of truth for submitted workforms, including
-    decisions made by hand there; this copy is refreshed every 15 minutes,
+    decisions made by hand there; this copy is refreshed nightly,
     after each write, and when a reviewer opens a month. Every column is
     copied from Airtable.
     """

@@ -153,7 +153,7 @@ async def sync_spinitron_schedule():
 async def refresh_workform_records():
     """
     Scheduled task to refresh the local copy of the Airtable workforms table.
-    Runs every 15 minutes.
+    Runs nightly at 2:30 AM Pacific.
     """
     from app.config import settings
     from app.database import SessionLocal
@@ -629,10 +629,11 @@ def start_scheduler():
     )
 
     if settings.workforms_enabled:
-        # Refresh the local copy of the Airtable workforms table every 15 minutes
+        # Refresh the local copy of the Airtable workforms table daily at 2:30 AM
+        # Pacific, after the Airtable sync has refreshed the department heads
         scheduler.add_job(
             refresh_workform_records,
-            trigger=CronTrigger(minute="*/15", timezone=_PT),
+            trigger=CronTrigger(hour=2, minute=30, timezone=_PT),
             id="workform_records_refresh",
             name="Refresh workforms from Airtable",
             replace_existing=True,
@@ -653,7 +654,7 @@ def start_scheduler():
         " Airtable sync at 2 AM PT, stale preassignment expiry at 3 AM PT, unclosed past"
         " show notifications at 4 AM PT, Spinitron schedule sync every 6 hours"
         + (
-            ", workforms refresh every 15 minutes, workform emails at 9 AM PT"
+            ", workforms refresh at 2:30 AM PT, workform emails at 9 AM PT"
             if settings.workforms_enabled
             else ""
         )
