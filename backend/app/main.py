@@ -51,11 +51,14 @@ from app.workforms.services.departments import (
 )
 
 # Department heads and other workforms data are refreshed with the staff sync
-register_post_sync_hook(workforms_after_staff_sync)
+if settings.workforms_enabled:
+    register_post_sync_hook(workforms_after_staff_sync)
 
 # Every sub-site's scheduled jobs are listed in KALX Staff Admin
 for job in (
-    common_jobs.ADMIN_JOBS + pass_giveaway_jobs.ADMIN_JOBS + workforms_jobs.ADMIN_JOBS
+    common_jobs.ADMIN_JOBS
+    + pass_giveaway_jobs.ADMIN_JOBS
+    + (workforms_jobs.ADMIN_JOBS if settings.workforms_enabled else [])
 ):
     register_job(job)
 
@@ -149,7 +152,8 @@ async def lifespan(app: FastAPI):
     check_network_config()
     start_scheduler()
     await bootstrap_users_if_empty()
-    await bootstrap_workforms_if_empty()
+    if settings.workforms_enabled:
+        await bootstrap_workforms_if_empty()
     await bootstrap_feature_bin_if_stale()
     await bootstrap_kalx_live_if_stale()
     await bootstrap_spinitron_schedule()
@@ -274,8 +278,9 @@ app.include_router(alternates.router, dependencies=_auth_check)
 app.include_router(specialty_shows.router, dependencies=_auth_check)
 app.include_router(on_air.router, dependencies=_auth_check)
 app.include_router(directory.router, dependencies=_auth_check)
-app.include_router(workforms_review.router, dependencies=_auth_check)
-app.include_router(workforms.router, dependencies=_auth_check)
+if settings.workforms_enabled:
+    app.include_router(workforms_review.router, dependencies=_auth_check)
+    app.include_router(workforms.router, dependencies=_auth_check)
 app.include_router(short_links_admin.router, dependencies=_auth_check)
 # /go/ is proxied by Apache like /api/, so it gets the same check
 app.include_router(short_links_redirect.router, dependencies=_auth_check)

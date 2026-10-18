@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     # departments are the departments a workform can report hours in.
     airtable_department_heads_table_name: str = "Department Heads"
 
+    # Whether the KALX Workforms sub-site is on: its API, scheduled jobs and
+    # Airtable syncs, and its home page card. Off by default; deploy.yml turns
+    # it on in staging only while the sub-site is under construction.
+    workforms_enabled: bool = False
     # KALX Workforms: a month's workform is due by the end of this day of the
     # following month (Pacific time); later submissions are marked late.
     workforms_deadline_day: int = 5

@@ -9,6 +9,8 @@ from sqlalchemy.pool import StaticPool
 
 # Set before importing the app: app.config ignores .env when TESTING is set.
 os.environ["TESTING"] = "1"
+# The workforms sub-site is off by default; its tests need its routes
+os.environ["WORKFORMS_ENABLED"] = "true"
 
 from app.main import app  # noqa: E402
 from app.database import Base, get_db  # noqa: E402

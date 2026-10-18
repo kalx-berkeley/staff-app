@@ -225,6 +225,7 @@ jobs:
         SMTP2GO_API_KEY=${{ secrets.SMTP2GO_API_KEY }}
         EMAIL_FROM_ADDRESS=${{ vars.EMAIL_FROM_ADDRESS }}
         WEBMASTER_EMAIL=${{ vars.WEBMASTER_EMAIL }}
+        WORKFORMS_ENABLED=${{ env.ENV_NAME == 'staging' }}
         LEGACY_IMPORT_ENABLED=${{ vars.LEGACY_IMPORT_ENABLED || 'false' }}
         FEATURE_BIN_SHEET_ID=${{ secrets.FEATURE_BIN_SHEET_ID }}
         FEATURE_BIN_SHEET_GID=${{ secrets.FEATURE_BIN_SHEET_GID }}

@@ -39,6 +39,7 @@ const user = (overrides: Partial<UserResponse> = {}): UserResponse => ({
   is_dj_network: false,
   is_station_office_network: false,
   is_department_head: false,
+  workforms_enabled: true,
   profile: { id: 1, name: 'Amy Adams', phone: '510-555-0001', dj_name: null, is_sublist_dj: false },
   ...overrides,
 });

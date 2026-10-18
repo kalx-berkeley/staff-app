@@ -569,6 +569,8 @@ def start_scheduler():
         logger.info("Skipping scheduler startup in test environment")
         return
 
+    from app.config import settings
+
     _PT = "America/Los_Angeles"
 
     # Add daily feature bin sync job at 1 AM Pacific, ahead of the other jobs
@@ -626,30 +628,35 @@ def start_scheduler():
         replace_existing=True,
     )
 
-    # Refresh the local copy of the Airtable workforms table every 15 minutes
-    scheduler.add_job(
-        refresh_workform_records,
-        trigger=CronTrigger(minute="*/15", timezone=_PT),
-        id="workform_records_refresh",
-        name="Refresh workforms from Airtable",
-        replace_existing=True,
-    )
+    if settings.workforms_enabled:
+        # Refresh the local copy of the Airtable workforms table every 15 minutes
+        scheduler.add_job(
+            refresh_workform_records,
+            trigger=CronTrigger(minute="*/15", timezone=_PT),
+            id="workform_records_refresh",
+            name="Refresh workforms from Airtable",
+            replace_existing=True,
+        )
 
-    # Send KALX Workforms reminder and review emails daily at 9 AM Pacific
-    scheduler.add_job(
-        send_workform_emails,
-        trigger=CronTrigger(hour=9, minute=0, timezone=_PT),
-        id="workform_emails",
-        name="Send workform reminder and review emails",
-        replace_existing=True,
-    )
+        # Send KALX Workforms reminder and review emails daily at 9 AM Pacific
+        scheduler.add_job(
+            send_workform_emails,
+            trigger=CronTrigger(hour=9, minute=0, timezone=_PT),
+            id="workform_emails",
+            name="Send workform reminder and review emails",
+            replace_existing=True,
+        )
 
     scheduler.start()
     logger.info(
         "Scheduler started - Feature bin sync at 1 AM PT, KALX Live sync at 1:30 AM PT,"
         " Airtable sync at 2 AM PT, stale preassignment expiry at 3 AM PT, unclosed past"
-        " show notifications at 4 AM PT, Spinitron schedule sync every 6 hours, workforms"
-        " refresh every 15 minutes, workform emails at 9 AM PT"
+        " show notifications at 4 AM PT, Spinitron schedule sync every 6 hours"
+        + (
+            ", workforms refresh every 15 minutes, workform emails at 9 AM PT"
+            if settings.workforms_enabled
+            else ""
+        )
     )
     _reschedule_pending_auto_close_jobs()
     _reschedule_pending_lottery_jobs()
