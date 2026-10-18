@@ -10,7 +10,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ### Changed
 
-- Turn off the KALX Workforms sub-site in production while it's under construction, with the new `WORKFORMS_ENABLED` setting (off by default; deploys turn it on in staging only). When off, its API, scheduled jobs and Airtable syncs aren't registered and the sub-site is hidden
+- Turn off the KALX Workforms sub-site in production while it's under construction, with the new `WORKFORMS_ENABLED` setting (off by default; deploys turn it on in staging only). When off, its API, scheduled jobs and Airtable syncs aren't registered and the sub-site is hidden ([51bf3a1](https://github.com/kalx-berkeley/staff-app/commit/51bf3a1))
 - Suggest switching Google accounts on the `/go/` link page shown to people who aren't active staff, like the rest of the site's access page ([ea78cfb](https://github.com/kalx-berkeley/staff-app/commit/ea78cfb))
 
 ## [1.7.0] - 2026-10-17
