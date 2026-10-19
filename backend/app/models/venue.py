@@ -17,7 +17,8 @@ class Venue(Base):
     show_sourcing_instructions = Column(Text, nullable=True)
     pass_call_instructions = Column(Text, nullable=True)
     win_frequency_days = Column(Integer, nullable=True)
-    default_wheelchair_accessible = Column(Boolean, nullable=True)
+    # "yes", "no", "unknown", or null for no default
+    default_wheelchair_accessible = Column(String, nullable=True)
     default_age_restriction = Column(String, nullable=True)
     default_num_pass_pairs = Column(Integer, nullable=True)
     logo_filename = Column(String, nullable=True)

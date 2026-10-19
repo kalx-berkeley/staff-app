@@ -44,7 +44,7 @@ def test_create_show(client: TestClient, test_venue, test_promotions_staff):
         "show_time": "20:00:00",
         "caller_special_instructions": "Doors open at 7pm",
         "age_restriction": "21+",
-        "wheelchair_accessible": True,
+        "wheelchair_accessible": "yes",
         "num_pass_pairs": 3,
     }
 
@@ -63,6 +63,54 @@ def test_create_show(client: TestClient, test_venue, test_promotions_staff):
     assert data["promotions_contacts"] == []
 
 
+@pytest.mark.parametrize("value", ["yes", "no", "unknown"])
+def test_create_show_wheelchair_accessible(
+    client: TestClient, test_venue, test_promotions_staff, value
+):
+    """A show's wheelchair accessibility is yes, no or unknown."""
+    show_data = {
+        "event_name": "Test Concert",
+        "venue_id": test_venue.id,
+        "show_date": "2024-12-31",
+        "show_time": "20:00:00",
+        "age_restriction": "all_ages",
+        "wheelchair_accessible": value,
+        "num_pass_pairs": 1,
+    }
+
+    response = client.post(
+        "/api/shows",
+        json=show_data,
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["wheelchair_accessible"] == value
+
+
+def test_create_show_rejects_boolean_wheelchair_accessible(
+    client: TestClient, test_venue, test_promotions_staff
+):
+    """The old true/false values are no longer accepted."""
+    show_data = {
+        "event_name": "Test Concert",
+        "venue_id": test_venue.id,
+        "show_date": "2024-12-31",
+        "show_time": "20:00:00",
+        "age_restriction": "all_ages",
+        "wheelchair_accessible": True,
+        "num_pass_pairs": 1,
+    }
+
+    response = client.post(
+        "/api/shows",
+        json=show_data,
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.status_code == 422
+
+
 def test_create_show_with_band_missing_musicbrainz_id(
     client: TestClient, test_venue, test_promotions_staff
 ):
@@ -73,7 +121,7 @@ def test_create_show_with_band_missing_musicbrainz_id(
         "show_date": "2024-12-31",
         "show_time": "20:00:00",
         "age_restriction": "all_ages",
-        "wheelchair_accessible": True,
+        "wheelchair_accessible": "yes",
         "num_pass_pairs": 2,
         "bands": [{
             "musicbrainz_id": None,
@@ -106,7 +154,7 @@ def test_create_show_requires_auth(client: TestClient, test_venue):
         "show_date": "2024-12-31",
         "show_time": "20:00:00",
         "age_restriction": "all_ages",
-        "wheelchair_accessible": True,
+        "wheelchair_accessible": "yes",
         "num_pass_pairs": 2,
     }
 
@@ -123,7 +171,7 @@ def test_create_show_requires_promotions_staff(client: TestClient, test_venue, d
         "show_date": "2024-12-31",
         "show_time": "20:00:00",
         "age_restriction": "all_ages",
-        "wheelchair_accessible": True,
+        "wheelchair_accessible": "yes",
         "num_pass_pairs": 2,
     }
 
@@ -147,7 +195,7 @@ def test_list_shows(client: TestClient, test_venue, test_promotions_staff, db: S
         show_date=date(2024, 12, 31),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="draft",
     )
@@ -174,7 +222,7 @@ def test_get_show(client: TestClient, test_venue, test_promotions_staff, db: Ses
         show_date=date(2024, 12, 31),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="draft",
     )
@@ -203,7 +251,7 @@ def test_update_show(client: TestClient, test_venue, test_promotions_staff, db: 
         show_date=date(2024, 12, 31),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="draft",
     )
@@ -237,7 +285,7 @@ def test_update_show_clears_text_field(
         show_date=date(2024, 12, 31),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="draft",
         **{field: "Doors at 8."},
@@ -269,7 +317,7 @@ def test_publish_show(client: TestClient, test_venue, test_promotions_staff, db:
         show_date=date(2024, 12, 31),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="draft",
     )
@@ -298,7 +346,7 @@ def test_close_show(client: TestClient, test_venue, test_promotions_staff, db: S
         show_date=date(2024, 12, 31),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="published",
     )
@@ -329,7 +377,7 @@ def test_invalid_status_transition(
         show_date=date(2024, 12, 31),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="draft",
     )
@@ -357,7 +405,7 @@ def test_pass_pair_validation(client: TestClient, test_venue, test_promotions_st
         "show_date": "2024-12-31",
         "show_time": "20:00:00",
         "age_restriction": "all_ages",
-        "wheelchair_accessible": True,
+        "wheelchair_accessible": "yes",
         "num_pass_pairs": 0,
     }
 
@@ -386,7 +434,7 @@ def _new_show_data(venue_id: int, **overrides) -> dict:
         "show_date": "2024-12-31",
         "show_time": "20:00:00",
         "age_restriction": "all_ages",
-        "wheelchair_accessible": True,
+        "wheelchair_accessible": "yes",
         "num_pass_pairs": 2,
     }
     data.update(overrides)
@@ -524,7 +572,7 @@ def test_role_based_show_visibility(
         show_date=date(2024, 12, 31),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="draft",
     )
@@ -535,7 +583,7 @@ def test_role_based_show_visibility(
         show_date=date(2024, 12, 30),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="published",
     )
@@ -546,7 +594,7 @@ def test_role_based_show_visibility(
         show_date=date(2024, 12, 29),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="closed",
     )
@@ -602,7 +650,7 @@ def test_show_visibility_uses_impersonated_role(
         show_date=date(2024, 12, 31),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="draft",
     )
@@ -613,7 +661,7 @@ def test_show_visibility_uses_impersonated_role(
         show_date=date(2024, 12, 30),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="published",
     )
@@ -662,7 +710,7 @@ def test_closed_show_prevents_pass_operations(
         show_date=date(2024, 12, 31),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="closed",
     )
@@ -715,7 +763,7 @@ def test_search_shows_freetext(
         show_time=time(20, 0),
         caller_special_instructions="VIP entrance available",
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="published",
     )
@@ -727,7 +775,7 @@ def test_search_shows_freetext(
         show_time=time(20, 0),
         caller_special_instructions="Doors open early",
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="published",
     )
@@ -794,7 +842,7 @@ def test_search_shows_filters(
         show_date=date(2024, 12, 31),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="published",
     )
@@ -805,7 +853,7 @@ def test_search_shows_filters(
         show_date=date(2024, 12, 30),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="published",
     )
@@ -816,7 +864,7 @@ def test_search_shows_filters(
         show_date=date(2024, 12, 29),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="published",
     )
@@ -880,7 +928,7 @@ def test_search_shows_role_based_visibility(
         show_date=date(2024, 12, 31),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="draft",
     )
@@ -891,7 +939,7 @@ def test_search_shows_role_based_visibility(
         show_date=date(2024, 12, 30),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="published",
     )
@@ -945,7 +993,7 @@ def test_show_detail_completeness(
         show_date=date(2024, 12, 31),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="published",
     )
@@ -1080,7 +1128,7 @@ def published_auto_close_show(db: Session, test_venue):
         show_date=date.today() + timedelta(days=30),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="published",
         auto_close=True,

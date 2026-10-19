@@ -115,7 +115,7 @@ class TestFindMatches:
             show_date=date(2024, 12, 31),
             show_time=time(20, 0),
             age_restriction="all_ages",
-            wheelchair_accessible=True,
+            wheelchair_accessible="yes",
             num_pass_pairs=2,
         )
         db.add(show)
@@ -144,7 +144,7 @@ class TestFindMatches:
             show_date=date(2024, 12, 31),
             show_time=time(20, 0),
             age_restriction="all_ages",
-            wheelchair_accessible=True,
+            wheelchair_accessible="yes",
             num_pass_pairs=2,
         )
         db.add(show)
@@ -173,7 +173,7 @@ class TestFindMatches:
             show_date=date(2024, 12, 31),
             show_time=time(20, 0),
             age_restriction="all_ages",
-            wheelchair_accessible=True,
+            wheelchair_accessible="yes",
             num_pass_pairs=2,
         )
         db.add(show)
@@ -194,7 +194,7 @@ class TestFindMatches:
             show_date=date(2024, 12, 31),
             show_time=time(20, 0),
             age_restriction="all_ages",
-            wheelchair_accessible=True,
+            wheelchair_accessible="yes",
             num_pass_pairs=2,
         )
         db.add(show)
@@ -223,7 +223,7 @@ class TestFindMatches:
             show_date=date(2024, 12, 31),
             show_time=time(20, 0),
             age_restriction="all_ages",
-            wheelchair_accessible=True,
+            wheelchair_accessible="yes",
             num_pass_pairs=2,
         )
         db.add(show)
@@ -244,7 +244,7 @@ class TestFindMatches:
             show_date=date(2024, 12, 31),
             show_time=time(20, 0),
             age_restriction="all_ages",
-            wheelchair_accessible=True,
+            wheelchair_accessible="yes",
             num_pass_pairs=2,
         )
         db.add(show)
@@ -267,7 +267,7 @@ class TestFindMatches:
             show_date=date(2024, 12, 31),
             show_time=time(20, 0),
             age_restriction="all_ages",
-            wheelchair_accessible=True,
+            wheelchair_accessible="yes",
             num_pass_pairs=2,
         )
         db.add(show)
@@ -290,7 +290,7 @@ class TestFindMatches:
             show_date=date(2024, 12, 31),
             show_time=time(20, 0),
             age_restriction="all_ages",
-            wheelchair_accessible=True,
+            wheelchair_accessible="yes",
             num_pass_pairs=2,
         )
         db.add(show)
@@ -312,7 +312,7 @@ class TestFindMatches:
             show_date=date(2024, 12, 31),
             show_time=time(20, 0),
             age_restriction="all_ages",
-            wheelchair_accessible=True,
+            wheelchair_accessible="yes",
             num_pass_pairs=2,
         )
         db.add(show)
@@ -333,7 +333,7 @@ class TestFindMatches:
             show_date=date(2024, 12, 31),
             show_time=time(20, 0),
             age_restriction="all_ages",
-            wheelchair_accessible=True,
+            wheelchair_accessible="yes",
             num_pass_pairs=2,
         )
         db.add(show)
@@ -352,7 +352,7 @@ class TestFindMatches:
             show_date=date(2024, 12, 31),
             show_time=time(20, 0),
             age_restriction="all_ages",
-            wheelchair_accessible=True,
+            wheelchair_accessible="yes",
             num_pass_pairs=2,
         )
         db.add(show)
@@ -369,7 +369,7 @@ class TestFindMatches:
             show_date=date(2024, 12, 31),
             show_time=time(20, 0),
             age_restriction="all_ages",
-            wheelchair_accessible=True,
+            wheelchair_accessible="yes",
             num_pass_pairs=2,
         )
         db.add(show)

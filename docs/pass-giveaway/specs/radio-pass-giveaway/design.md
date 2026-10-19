@@ -362,7 +362,7 @@ class Show(Base):
     show_time: time                  # Required
     special_instructions: str | None # Optional
     age_restriction: str             # "all_ages", "18+", "21+"
-    wheelchair_accessible: bool      # Required
+    wheelchair_accessible: Literal["yes", "no", "unknown"]      # Required
     num_pass_pairs: int              # 1-5, required
     promotions_staff_id: int         # FK to promotions_staff.id
     status: str                      # "draft", "published", "closed"
@@ -439,7 +439,7 @@ class ShowCreate(BaseModel):
     show_time: time
     special_instructions: str | None = None      # max 1000 chars
     age_restriction: Literal["all_ages", "18+", "21+"]
-    wheelchair_accessible: bool
+    wheelchair_accessible: Literal["yes", "no", "unknown"]
     num_pass_pairs: int                          # 1-5 inclusive
 ```
 
@@ -472,7 +472,7 @@ class ShowResponse(BaseModel):
     show_time: time
     special_instructions: str | None
     age_restriction: str
-    wheelchair_accessible: bool
+    wheelchair_accessible: Literal["yes", "no", "unknown"]
     num_pass_pairs: int
     promotions_staff: PromotionsStaffResponse  # nested staff object
     status: str

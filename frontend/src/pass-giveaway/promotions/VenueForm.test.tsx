@@ -223,6 +223,41 @@ describe('VenueForm', () => {
     });
   });
 
+  describe('Default Wheelchair Accessible', () => {
+    it('should load and save Unknown, and clear it with No default', async () => {
+      vi.mocked(venuesAPI.update).mockResolvedValue(makeVenue());
+
+      render(
+        <VenueForm
+          venue={makeVenue({ default_wheelchair_accessible: 'unknown' })}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+
+      const select = screen.getByLabelText(/default wheelchair accessible/i);
+      expect(select).toHaveValue('unknown');
+
+      fireEvent.click(screen.getByRole('button', { name: /update/i }));
+      await waitFor(() => {
+        expect(venuesAPI.update).toHaveBeenCalledWith(1, expect.objectContaining({
+          default_wheelchair_accessible: 'unknown',
+        }));
+      });
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalled());
+
+      fireEvent.change(select, { target: { value: '' } });
+      fireEvent.click(screen.getByRole('button', { name: /update/i }));
+      await waitFor(() => {
+        expect(venuesAPI.update).toHaveBeenLastCalledWith(1, expect.objectContaining({
+          default_wheelchair_accessible: null,
+        }));
+      });
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalledTimes(2));
+    });
+  });
+
   describe('Show Sourcing Instructions', () => {
     it('should load and save show sourcing instructions', async () => {
       const existingVenue = makeVenue({ show_sourcing_instructions: 'Check in mid-month.' });

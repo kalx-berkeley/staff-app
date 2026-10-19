@@ -6,6 +6,7 @@ import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker }
 import type { ShowSummary } from '../types';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
+import { WHEELCHAIR_ACCESSIBLE_LABELS } from '../utils';
 
 const VIEW_MODE_KEY = 'kalx_staff_view_mode';
 
@@ -331,7 +332,7 @@ const ShowBrowser = () => {
                     <div className="info-row">
                       <span className="info-label">Accessible:</span>
                       <span className="info-value">
-                        {show.wheelchair_accessible ? 'Yes' : 'No'}
+                        {WHEELCHAIR_ACCESSIBLE_LABELS[show.wheelchair_accessible]}
                       </span>
                     </div>
                   </div>

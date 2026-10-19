@@ -4,7 +4,7 @@ import { showsAPI, venuesAPI, venuesMyAPI, promotersAPI } from '../api';
 import { Tooltip, BandAnnotator, DatePicker, DescriptionCheckFeedback, useDescriptionCheck } from '../components';
 import { formatPhone } from '../../common/utils';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import type { ShowCreate, ShowUpdate, ShowBand, MusicBrainzArtist, VenueResponse, AgeRestriction, PassResponse, PromoterResponse, PassAdjustmentResult } from '../types';
+import type { ShowCreate, ShowUpdate, ShowBand, MusicBrainzArtist, VenueResponse, AgeRestriction, PassResponse, PromoterResponse, PassAdjustmentResult, WheelchairAccessible } from '../types';
 import type { APIError, ValidationError } from '../../common/types';
 
 interface DeleteConfirmModalProps {
@@ -178,7 +178,7 @@ const ShowForm = () => {
   const [onAirDescription, setOnAirDescription] = useState('');
   const [callerSpecialInstructions, setCallerSpecialInstructions] = useState('');
   const [ageRestriction, setAgeRestriction] = useState<AgeRestriction>('all_ages');
-  const [wheelchairAccessible, setWheelchairAccessible] = useState(true);
+  const [wheelchairAccessible, setWheelchairAccessible] = useState<WheelchairAccessible>('yes');
   const [numPassPairs, setNumPassPairs] = useState<number>(1);
   const [extraStaffPasses, setExtraStaffPasses] = useState<number>(0);
   const [plannedCloseDate, setPlannedCloseDate] = useState('');
@@ -947,16 +947,18 @@ const ShowForm = () => {
           </div>
         </div>
 
-        <div className="form-group checkbox-group">
-          <label>
-            <input
-              type="checkbox"
-              checked={wheelchairAccessible}
-              onChange={(e) => setWheelchairAccessible(e.target.checked)}
-              disabled={submitting}
-            />
-            Wheelchair Accessible
-          </label>
+        <div className="form-group">
+          <label htmlFor="wheelchair_accessible">Wheelchair Accessible</label>
+          <select
+            id="wheelchair_accessible"
+            value={wheelchairAccessible}
+            onChange={(e) => setWheelchairAccessible(e.target.value as WheelchairAccessible)}
+            disabled={submitting}
+          >
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+            <option value="unknown">Unknown</option>
+          </select>
         </div>
 
         <div className="form-group checkbox-group">

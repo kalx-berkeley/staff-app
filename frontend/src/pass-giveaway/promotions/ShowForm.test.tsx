@@ -248,7 +248,7 @@ describe('ShowForm', () => {
         on_air_description: null,
         caller_special_instructions: null,
         age_restriction: 'all_ages',
-        wheelchair_accessible: true,
+        wheelchair_accessible: 'yes',
         num_pass_pairs: 1,
         extra_staff_passes: 0,
         num_staff_passes: 1,
@@ -683,6 +683,60 @@ describe('ShowForm', () => {
         'Venue B description'
       );
       expect(screen.getByLabelText(/caller special instructions/i)).toHaveValue('Bring ID');
+    });
+  });
+
+  describe('Wheelchair Accessible', () => {
+    it("starts as Yes and takes the venue's default, including Unknown", async () => {
+      vi.mocked(venuesMyAPI.listMy).mockResolvedValue([
+        { ...mockVenues[0], default_wheelchair_accessible: 'unknown' },
+        mockVenues[1],
+      ]);
+      renderShowForm();
+      await waitFor(() => {
+        expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+      });
+      const wheelchair = screen.getByLabelText(/wheelchair accessible/i);
+      expect(wheelchair).toHaveValue('yes');
+
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), { target: { value: '1' } });
+      expect(await screen.findByLabelText(/wheelchair accessible/i)).toHaveValue('unknown');
+
+      // A venue with no default leaves it as it is
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), { target: { value: '2' } });
+      expect(await screen.findByLabelText(/wheelchair accessible/i)).toHaveValue('unknown');
+    });
+
+    it('sends the chosen value', async () => {
+      vi.mocked(showsAPI.create).mockResolvedValue(
+        { id: 1 } as Awaited<ReturnType<typeof showsAPI.create>>,
+      );
+
+      renderShowForm();
+
+      await waitFor(() => {
+        expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+      });
+
+      const eventNameInput = screen.getByLabelText(/event name/i);
+      eventNameInput.textContent = 'Test Event';
+      fireEvent.input(eventNameInput);
+      fireEvent.change(screen.getByLabelText(/genre/i), { target: { value: 'Rock' } });
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), { target: { value: '1' } });
+      fireEvent.change(screen.getByLabelText(/show date/i), { target: { value: '2024-12-31' } });
+      fireEvent.change(screen.getByLabelText(/show time/i), { target: { value: '20:00' } });
+      fireEvent.change(screen.getByLabelText(/close date/i), { target: { value: '2024-12-31' } });
+      fireEvent.change(screen.getByLabelText(/close time/i), { target: { value: '18:00' } });
+      fireEvent.change(screen.getByLabelText(/wheelchair accessible/i), { target: { value: 'no' } });
+
+      fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('/promotions/shows');
+      });
+      expect(showsAPI.create).toHaveBeenCalledWith(
+        expect.objectContaining({ wheelchair_accessible: 'no' }),
+      );
     });
   });
 });

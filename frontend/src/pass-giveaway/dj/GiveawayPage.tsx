@@ -8,6 +8,7 @@ import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { useHasRole } from '../../common/contexts/authHooks';
 import type { ShowResponse, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
+import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
 
 const GiveawayPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -185,9 +186,7 @@ const GiveawayPage = () => {
 
               <span className="kalx-doc-label">Wheelchair accessible?</span>
               <span className="kalx-doc-value">
-                Yes {show.wheelchair_accessible ? '☑' : '☐'}
-                {'   '}
-                No {!show.wheelchair_accessible ? '☑' : '☐'}
+                <WheelchairAccessibleChecks value={show.wheelchair_accessible} />
               </span>
             </div>
           </div>

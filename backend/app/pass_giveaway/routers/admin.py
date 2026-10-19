@@ -226,8 +226,13 @@ def seed_test_data(
                 )
                 continue
 
-            wheelchair_str = row.get("wheelchair_accessible", "true").strip().lower()
-            wheelchair_accessible = wheelchair_str in ("true", "1", "yes")
+            wheelchair_str = row.get("wheelchair_accessible", "yes").strip().lower()
+            if wheelchair_str in ("true", "1", "yes"):
+                wheelchair_accessible = "yes"
+            elif wheelchair_str in ("false", "0", "no"):
+                wheelchair_accessible = "no"
+            else:
+                wheelchair_accessible = "unknown"
 
             num_pass_pairs_str = row.get("num_pass_pairs", "1").strip()
             try:

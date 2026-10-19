@@ -54,6 +54,7 @@ import type {
   VenueCreate,
   VenueResponse,
   VenueUpdate,
+  WheelchairAccessible,
   WinnerEligibility,
   WinnerReleaseData,
 } from './types';
@@ -1331,7 +1332,7 @@ export const legacyImportAPI = {
     on_air_description: string | null;
     caller_special_instructions: string | null;
     age_restriction: string;
-    wheelchair_accessible: boolean;
+    wheelchair_accessible: WheelchairAccessible;
     num_pass_pairs: number;
     co_announce: boolean;
     on_air_winners: LegacyOnAirWinnerPayload[];

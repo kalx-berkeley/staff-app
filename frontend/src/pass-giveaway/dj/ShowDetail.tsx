@@ -6,6 +6,7 @@ import MarkdownContent from '../../common/components/MarkdownContent';
 import { formatPhone } from '../../common/utils';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, findRecentDjGiveaway } from '../utils';
+import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
 import type { ShowResponse, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 
@@ -190,9 +191,7 @@ const ShowDetail = () => {
 
           <span className="kalx-doc-label">Wheelchair accessible?</span>
           <span className="kalx-doc-value">
-            Yes {show.wheelchair_accessible ? '☑' : '☐'}
-            {'   '}
-            No {!show.wheelchair_accessible ? '☑' : '☐'}
+            <WheelchairAccessibleChecks value={show.wheelchair_accessible} />
           </span>
         </div>
       </div>

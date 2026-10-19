@@ -168,6 +168,33 @@ def test_win_frequency_days_can_be_cleared(client: TestClient, test_promotions_s
     assert response.json()["win_frequency_days"] is None
 
 
+def test_default_wheelchair_accessible_can_be_unknown_or_cleared(
+    client: TestClient, test_promotions_staff
+):
+    """A venue's wheelchair default can be "unknown", and null means no default."""
+    headers = {"X-Forwarded-User": test_promotions_staff.email}
+    create_response = client.post(
+        "/api/venues",
+        json={
+            "name": "Ivy Room",
+            "address": "860 San Pablo Ave",
+            "default_wheelchair_accessible": "unknown",
+        },
+        headers=headers,
+    )
+    assert create_response.status_code == 201
+    venue = create_response.json()
+    assert venue["default_wheelchair_accessible"] == "unknown"
+
+    response = client.put(
+        f"/api/venues/{venue['id']}",
+        json={"default_wheelchair_accessible": None},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["default_wheelchair_accessible"] is None
+
+
 def test_create_duplicate_venue_name(client: TestClient, test_promotions_staff):
     """Test that creating a venue with duplicate name fails."""
     # Create first venue

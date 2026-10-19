@@ -8,6 +8,7 @@ import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import type { ShowResponse, PreAssignmentData, LotteryStatus, PassResponse, DjSuggestion, DjLeave, AlternateEntry } from '../types';
 import type { APIError, PromotionsStaffProfile } from '../../common/types';
+import { WHEELCHAIR_ACCESSIBLE_LABELS } from '../utils';
 
 type SuggestMode = 'choose' | 'date' | 'genre' | null;
 
@@ -856,7 +857,7 @@ const ShowDetail = () => {
             <dt>Age Restriction:</dt>
             <dd>{formatAgeRestriction(show.age_restriction)}</dd>
             <dt>Wheelchair Accessible:</dt>
-            <dd>{show.wheelchair_accessible ? 'Yes' : 'No'}</dd>
+            <dd>{WHEELCHAIR_ACCESSIBLE_LABELS[show.wheelchair_accessible]}</dd>
             {show.planned_close_date && show.planned_close_time && (
               <>
                 <dt>Planned Close:</dt>

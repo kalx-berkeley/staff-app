@@ -63,7 +63,7 @@ def published_show(db: Session, venue, promotions_staff):
         show_date=date(2025, 6, 1),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="published",
     )
@@ -290,7 +290,7 @@ def test_winner_frequency_warning_audit(
         show_date=date(2025, 6, 10),  # 9 days after first show
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=1,
         status="published",
     )

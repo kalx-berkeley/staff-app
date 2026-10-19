@@ -1,6 +1,6 @@
 import type { UserResponse } from '../common/types';
 import { formatDateValue } from '../common/utils';
-import type { PassResponse } from './types';
+import type { PassResponse, WheelchairAccessible } from './types';
 
 // Staging-only: lets a staff member with active Sublist DJ status access the
 // DJ view, ahead of this being rolled out to production.
@@ -74,3 +74,9 @@ export function findRecentDjGiveaway(
       new Date(p.given_away_at).getTime() >= windowStart,
   );
 }
+
+export const WHEELCHAIR_ACCESSIBLE_LABELS: Record<WheelchairAccessible, string> = {
+  yes: 'Yes',
+  no: 'No',
+  unknown: 'Unknown',
+};

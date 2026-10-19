@@ -5,6 +5,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.pass_giveaway.schemas.venue import WheelchairAccessible
+
 
 class OnAirWinnerImport(BaseModel):
     """On-air winner data from a paper form."""
@@ -35,7 +37,7 @@ class LegacyShowImport(BaseModel):
     on_air_description: Optional[str] = Field(None, max_length=2000)
     caller_special_instructions: Optional[str] = Field(None, max_length=1000)
     age_restriction: Literal["all_ages", "18+", "21+"] = "all_ages"
-    wheelchair_accessible: bool = True
+    wheelchair_accessible: WheelchairAccessible = "yes"
     num_pass_pairs: int = Field(..., ge=1, le=5)
     co_announce: bool = False
     on_air_winners: list[OnAirWinnerImport] = Field(default_factory=list)

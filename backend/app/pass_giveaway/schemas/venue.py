@@ -1,7 +1,13 @@
 """Pydantic schemas for Venue API."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field, ConfigDict
 from app.pass_giveaway.schemas.promoter import PromoterResponse
+
+# Whether a show's venue is wheelchair accessible, "unknown" when nobody has
+# found out
+WheelchairAccessible = Literal["yes", "no", "unknown"]
 
 
 class VenueContactCreate(BaseModel):
@@ -33,7 +39,7 @@ class VenueCreate(BaseModel):
     show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     win_frequency_days: int | None = None
-    default_wheelchair_accessible: bool | None = None
+    default_wheelchair_accessible: WheelchairAccessible | None = None
     default_age_restriction: str | None = None
     default_num_pass_pairs: int | None = None
     requires_phone_number: bool = False
@@ -61,7 +67,7 @@ class VenueUpdate(BaseModel):
     show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     win_frequency_days: int | None = None
-    default_wheelchair_accessible: bool | None = None
+    default_wheelchair_accessible: WheelchairAccessible | None = None
     default_age_restriction: str | None = None
     default_num_pass_pairs: int | None = None
     requires_phone_number: bool | None = None
@@ -90,7 +96,7 @@ class VenueResponse(BaseModel):
     show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     win_frequency_days: int | None = None
-    default_wheelchair_accessible: bool | None = None
+    default_wheelchair_accessible: WheelchairAccessible | None = None
     default_age_restriction: str | None = None
     default_num_pass_pairs: int | None = None
     requires_phone_number: bool = False

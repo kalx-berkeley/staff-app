@@ -6,7 +6,7 @@ import MarkdownContent from '../../common/components/MarkdownContent';
 import { formatPhone, formatLeave, isOnLeave, leaveCoversShow, formatDateValue } from '../../common/utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { STAFF_PASSES_NOT_YET_ACTIVE, staffPassesNotYetActive } from '../utils';
+import { STAFF_PASSES_NOT_YET_ACTIVE, WHEELCHAIR_ACCESSIBLE_LABELS, staffPassesNotYetActive } from '../utils';
 import type { ShowResponse, ClaimData, LotteryStatus, SpecialtyShowResponse, AlternateQueue, AlternateJoinRequest } from '../types';
 import type { StaffProfile, APIError } from '../../common/types';
 
@@ -748,7 +748,7 @@ const ShowDetail = () => {
             <div className="info-item">
               <span className="info-label">Wheelchair Accessible:</span>
               <span className="info-value">
-                {show.wheelchair_accessible ? 'Yes' : 'No'}
+                {WHEELCHAIR_ACCESSIBLE_LABELS[show.wheelchair_accessible]}
               </span>
             </div>
 

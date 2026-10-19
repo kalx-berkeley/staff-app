@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { legacyImportAPI, venuesAPI, showsAPI, autocompleteAPI, specialtyShowsAPI } from '../api';
-import type { VenueResponse, AgeRestriction, ShowSummary } from '../types';
+import type { VenueResponse, AgeRestriction, ShowSummary, WheelchairAccessible } from '../types';
 import {
   DatePicker,
   Tooltip,
@@ -86,7 +86,7 @@ const LegacyImport = () => {
   const [onAirDescription, setOnAirDescription] = useState('');
   const [callerSpecialInstructions, setCallerSpecialInstructions] = useState('');
   const [ageRestriction, setAgeRestriction] = useState<AgeRestriction>('all_ages');
-  const [wheelchairAccessible, setWheelchairAccessible] = useState(true);
+  const [wheelchairAccessible, setWheelchairAccessible] = useState<WheelchairAccessible>('yes');
   const [numPassPairs, setNumPassPairs] = useState(1);
   const [coAnnounce, setCoAnnounce] = useState(false);
 
@@ -741,16 +741,18 @@ const LegacyImport = () => {
               </div>
             </div>
 
-            <div className="form-group checkbox-group">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={wheelchairAccessible}
-                  onChange={(e) => setWheelchairAccessible(e.target.checked)}
-                  disabled={submitting}
-                />
-                Wheelchair Accessible
-              </label>
+            <div className="form-group">
+              <label htmlFor="li_wheelchair_accessible">Wheelchair Accessible</label>
+              <select
+                id="li_wheelchair_accessible"
+                value={wheelchairAccessible}
+                onChange={(e) => setWheelchairAccessible(e.target.value as WheelchairAccessible)}
+                disabled={submitting}
+              >
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+                <option value="unknown">Unknown</option>
+              </select>
             </div>
 
             <div className="form-group checkbox-group">

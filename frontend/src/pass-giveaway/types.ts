@@ -96,7 +96,7 @@ export interface VenueCreate {
   show_sourcing_instructions?: string | null;
   pass_call_instructions?: string | null;
   win_frequency_days?: number | null;
-  default_wheelchair_accessible?: boolean | null;
+  default_wheelchair_accessible?: WheelchairAccessible | null;
   default_age_restriction?: AgeRestriction | null;
   default_num_pass_pairs?: number | null;
   requires_phone_number?: boolean;
@@ -120,7 +120,7 @@ export interface VenueUpdate {
   show_sourcing_instructions?: string | null;
   pass_call_instructions?: string | null;
   win_frequency_days?: number | null;
-  default_wheelchair_accessible?: boolean | null;
+  default_wheelchair_accessible?: WheelchairAccessible | null;
   default_age_restriction?: AgeRestriction | null;
   default_num_pass_pairs?: number | null;
   requires_phone_number?: boolean;
@@ -145,7 +145,7 @@ export interface VenueResponse {
   show_sourcing_instructions: string | null;
   pass_call_instructions: string | null;
   win_frequency_days: number | null;
-  default_wheelchair_accessible: boolean | null;
+  default_wheelchair_accessible: WheelchairAccessible | null;
   default_age_restriction: AgeRestriction | null;
   default_num_pass_pairs: number | null;
   requires_phone_number: boolean;
@@ -212,6 +212,8 @@ export interface KalxLiveAppearance {
 
 // Show types
 export type AgeRestriction = 'all_ages' | '18+' | '21+';
+// 'unknown' when nobody has found out whether the venue is wheelchair accessible
+export type WheelchairAccessible = 'yes' | 'no' | 'unknown';
 export type ShowStatus = 'draft' | 'published' | 'closed' | 'deleted';
 
 export interface ShowCreate {
@@ -225,7 +227,7 @@ export interface ShowCreate {
   on_air_description?: string | null;
   caller_special_instructions?: string | null;
   age_restriction: AgeRestriction;
-  wheelchair_accessible: boolean;
+  wheelchair_accessible: WheelchairAccessible;
   num_pass_pairs: number; // 1-5
   extra_staff_passes?: number; // 0-10, defaults to 0
   planned_close_date?: string | null;
@@ -249,7 +251,7 @@ export interface ShowUpdate {
   on_air_description?: string | null;
   caller_special_instructions?: string | null;
   age_restriction?: AgeRestriction;
-  wheelchair_accessible?: boolean;
+  wheelchair_accessible?: WheelchairAccessible;
   num_pass_pairs?: number;
   extra_staff_passes?: number;
   planned_close_date?: string | null;
@@ -421,7 +423,7 @@ export interface ShowResponse {
   on_air_description: string | null;
   caller_special_instructions: string | null;
   age_restriction: AgeRestriction;
-  wheelchair_accessible: boolean;
+  wheelchair_accessible: WheelchairAccessible;
   num_pass_pairs: number;
   extra_staff_passes: number;
   num_staff_passes: number;
@@ -463,7 +465,7 @@ export interface ShowSummary {
   show_start_date: string | null;
   caller_special_instructions: string | null;
   age_restriction: AgeRestriction;
-  wheelchair_accessible: boolean;
+  wheelchair_accessible: WheelchairAccessible;
   status: ShowStatus;
   num_pass_pairs: number;
   extra_staff_passes: number;

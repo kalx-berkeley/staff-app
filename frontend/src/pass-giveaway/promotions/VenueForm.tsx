@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { venuesAPI, promotersAPI } from '../api';
 import { Tooltip, PersonAutocomplete, extractPersonEmail, DescriptionCheckFeedback, useDescriptionCheck } from '../components';
-import type { VenueResponse, VenueCreate, VenueUpdate, VenueContactCreate, AgeRestriction, PromoterResponse, PromotionsStaffOption } from '../types';
+import type { VenueResponse, VenueCreate, VenueUpdate, VenueContactCreate, AgeRestriction, PromoterResponse, PromotionsStaffOption, WheelchairAccessible } from '../types';
 import type { APIError, ValidationError } from '../../common/types';
 
 const venueLogoUrl = (id: number) => `/api/venues/${id}/logo`;
@@ -27,7 +27,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   const [showSourcingInstructions, setShowSourcingInstructions] = useState('');
   const [passCallInstructions, setPassCallInstructions] = useState('');
   const [winFrequencyDays, setWinFrequencyDays] = useState('');
-  const [defaultWheelchair, setDefaultWheelchair] = useState<'' | 'true' | 'false'>('');
+  const [defaultWheelchair, setDefaultWheelchair] = useState<'' | WheelchairAccessible>('');
   const [defaultAgeRestriction, setDefaultAgeRestriction] = useState<'' | AgeRestriction>('');
   const [defaultNumPassPairs, setDefaultNumPassPairs] = useState('');
   const [requiresPhoneNumber, setRequiresPhoneNumber] = useState(false);
@@ -69,11 +69,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
       setDefaultOnAirDescription(venue.default_on_air_description || '');
       setDefaultCallerSpecialInstructions(venue.default_caller_special_instructions || '');
       setWinFrequencyDays(venue.win_frequency_days != null ? String(venue.win_frequency_days) : '');
-      setDefaultWheelchair(
-        venue.default_wheelchair_accessible === true ? 'true'
-        : venue.default_wheelchair_accessible === false ? 'false'
-        : ''
-      );
+      setDefaultWheelchair(venue.default_wheelchair_accessible ?? '');
       setDefaultAgeRestriction((venue.default_age_restriction ?? '') as '' | AgeRestriction);
       setDefaultNumPassPairs(venue.default_num_pass_pairs != null ? String(venue.default_num_pass_pairs) : '');
       setRequiresPhoneNumber(venue.requires_phone_number ?? false);
@@ -203,7 +199,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
     const winDays = winFrequencyDays.trim() ? Number(winFrequencyDays) : null;
     const sourcingInstructions = showSourcingInstructions.trim() || null;
     const instructions = passCallInstructions.trim() || null;
-    const defaultWheelchairValue = defaultWheelchair === 'true' ? true : defaultWheelchair === 'false' ? false : null;
+    const defaultWheelchairValue = defaultWheelchair || null;
     const defaultAgeValue = (defaultAgeRestriction || null) as AgeRestriction | null;
     const defaultNumPassPairsValue = defaultNumPassPairs.trim() ? Number(defaultNumPassPairs) : null;
     const defaultDjPreassignProhibitionDaysValue = defaultDjPreassignProhibitionDays.trim()
@@ -464,12 +460,13 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
               <select
                 id="venue-default-wheelchair"
                 value={defaultWheelchair}
-                onChange={(e) => setDefaultWheelchair(e.target.value as '' | 'true' | 'false')}
+                onChange={(e) => setDefaultWheelchair(e.target.value as '' | WheelchairAccessible)}
                 disabled={submitting}
               >
                 <option value="">No default</option>
-                <option value="true">Yes</option>
-                <option value="false">No</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+                <option value="unknown">Unknown</option>
               </select>
             </div>
 

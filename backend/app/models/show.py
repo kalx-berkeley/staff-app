@@ -38,7 +38,7 @@ class Show(Base):
     on_air_description = Column(String, nullable=True)
     caller_special_instructions = Column(String, nullable=True)
     age_restriction = Column(String, nullable=False)  # "all_ages", "18+", "21+"
-    wheelchair_accessible = Column(Boolean, nullable=False)
+    wheelchair_accessible = Column(String, nullable=False)  # "yes", "no", "unknown"
     num_pass_pairs = Column(Integer, nullable=False)
     # Staff passes the venue or promoter gives us beyond the usual one per pair
     extra_staff_passes = Column(

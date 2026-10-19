@@ -74,7 +74,7 @@ def show(db: Session, venue, promotions_staff):
         show_date=date(2024, 12, 31),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=2,
         status="published",
     )
@@ -570,7 +570,7 @@ def published_show_with_passes(db: Session, venue, promotions_staff):
         show_date=date(2025, 1, 1),
         show_time=time(21, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=False,
+        wheelchair_accessible="no",
         num_pass_pairs=2,
         status="published",
     )
@@ -674,7 +674,7 @@ def test_expire_stale_preassignment_ignores_closed_show(db, venue, promotions_st
         show_date=date(2025, 1, 1),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=False,
+        wheelchair_accessible="no",
         num_pass_pairs=1,
         status="closed",
     )
@@ -710,7 +710,7 @@ def test_expire_stale_preassignment_ignores_draft_show(db, venue, promotions_sta
         show_date=date(2025, 1, 1),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=False,
+        wheelchair_accessible="no",
         num_pass_pairs=1,
         status="draft",
     )

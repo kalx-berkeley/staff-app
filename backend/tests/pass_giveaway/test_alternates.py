@@ -68,7 +68,7 @@ def _make_show(db: Session, venue: Venue, staff_passes: int, **kwargs) -> Show:
         show_date=date.today() + timedelta(days=30),
         show_time=time(20, 0),
         age_restriction="all_ages",
-        wheelchair_accessible=True,
+        wheelchair_accessible="yes",
         num_pass_pairs=staff_passes,
         status=kwargs.pop("status", "published"),
         published_at=datetime.now(timezone.utc) - timedelta(days=1),

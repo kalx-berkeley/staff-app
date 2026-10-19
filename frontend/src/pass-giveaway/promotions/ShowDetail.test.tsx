@@ -122,7 +122,7 @@ const makeShow = (passes: PassResponse[]): ShowResponse => ({
   on_air_description: null,
   caller_special_instructions: null,
   age_restriction: '21+',
-  wheelchair_accessible: true,
+  wheelchair_accessible: 'yes',
   num_pass_pairs: passes.length,
   extra_staff_passes: 0,
   num_staff_passes: passes.length,

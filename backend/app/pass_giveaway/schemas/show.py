@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.common.schemas.types import UtcDatetime
 from app.pass_giveaway.schemas.lottery import LotteryEntryResponse
+from app.pass_giveaway.schemas.venue import WheelchairAccessible
 
 
 class ShowBandCreate(BaseModel):
@@ -71,8 +72,8 @@ class ShowCreate(BaseModel):
     age_restriction: Literal["all_ages", "18+", "21+"] = Field(
         ..., description="Age restriction"
     )
-    wheelchair_accessible: bool = Field(
-        ..., description="Whether the venue is wheelchair accessible"
+    wheelchair_accessible: WheelchairAccessible = Field(
+        ..., description="Whether the venue is wheelchair accessible: yes, no or unknown"
     )
     num_pass_pairs: int = Field(..., ge=1, le=5, description="Number of pass pairs (1-5)")
     extra_staff_passes: int = Field(
@@ -173,8 +174,8 @@ class ShowUpdate(BaseModel):
     age_restriction: Literal["all_ages", "18+", "21+"] | None = Field(
         None, description="Age restriction"
     )
-    wheelchair_accessible: bool | None = Field(
-        None, description="Whether the venue is wheelchair accessible"
+    wheelchair_accessible: WheelchairAccessible | None = Field(
+        None, description="Whether the venue is wheelchair accessible: yes, no or unknown"
     )
     num_pass_pairs: int | None = Field(
         None, ge=1, le=5, description="Number of pass pairs (1-5)"
@@ -328,7 +329,7 @@ class ShowResponse(BaseModel):
     on_air_description: str | None
     caller_special_instructions: str | None
     age_restriction: str
-    wheelchair_accessible: bool
+    wheelchair_accessible: str
     num_pass_pairs: int
     extra_staff_passes: int = 0
     num_staff_passes: int = 0
@@ -402,7 +403,7 @@ class ShowSummary(BaseModel):
     show_start_date: date | None
     caller_special_instructions: str | None
     age_restriction: str
-    wheelchair_accessible: bool
+    wheelchair_accessible: str
     status: str
     num_pass_pairs: int
     extra_staff_passes: int = 0
