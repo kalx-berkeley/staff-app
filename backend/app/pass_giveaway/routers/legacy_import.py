@@ -32,6 +32,7 @@ from app.models.staff import Staff
 from app.models.staff_status import StaffStatus
 from app.models.venue import Venue
 from app.pass_giveaway.services.pass_service import normalize_phone
+from app.pass_giveaway.services.show_service import apply_venue_rating
 from app.pass_giveaway.guest_redaction import GuestRedactingRoute
 
 logger = logging.getLogger(__name__)
@@ -208,12 +209,14 @@ def import_legacy_show(
         on_air_description=data.on_air_description,
         caller_special_instructions=data.caller_special_instructions,
         age_restriction=data.age_restriction,
+        movie_rating=data.movie_rating,
         wheelchair_accessible=data.wheelchair_accessible,
         num_pass_pairs=data.num_pass_pairs,
         co_announce=data.co_announce,
         status="published",
         published_at=now,
     )
+    apply_venue_rating(show, venue)
     db.add(show)
     db.flush()
 

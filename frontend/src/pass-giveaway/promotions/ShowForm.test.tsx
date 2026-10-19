@@ -37,8 +37,8 @@ vi.mock('react-router-dom', async () => {
 
 describe('ShowForm', () => {
   const mockVenues: VenueResponse[] = [
-    { id: 1, name: 'Venue A', address: '123 Main St', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, default_age_restriction: null, default_num_pass_pairs: null, requires_phone_number: false, requires_email_address: false, staff_guest_requires_name: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, default_on_air_description: null, default_caller_special_instructions: null, has_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], contacts: [] },
-    { id: 2, name: 'Venue B', address: '456 Oak Ave', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, default_age_restriction: null, default_num_pass_pairs: null, requires_phone_number: false, requires_email_address: false, staff_guest_requires_name: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, default_on_air_description: null, default_caller_special_instructions: null, has_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], contacts: [] },
+    { id: 1, name: 'Venue A', address: '123 Main St', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, venue_type: 'music', default_age_restriction: null, default_movie_rating: null, default_num_pass_pairs: null, requires_phone_number: false, requires_email_address: false, staff_guest_requires_name: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, default_on_air_description: null, default_caller_special_instructions: null, has_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], contacts: [] },
+    { id: 2, name: 'Venue B', address: '456 Oak Ave', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, venue_type: 'music', default_age_restriction: null, default_movie_rating: null, default_num_pass_pairs: null, requires_phone_number: false, requires_email_address: false, staff_guest_requires_name: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, default_on_air_description: null, default_caller_special_instructions: null, has_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], contacts: [] },
   ];
 
   beforeEach(() => {
@@ -248,6 +248,7 @@ describe('ShowForm', () => {
         on_air_description: null,
         caller_special_instructions: null,
         age_restriction: 'all_ages',
+        movie_rating: null,
         wheelchair_accessible: 'yes',
         num_pass_pairs: 1,
         extra_staff_passes: 0,
@@ -736,6 +737,66 @@ describe('ShowForm', () => {
       });
       expect(showsAPI.create).toHaveBeenCalledWith(
         expect.objectContaining({ wheelchair_accessible: 'no' }),
+      );
+    });
+  });
+
+  describe('Movie Rating', () => {
+    const cinema: VenueResponse = {
+      ...mockVenues[1],
+      id: 3,
+      name: 'Cinema C',
+      venue_type: 'movie_theater',
+      default_movie_rating: 'PG-13',
+    };
+
+    it('replaces Age Restriction at a movie theater and takes its default', async () => {
+      vi.mocked(venuesMyAPI.listMy).mockResolvedValue([...mockVenues, cinema]);
+      renderShowForm();
+      await waitFor(() => {
+        expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+      });
+      expect(screen.getByLabelText(/age restriction/i)).toBeInTheDocument();
+      expect(screen.queryByLabelText(/movie rating/i)).not.toBeInTheDocument();
+
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), { target: { value: '3' } });
+      expect(await screen.findByLabelText(/movie rating/i)).toHaveValue('PG-13');
+      expect(screen.queryByLabelText(/age restriction/i)).not.toBeInTheDocument();
+
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), { target: { value: '1' } });
+      expect(await screen.findByLabelText(/age restriction/i)).toBeInTheDocument();
+    });
+
+    it('sends the movie rating and no age restriction', async () => {
+      vi.mocked(venuesMyAPI.listMy).mockResolvedValue([...mockVenues, cinema]);
+      vi.mocked(showsAPI.create).mockResolvedValue(
+        { id: 1 } as Awaited<ReturnType<typeof showsAPI.create>>,
+      );
+
+      renderShowForm();
+
+      await waitFor(() => {
+        expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+      });
+
+      const eventNameInput = screen.getByLabelText(/event name/i);
+      eventNameInput.textContent = 'Test Movie';
+      fireEvent.input(eventNameInput);
+      fireEvent.change(screen.getByLabelText(/genre/i), { target: { value: 'Rock' } });
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), { target: { value: '3' } });
+      fireEvent.change(screen.getByLabelText(/show date/i), { target: { value: '2024-12-31' } });
+      fireEvent.change(screen.getByLabelText(/show time/i), { target: { value: '20:00' } });
+      fireEvent.change(screen.getByLabelText(/close date/i), { target: { value: '2024-12-31' } });
+      fireEvent.change(screen.getByLabelText(/close time/i), { target: { value: '18:00' } });
+      fireEvent.change(screen.getByLabelText(/movie rating/i), { target: { value: 'R' } });
+
+      fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('/promotions/shows');
+      });
+      expect(showsAPI.create).toHaveBeenCalledWith(
+        expect.objectContaining({ movie_rating: 'R', age_restriction: null }),
       );
     });
   });

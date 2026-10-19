@@ -6,7 +6,7 @@ import { Tooltip, DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, K
 import type { ShowSummary, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { WHEELCHAIR_ACCESSIBLE_LABELS } from '../utils';
+import { WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow } from '../utils';
 
 const VIEW_MODE_KEY = 'kalx_dj_view_mode';
 
@@ -97,9 +97,6 @@ const ShowBrowser = () => {
   };
 
   const assignedShowIds = new Set(myAssignedPasses.map((p) => p.show_id));
-
-  const formatAgeRestriction = (age: string) =>
-    age === 'all_ages' ? 'All Ages' : age;
 
   const formatDate = (dateStr: string) => {
     const [_y, _m, _d] = dateStr.split('-').map(Number); const date = new Date(_y, _m - 1, _d);
@@ -428,8 +425,8 @@ const ShowBrowser = () => {
                     </div>
                     )}
                     <div className="info-row">
-                      <span className="info-label">Age:</span>
-                      <span className="info-value">{formatAgeRestriction(show.age_restriction)}</span>
+                      <span className="info-label">{isMovieShow(show) ? 'Rating:' : 'Age:'}</span>
+                      <span className="info-value">{formatShowRating(show)}</span>
                     </div>
                     <div className="info-row">
                       <span className="info-label">Accessible:</span>

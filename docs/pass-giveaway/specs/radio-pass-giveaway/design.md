@@ -307,6 +307,7 @@ class Venue(Base):
     id: int                          # Primary key
     name: str                        # Required, unique, indexed
     address: str                     # Required (postal address)
+    venue_type: str                  # "music" or "movie_theater"
     created_at: datetime
     updated_at: datetime
 
@@ -361,7 +362,8 @@ class Show(Base):
     show_date: date                  # Required
     show_time: time                  # Required
     special_instructions: str | None # Optional
-    age_restriction: str             # "all_ages", "18+", "21+"
+    age_restriction: str | None      # "all_ages", "18+", "21+"; music venues only
+    movie_rating: str | None         # "G", "PG", "PG-13", "R", "NC-17", "NR"; movie theaters only
     wheelchair_accessible: Literal["yes", "no", "unknown"]      # Required
     num_pass_pairs: int              # 1-5, required
     promotions_staff_id: int         # FK to promotions_staff.id
@@ -438,7 +440,8 @@ class ShowCreate(BaseModel):
     show_date: date
     show_time: time
     special_instructions: str | None = None      # max 1000 chars
-    age_restriction: Literal["all_ages", "18+", "21+"]
+    age_restriction: Literal["all_ages", "18+", "21+"] | None  # required at music venues
+    movie_rating: Literal["G", "PG", "PG-13", "R", "NC-17", "NR"] | None  # required at movie theaters
     wheelchair_accessible: Literal["yes", "no", "unknown"]
     num_pass_pairs: int                          # 1-5 inclusive
 ```
@@ -471,7 +474,8 @@ class ShowResponse(BaseModel):
     show_date: date
     show_time: time
     special_instructions: str | None
-    age_restriction: str
+    age_restriction: str | None
+    movie_rating: str | None
     wheelchair_accessible: Literal["yes", "no", "unknown"]
     num_pass_pairs: int
     promotions_staff: PromotionsStaffResponse  # nested staff object

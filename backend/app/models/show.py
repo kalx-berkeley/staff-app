@@ -37,7 +37,11 @@ class Show(Base):
     show_start_date = Column(Date, nullable=True)
     on_air_description = Column(String, nullable=True)
     caller_special_instructions = Column(String, nullable=True)
-    age_restriction = Column(String, nullable=False)  # "all_ages", "18+", "21+"
+    # Shows at music venues have an age restriction ("all_ages", "18+", "21+")
+    # and shows at movie theaters a movie rating ("G", "PG", "PG-13", "R",
+    # "NC-17", "NR"); the other is null
+    age_restriction = Column(String, nullable=True)
+    movie_rating = Column(String, nullable=True)
     wheelchair_accessible = Column(String, nullable=False)  # "yes", "no", "unknown"
     num_pass_pairs = Column(Integer, nullable=False)
     # Staff passes the venue or promoter gives us beyond the usual one per pair

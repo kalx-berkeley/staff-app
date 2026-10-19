@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   canUsePassGiveawayAdmin,
   findRecentDjGiveaway,
+  formatShowRating,
   isRecentShow,
   isStagingSublistDjStaff,
   showsPassGiveawayAdminLink,
@@ -120,5 +121,28 @@ describe('showsPassGiveawayAdminLink', () => {
     expect(showsPassGiveawayAdminLink(impersonating)).toBe(false);
     expect(showsPassGiveawayAdminLink({ ...admin, is_impersonating_dj_network: true })).toBe(false);
     expect(canUsePassGiveawayAdmin(impersonating)).toBe(true);
+  });
+});
+
+describe('formatShowRating', () => {
+  const music = { venue: { venue_type: 'music' as const } };
+  const cinema = { venue: { venue_type: 'movie_theater' as const } };
+
+  it('shows the age restriction at a music venue', () => {
+    expect(formatShowRating({ ...music, age_restriction: 'all_ages', movie_rating: null })).toBe(
+      'All Ages',
+    );
+  });
+
+  it('shows the movie rating at a movie theater', () => {
+    expect(formatShowRating({ ...cinema, age_restriction: null, movie_rating: 'NR' })).toBe(
+      'Not Rated',
+    );
+  });
+
+  it("says Not set when the show lacks the field its venue uses", () => {
+    expect(formatShowRating({ ...cinema, age_restriction: '21+', movie_rating: null })).toBe(
+      'Not set',
+    );
   });
 });

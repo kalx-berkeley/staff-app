@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { venuesAPI, promotersAPI } from '../api';
 import { Tooltip, PersonAutocomplete, extractPersonEmail, DescriptionCheckFeedback, useDescriptionCheck } from '../components';
-import type { VenueResponse, VenueCreate, VenueUpdate, VenueContactCreate, AgeRestriction, PromoterResponse, PromotionsStaffOption, WheelchairAccessible } from '../types';
+import type { VenueResponse, VenueCreate, VenueUpdate, VenueContactCreate, AgeRestriction, MovieRating, PromoterResponse, PromotionsStaffOption, VenueType, WheelchairAccessible } from '../types';
+import { MOVIE_RATING_LABELS, VENUE_TYPE_LABELS } from '../utils';
 import type { APIError, ValidationError } from '../../common/types';
 
 const venueLogoUrl = (id: number) => `/api/venues/${id}/logo`;
@@ -28,7 +29,9 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   const [passCallInstructions, setPassCallInstructions] = useState('');
   const [winFrequencyDays, setWinFrequencyDays] = useState('');
   const [defaultWheelchair, setDefaultWheelchair] = useState<'' | WheelchairAccessible>('');
+  const [venueType, setVenueType] = useState<VenueType>('music');
   const [defaultAgeRestriction, setDefaultAgeRestriction] = useState<'' | AgeRestriction>('');
+  const [defaultMovieRating, setDefaultMovieRating] = useState<'' | MovieRating>('');
   const [defaultNumPassPairs, setDefaultNumPassPairs] = useState('');
   const [requiresPhoneNumber, setRequiresPhoneNumber] = useState(false);
   const [requiresEmailAddress, setRequiresEmailAddress] = useState(false);
@@ -70,7 +73,9 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
       setDefaultCallerSpecialInstructions(venue.default_caller_special_instructions || '');
       setWinFrequencyDays(venue.win_frequency_days != null ? String(venue.win_frequency_days) : '');
       setDefaultWheelchair(venue.default_wheelchair_accessible ?? '');
+      setVenueType(venue.venue_type ?? 'music');
       setDefaultAgeRestriction((venue.default_age_restriction ?? '') as '' | AgeRestriction);
+      setDefaultMovieRating(venue.default_movie_rating ?? '');
       setDefaultNumPassPairs(venue.default_num_pass_pairs != null ? String(venue.default_num_pass_pairs) : '');
       setRequiresPhoneNumber(venue.requires_phone_number ?? false);
       setRequiresEmailAddress(venue.requires_email_address ?? false);
@@ -200,7 +205,10 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
     const sourcingInstructions = showSourcingInstructions.trim() || null;
     const instructions = passCallInstructions.trim() || null;
     const defaultWheelchairValue = defaultWheelchair || null;
-    const defaultAgeValue = (defaultAgeRestriction || null) as AgeRestriction | null;
+    // Keep only the default that fits the venue type
+    const isMovieTheater = venueType === 'movie_theater';
+    const defaultAgeValue = isMovieTheater ? null : defaultAgeRestriction || null;
+    const defaultMovieRatingValue = isMovieTheater ? defaultMovieRating || null : null;
     const defaultNumPassPairsValue = defaultNumPassPairs.trim() ? Number(defaultNumPassPairs) : null;
     const defaultDjPreassignProhibitionDaysValue = defaultDjPreassignProhibitionDays.trim()
       ? Number(defaultDjPreassignProhibitionDays)
@@ -218,8 +226,10 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           show_sourcing_instructions: sourcingInstructions,
           pass_call_instructions: instructions,
           win_frequency_days: winDays,
+          venue_type: venueType,
           default_wheelchair_accessible: defaultWheelchairValue,
           default_age_restriction: defaultAgeValue,
+          default_movie_rating: defaultMovieRatingValue,
           default_num_pass_pairs: defaultNumPassPairsValue,
           requires_phone_number: requiresPhoneNumber,
           requires_email_address: requiresEmailAddress,
@@ -243,8 +253,10 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           show_sourcing_instructions: sourcingInstructions,
           pass_call_instructions: instructions,
           win_frequency_days: winDays,
+          venue_type: venueType,
           default_wheelchair_accessible: defaultWheelchairValue,
           default_age_restriction: defaultAgeValue,
+          default_movie_rating: defaultMovieRatingValue,
           default_num_pass_pairs: defaultNumPassPairsValue,
           requires_phone_number: requiresPhoneNumber,
           requires_email_address: requiresEmailAddress,
@@ -370,6 +382,25 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           </div>
 
           <div className="form-group">
+            <label htmlFor="venue-type">
+              Venue Type <span className="required">*</span>
+            </label>
+            <select
+              id="venue-type"
+              value={venueType}
+              onChange={(e) => setVenueType(e.target.value as VenueType)}
+              disabled={submitting}
+            >
+              {(Object.keys(VENUE_TYPE_LABELS) as VenueType[]).map((type) => (
+                <option key={type} value={type}>{VENUE_TYPE_LABELS[type]}</option>
+              ))}
+            </select>
+            <span className="field-hint">
+              Shows at a movie theater have a movie rating instead of an age restriction.
+            </span>
+          </div>
+
+          <div className="form-group">
             <label htmlFor="venue-promoter">Default Promoter</label>
             <select
               id="venue-promoter"
@@ -470,20 +501,37 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
               </select>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="venue-default-age">Default Age Restriction</label>
-              <select
-                id="venue-default-age"
-                value={defaultAgeRestriction}
-                onChange={(e) => setDefaultAgeRestriction(e.target.value as '' | AgeRestriction)}
-                disabled={submitting}
-              >
-                <option value="">No default</option>
-                <option value="all_ages">All Ages</option>
-                <option value="18+">18+</option>
-                <option value="21+">21+</option>
-              </select>
-            </div>
+            {venueType === 'movie_theater' ? (
+              <div className="form-group">
+                <label htmlFor="venue-default-movie-rating">Default Movie Rating</label>
+                <select
+                  id="venue-default-movie-rating"
+                  value={defaultMovieRating}
+                  onChange={(e) => setDefaultMovieRating(e.target.value as '' | MovieRating)}
+                  disabled={submitting}
+                >
+                  <option value="">No default</option>
+                  {(Object.keys(MOVIE_RATING_LABELS) as MovieRating[]).map((rating) => (
+                    <option key={rating} value={rating}>{MOVIE_RATING_LABELS[rating]}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="form-group">
+                <label htmlFor="venue-default-age">Default Age Restriction</label>
+                <select
+                  id="venue-default-age"
+                  value={defaultAgeRestriction}
+                  onChange={(e) => setDefaultAgeRestriction(e.target.value as '' | AgeRestriction)}
+                  disabled={submitting}
+                >
+                  <option value="">No default</option>
+                  <option value="all_ages">All Ages</option>
+                  <option value="18+">18+</option>
+                  <option value="21+">21+</option>
+                </select>
+              </div>
+            )}
 
             <div className="form-group">
               <div className="label-with-help">

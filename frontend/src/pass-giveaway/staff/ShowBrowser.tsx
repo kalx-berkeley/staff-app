@@ -6,7 +6,7 @@ import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker }
 import type { ShowSummary } from '../types';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { WHEELCHAIR_ACCESSIBLE_LABELS } from '../utils';
+import { WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow } from '../utils';
 
 const VIEW_MODE_KEY = 'kalx_staff_view_mode';
 
@@ -67,9 +67,6 @@ const ShowBrowser = () => {
     setViewMode(mode);
     localStorage.setItem(VIEW_MODE_KEY, mode);
   };
-
-  const formatAgeRestriction = (age: string) =>
-    age === 'all_ages' ? 'All Ages' : age;
 
   const formatDate = (dateStr: string) => {
     const [_y, _m, _d] = dateStr.split('-').map(Number); const date = new Date(_y, _m - 1, _d);
@@ -326,8 +323,8 @@ const ShowBrowser = () => {
                     </div>
                     )}
                     <div className="info-row">
-                      <span className="info-label">Age:</span>
-                      <span className="info-value">{formatAgeRestriction(show.age_restriction)}</span>
+                      <span className="info-label">{isMovieShow(show) ? 'Rating:' : 'Age:'}</span>
+                      <span className="info-value">{formatShowRating(show)}</span>
                     </div>
                     <div className="info-row">
                       <span className="info-label">Accessible:</span>

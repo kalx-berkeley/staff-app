@@ -9,6 +9,12 @@ from app.pass_giveaway.schemas.promoter import PromoterResponse
 # found out
 WheelchairAccessible = Literal["yes", "no", "unknown"]
 
+# Shows at a movie theater have a movie rating instead of an age restriction
+VenueType = Literal["music", "movie_theater"]
+AgeRestriction = Literal["all_ages", "18+", "21+"]
+# "NR" is Not Rated
+MovieRating = Literal["G", "PG", "PG-13", "R", "NC-17", "NR"]
+
 
 class VenueContactCreate(BaseModel):
     name: str | None = None
@@ -39,8 +45,10 @@ class VenueCreate(BaseModel):
     show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     win_frequency_days: int | None = None
+    venue_type: VenueType = "music"
     default_wheelchair_accessible: WheelchairAccessible | None = None
     default_age_restriction: str | None = None
+    default_movie_rating: MovieRating | None = None
     default_num_pass_pairs: int | None = None
     requires_phone_number: bool = False
     requires_email_address: bool = False
@@ -67,8 +75,10 @@ class VenueUpdate(BaseModel):
     show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     win_frequency_days: int | None = None
+    venue_type: VenueType | None = None
     default_wheelchair_accessible: WheelchairAccessible | None = None
     default_age_restriction: str | None = None
+    default_movie_rating: MovieRating | None = None
     default_num_pass_pairs: int | None = None
     requires_phone_number: bool | None = None
     requires_email_address: bool | None = None
@@ -96,8 +106,10 @@ class VenueResponse(BaseModel):
     show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     win_frequency_days: int | None = None
+    venue_type: VenueType = "music"
     default_wheelchair_accessible: WheelchairAccessible | None = None
     default_age_restriction: str | None = None
+    default_movie_rating: MovieRating | None = None
     default_num_pass_pairs: int | None = None
     requires_phone_number: bool = False
     requires_email_address: bool = False
@@ -125,8 +137,10 @@ class VenueResponse(BaseModel):
             show_sourcing_instructions=venue.show_sourcing_instructions,
             pass_call_instructions=venue.pass_call_instructions,
             win_frequency_days=venue.win_frequency_days,
+            venue_type=venue.venue_type,
             default_wheelchair_accessible=venue.default_wheelchair_accessible,
             default_age_restriction=venue.default_age_restriction,
+            default_movie_rating=venue.default_movie_rating,
             default_num_pass_pairs=venue.default_num_pass_pairs,
             requires_phone_number=venue.requires_phone_number,
             requires_email_address=venue.requires_email_address,

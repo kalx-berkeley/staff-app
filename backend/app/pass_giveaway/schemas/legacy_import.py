@@ -1,11 +1,15 @@
 """Schemas for the legacy paper-form data import feature."""
 
 from datetime import date, time
-from typing import Literal, Optional
+from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.pass_giveaway.schemas.venue import WheelchairAccessible
+from app.pass_giveaway.schemas.venue import (
+    AgeRestriction,
+    MovieRating,
+    WheelchairAccessible,
+)
 
 
 class OnAirWinnerImport(BaseModel):
@@ -36,7 +40,9 @@ class LegacyShowImport(BaseModel):
     show_start_date: Optional[date] = None
     on_air_description: Optional[str] = Field(None, max_length=2000)
     caller_special_instructions: Optional[str] = Field(None, max_length=1000)
-    age_restriction: Literal["all_ages", "18+", "21+"] = "all_ages"
+    # Shows at a movie theater need a movie_rating, and drop the age restriction
+    age_restriction: Optional[AgeRestriction] = "all_ages"
+    movie_rating: Optional[MovieRating] = None
     wheelchair_accessible: WheelchairAccessible = "yes"
     num_pass_pairs: int = Field(..., ge=1, le=5)
     co_announce: bool = False

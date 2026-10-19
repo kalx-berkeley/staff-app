@@ -111,6 +111,164 @@ def test_create_show_rejects_boolean_wheelchair_accessible(
     assert response.status_code == 422
 
 
+@pytest.fixture
+def movie_theater(db: Session):
+    """Create a movie theater venue."""
+    venue = Venue(name="Test Cinema", address="1 Film St", venue_type="movie_theater")
+    db.add(venue)
+    db.commit()
+    db.refresh(venue)
+    return venue
+
+
+def _movie_show_data(venue_id: int, **fields) -> dict:
+    return {
+        "event_name": "Test Movie",
+        "venue_id": venue_id,
+        "show_date": "2024-12-31",
+        "show_time": "20:00:00",
+        "wheelchair_accessible": "yes",
+        "num_pass_pairs": 1,
+        **fields,
+    }
+
+
+def test_create_show_at_movie_theater_has_movie_rating(
+    client: TestClient, movie_theater, test_promotions_staff
+):
+    """A show at a movie theater stores a movie rating and no age restriction."""
+    response = client.post(
+        "/api/shows",
+        json=_movie_show_data(
+            movie_theater.id, movie_rating="PG-13", age_restriction="21+"
+        ),
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["movie_rating"] == "PG-13"
+    assert data["age_restriction"] is None
+    assert data["venue"]["venue_type"] == "movie_theater"
+
+
+def test_create_show_at_movie_theater_requires_movie_rating(
+    client: TestClient, movie_theater, test_promotions_staff
+):
+    """A show at a movie theater can't be created with only an age restriction."""
+    response = client.post(
+        "/api/shows",
+        json=_movie_show_data(movie_theater.id, age_restriction="all_ages"),
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.status_code == 400
+
+
+def test_create_show_at_music_venue_requires_age_restriction(
+    client: TestClient, test_venue, test_promotions_staff
+):
+    """A show at a music venue needs an age restriction, and drops a movie rating."""
+    headers = {"X-Forwarded-User": test_promotions_staff.email}
+    response = client.post(
+        "/api/shows",
+        json=_movie_show_data(test_venue.id, movie_rating="R"),
+        headers=headers,
+    )
+    assert response.status_code == 400
+
+    response = client.post(
+        "/api/shows",
+        json=_movie_show_data(test_venue.id, movie_rating="R", age_restriction="18+"),
+        headers=headers,
+    )
+    assert response.status_code == 201
+    assert response.json()["age_restriction"] == "18+"
+    assert response.json()["movie_rating"] is None
+
+
+def test_create_show_rejects_unknown_movie_rating(
+    client: TestClient, movie_theater, test_promotions_staff
+):
+    response = client.post(
+        "/api/shows",
+        json=_movie_show_data(movie_theater.id, movie_rating="X"),
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.status_code == 422
+
+
+def test_update_show_moved_to_movie_theater(
+    client: TestClient, test_venue, movie_theater, test_promotions_staff
+):
+    """Moving a show to a movie theater swaps its age restriction for a movie rating."""
+    headers = {"X-Forwarded-User": test_promotions_staff.email}
+    show = client.post(
+        "/api/shows",
+        json=_movie_show_data(test_venue.id, age_restriction="21+"),
+        headers=headers,
+    ).json()
+
+    response = client.put(
+        f"/api/shows/{show['id']}", json={"venue_id": movie_theater.id}, headers=headers
+    )
+    assert response.status_code == 400
+
+    response = client.put(
+        f"/api/shows/{show['id']}",
+        json={"venue_id": movie_theater.id, "age_restriction": None, "movie_rating": "G"},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["movie_rating"] == "G"
+    assert data["age_restriction"] is None
+
+
+def test_update_show_unrelated_field_after_venue_changes_type(
+    client: TestClient, test_venue, test_promotions_staff, db: Session
+):
+    """
+    Updates that don't touch the venue or its rating still work after the
+    venue becomes a movie theater.
+    """
+    headers = {"X-Forwarded-User": test_promotions_staff.email}
+    show = client.post(
+        "/api/shows",
+        json=_movie_show_data(test_venue.id, age_restriction="21+"),
+        headers=headers,
+    ).json()
+    test_venue.venue_type = "movie_theater"
+    db.commit()
+
+    response = client.put(
+        f"/api/shows/{show['id']}", json={"event_name": "Renamed"}, headers=headers
+    )
+
+    assert response.status_code == 200
+    assert response.json()["event_name"] == "Renamed"
+
+
+def test_show_summary_includes_venue_type(
+    client: TestClient, movie_theater, test_promotions_staff
+):
+    headers = {"X-Forwarded-User": test_promotions_staff.email}
+    client.post(
+        "/api/shows",
+        json=_movie_show_data(movie_theater.id, movie_rating="NR"),
+        headers=headers,
+    )
+
+    response = client.get("/api/shows", headers=headers)
+
+    assert response.status_code == 200
+    [show] = response.json()
+    assert show["venue"]["venue_type"] == "movie_theater"
+    assert show["movie_rating"] == "NR"
+    assert show["age_restriction"] is None
+
+
 def test_create_show_with_band_missing_musicbrainz_id(
     client: TestClient, test_venue, test_promotions_staff
 ):

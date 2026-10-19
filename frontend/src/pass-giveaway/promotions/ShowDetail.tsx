@@ -8,7 +8,7 @@ import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import type { ShowResponse, PreAssignmentData, LotteryStatus, PassResponse, DjSuggestion, DjLeave, AlternateEntry } from '../types';
 import type { APIError, PromotionsStaffProfile } from '../../common/types';
-import { WHEELCHAIR_ACCESSIBLE_LABELS } from '../utils';
+import { WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow } from '../utils';
 
 type SuggestMode = 'choose' | 'date' | 'genre' | null;
 
@@ -535,9 +535,6 @@ const ShowDetail = () => {
     }
   };
 
-  const formatAgeRestriction = (age: string) =>
-    age === 'all_ages' ? 'All Ages' : age;
-
   const formatDate = (dateStr: string): string => {
     const [_y, _m, _d] = dateStr.split('-').map(Number); const date = new Date(_y, _m - 1, _d);
     return date.toLocaleDateString('en-US', {
@@ -854,8 +851,8 @@ const ShowDetail = () => {
                 ? formatDateRange(show.show_start_date, show.show_date)
                 : `${formatDate(show.show_date)} at ${formatTime(show.show_time!)}`}
             </dd>
-            <dt>Age Restriction:</dt>
-            <dd>{formatAgeRestriction(show.age_restriction)}</dd>
+            <dt>{isMovieShow(show) ? 'Movie Rating:' : 'Age Restriction:'}</dt>
+            <dd>{formatShowRating(show)}</dd>
             <dt>Wheelchair Accessible:</dt>
             <dd>{WHEELCHAIR_ACCESSIBLE_LABELS[show.wheelchair_accessible]}</dd>
             {show.planned_close_date && show.planned_close_time && (

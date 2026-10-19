@@ -7,6 +7,7 @@
 
 import apiClient, { handleAPIError } from '../common/api';
 import type {
+  AgeRestriction,
   AlternateEntry,
   AlternateJoinRequest,
   AlternateQueue,
@@ -22,6 +23,7 @@ import type {
   LotteryEntryResponse,
   LotteryScheduleItem,
   LotteryStatus,
+  MovieRating,
   MusicBrainzArtist,
   MyAlternateEntry,
   MyLotteryEntryResponse,
@@ -1331,7 +1333,8 @@ export const legacyImportAPI = {
     show_start_date: string | null;
     on_air_description: string | null;
     caller_special_instructions: string | null;
-    age_restriction: string;
+    age_restriction: AgeRestriction | null;
+    movie_rating: MovieRating | null;
     wheelchair_accessible: WheelchairAccessible;
     num_pass_pairs: number;
     co_announce: boolean;

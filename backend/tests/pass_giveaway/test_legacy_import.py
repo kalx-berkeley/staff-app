@@ -95,6 +95,40 @@ def test_import_accepts_winner_email_when_the_venue_requires_it(db: Session, sta
     assert result.on_air_winners_created == 1
 
 
+def test_import_at_movie_theater_keeps_movie_rating(db: Session, staff: Staff):
+    """A movie theater show gets its movie rating and no age restriction."""
+    venue = _venue(db, venue_type="movie_theater")
+
+    result = import_legacy_show(_import(venue, movie_rating="PG"), staff, db)
+
+    show = db.query(Show).filter(Show.id == result.show_id).one()
+    assert show.movie_rating == "PG"
+    assert show.age_restriction is None
+
+
+def test_import_at_movie_theater_requires_movie_rating(db: Session, staff: Staff):
+    venue = _venue(db, venue_type="movie_theater")
+
+    with pytest.raises(HTTPException) as exc:
+        import_legacy_show(_import(venue), staff, db)
+
+    assert exc.value.status_code == 400
+    assert "movie rating" in exc.value.detail
+    assert db.query(Show).count() == 0
+
+
+def test_import_at_music_venue_drops_movie_rating(db: Session, staff: Staff):
+    venue = _venue(db)
+
+    result = import_legacy_show(
+        _import(venue, age_restriction="21+", movie_rating="R"), staff, db
+    )
+
+    show = db.query(Show).filter(Show.id == result.show_id).one()
+    assert show.age_restriction == "21+"
+    assert show.movie_rating is None
+
+
 def test_merge_requires_guest_name_when_the_venue_does(db: Session, staff: Staff):
     venue = _venue(db, staff_guest_requires_name=True)
     show = _show_with_passes(db, venue)

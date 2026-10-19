@@ -27,7 +27,7 @@ const makeVenue = (overrides: Partial<VenueResponse> = {}): VenueResponse => ({
   pass_call_instructions: null,
   win_frequency_days: null,
   default_wheelchair_accessible: null,
-  default_age_restriction: null,
+  venue_type: 'music', default_age_restriction: null, default_movie_rating: null,
   default_num_pass_pairs: null,
   requires_phone_number: false,
   requires_email_address: false,
@@ -255,6 +255,40 @@ describe('VenueForm', () => {
         }));
       });
       await waitFor(() => expect(mockOnSuccess).toHaveBeenCalledTimes(2));
+    });
+  });
+
+  describe('Venue Type', () => {
+    it('shows Default Movie Rating for a movie theater and saves it', async () => {
+      vi.mocked(venuesAPI.update).mockResolvedValue(makeVenue());
+
+      render(
+        <VenueForm
+          venue={makeVenue({ default_age_restriction: '21+' })}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+
+      expect(screen.getByLabelText(/venue type/i)).toHaveValue('music');
+      expect(screen.queryByLabelText(/default movie rating/i)).not.toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText(/venue type/i), {
+        target: { value: 'movie_theater' },
+      });
+      expect(screen.queryByLabelText(/default age restriction/i)).not.toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText(/default movie rating/i), { target: { value: 'G' } });
+
+      fireEvent.click(screen.getByRole('button', { name: /update/i }));
+      await waitFor(() => {
+        expect(venuesAPI.update).toHaveBeenCalledWith(1, expect.objectContaining({
+          venue_type: 'movie_theater',
+          default_movie_rating: 'G',
+          default_age_restriction: null,
+        }));
+      });
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalled());
     });
   });
 

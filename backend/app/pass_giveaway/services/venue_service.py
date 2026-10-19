@@ -74,8 +74,10 @@ class VenueService:
                 show_sourcing_instructions=venue_data.show_sourcing_instructions,
                 pass_call_instructions=venue_data.pass_call_instructions,
                 win_frequency_days=venue_data.win_frequency_days,
+                venue_type=venue_data.venue_type,
                 default_wheelchair_accessible=venue_data.default_wheelchair_accessible,
                 default_age_restriction=venue_data.default_age_restriction,
+                default_movie_rating=venue_data.default_movie_rating,
                 default_num_pass_pairs=venue_data.default_num_pass_pairs,
                 requires_phone_number=venue_data.requires_phone_number,
                 requires_email_address=venue_data.requires_email_address,
@@ -173,12 +175,16 @@ class VenueService:
                 venue.pass_call_instructions = venue_data.pass_call_instructions
             if "win_frequency_days" in venue_data.model_fields_set:
                 venue.win_frequency_days = venue_data.win_frequency_days
+            if venue_data.venue_type is not None:
+                venue.venue_type = venue_data.venue_type
             if "default_wheelchair_accessible" in venue_data.model_fields_set:
                 venue.default_wheelchair_accessible = (
                     venue_data.default_wheelchair_accessible
                 )
             if "default_age_restriction" in venue_data.model_fields_set:
                 venue.default_age_restriction = venue_data.default_age_restriction
+            if "default_movie_rating" in venue_data.model_fields_set:
+                venue.default_movie_rating = venue_data.default_movie_rating
             if "default_num_pass_pairs" in venue_data.model_fields_set:
                 venue.default_num_pass_pairs = venue_data.default_num_pass_pairs
             if "requires_phone_number" in venue_data.model_fields_set:

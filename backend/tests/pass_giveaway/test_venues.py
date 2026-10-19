@@ -195,6 +195,49 @@ def test_default_wheelchair_accessible_can_be_unknown_or_cleared(
     assert response.json()["default_wheelchair_accessible"] is None
 
 
+def test_venue_type_defaults_to_music_and_can_be_movie_theater(
+    client: TestClient, test_promotions_staff
+):
+    """A venue is a music venue unless set to a movie theater, with a default movie rating."""
+    headers = {"X-Forwarded-User": test_promotions_staff.email}
+    create_response = client.post(
+        "/api/venues",
+        json={"name": "The Grand Lake", "address": "3200 Grand Ave"},
+        headers=headers,
+    )
+    assert create_response.status_code == 201
+    venue = create_response.json()
+    assert venue["venue_type"] == "music"
+    assert venue["default_movie_rating"] is None
+
+    response = client.put(
+        f"/api/venues/{venue['id']}",
+        json={"venue_type": "movie_theater", "default_movie_rating": "PG"},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["venue_type"] == "movie_theater"
+    assert response.json()["default_movie_rating"] == "PG"
+
+    response = client.put(
+        f"/api/venues/{venue['id']}",
+        json={"default_movie_rating": None},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["venue_type"] == "movie_theater"
+    assert response.json()["default_movie_rating"] is None
+
+
+def test_venue_type_rejects_unknown_value(client: TestClient, test_promotions_staff):
+    response = client.post(
+        "/api/venues",
+        json={"name": "Somewhere", "address": "1 Main St", "venue_type": "stadium"},
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+    assert response.status_code == 422
+
+
 def test_create_duplicate_venue_name(client: TestClient, test_promotions_staff):
     """Test that creating a venue with duplicate name fails."""
     # Create first venue

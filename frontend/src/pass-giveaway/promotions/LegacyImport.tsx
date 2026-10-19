@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { legacyImportAPI, venuesAPI, showsAPI, autocompleteAPI, specialtyShowsAPI } from '../api';
-import type { VenueResponse, AgeRestriction, ShowSummary, WheelchairAccessible } from '../types';
+import type { VenueResponse, AgeRestriction, MovieRating, ShowSummary, WheelchairAccessible } from '../types';
+import { MOVIE_RATING_LABELS } from '../utils';
 import {
   DatePicker,
   Tooltip,
@@ -86,6 +87,7 @@ const LegacyImport = () => {
   const [onAirDescription, setOnAirDescription] = useState('');
   const [callerSpecialInstructions, setCallerSpecialInstructions] = useState('');
   const [ageRestriction, setAgeRestriction] = useState<AgeRestriction>('all_ages');
+  const [movieRating, setMovieRating] = useState<MovieRating>('NR');
   const [wheelchairAccessible, setWheelchairAccessible] = useState<WheelchairAccessible>('yes');
   const [numPassPairs, setNumPassPairs] = useState(1);
   const [coAnnounce, setCoAnnounce] = useState(false);
@@ -109,6 +111,8 @@ const LegacyImport = () => {
   );
   // The venue whose guest list rules apply to the winners and claims below.
   const targetVenue = mode === 'new' ? selectedVenue : selectedShowVenue;
+  // Shows at a movie theater have a movie rating instead of an age restriction
+  const isMovieTheater = selectedVenue?.venue_type === 'movie_theater';
   const requiresEmail = !!targetVenue?.requires_email_address;
   const guestRequiresName = !!targetVenue?.staff_guest_requires_name;
 
@@ -171,6 +175,9 @@ const LegacyImport = () => {
     }
     if (venue.default_age_restriction != null) {
       setAgeRestriction(venue.default_age_restriction as AgeRestriction);
+    }
+    if (venue.default_movie_rating != null) {
+      setMovieRating(venue.default_movie_rating);
     }
     if (venue.default_num_pass_pairs != null) {
       setNumPassPairs(venue.default_num_pass_pairs);
@@ -388,7 +395,8 @@ const LegacyImport = () => {
           show_start_date: isMultiDay ? showStartDate : null,
           on_air_description: onAirDescription.trim() || null,
           caller_special_instructions: callerSpecialInstructions.trim() || null,
-          age_restriction: ageRestriction,
+          age_restriction: isMovieTheater ? null : ageRestriction,
+          movie_rating: isMovieTheater ? movieRating : null,
           wheelchair_accessible: wheelchairAccessible,
           num_pass_pairs: numPassPairs,
           co_announce: coAnnounce,
@@ -713,19 +721,35 @@ const LegacyImport = () => {
             </div>
 
             <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="li_age_restriction">Age Restriction <span className="required">*</span></label>
-                <select
-                  id="li_age_restriction"
-                  value={ageRestriction}
-                  onChange={(e) => setAgeRestriction(e.target.value as AgeRestriction)}
-                  disabled={submitting}
-                >
-                  <option value="all_ages">All Ages</option>
-                  <option value="18+">18+</option>
-                  <option value="21+">21+</option>
-                </select>
-              </div>
+              {isMovieTheater ? (
+                <div className="form-group">
+                  <label htmlFor="li_movie_rating">Movie Rating <span className="required">*</span></label>
+                  <select
+                    id="li_movie_rating"
+                    value={movieRating}
+                    onChange={(e) => setMovieRating(e.target.value as MovieRating)}
+                    disabled={submitting}
+                  >
+                    {(Object.keys(MOVIE_RATING_LABELS) as MovieRating[]).map((rating) => (
+                      <option key={rating} value={rating}>{MOVIE_RATING_LABELS[rating]}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label htmlFor="li_age_restriction">Age Restriction <span className="required">*</span></label>
+                  <select
+                    id="li_age_restriction"
+                    value={ageRestriction}
+                    onChange={(e) => setAgeRestriction(e.target.value as AgeRestriction)}
+                    disabled={submitting}
+                  >
+                    <option value="all_ages">All Ages</option>
+                    <option value="18+">18+</option>
+                    <option value="21+">21+</option>
+                  </select>
+                </div>
+              )}
               <div className="form-group">
                 <label htmlFor="li_num_pass_pairs">Pass Pairs <span className="required">*</span></label>
                 <select

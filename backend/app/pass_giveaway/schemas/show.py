@@ -7,7 +7,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.common.schemas.types import UtcDatetime
 from app.pass_giveaway.schemas.lottery import LotteryEntryResponse
-from app.pass_giveaway.schemas.venue import WheelchairAccessible
+from app.pass_giveaway.schemas.venue import (
+    AgeRestriction,
+    MovieRating,
+    VenueType,
+    WheelchairAccessible,
+)
 
 
 class ShowBandCreate(BaseModel):
@@ -69,8 +74,11 @@ class ShowCreate(BaseModel):
     caller_special_instructions: str | None = Field(
         None, max_length=1000, description="Caller special instructions for the show"
     )
-    age_restriction: Literal["all_ages", "18+", "21+"] = Field(
-        ..., description="Age restriction"
+    age_restriction: AgeRestriction | None = Field(
+        None, description="Age restriction (required for shows at music venues)"
+    )
+    movie_rating: MovieRating | None = Field(
+        None, description="Movie rating (required for shows at movie theaters)"
     )
     wheelchair_accessible: WheelchairAccessible = Field(
         ..., description="Whether the venue is wheelchair accessible: yes, no or unknown"
@@ -171,8 +179,11 @@ class ShowUpdate(BaseModel):
     caller_special_instructions: str | None = Field(
         None, max_length=1000, description="Caller special instructions for the show"
     )
-    age_restriction: Literal["all_ages", "18+", "21+"] | None = Field(
-        None, description="Age restriction"
+    age_restriction: AgeRestriction | None = Field(
+        None, description="Age restriction (for shows at music venues)"
+    )
+    movie_rating: MovieRating | None = Field(
+        None, description="Movie rating (for shows at movie theaters)"
     )
     wheelchair_accessible: WheelchairAccessible | None = Field(
         None, description="Whether the venue is wheelchair accessible: yes, no or unknown"
@@ -328,7 +339,8 @@ class ShowResponse(BaseModel):
     show_start_date: date | None
     on_air_description: str | None
     caller_special_instructions: str | None
-    age_restriction: str
+    age_restriction: str | None
+    movie_rating: str | None = None
     wheelchair_accessible: str
     num_pass_pairs: int
     extra_staff_passes: int = 0
@@ -387,6 +399,7 @@ class VenueShowSummary(BaseModel):
 
     id: int
     name: str
+    venue_type: VenueType = "music"
 
 
 class ShowSummary(BaseModel):
@@ -402,7 +415,8 @@ class ShowSummary(BaseModel):
     show_time: time | None
     show_start_date: date | None
     caller_special_instructions: str | None
-    age_restriction: str
+    age_restriction: str | None
+    movie_rating: str | None = None
     wheelchair_accessible: str
     status: str
     num_pass_pairs: int

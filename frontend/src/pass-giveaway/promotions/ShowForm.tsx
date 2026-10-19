@@ -4,7 +4,8 @@ import { showsAPI, venuesAPI, venuesMyAPI, promotersAPI } from '../api';
 import { Tooltip, BandAnnotator, DatePicker, DescriptionCheckFeedback, useDescriptionCheck } from '../components';
 import { formatPhone } from '../../common/utils';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import type { ShowCreate, ShowUpdate, ShowBand, MusicBrainzArtist, VenueResponse, AgeRestriction, PassResponse, PromoterResponse, PassAdjustmentResult, WheelchairAccessible } from '../types';
+import type { ShowCreate, ShowUpdate, ShowBand, MusicBrainzArtist, VenueResponse, AgeRestriction, MovieRating, PassResponse, PromoterResponse, PassAdjustmentResult, VenueType, WheelchairAccessible } from '../types';
+import { MOVIE_RATING_LABELS } from '../utils';
 import type { APIError, ValidationError } from '../../common/types';
 
 interface DeleteConfirmModalProps {
@@ -177,7 +178,11 @@ const ShowForm = () => {
   const [isMultiDay, setIsMultiDay] = useState(false);
   const [onAirDescription, setOnAirDescription] = useState('');
   const [callerSpecialInstructions, setCallerSpecialInstructions] = useState('');
+  // The selected venue's type decides whether the show has an age
+  // restriction or a movie rating
+  const [venueType, setVenueType] = useState<VenueType>('music');
   const [ageRestriction, setAgeRestriction] = useState<AgeRestriction>('all_ages');
+  const [movieRating, setMovieRating] = useState<MovieRating>('NR');
   const [wheelchairAccessible, setWheelchairAccessible] = useState<WheelchairAccessible>('yes');
   const [numPassPairs, setNumPassPairs] = useState<number>(1);
   const [extraStaffPasses, setExtraStaffPasses] = useState<number>(0);
@@ -188,6 +193,7 @@ const ShowForm = () => {
   const [lotteryEnabled, setLotteryEnabled] = useState(false);
   const [lotteryWindowHours, setLotteryWindowHours] = useState('24');
   const [djPreassignProhibitionDays, setDjPreassignProhibitionDays] = useState('');
+  const isMovieTheater = venueType === 'movie_theater';
 
   useEffect(() => {
     const loadData = async () => {
@@ -213,8 +219,12 @@ const ShowForm = () => {
           if (only.default_wheelchair_accessible !== null && only.default_wheelchair_accessible !== undefined) {
             setWheelchairAccessible(only.default_wheelchair_accessible);
           }
+          setVenueType(only.venue_type ?? 'music');
           if (only.default_age_restriction) {
             setAgeRestriction(only.default_age_restriction);
+          }
+          if (only.default_movie_rating) {
+            setMovieRating(only.default_movie_rating);
           }
           if (only.default_num_pass_pairs != null) {
             setNumPassPairs(only.default_num_pass_pairs);
@@ -248,7 +258,9 @@ const ShowForm = () => {
           setIsMultiDay(!!show.show_start_date);
           setOnAirDescription(show.on_air_description || '');
           setCallerSpecialInstructions(show.caller_special_instructions || '');
-          setAgeRestriction(show.age_restriction);
+          setVenueType(show.venue.venue_type ?? 'music');
+          setAgeRestriction(show.age_restriction ?? 'all_ages');
+          setMovieRating(show.movie_rating ?? 'NR');
           setWheelchairAccessible(show.wheelchair_accessible);
           setNumPassPairs(show.num_pass_pairs);
           setExtraStaffPasses(show.extra_staff_passes);
@@ -369,8 +381,12 @@ const ShowForm = () => {
       if (selected?.default_wheelchair_accessible !== null && selected?.default_wheelchair_accessible !== undefined) {
         setWheelchairAccessible(selected.default_wheelchair_accessible);
       }
+      setVenueType(selected?.venue_type ?? 'music');
       if (selected?.default_age_restriction) {
         setAgeRestriction(selected.default_age_restriction);
+      }
+      if (selected?.default_movie_rating) {
+        setMovieRating(selected.default_movie_rating);
       }
       if (selected?.default_num_pass_pairs != null) {
         setNumPassPairs(selected.default_num_pass_pairs);
@@ -520,7 +536,8 @@ const ShowForm = () => {
           show_start_date: showStartDate || null,
           on_air_description: onAirDescription.trim() || null,
           caller_special_instructions: callerSpecialInstructions.trim() || null,
-          age_restriction: ageRestriction,
+          age_restriction: isMovieTheater ? null : ageRestriction,
+          movie_rating: isMovieTheater ? movieRating : null,
           wheelchair_accessible: wheelchairAccessible,
           num_pass_pairs: numPassPairs,
           extra_staff_passes: extraStaffPasses,
@@ -555,7 +572,8 @@ const ShowForm = () => {
           show_start_date: showStartDate || null,
           on_air_description: onAirDescription.trim() || null,
           caller_special_instructions: callerSpecialInstructions.trim() || null,
-          age_restriction: ageRestriction,
+          age_restriction: isMovieTheater ? null : ageRestriction,
+          movie_rating: isMovieTheater ? movieRating : null,
           wheelchair_accessible: wheelchairAccessible,
           num_pass_pairs: numPassPairs,
           extra_staff_passes: extraStaffPasses,
@@ -908,21 +926,39 @@ const ShowForm = () => {
         </div>
 
         <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="age_restriction">
-              Age Restriction <span className="required">*</span>
-            </label>
-            <select
-              id="age_restriction"
-              value={ageRestriction}
-              onChange={(e) => setAgeRestriction(e.target.value as AgeRestriction)}
-              disabled={submitting}
-            >
-              <option value="all_ages">All Ages</option>
-              <option value="18+">18+</option>
-              <option value="21+">21+</option>
-            </select>
-          </div>
+          {isMovieTheater ? (
+            <div className="form-group">
+              <label htmlFor="movie_rating">
+                Movie Rating <span className="required">*</span>
+              </label>
+              <select
+                id="movie_rating"
+                value={movieRating}
+                onChange={(e) => setMovieRating(e.target.value as MovieRating)}
+                disabled={submitting}
+              >
+                {(Object.keys(MOVIE_RATING_LABELS) as MovieRating[]).map((rating) => (
+                  <option key={rating} value={rating}>{MOVIE_RATING_LABELS[rating]}</option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="form-group">
+              <label htmlFor="age_restriction">
+                Age Restriction <span className="required">*</span>
+              </label>
+              <select
+                id="age_restriction"
+                value={ageRestriction}
+                onChange={(e) => setAgeRestriction(e.target.value as AgeRestriction)}
+                disabled={submitting}
+              >
+                <option value="all_ages">All Ages</option>
+                <option value="18+">18+</option>
+                <option value="21+">21+</option>
+              </select>
+            </div>
+          )}
 
           <div className="form-group">
             <div className="label-with-help">

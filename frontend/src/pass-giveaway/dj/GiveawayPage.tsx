@@ -9,6 +9,7 @@ import { useHasRole } from '../../common/contexts/authHooks';
 import type { ShowResponse, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
+import { formatShowRating, isMovieShow } from '../utils';
 
 const GiveawayPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -177,12 +178,21 @@ const GiveawayPage = () => {
                 </>
               )}
 
-              <span className="kalx-doc-label">Age Restriction:</span>
-              <span className="kalx-doc-value kalx-age-restriction">
-                <span>21+ {age === '21+' ? '☑' : '☐'}</span>
-                <span>18+ {age === '18+' ? '☑' : '☐'}</span>
-                <span>All Ages {age === 'all_ages' ? '☑' : '☐'}</span>
-              </span>
+              {isMovieShow(show) ? (
+                <>
+                  <span className="kalx-doc-label">Movie Rating:</span>
+                  <span className="kalx-doc-value">{formatShowRating(show)}</span>
+                </>
+              ) : (
+                <>
+                  <span className="kalx-doc-label">Age Restriction:</span>
+                  <span className="kalx-doc-value kalx-age-restriction">
+                    <span>21+ {age === '21+' ? '☑' : '☐'}</span>
+                    <span>18+ {age === '18+' ? '☑' : '☐'}</span>
+                    <span>All Ages {age === 'all_ages' ? '☑' : '☐'}</span>
+                  </span>
+                </>
+              )}
 
               <span className="kalx-doc-label">Wheelchair accessible?</span>
               <span className="kalx-doc-value">

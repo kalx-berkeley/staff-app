@@ -24,6 +24,30 @@ logger = logging.getLogger(__name__)
 _LA = ZoneInfo("America/Los_Angeles")
 
 
+def apply_venue_rating(show: Show, venue: Venue) -> None:
+    """
+    Keep only the field that fits the venue's type: a movie rating for a show
+    at a movie theater, an age restriction for a show at a music venue.
+
+    Raises:
+        HTTPException: If the show doesn't have the field its venue needs
+    """
+    if venue.venue_type == "movie_theater":
+        if show.movie_rating is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A movie rating is required for shows at a movie theater",
+            )
+        show.age_restriction = None
+    else:
+        if show.age_restriction is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An age restriction is required for shows at a music venue",
+            )
+        show.movie_rating = None
+
+
 class ShowService:
     """Service for managing show operations."""
 
@@ -64,6 +88,7 @@ class ShowService:
                 on_air_description=show_data.on_air_description,
                 caller_special_instructions=show_data.caller_special_instructions,
                 age_restriction=show_data.age_restriction,
+                movie_rating=show_data.movie_rating,
                 wheelchair_accessible=show_data.wheelchair_accessible,
                 num_pass_pairs=show_data.num_pass_pairs,
                 extra_staff_passes=show_data.extra_staff_passes,
@@ -76,6 +101,7 @@ class ShowService:
                 dj_preassign_prohibition_days=show_data.dj_preassign_prohibition_days,
                 status="draft",
             )
+            apply_venue_rating(show, venue)
 
             db.add(show)
             db.commit()
@@ -156,6 +182,7 @@ class ShowService:
             show = ShowService.get_show(db, show_id)
 
             # Verify venue exists if being updated
+            venue = show.venue
             if show_data.venue_id is not None:
                 venue = db.query(Venue).filter(Venue.id == show_data.venue_id).first()
                 if not venue:
@@ -188,6 +215,16 @@ class ShowService:
                 show.caller_special_instructions = show_data.caller_special_instructions
             if show_data.age_restriction is not None:
                 show.age_restriction = show_data.age_restriction
+            if show_data.movie_rating is not None:
+                show.movie_rating = show_data.movie_rating
+            # Only check when the update touches the venue or its rating, so
+            # other updates still work on a show whose venue changed type
+            if show_data.model_fields_set & {
+                "venue_id",
+                "age_restriction",
+                "movie_rating",
+            }:
+                apply_venue_rating(show, venue)
             if show_data.wheelchair_accessible is not None:
                 show.wheelchair_accessible = show_data.wheelchair_accessible
             if show_data.num_pass_pairs is not None:

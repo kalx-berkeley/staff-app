@@ -1,6 +1,12 @@
 import type { UserResponse } from '../common/types';
 import { formatDateValue } from '../common/utils';
-import type { PassResponse, WheelchairAccessible } from './types';
+import type {
+  AgeRestriction,
+  MovieRating,
+  PassResponse,
+  VenueType,
+  WheelchairAccessible,
+} from './types';
 
 // Staging-only: lets a staff member with active Sublist DJ status access the
 // DJ view, ahead of this being rolled out to production.
@@ -80,3 +86,41 @@ export const WHEELCHAIR_ACCESSIBLE_LABELS: Record<WheelchairAccessible, string> 
   no: 'No',
   unknown: 'Unknown',
 };
+
+export const VENUE_TYPE_LABELS: Record<VenueType, string> = {
+  music: 'Music Venue',
+  movie_theater: 'Movie Theater',
+};
+
+export const AGE_RESTRICTION_LABELS: Record<AgeRestriction, string> = {
+  all_ages: 'All Ages',
+  '18+': '18+',
+  '21+': '21+',
+};
+
+export const MOVIE_RATING_LABELS: Record<MovieRating, string> = {
+  G: 'G',
+  PG: 'PG',
+  'PG-13': 'PG-13',
+  R: 'R',
+  'NC-17': 'NC-17',
+  NR: 'Not Rated',
+};
+
+interface RatedShow {
+  venue: { venue_type: VenueType };
+  age_restriction: AgeRestriction | null;
+  movie_rating: MovieRating | null;
+}
+
+// Shows at a movie theater have a movie rating instead of an age restriction
+export const isMovieShow = (show: RatedShow): boolean =>
+  show.venue.venue_type === 'movie_theater';
+
+// The show's movie rating or age restriction, whichever its venue uses
+export function formatShowRating(show: RatedShow): string {
+  if (isMovieShow(show)) {
+    return show.movie_rating ? MOVIE_RATING_LABELS[show.movie_rating] : 'Not set';
+  }
+  return show.age_restriction ? AGE_RESTRICTION_LABELS[show.age_restriction] : 'Not set';
+}
