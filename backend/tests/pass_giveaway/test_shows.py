@@ -223,6 +223,41 @@ def test_update_show(client: TestClient, test_venue, test_promotions_staff, db: 
     assert data["event_name"] == "Updated Show"
 
 
+@pytest.mark.parametrize("field", ["on_air_description", "caller_special_instructions"])
+def test_update_show_clears_text_field(
+    client: TestClient, test_venue, test_promotions_staff, db: Session, field
+):
+    """Sending null for a show text field clears it, as the form does when it's emptied."""
+    from app.models.show import Show
+
+    show = Show(
+        event_name="Test Show",
+        genre=["Jazz"],
+        venue_id=test_venue.id,
+        show_date=date(2024, 12, 31),
+        show_time=time(20, 0),
+        age_restriction="all_ages",
+        wheelchair_accessible=True,
+        num_pass_pairs=2,
+        status="draft",
+        **{field: "Doors at 8."},
+    )
+    db.add(show)
+    db.commit()
+    db.refresh(show)
+
+    response = client.put(
+        f"/api/shows/{show.id}",
+        json={field: None},
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.status_code == 200
+    assert response.json()[field] is None
+    db.refresh(show)
+    assert getattr(show, field) is None
+
+
 def test_publish_show(client: TestClient, test_venue, test_promotions_staff, db: Session):
     """Test publishing a show."""
     from app.models.show import Show

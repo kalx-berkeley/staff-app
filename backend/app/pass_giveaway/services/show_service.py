@@ -175,15 +175,16 @@ class ShowService:
                 show.promoter_id = show_data.promoter_id
             if show_data.show_date is not None:
                 show.show_date = show_data.show_date
-            # show_time and show_start_date can be explicitly set to null, so use
-            # model_fields_set to distinguish "not provided" from "explicitly null"
+            # Nullable fields can be explicitly set to null (the form sends null for
+            # a cleared field), so use model_fields_set to distinguish "not
+            # provided" from "explicitly null"
             if "show_time" in show_data.model_fields_set:
                 show.show_time = show_data.show_time
             if "show_start_date" in show_data.model_fields_set:
                 show.show_start_date = show_data.show_start_date
-            if show_data.on_air_description is not None:
+            if "on_air_description" in show_data.model_fields_set:
                 show.on_air_description = show_data.on_air_description
-            if show_data.caller_special_instructions is not None:
+            if "caller_special_instructions" in show_data.model_fields_set:
                 show.caller_special_instructions = show_data.caller_special_instructions
             if show_data.age_restriction is not None:
                 show.age_restriction = show_data.age_restriction

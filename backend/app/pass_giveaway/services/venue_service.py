@@ -171,7 +171,7 @@ class VenueService:
                 venue.show_sourcing_instructions = venue_data.show_sourcing_instructions
             if "pass_call_instructions" in venue_data.model_fields_set:
                 venue.pass_call_instructions = venue_data.pass_call_instructions
-            if venue_data.win_frequency_days is not None:
+            if "win_frequency_days" in venue_data.model_fields_set:
                 venue.win_frequency_days = venue_data.win_frequency_days
             if "default_wheelchair_accessible" in venue_data.model_fields_set:
                 venue.default_wheelchair_accessible = (

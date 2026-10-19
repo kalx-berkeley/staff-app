@@ -147,6 +147,27 @@ def test_text_fields_can_be_set_and_cleared(
     assert response.json()[field] is None
 
 
+def test_win_frequency_days_can_be_cleared(client: TestClient, test_promotions_staff):
+    """Sending null for win_frequency_days clears it, as the form does when it's emptied."""
+    headers = {"X-Forwarded-User": test_promotions_staff.email}
+    create_response = client.post(
+        "/api/venues",
+        json={"name": "Ivy Room", "address": "860 San Pablo Ave", "win_frequency_days": 30},
+        headers=headers,
+    )
+    assert create_response.status_code == 201
+    venue = create_response.json()
+    assert venue["win_frequency_days"] == 30
+
+    response = client.put(
+        f"/api/venues/{venue['id']}",
+        json={"win_frequency_days": None},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["win_frequency_days"] is None
+
+
 def test_create_duplicate_venue_name(client: TestClient, test_promotions_staff):
     """Test that creating a venue with duplicate name fails."""
     # Create first venue
