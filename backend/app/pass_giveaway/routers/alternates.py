@@ -6,7 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.common.areas import PASS_GIVEAWAY_AREA
-from app.auth import get_promotions_staff, require_promotions_or_staff
+from app.auth import (
+    get_promotions_staff,
+    require_promotions_or_staff,
+    require_staff_pass_claimant,
+)
 from app.database import get_db
 from app.models.pass_model import Pass
 from app.models.show import Show
@@ -131,7 +135,7 @@ def get_alternate_queue(
 def join_alternate_queue(
     show_id: int,
     body: AlternateJoinRequest = AlternateJoinRequest(),
-    user_info: tuple = Depends(require_promotions_or_staff),
+    user_info: tuple = Depends(require_staff_pass_claimant),
     db: Session = Depends(get_db),
 ):
     """Join the bottom of a show's staff-pass alternate queue."""

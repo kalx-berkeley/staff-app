@@ -1,7 +1,8 @@
 """
 The /go/<slug> redirects. Apache proxies /go/ here (outside /api/), and lets
 DJ studio and station office network requests through without a login, so
-this route is the access check: only active staff can follow a short link.
+this route is the access check: only current (Active or 🆕) staff can follow a
+short link.
 """
 
 import re

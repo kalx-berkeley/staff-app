@@ -7,7 +7,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.common.areas import WORKFORMS_AREA
-from app.auth import ACTIVE_STATUS, _staff_statuses
+from app.auth import ACTIVE_STATUS, _staff_statuses, is_current_staff
 from app.common.services.notification_service import send_email
 from app.config import settings
 from app.models.job_log import JobLog
@@ -75,7 +75,7 @@ async def send_reminders(
     db: Session, today: Optional[date] = None, trigger: str = "scheduled"
 ) -> int:
     """
-    Remind Active staff who haven't submitted a workform for the month.
+    Remind current (Active or 🆕) staff who haven't submitted a workform for the month.
 
     Runs daily and only sends on reminder days. Skips department heads, who
     don't need to fill in workforms, anyone who has submitted (a 0-hour
@@ -93,7 +93,7 @@ async def send_reminders(
     due = deadline(month).astimezone(PACIFIC)
     sent = 0
     for staff in db.query(Staff).order_by(Staff.id):
-        if ACTIVE_STATUS not in _staff_statuses(staff):
+        if not is_current_staff(staff):
             continue
         if staff.airtable_record_id in heads:
             continue

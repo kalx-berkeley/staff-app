@@ -14,8 +14,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.auth import (
-    ACTIVE_STATUS,
+    NEW_STATUS,
     _is_promotions_staff,
+    _staff_statuses,
+    current_staff_filter,
     get_site_admin,
     get_site_or_promotions_admin,
     is_site_admin,
@@ -36,7 +38,6 @@ from app.models.audit_log import AuditLog
 from app.models.impersonation_session import ImpersonationSession
 from app.models.job_log import JobLog
 from app.models.staff import Staff
-from app.models.staff_status import StaffStatus
 from app.scheduler import scheduler
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -57,21 +58,27 @@ def list_all_users(
     admin: Staff = Depends(get_site_admin),
     db: Session = Depends(get_db),
 ) -> list[UserListItem]:
-    """List all active users, promotions staff first, for the impersonation UI."""
+    """
+    List all current (Active or 🆕) users, promotions staff first, for the
+    impersonation UI.
+    """
     _require_staging()
 
-    active_staff = (
-        db.query(Staff)
-        .join(StaffStatus, Staff.id == StaffStatus.staff_id)
-        .filter(StaffStatus.status == ACTIVE_STATUS)
-        .order_by(Staff.name)
-        .all()
+    current_staff = (
+        db.query(Staff).filter(current_staff_filter()).order_by(Staff.name).all()
     )
-    promotions = [s for s in active_staff if _is_promotions_staff(s)]
-    staff = [s for s in active_staff if not _is_promotions_staff(s)]
+    promotions = [s for s in current_staff if _is_promotions_staff(s)]
+    staff = [s for s in current_staff if not _is_promotions_staff(s)]
     return [
-        UserListItem(email=s.email, name=s.name, role="promotions") for s in promotions
-    ] + [UserListItem(email=s.email, name=s.name, role="staff") for s in staff]
+        UserListItem(
+            email=s.email,
+            name=s.name,
+            role=role,
+            is_new=NEW_STATUS in _staff_statuses(s),
+        )
+        for role, members in (("promotions", promotions), ("staff", staff))
+        for s in members
+    ]
 
 
 @router.get("/job-statuses", response_model=list[JobStatus])

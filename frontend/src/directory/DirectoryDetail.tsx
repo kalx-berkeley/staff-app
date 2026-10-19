@@ -4,6 +4,7 @@ import { formatLeave } from '../common/utils';
 import MarkdownContent from '../common/components/MarkdownContent';
 import DjNames from './DjNames';
 import { DJ_INELIGIBLE_NOTES, djIneligibility, hasOnLeaveStatus } from './djEligibility';
+import NewStaffBadge from './NewStaffBadge';
 import StaffPhoto from './StaffPhoto';
 
 interface DirectoryDetailProps {
@@ -57,6 +58,7 @@ const DirectoryDetail = ({ entry, isMe, onClose }: DirectoryDetailProps) => {
               <div>
                 <h2 id="directory-detail-name">
                   {entry.name}
+                  <NewStaffBadge entry={entry} />
                   {isMe && <span className="directory-me-tag">You</span>}
                 </h2>
                 {entry.pronouns && <div className="directory-pronouns">{entry.pronouns}</div>}

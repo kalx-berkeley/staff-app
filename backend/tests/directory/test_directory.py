@@ -166,6 +166,24 @@ def test_directory_pairs_dj_names_for_records_without_dj_personas(
     assert response.json()[0]["dj_personas"] == expected
 
 
+def test_new_staff_see_and_are_listed_in_the_directory(client: TestClient, db: Session):
+    """'🆕' staff (new students, not yet Active) can use the directory and are
+    listed in it, once each even with both statuses."""
+    _make_staff(db, "amy@example.com", "Amy Adams")
+    _make_staff(db, "new@example.com", "Nia New", statuses=("🆕",))
+    _make_staff(db, "both@example.com", "Bo Both", statuses=("Active", "🆕"))
+    _make_staff(db, "alum@example.com", "Al Alum", statuses=("Alumni",))
+
+    response = client.get("/api/directory", headers=_as("new@example.com"))
+
+    assert response.status_code == 200
+    assert [(e["name"], e["statuses"]) for e in response.json()] == [
+        ("Amy Adams", ["Active"]),
+        ("Bo Both", ["Active", "🆕"]),
+        ("Nia New", ["🆕"]),
+    ]
+
+
 @pytest.mark.parametrize("email", ["gone@example.com", "stranger@example.com"])
 def test_directory_rejects_anyone_not_active(client: TestClient, db: Session, email):
     _make_staff(db, "gone@example.com", "Gone Person", statuses=("Sublist DJ",))

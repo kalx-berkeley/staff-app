@@ -42,6 +42,20 @@ def _make_active_staff(db: Session, email: str, name: str, phone: str) -> Staff:
     return staff
 
 
+def _make_new_staff(
+    db: Session, email: str, name: str, phone: str, department: str | None = None
+) -> Staff:
+    """Create a staff member with the "🆕" status (a new student, not yet Active)."""
+    staff = Staff(email=email, name=name, phone=phone)
+    db.add(staff)
+    db.flush()
+    db.add(StaffStatus(staff_id=staff.id, status="🆕"))
+    if department:
+        db.add(StaffDepartment(staff_id=staff.id, department=department))
+    db.commit()
+    return staff
+
+
 def test_get_current_user_promotions_via_department(client: TestClient, db: Session):
     """Promotions department + Active status → role=promotions."""
     _make_promotions_staff(db, "promo@example.com", "Promo User", "555-1234")
@@ -725,9 +739,9 @@ async def test_sync_deactivates_staff_missing_from_airtable(
 
 
 @pytest.mark.asyncio
-async def test_sync_skips_records_without_active_status(client: TestClient, db: Session):
-    """Sync imports only records whose Status includes 'Active': the table also
-    lists people who aren't active yet (e.g. '🆕'), and they get no Staff row."""
+async def test_sync_imports_active_and_new_records_only(client: TestClient, db: Session):
+    """Sync imports records whose Status includes 'Active' or '🆕' (a new
+    student, not yet Active), and skips the rest as if absent."""
     from unittest.mock import patch, AsyncMock
 
     _make_promotions_staff(db, "admin@example.com", "Admin", "555-0000")
@@ -739,6 +753,11 @@ async def test_sync_skips_records_without_active_status(client: TestClient, db: 
             "Status": ["Active"],
         },
         {"Email address": "new@example.com", "Department": ["Music"], "Status": ["🆕"]},
+        {
+            "Email address": "alum@example.com",
+            "Department": ["Music"],
+            "Status": ["Alumni"],
+        },
         {"Email address": "nostatus@example.com", "Department": ["Music"]},
     ]
 
@@ -753,24 +772,26 @@ async def test_sync_skips_records_without_active_status(client: TestClient, db: 
 
     assert response.status_code == 200
     data = response.json()
-    assert data["staff_upserted"] == ["admin@example.com"]
+    assert sorted(data["staff_upserted"]) == ["admin@example.com", "new@example.com"]
     assert data["errors"] == []
-    assert db.query(Staff).filter_by(email="new@example.com").first() is None
+    new = db.query(Staff).filter_by(email="new@example.com").first()
+    assert {s.status for s in new.statuses} == {"🆕"}
+    assert db.query(Staff).filter_by(email="alum@example.com").first() is None
     assert db.query(Staff).filter_by(email="nostatus@example.com").first() is None
-    assert db.query(AuditLog).filter_by(event_type="airtable_sync_added").count() == 0
 
 
 @pytest.mark.asyncio
-async def test_sync_deactivates_staff_no_longer_active_in_airtable(
+async def test_sync_deactivates_staff_no_longer_active_or_new_in_airtable(
     client: TestClient, db: Session
 ):
-    """Sync removes 'Active' status for staff still listed in Airtable but no
-    longer Active there, the same as if they'd left the table, and leaves
-    their record otherwise untouched."""
+    """Sync removes the 'Active' and '🆕' statuses of staff still listed in
+    Airtable but with neither status there, the same as if they'd left the
+    table, and leaves their record otherwise untouched."""
     from unittest.mock import patch, AsyncMock
 
     _make_promotions_staff(db, "admin@example.com", "Admin", "555-0000")
     _make_active_staff(db, "lapsed@example.com", "Lapsed User", "555-1111")
+    _make_new_staff(db, "gone@example.com", "Gone Trainee", "555-2222")
 
     airtable_records = [
         {
@@ -781,7 +802,7 @@ async def test_sync_deactivates_staff_no_longer_active_in_airtable(
         {
             "Email address": "lapsed@example.com",
             "Name": "Renamed, Someone",
-            "Status": ["🆕"],
+            "Status": ["Alumni"],
         },
     ]
 
@@ -795,11 +816,49 @@ async def test_sync_deactivates_staff_no_longer_active_in_airtable(
         )
 
     assert response.status_code == 200
-    assert response.json()["deactivated"] == ["lapsed@example.com"]
+    assert sorted(response.json()["deactivated"]) == [
+        "gone@example.com",
+        "lapsed@example.com",
+    ]
 
     lapsed = db.query(Staff).filter_by(email="lapsed@example.com").first()
     assert lapsed.name == "Lapsed User"
     assert {s.status for s in lapsed.statuses} == set()
+    gone = db.query(Staff).filter_by(email="gone@example.com").first()
+    assert {s.status for s in gone.statuses} == set()
+
+
+@pytest.mark.asyncio
+async def test_sync_moves_new_staff_to_active(client: TestClient, db: Session):
+    """A '🆕' staff member who becomes Active in Airtable loses '🆕' and gains
+    'Active', and isn't reported as deactivated."""
+    from unittest.mock import patch, AsyncMock
+
+    _make_promotions_staff(db, "admin@example.com", "Admin", "555-0000")
+    _make_new_staff(db, "trainee@example.com", "Trainee", "555-3333")
+
+    airtable_records = [
+        {
+            "Email address": "admin@example.com",
+            "Department": ["Promotions"],
+            "Status": ["Active"],
+        },
+        {"Email address": "trainee@example.com", "Status": ["Active"]},
+    ]
+
+    with patch(
+        "app.common.services.user_service.UserService.fetch_airtable_records",
+        new_callable=AsyncMock,
+        return_value=_airtable_records(airtable_records),
+    ):
+        response = client.post(
+            "/api/users/sync", headers={"X-Forwarded-User": "admin@example.com"}
+        )
+
+    assert response.status_code == 200
+    assert response.json()["deactivated"] == []
+    trainee = db.query(Staff).filter_by(email="trainee@example.com").first()
+    assert {s.status for s in trainee.statuses} == {"Active"}
 
 
 @pytest.mark.asyncio
@@ -1094,3 +1153,61 @@ def test_notification_preferences_use_impersonated_identity(
         .email_enabled
         is True
     )
+
+
+def test_get_current_user_new_staff(client: TestClient, db: Session):
+    """'🆕' status → role=staff, but no staff pass claims."""
+    _make_new_staff(db, "trainee@example.com", "Trainee", "555-3333")
+
+    response = client.get(
+        "/api/users/me", headers={"X-Forwarded-User": "trainee@example.com"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["role"] == "staff"
+    assert data["can_claim_staff_passes"] is False
+    assert data["profile"]["name"] == "Trainee"
+    assert data["is_site_admin"] is False
+    assert data["is_promotions_admin"] is False
+
+
+def test_get_current_user_new_promotions_member(client: TestClient, db: Session):
+    """'🆕' Promotions member → role=promotions and promotions admin, but no
+    staff pass claims and not a site admin."""
+    _make_new_staff(db, "newpromo@example.com", "New Promo", "555-4444", "Promotions")
+
+    response = client.get(
+        "/api/users/me", headers={"X-Forwarded-User": "newpromo@example.com"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["role"] == "promotions"
+    assert data["can_claim_staff_passes"] is False
+    assert data["is_promotions_admin"] is True
+    assert data["is_site_admin"] is False
+
+
+def test_get_current_user_active_staff_can_claim_staff_passes(
+    client: TestClient, db: Session
+):
+    """Active staff and promotions staff can claim staff passes."""
+    _make_active_staff(db, "staff@example.com", "Staff", "555-5555")
+    _make_promotions_staff(db, "promo@example.com", "Promo", "555-6666")
+
+    for email in ("staff@example.com", "promo@example.com"):
+        response = client.get("/api/users/me", headers={"X-Forwarded-User": email})
+        assert response.json()["can_claim_staff_passes"] is True
+
+
+def test_new_staff_is_not_site_admin_even_as_paid_staff(db: Session):
+    """Site admin stays Active-only, whatever else a '🆕' person has."""
+    from app.auth import is_site_admin
+
+    trainee = _make_new_staff(db, "trainee@example.com", "Trainee", "555-3333")
+    db.add(StaffStatus(staff_id=trainee.id, status="Paid Staff"))
+    db.commit()
+    db.refresh(trainee)
+
+    assert is_site_admin(db, trainee) is False

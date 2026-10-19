@@ -41,6 +41,12 @@ export interface UserResponse {
   /** Whether the user heads a department, and so can review KALX Workforms. */
   is_department_head?: boolean;
   /**
+   * Whether the user can claim staff passes, enter the staff pass lottery and
+   * join the alternate list. Active staff can; "🆕" staff (new students, not
+   * yet Active) can't.
+   */
+  can_claim_staff_passes?: boolean;
+  /**
    * Whether the signed-in user is a site admin, who can use all of KALX Staff
    * Admin. Describes the real user, not anyone they're impersonating.
    */

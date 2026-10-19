@@ -22,6 +22,7 @@ import ImpersonationNotice from '../common/components/ImpersonationNotice';
 import DirectoryDetail from './DirectoryDetail';
 import DjNames from './DjNames';
 import FilterMenu from './FilterMenu';
+import NewStaffBadge from './NewStaffBadge';
 import StaffPhoto from './StaffPhoto';
 import { firstNonBlankLine, matchesSearch } from './directorySearch';
 import {
@@ -97,6 +98,7 @@ const columns = helper.columns([
           <Link className="directory-name" to={`/${row.original.id}${window.location.search}`}>
             {row.original.name}
           </Link>
+          <NewStaffBadge entry={row.original} />
           {row.original.on_leave && (
             <>
               {' '}

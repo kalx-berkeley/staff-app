@@ -19,9 +19,10 @@ from app.auth import (
     _get_promotions_staff_by_email,
     _is_promotions_staff,
     _staff_statuses,
+    can_claim_staff_passes,
+    is_current_staff,
     is_promotions_admin,
     is_site_admin,
-    ACTIVE_STATUS,
     SUBLIST_DJ_STATUS,
 )
 from app.config import settings
@@ -39,8 +40,8 @@ def determine_user_role(db: Session, email: str) -> str:
 
     Role mapping (checked in order):
     - 'Paid Staff' + 'Active' statuses → promotions
-    - 'Promotions' department + 'Active' status → promotions
-    - 'Active' status → staff
+    - 'Promotions' department + 'Active' or '🆕' status → promotions
+    - 'Active' or '🆕' status → staff
     - otherwise → dj
 
     :param db: Database session
@@ -51,8 +52,7 @@ def determine_user_role(db: Session, email: str) -> str:
     if not staff:
         return "dj"
 
-    statuses = _staff_statuses(staff)
-    if ACTIVE_STATUS not in statuses:
+    if not is_current_staff(staff):
         return "dj"
 
     if _is_promotions_staff(staff):
@@ -210,12 +210,11 @@ def get_current_user(
             )
 
     is_department_head = False
+    claims_staff_passes = False
     if role in ("promotions", "staff"):
-        record_id = (
-            db.query(Staff.airtable_record_id)
-            .filter(Staff.email == effective_email)
-            .scalar()
-        )
+        effective_staff = db.query(Staff).filter(Staff.email == effective_email).first()
+        claims_staff_passes = can_claim_staff_passes(effective_staff)
+        record_id = effective_staff.airtable_record_id if effective_staff else None
         is_department_head = bool(record_id) and (
             db.query(DepartmentHead)
             .filter(DepartmentHead.staff_airtable_record_id == record_id)
@@ -236,6 +235,7 @@ def get_current_user(
         is_impersonating_dj_network=is_impersonating_dj_network,
         is_impersonating_station_office_network=is_impersonating_station_office_network,
         is_department_head=is_department_head,
+        can_claim_staff_passes=claims_staff_passes,
         **admin_flags,
         profile=profile,
     )

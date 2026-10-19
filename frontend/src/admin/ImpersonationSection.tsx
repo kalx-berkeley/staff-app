@@ -56,7 +56,8 @@ export default function ImpersonationSection() {
   }, []);
 
   const userOptions = useMemo(
-    () => userList.map((u) => ({ email: u.email, name: u.name })),
+    // Mark new students, so an admin can pick one to see what a trainee sees
+    () => userList.map((u) => ({ email: u.email, name: u.is_new ? `${u.name} 🆕` : u.name })),
     [userList]
   );
 

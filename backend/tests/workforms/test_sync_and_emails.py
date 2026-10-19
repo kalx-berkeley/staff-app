@@ -74,9 +74,10 @@ async def test_sync_department_heads_keeps_copy_on_failure(db: Session):
 
 def test_drop_inactive_drafts(db: Session):
     active = make_staff(db, "a@example.com", "A", "recA")
+    new = make_staff(db, "n@example.com", "N", "recN", statuses=("🆕",))
     gone = make_staff(db, "g@example.com", "G", "recG", statuses=("Alumni",))
     month = date(2026, 10, 1)
-    for staff in (active, gone):
+    for staff in (active, new, gone):
         workform = Workform(staff_id=staff.id, month=month)
         db.add(workform)
         db.flush()
@@ -94,8 +95,8 @@ def test_drop_inactive_drafts(db: Session):
 
     assert drop_inactive_drafts(db) == 1
     remaining = {(w.staff_id, w.month) for w in db.query(Workform)}
-    assert remaining == {(active.id, month), (gone.id, date(2026, 9, 1))}
-    assert db.query(WorkformEntry).count() == 1
+    assert remaining == {(active.id, month), (new.id, month), (gone.id, date(2026, 9, 1))}
+    assert db.query(WorkformEntry).count() == 2
 
 
 async def test_staff_sync_runs_the_workforms_hook(db: Session):
@@ -141,6 +142,7 @@ def sent(monkeypatch):
 async def test_reminders_go_to_staff_who_havent_submitted(db: Session, airtable, sent):
     draft = make_staff(db, "draft@example.com", "Draft", "recDRAFT")
     make_staff(db, "none@example.com", "None", "recNONE")
+    make_staff(db, "new@example.com", "New", "recNEW", statuses=("🆕",))
     make_staff(db, "zero@example.com", "Zero", "recZERO")
     make_staff(db, "head@example.com", "Head", "recHEAD", heads=("Music",))
     make_staff(db, "gone@example.com", "Gone", "recGONE", statuses=("Alumni",))
@@ -150,8 +152,12 @@ async def test_reminders_go_to_staff_who_havent_submitted(db: Session, airtable,
     db.commit()
     airtable.add({"Name": ["recZERO"], "Month": "2026-10-01"})
 
-    assert await notifications.send_reminders(db, today=date(2026, 10, 31)) == 2
-    assert sorted(e["to_email"] for e in sent) == ["draft@example.com", "none@example.com"]
+    assert await notifications.send_reminders(db, today=date(2026, 10, 31)) == 3
+    assert sorted(e["to_email"] for e in sent) == [
+        "draft@example.com",
+        "new@example.com",
+        "none@example.com",
+    ]
     assert "October 2026" in sent[0]["subject"]
     assert "November 5" in sent[0]["body_text"]
     assert "/workforms/month/2026-10" in sent[0]["body_text"]

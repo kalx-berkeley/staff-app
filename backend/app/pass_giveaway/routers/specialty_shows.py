@@ -17,29 +17,33 @@ from app.common.services import audit_service
 from app.pass_giveaway.services.spinitron_show_titles_service import (
     SpinitronShowTitlesService,
 )
-from app.auth import get_promotions_staff, get_staff_member, require_promotions_or_staff
+from app.auth import (
+    current_staff_filter,
+    get_promotions_staff,
+    get_staff_member,
+    require_promotions_or_staff,
+)
 from app.models.staff import Staff
 from app.models.specialty_show import SpecialtyShow
 from app.models.specialty_show_owner import SpecialtyShowOwner
 from app.models.specialty_show_dj import SpecialtyShowDJ
-from app.models.staff_status import StaffStatus
 from app.pass_giveaway.guest_redaction import GuestRedactingRoute
 
 router = APIRouter(
     prefix="/api/specialty-shows", tags=["specialty-shows"], route_class=GuestRedactingRoute
 )
 
-ACTIVE_STATUS = "Active"
-
 
 def _resolve_staff_id(db: Session, email: str) -> int | None:
-    """Return the Staff.id for an active staff member with the given email, or None."""
+    """
+    Return the Staff.id for a current (Active or 🆕) staff member with the
+    given email, or None.
+    """
     from app.models.staff import Staff as StaffModel
 
     staff = (
         db.query(StaffModel)
-        .join(StaffStatus, StaffModel.id == StaffStatus.staff_id)
-        .filter(StaffModel.email == email, StaffStatus.status == ACTIVE_STATUS)
+        .filter(StaffModel.email == email, current_staff_filter())
         .first()
     )
     return staff.id if staff else None
@@ -169,17 +173,12 @@ def list_staff_emails(
     staff: Staff = Depends(get_staff_member),
     db: Session = Depends(get_db),
 ):
-    """List active staff members' names and emails, for owner-email autocomplete.
+    """List current (Active or 🆕) staff members' names and emails, for the
+    owner-email autocomplete.
 
     Declared before `/{show_id}` so it isn't swallowed by that route.
     """
-    return (
-        db.query(Staff)
-        .join(StaffStatus, Staff.id == StaffStatus.staff_id)
-        .filter(StaffStatus.status == ACTIVE_STATUS)
-        .order_by(Staff.name)
-        .all()
-    )
+    return db.query(Staff).filter(current_staff_filter()).order_by(Staff.name).all()
 
 
 @router.post("", response_model=SpecialtyShowResponse, status_code=status.HTTP_201_CREATED)

@@ -185,6 +185,18 @@ describe('KALX Staff Admin', () => {
     expect(screen.getByRole('button', { name: 'End impersonation' })).toBeInTheDocument();
   });
 
+  it('marks new students in the list of users to impersonate', async () => {
+    vi.mocked(adminAPI.listUsers).mockResolvedValue([
+      { email: 'nia@example.com', name: 'Nia New', role: 'staff', is_new: true },
+    ]);
+    await renderAdmin(user({ is_staging: true }));
+
+    const input = await screen.findByRole('textbox', { name: 'User to impersonate' });
+    fireEvent.change(input, { target: { value: 'nia' } });
+
+    expect(await screen.findByText('Nia New 🆕 (nia@example.com)')).toBeInTheDocument();
+  });
+
   it('picks the user to impersonate by typing part of their name', async () => {
     vi.mocked(adminAPI.listUsers).mockResolvedValue([
       { email: 'amy@example.com', name: 'Amy Adams', role: 'staff' },

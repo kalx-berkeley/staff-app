@@ -259,6 +259,23 @@ describe('DirectoryPage', () => {
     expect(screen.queryByText('On leave')).not.toBeInTheDocument();
   });
 
+  it('marks new students with a badge, and filters to them by status', async () => {
+    window.history.pushState({}, '', '/directory/7?status=%F0%9F%86%95');
+    vi.mocked(usersAPI.getMe).mockResolvedValue(staffUser);
+    vi.mocked(directoryAPI.list).mockResolvedValue([
+      entry({ id: 1, name: 'Amy Adams', email: 'amy@example.com' }),
+      entry({ id: 7, name: 'Nia New', email: 'nia@example.com', statuses: ['🆕'] }),
+    ]);
+    await renderWithAuth(<App />);
+    await screen.findByRole('table');
+
+    expect(names()).toEqual(['Nia New']);
+    const row = screen.getByRole('link', { name: 'Nia New' }).closest('tr')!;
+    expect(within(row).getByText('🆕 New')).toBeInTheDocument();
+    const panel = await screen.findByRole('dialog', { name: /Nia New/ });
+    expect(within(panel).getByText('🆕 New')).toBeInTheDocument();
+  });
+
   it('shows the first line of Titles and Roles under the name in the table', async () => {
     await renderDirectory();
 

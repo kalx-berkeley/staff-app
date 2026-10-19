@@ -8,12 +8,18 @@ import ipaddress
 
 from app.database import get_db
 from app.models.staff import Staff
+from app.models.staff_status import StaffStatus
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 PAID_STAFF_STATUS = "Paid Staff"
 ACTIVE_STATUS = "Active"
+# New students who haven't become Active yet. They can use everything Active
+# staff can, except claiming staff passes, being a site admin and the Sublist
+# DJ actions, which stay Active-only.
+NEW_STATUS = "🆕"
+CURRENT_STAFF_STATUSES = frozenset({ACTIVE_STATUS, NEW_STATUS})
 PROMOTIONS_DEPARTMENT = "Promotions"
 SUBLIST_DJ_STATUS = "Sublist DJ"
 
@@ -95,21 +101,43 @@ def _staff_departments(staff: Staff) -> set[str]:
     return {d.department for d in staff.departments}
 
 
+def is_current_staff(staff: Staff | None) -> bool:
+    """Return True if *staff* has the "Active" or "🆕" status."""
+    return staff is not None and bool(_staff_statuses(staff) & CURRENT_STAFF_STATUSES)
+
+
+def current_staff_filter():
+    """
+    A query filter matching Staff with the "Active" or "🆕" status.
+
+    An EXISTS clause rather than a join, so someone with both statuses is
+    matched once.
+    """
+    return Staff.statuses.any(StaffStatus.status.in_(CURRENT_STAFF_STATUSES))
+
+
+def can_claim_staff_passes(staff: Staff | None) -> bool:
+    """
+    Return True if *staff* may claim staff passes, enter the staff pass lottery
+    and join the alternate queue. Only Active staff can, not "🆕" ones.
+    """
+    return staff is not None and ACTIVE_STATUS in _staff_statuses(staff)
+
+
 def _is_promotions_staff(staff: Staff) -> bool:
     """
     Return True if a staff member qualifies for the promotions role.
 
     Promotions role is granted when:
     - Status contains both 'Paid Staff' and 'Active', OR
-    - Department contains 'Promotions' and Status contains 'Active'
+    - Department contains 'Promotions' and Status contains 'Active' or '🆕'
     """
     statuses = _staff_statuses(staff)
-    is_active = ACTIVE_STATUS in statuses
 
-    if PAID_STAFF_STATUS in statuses and is_active:
+    if PAID_STAFF_STATUS in statuses and ACTIVE_STATUS in statuses:
         return True
 
-    if PROMOTIONS_DEPARTMENT in _staff_departments(staff) and is_active:
+    if PROMOTIONS_DEPARTMENT in _staff_departments(staff) and is_current_staff(staff):
         return True
 
     return False
@@ -166,8 +194,8 @@ def get_user_role(
 
     Role mapping (checked in order):
     - 'Paid Staff' + 'Active' statuses → promotions
-    - 'Promotions' department + 'Active' status → promotions
-    - 'Active' status → staff
+    - 'Promotions' department + 'Active' or '🆕' status → promotions
+    - 'Active' or '🆕' status → staff
     - otherwise → dj
 
     :param email: User email from authentication
@@ -178,8 +206,7 @@ def get_user_role(
     if not staff:
         return "dj"
 
-    statuses = _staff_statuses(staff)
-    if ACTIVE_STATUS not in statuses:
+    if not is_current_staff(staff):
         return "dj"
 
     if _is_promotions_staff(staff):
@@ -214,8 +241,7 @@ def get_user_role_or_dj(
     if not staff:
         return "dj"
 
-    statuses = _staff_statuses(staff)
-    if ACTIVE_STATUS not in statuses:
+    if not is_current_staff(staff):
         return "dj"
 
     if _is_promotions_staff(staff):
@@ -307,14 +333,14 @@ def is_site_admin(db: Session, staff: Staff | None) -> bool:
 
 def is_promotions_admin(staff: Staff | None) -> bool:
     """
-    Return True if *staff* is a promotions admin: an Active member of the
-    Promotions department.
+    Return True if *staff* is a promotions admin: an Active or "🆕" member of
+    the Promotions department.
 
     Promotions admins can use the pass giveaway's admin tools, and in KALX Staff
     Admin can see the scheduled jobs (without running them) and the pass
     giveaway's audit log entries.
     """
-    if staff is None or ACTIVE_STATUS not in _staff_statuses(staff):
+    if not is_current_staff(staff):
         return False
     return PROMOTIONS_DEPARTMENT in _staff_departments(staff)
 
@@ -369,7 +395,7 @@ def get_staff_member(
     email: str = Depends(require_authentication), db: Session = Depends(get_db)
 ) -> Staff:
     """
-    Get staff member from authenticated user.
+    Get staff member (Active or "🆕") from authenticated user.
 
     In staging, resolves any active impersonation session so that a promotions
     staff member impersonating a staff account acts as that staff member.
@@ -392,7 +418,7 @@ def get_staff_member(
             effective_email = imp.impersonated_email
 
     staff = db.query(Staff).filter(Staff.email == effective_email).first()
-    if not staff or ACTIVE_STATUS not in _staff_statuses(staff):
+    if not is_current_staff(staff):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only staff members can perform this action",
@@ -585,7 +611,7 @@ def require_promotions_or_staff(
     :param email: User email from authentication
     :param db: Database session
     :returns: Tuple of (role, user_record) where role is "promotions" or "staff"
-    :raises HTTPException: If user is neither promotions staff nor active staff member
+    :raises HTTPException: If user is neither promotions staff nor current staff member
     """
     from app.models.impersonation_session import ImpersonationSession
 
@@ -609,10 +635,30 @@ def require_promotions_or_staff(
     if _is_promotions_staff(staff):
         return ("promotions", staff)
 
-    if ACTIVE_STATUS in _staff_statuses(staff):
+    if is_current_staff(staff):
         return ("staff", staff)
 
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="This action requires promotions staff or staff member authentication",
     )
+
+
+def require_staff_pass_claimant(
+    user_info: tuple[str, Staff] = Depends(require_promotions_or_staff),
+) -> tuple[str, Staff]:
+    """
+    Like `require_promotions_or_staff`, but only for staff who may claim staff
+    passes (see `can_claim_staff_passes`). Guards claiming a staff pass,
+    entering the staff pass lottery and joining the alternate queue.
+
+    :param user_info: (role, staff) from `require_promotions_or_staff`
+    :returns: The same (role, staff) tuple
+    :raises HTTPException: 403 if the staff member is "🆕" rather than Active
+    """
+    if not can_claim_staff_passes(user_info[1]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Staff passes open to you once your status is Active",
+        )
+    return user_info

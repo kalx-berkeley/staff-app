@@ -27,8 +27,8 @@ export const SUBSITES: Subsite[] = [
     basePath: '/directory',
     name: 'KALX Staff Directory',
     description: 'Look up contact details for other KALX staff members.',
-    // The promotions and staff roles both require Active status in Airtable,
-    // which is what the directory API requires.
+    // The promotions and staff roles both require the Active or 🆕 status in
+    // Airtable, which is what the directory API requires.
     isAvailable: (user) => user?.role === 'promotions' || user?.role === 'staff',
   },
   {
@@ -36,8 +36,8 @@ export const SUBSITES: Subsite[] = [
     name: 'KALX Workforms',
     description:
       'Under construction, not yet the official way to submit workforms. A preview of reporting your monthly work and having department heads review it.',
-    // Active staff, as the workforms API requires, and only where the backend
-    // has the sub-site turned on (staging, while it's under construction)
+    // Active or 🆕 staff, as the workforms API requires, and only where the
+    // backend has the sub-site turned on (staging, while it's under construction)
     isAvailable: (user) =>
       !!user?.workforms_enabled && (user.role === 'promotions' || user.role === 'staff'),
   },

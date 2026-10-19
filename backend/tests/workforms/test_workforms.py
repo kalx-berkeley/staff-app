@@ -120,6 +120,20 @@ def test_combine_sorts_dated_entries_first_and_formats_lines():
 # --- entries ---
 
 
+def test_new_staff_can_use_workforms(client: TestClient, db: Session, departments):
+    make_staff(db, "new@example.com", "Nia New", "recNEW", statuses=("🆕",))
+    headers = as_user("new@example.com")
+
+    response = client.post(
+        f"/api/workforms/me/{_month_path(None)}/entries",
+        json={"department": "Promotions", "hours": 1, "description": "Training"},
+        headers=headers,
+    )
+
+    assert response.status_code == 201, response.text
+    assert client.get("/api/workforms/me", headers=headers).status_code == 200
+
+
 def test_add_update_and_delete_entries(client: TestClient, amy):
     response = _add(client, work_date=_this_month().isoformat())
     assert response.status_code == 201, response.text

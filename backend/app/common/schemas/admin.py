@@ -33,6 +33,8 @@ class UserListItem(BaseModel):
     email: str
     name: str
     role: str  # "promotions" or "staff"
+    # Whether they have the "🆕" status (a new student, not yet Active)
+    is_new: bool = False
 
 
 class AuditLogItem(BaseModel):

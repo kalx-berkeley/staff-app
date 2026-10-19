@@ -65,17 +65,21 @@ This application implements several security best practices:
   [Guest Access From Trusted Networks](#guest-access-from-trusted-networks) for what the two
   networks can reach without a login.
 - **Role-Based Access Control (RBAC)**: Three distinct roles (promotions, staff, DJ) enforced by
-  the backend.
+  the backend. The promotions and staff roles need the Airtable status "Active" or "🆕" (a new
+  student, not yet Active), which the nightly sync imports. "🆕" staff can use everything Active
+  staff can except claiming staff passes, entering the staff pass lottery and joining the
+  alternate list (`auth.require_staff_pass_claimant`), the Sublist DJ actions and being a site
+  admin, which all need Active.
 - **Admin groups**: the admin tools check two groups, both worked out from the real signed-in user
-  (never anyone they're impersonating) and both requiring Active status:
-  - *Site admins* (`auth.get_site_admin`): department heads (from the "Department Heads" table),
-    Paid Staff, and anyone listed in `SITE_ADMIN_EMAILS`. They can use all of KALX Staff Admin
-    (`/admin/`), including running jobs and staging impersonation, and the pass giveaway's admin
-    page.
-  - *Promotions admins*: Promotions department members. They can use the pass giveaway's admin
-    page, and in KALX Staff Admin can see the scheduled jobs (without running them) and the pass
-    giveaway's audit log entries only (`auth.get_site_or_promotions_admin`, with the audit log
-    filtered by its `area` column).
+  (never anyone they're impersonating):
+  - *Site admins* (`auth.get_site_admin`): Active department heads (from the "Department Heads"
+    table), Active Paid Staff, and Active staff listed in `SITE_ADMIN_EMAILS`. They can use all of
+    KALX Staff Admin (`/admin/`), including running jobs and staging impersonation, and the pass
+    giveaway's admin page.
+  - *Promotions admins*: Active or "🆕" Promotions department members. They can use the pass
+    giveaway's admin page, and in KALX Staff Admin can see the scheduled jobs (without running
+    them) and the pass giveaway's audit log entries only (`auth.get_site_or_promotions_admin`,
+    with the audit log filtered by its `area` column).
 - **Defense-in-depth authentication check**: the backend independently verifies that every `/api/`
   request carries a Google identity (`X-Forwarded-User`) or comes from the DJ studio or station
   office network. If neither is present, the request is rejected with HTTP 400 and a CRITICAL
@@ -246,7 +250,7 @@ If using Airtable sync:
 - Monitor sync logs for unexpected changes
 - KALX Workforms writes to the base: the token needs write access to the workforms table
   (`AIRTABLE_WORKFORMS_TABLE_NAME`). Every workforms endpoint requires a Google login and Active
-  status; review endpoints also require being a department head (from the "Department Heads"
+  or "🆕" status; review endpoints also require being a department head (from the "Department Heads"
   table), and a head can't decide on their own hours unless they head Operations. Every
   submission and decision is recorded in `audit_log`.
 

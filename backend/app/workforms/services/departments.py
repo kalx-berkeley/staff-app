@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.auth import ACTIVE_STATUS, _staff_statuses
+from app.auth import is_current_staff
 from app.common.services.user_service import UserService
 from app.config import settings
 from app.models.staff import Staff
@@ -72,16 +72,21 @@ async def sync_department_heads(db: Session, result: Dict[str, Any]) -> None:
 
 
 def drop_inactive_drafts(db: Session) -> int:
-    """Delete the unsubmitted workforms of staff who are no longer Active."""
+    """
+    Delete the unsubmitted workforms of staff who are no longer current staff
+    (neither Active nor 🆕).
+    """
     dropped = 0
     drafts = db.query(Workform).filter(Workform.airtable_record_id.is_(None)).all()
     for draft in drafts:
-        if ACTIVE_STATUS not in _staff_statuses(draft.staff):
+        if not is_current_staff(draft.staff):
             db.delete(draft)
             dropped += 1
     db.commit()
     if dropped:
-        logger.info("Deleted %d draft workforms of staff who are no longer Active", dropped)
+        logger.info(
+            "Deleted %d draft workforms of staff who are no longer Active or 🆕", dropped
+        )
     return dropped
 
 

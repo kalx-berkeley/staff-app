@@ -29,6 +29,8 @@ export interface UserListItem {
   email: string;
   name: string;
   role: 'promotions' | 'staff';
+  /** Whether they have the "🆕" status (a new student, not yet Active). */
+  is_new?: boolean;
 }
 
 export interface AuditLogItem {

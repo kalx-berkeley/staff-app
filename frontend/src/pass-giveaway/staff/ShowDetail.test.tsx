@@ -470,6 +470,60 @@ describe('Staff ShowDetail', () => {
     });
   });
 
+  describe('New (not yet Active) staff', () => {
+    const newUser: UserResponse = {
+      email: 'trainee@example.com',
+      role: 'staff',
+      is_dj_network: false,
+      is_station_office_network: false,
+      can_claim_staff_passes: false,
+      profile: { id: 1, name: 'Trainee', phone: '555-0000', dj_name: null, is_sublist_dj: false },
+    };
+
+    beforeEach(() => {
+      mockUseAuth.mockReturnValue({ user: newUser, loading: false, error: null, refetchUser: vi.fn() });
+    });
+
+    it('shows the Claim buttons disabled, with why', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue({
+        ...mockShow,
+        passes: [availablePass, { ...availablePass, id: 3 }],
+        available_staff_count: 2,
+      });
+
+      render(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      expect(
+        await screen.findByText('Staff passes open to you once your status is Active.')
+      ).toBeInTheDocument();
+      for (const button of screen.getAllByRole('button', { name: /^claim$/i })) {
+        expect(button).toBeDisabled();
+      }
+      for (const button of screen.getAllByRole('button', { name: /claim with \+1 guest/i })) {
+        expect(button).toBeDisabled();
+      }
+    });
+
+    it('shows the Join Alternate List button disabled', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue({
+        ...mockShow,
+        passes: [claimedPass, { ...claimedPass, id: 3, staff_name: 'Ken', staff_email: 'ken@example.com' }],
+        available_staff_count: 0,
+      });
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue({
+        queue_open: true,
+        entries: [],
+        my_entry_id: null,
+        next_candidate_staff_id: null,
+        next_candidate_name: null,
+      });
+
+      render(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      expect(await screen.findByRole('button', { name: /join alternate list/i })).toBeDisabled();
+    });
+  });
+
   describe('Release Pass', () => {
     it('should call releaseClaim API with pass ID', async () => {
       loginAsClaimer();

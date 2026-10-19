@@ -7,7 +7,11 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.common.areas import PASS_GIVEAWAY_AREA
-from app.auth import get_sublist_dj_staff, require_promotions_or_staff
+from app.auth import (
+    get_sublist_dj_staff,
+    require_promotions_or_staff,
+    require_staff_pass_claimant,
+)
 from app.database import get_db
 from app.models.lottery_entry import LotteryEntry
 from app.models.show import Show
@@ -145,7 +149,7 @@ def get_lottery_status(
 def enter_staff_lottery(
     show_id: int,
     entry_data: StaffLotteryEntryCreate = StaffLotteryEntryCreate(),
-    user_info: tuple = Depends(require_promotions_or_staff),
+    user_info: tuple = Depends(require_staff_pass_claimant),
     db: Session = Depends(get_db),
 ):
     """Enter the staff pass lottery for a show."""

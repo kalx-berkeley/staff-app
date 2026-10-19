@@ -22,6 +22,7 @@ def _make_staff(
     department: str | None = None,
     head_of: str | None = None,
     active: bool = True,
+    new: bool = False,
     paid: bool = False,
 ) -> Staff:
     staff = Staff(
@@ -33,6 +34,8 @@ def _make_staff(
         db.add(StaffDepartment(staff_id=staff.id, department=department))
     if active:
         db.add(StaffStatus(staff_id=staff.id, status="Active"))
+    if new:
+        db.add(StaffStatus(staff_id=staff.id, status="🆕"))
     if paid:
         db.add(StaffStatus(staff_id=staff.id, status="Paid Staff"))
     if head_of:
@@ -63,6 +66,9 @@ def staging(monkeypatch):
         ({"paid": True, "active": False}, False, False, False),
         ({"department": "Promotions", "active": False}, False, False, False),
         ({"active": False}, True, False, False),
+        ({"department": "Promotions", "active": False, "new": True}, False, False, True),
+        ({"head_of": "Music", "active": False, "new": True}, False, False, False),
+        ({"active": False, "new": True}, True, False, False),
     ],
     ids=[
         "promotions",
@@ -75,6 +81,9 @@ def staging(monkeypatch):
         "inactive-paid-staff",
         "inactive-promotions",
         "inactive-listed-email",
+        "new-promotions",
+        "new-head",
+        "new-listed-email",
     ],
 )
 def test_who_is_an_admin(
@@ -223,6 +232,23 @@ def test_department_head_can_impersonate_in_staging(
     assert me.json()["email"] == "staff@example.com"
     assert me.json()["is_department_head"] is False
     assert me.json()["is_site_admin"] is True
+
+
+def test_impersonation_list_includes_and_marks_new_staff(
+    client: TestClient, db: Session, staging
+):
+    _make_staff(db, "head@example.com", head_of="Music")
+    _make_staff(db, "trainee@example.com", active=False, new=True)
+    _make_staff(db, "newpromo@example.com", department="Promotions", active=False, new=True)
+    _make_staff(db, "alum@example.com", active=False)
+
+    users = client.get("/api/admin/users", headers=_as("head@example.com")).json()
+
+    assert [(u["email"], u["role"], u["is_new"]) for u in users] == [
+        ("newpromo@example.com", "promotions", True),
+        ("head@example.com", "staff", False),
+        ("trainee@example.com", "staff", True),
+    ]
 
 
 def test_promotions_admins_cannot_impersonate(client: TestClient, db: Session, staging):

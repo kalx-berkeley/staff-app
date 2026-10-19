@@ -54,6 +54,9 @@ class UserInfo(BaseModel):
     is_impersonating_station_office_network: bool = False
     # Whether the user heads a department, and so can review KALX Workforms
     is_department_head: bool = False
+    # Whether the user can claim staff passes, enter the staff pass lottery and
+    # join the alternate queue: Active staff can, "🆕" staff can't
+    can_claim_staff_passes: bool = False
     # Whether the signed-in user, not anyone they're impersonating, is a site
     # admin (all of KALX Staff Admin) or a promotions admin (part of it). Either
     # can use the pass giveaway's admin tools.
@@ -74,8 +77,8 @@ class SyncResult(BaseModel):
     deactivated: list[str] = Field(
         default_factory=list,
         description=(
-            "Staff emails whose 'Active' status was removed because "
-            "they no longer appear in Airtable as Active"
+            "Staff emails whose 'Active' and '🆕' statuses were removed "
+            "because they no longer appear in Airtable as either"
         ),
     )
     errors: list[str] = Field(

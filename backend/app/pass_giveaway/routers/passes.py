@@ -28,6 +28,7 @@ from app.pass_giveaway.services.spinitron_upcoming_schedule_service import (
 )
 from app.auth import (
     require_promotions_or_staff,
+    require_staff_pass_claimant,
     resolve_effective_email,
     get_promotions_staff,
     get_sublist_dj_staff,
@@ -35,9 +36,8 @@ from app.auth import (
     check_dj_giveaway_access,
     check_station_office_access,
     is_ip_in_network,
-    ACTIVE_STATUS,
+    is_current_staff,
     _is_promotions_staff,
-    _staff_statuses,
 )
 from app.config import settings
 from app.rate_limiter import create_rate_limit_dependency
@@ -222,7 +222,7 @@ def give_away_pass(
 def claim_pass(
     pass_id: int,
     claim_data: ClaimData = ClaimData(),
-    user_info: tuple = Depends(require_promotions_or_staff),
+    user_info: tuple = Depends(require_staff_pass_claimant),
     db: Session = Depends(get_db),
 ):
     """
@@ -963,7 +963,7 @@ def remove_preassignment(
     if x_forwarded_user:
         effective_email = resolve_effective_email(x_forwarded_user, db)
         staff_record = db.query(Staff).filter(Staff.email == effective_email).first()
-        if not staff_record or ACTIVE_STATUS not in _staff_statuses(staff_record):
+        if not is_current_staff(staff_record):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only promotions staff or staff members can perform this action",

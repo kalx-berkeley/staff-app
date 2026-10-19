@@ -32,6 +32,17 @@ export function showsPassGiveawayAdminLink(user: UserResponse | null | undefined
 }
 
 // My Passes pages hide passes for shows more than this many days in the past.
+/** Shown where "🆕" staff (not yet Active) would claim a staff pass. */
+export const STAFF_PASSES_NOT_YET_ACTIVE = 'Staff passes open to you once your status is Active.';
+
+/**
+ * Whether the user is "🆕" staff, who can't claim staff passes, enter the
+ * staff pass lottery or join the alternate list (enforced server-side too).
+ */
+export function staffPassesNotYetActive(user: Pick<UserResponse, 'can_claim_staff_passes'> | null | undefined): boolean {
+  return user?.can_claim_staff_passes === false;
+}
+
 export const MY_PASSES_PAST_SHOW_DAYS = 3;
 
 /** Whether a show (`YYYY-MM-DD`) is recent or upcoming enough to list on a My Passes page. */

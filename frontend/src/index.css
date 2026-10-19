@@ -1460,6 +1460,18 @@ fieldset.radio-group legend {
   background-color: #fef3c7;
 }
 
+/* A "🆕" (new student, not yet Active) directory entry. */
+.new-staff-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  white-space: nowrap;
+  vertical-align: middle;
+  color: #065f46;
+  background-color: #d1fae5;
+}
+
 /* "Suggest DJs by date/genre" panel inside the Pre-assign to DJ box. */
 .suggest-panel {
   display: flex;

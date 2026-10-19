@@ -6,6 +6,7 @@ import MarkdownContent from '../../common/components/MarkdownContent';
 import { formatPhone, formatLeave, isOnLeave, leaveCoversShow, formatDateValue } from '../../common/utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
+import { STAFF_PASSES_NOT_YET_ACTIVE, staffPassesNotYetActive } from '../utils';
 import type { ShowResponse, ClaimData, LotteryStatus, SpecialtyShowResponse, AlternateQueue, AlternateJoinRequest } from '../types';
 import type { StaffProfile, APIError } from '../../common/types';
 
@@ -580,6 +581,13 @@ const ShowDetail = () => {
         (p) => p.status === 'claimed' && p.staff_email?.toLowerCase() === myEmail
       )
     : false;
+  const notYetActive = staffPassesNotYetActive(user);
+  // Why the claim buttons are disabled, if they are
+  const claimBlockedTitle = notYetActive
+    ? STAFF_PASSES_NOT_YET_ACTIVE
+    : alreadyHasStaffPass
+      ? 'You already have a staff pass for this show.'
+      : undefined;
   const myName = user?.profile?.name ?? null;
   const mySpecialtyShowIds = new Set(myDJSpecialtyShows.map((s) => s.id));
   const myPreassignedPasses = myName
@@ -1155,6 +1163,8 @@ const ShowDetail = () => {
             <p className="field-hint">{leaveBlockMessage}</p>
           )}
 
+          {notYetActive && <p className="field-hint">{STAFF_PASSES_NOT_YET_ACTIVE}</p>}
+
           {lotteryActive && lotteryDeadline && (
             <div className="lottery-banner">
               <strong>Lottery mode is active.</strong> Claiming a pass during this window enters
@@ -1271,7 +1281,8 @@ const ShowDetail = () => {
               <button
                 onClick={() => setShowStaffLotteryForm(true)}
                 className="btn-small btn-primary"
-                title="Enter the lottery for a staff pass to attend this show."
+                disabled={notYetActive}
+                title={notYetActive ? STAFF_PASSES_NOT_YET_ACTIVE : 'Enter the lottery for a staff pass to attend this show.'}
               >
                 Enter Lottery
               </button>
@@ -1340,8 +1351,8 @@ const ShowDetail = () => {
                           <button
                             onClick={() => handleClaimPass(pass.id)}
                             className="btn-small btn-primary"
-                            disabled={passActionId === pass.id || alreadyHasStaffPass}
-                            title={alreadyHasStaffPass ? 'You already have a staff pass for this show.' : undefined}
+                            disabled={passActionId === pass.id || alreadyHasStaffPass || notYetActive}
+                            title={claimBlockedTitle}
                           >
                             {passActionId === pass.id ? 'Claiming...' : 'Claim'}
                           </button>
@@ -1425,8 +1436,8 @@ const ShowDetail = () => {
                             <button
                               onClick={() => handleClaimPass(pass.id)}
                               className="btn-small btn-primary"
-                              disabled={passActionId === pass.id || alreadyHasStaffPass}
-                              title={alreadyHasStaffPass ? 'You already have a staff pass for this show.' : 'Claim this staff pass to attend the show (1 person).'}
+                              disabled={passActionId === pass.id || alreadyHasStaffPass || notYetActive}
+                              title={claimBlockedTitle ?? 'Claim this staff pass to attend the show (1 person).'}
                             >
                               {passActionId === pass.id ? 'Claiming...' : 'Claim'}
                             </button>
@@ -1434,8 +1445,8 @@ const ShowDetail = () => {
                               <button
                                 onClick={() => { setGuestClaimPassId(pass.id); setGuestName(''); setOnlyWithGuest(false); }}
                                 className="btn-small"
-                                disabled={passActionId === pass.id || alreadyHasStaffPass}
-                                title={alreadyHasStaffPass ? 'You already have a staff pass for this show.' : 'Claim this pass and reserve a second pass for a +1 guest. Guest spot is tentative until show closes.'}
+                                disabled={passActionId === pass.id || alreadyHasStaffPass || notYetActive}
+                                title={claimBlockedTitle ?? 'Claim this pass and reserve a second pass for a +1 guest. Guest spot is tentative until show closes.'}
                               >
                                 Claim with +1 Guest
                               </button>
@@ -1473,7 +1484,8 @@ const ShowDetail = () => {
                 <button
                   onClick={() => setAlternateFormMode('join')}
                   className="btn-small btn-primary"
-                  title="Get in line for a staff pass in case someone releases theirs."
+                  disabled={notYetActive}
+                  title={notYetActive ? STAFF_PASSES_NOT_YET_ACTIVE : 'Get in line for a staff pass in case someone releases theirs.'}
                 >
                   Join Alternate List
                 </button>

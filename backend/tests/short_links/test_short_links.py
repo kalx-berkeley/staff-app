@@ -321,6 +321,18 @@ def test_only_active_staff_can_follow(client: TestClient, people, email):
     assert "example.com/give" not in response.text
 
 
+def test_new_staff_can_follow(client: TestClient, db: Session, people):
+    _make_staff(db, "trainee@example.com", statuses=("🆕",))
+    _create(client)
+
+    response = client.get(
+        "/go/fundraiser", headers=_as("trainee@example.com"), follow_redirects=False
+    )
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "https://example.com/give"
+
+
 def test_forbidden_page_offers_to_switch_google_account(client: TestClient, people):
     _create(client)
 
