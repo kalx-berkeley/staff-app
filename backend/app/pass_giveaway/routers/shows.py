@@ -23,6 +23,7 @@ from app.pass_giveaway.schemas.show import (
 )
 from app.pass_giveaway.services.language_analysis_service import analyze_description
 from app.pass_giveaway.services.show_service import ShowService
+from app.pass_giveaway.services.lottery_service import LotteryService
 from app.pass_giveaway.services.feature_bin_service import (
     FeatureBinService,
     FeatureBinIndex,
@@ -959,7 +960,7 @@ def publish_show(
     db: Session = Depends(get_db),
 ):
     """Publish a show (promotions staff only)."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timezone
 
     show = ShowService.publish_show(db, show_id)
 
@@ -969,8 +970,10 @@ def publish_show(
     db.refresh(show)
 
     # Schedule lottery draw if enabled
-    if show.lottery_enabled:
-        lottery_deadline = show.published_at + timedelta(hours=show.lottery_window_hours)
+    # The refresh reloads published_at naive from SQLite, so get the deadline
+    # from LotteryService, which treats it as UTC
+    lottery_deadline = LotteryService.get_lottery_deadline(show)
+    if lottery_deadline:
         schedule_lottery_job(show.id, lottery_deadline)
 
     # A republished show may have passes freed while it was a draft.
@@ -1037,7 +1040,6 @@ def unpublish_show(
 ):
     """Unpublish a show, returning it to draft status (promotions staff only)."""
     from app.models.lottery_entry import LotteryEntry
-    from app.pass_giveaway.services.lottery_service import LotteryService
 
     # Collect and notify pending lottery entrants before unpublishing
     pending_entries = (
@@ -1077,7 +1079,7 @@ def reopen_show(
     db: Session = Depends(get_db),
 ):
     """Reopen a closed show, returning it to published status (promotions staff only)."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timezone
     from zoneinfo import ZoneInfo
 
     from app.pass_giveaway.services.alternate_service import AlternateService
@@ -1093,10 +1095,9 @@ def reopen_show(
             schedule_auto_close_job(show.id, close_dt)
 
     # Re-schedule lottery job if the window hasn't expired
-    if show.lottery_enabled and show.published_at:
-        lottery_deadline = show.published_at + timedelta(hours=show.lottery_window_hours)
-        if lottery_deadline > datetime.now(timezone.utc):
-            schedule_lottery_job(show.id, lottery_deadline)
+    lottery_deadline = LotteryService.get_lottery_deadline(show)
+    if lottery_deadline and lottery_deadline > datetime.now(timezone.utc):
+        schedule_lottery_job(show.id, lottery_deadline)
 
     audit_service.log_event(
         db,

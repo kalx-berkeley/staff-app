@@ -1371,3 +1371,64 @@ class TestStartupMissedLottery:
         self._close_window(db, show)
 
         assert run_startup() == []
+
+
+class TestLotteryJobScheduling:
+    """Publish and reopen schedule the draw at a UTC-aware deadline."""
+
+    SCHEDULE = "app.pass_giveaway.routers.shows.schedule_lottery_job"
+
+    def test_reopen_reschedules_open_lottery(self, client, db, venue, promotions_staff):
+        show = _make_lottery_show(db, venue, num_staff_passes=1)
+        show.status = "closed"
+        show.show_date = date.today() + timedelta(days=30)
+        db.commit()
+        db.expire(show)  # reload published_at the way the database returns it
+        expected = show.published_at.replace(tzinfo=timezone.utc) + timedelta(hours=24)
+
+        with patch(self.SCHEDULE) as schedule:
+            response = client.post(
+                f"/api/shows/{show.id}/reopen",
+                headers={"X-Forwarded-User": promotions_staff.email},
+            )
+
+        assert response.status_code == 200
+        schedule.assert_called_once()
+        run_date = schedule.call_args.args[1]
+        assert run_date.tzinfo is not None
+        assert run_date == expected
+
+    def test_reopen_skips_expired_lottery(self, client, db, venue, promotions_staff):
+        show = _make_lottery_show(db, venue, num_staff_passes=1)
+        show.status = "closed"
+        show.show_date = date.today() + timedelta(days=30)
+        show.published_at = datetime.now(timezone.utc) - timedelta(hours=48)
+        db.commit()
+
+        with patch(self.SCHEDULE) as schedule:
+            response = client.post(
+                f"/api/shows/{show.id}/reopen",
+                headers={"X-Forwarded-User": promotions_staff.email},
+            )
+
+        assert response.status_code == 200
+        schedule.assert_not_called()
+
+    def test_publish_schedules_utc_deadline(self, client, db, venue, promotions_staff):
+        show = _make_lottery_show(db, venue, num_staff_passes=1)
+        show.status = "draft"
+        show.published_at = None
+        db.commit()
+
+        before = datetime.now(timezone.utc)
+        with patch(self.SCHEDULE) as schedule:
+            response = client.post(
+                f"/api/shows/{show.id}/publish",
+                headers={"X-Forwarded-User": promotions_staff.email},
+            )
+
+        assert response.status_code == 200
+        run_date = schedule.call_args.args[1]
+        assert run_date.tzinfo is not None
+        assert before + timedelta(hours=24) <= run_date
+        assert run_date <= datetime.now(timezone.utc) + timedelta(hours=24)
