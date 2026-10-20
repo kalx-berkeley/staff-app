@@ -112,6 +112,7 @@ export interface VenueCreate {
   default_caller_special_instructions?: string | null;
   promoter_id?: number | null;
   shows_have_external_promoter?: boolean;
+  show_name_with_logo?: boolean;
   owner_emails?: string[];
   contacts?: VenueContactCreate[];
 }
@@ -138,6 +139,7 @@ export interface VenueUpdate {
   default_caller_special_instructions?: string | null;
   promoter_id?: number | null;
   shows_have_external_promoter?: boolean;
+  show_name_with_logo?: boolean;
   owner_emails?: string[];
   contacts?: VenueContactCreate[];
 }
@@ -164,6 +166,7 @@ export interface VenueResponse {
   default_on_air_description: string | null;
   default_caller_special_instructions: string | null;
   has_logo: boolean;
+  show_name_with_logo: boolean;
   deleted: boolean;
   promoter_id?: number | null;
   promoter?: PromoterResponse | null;

@@ -57,6 +57,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [hasLogo, setHasLogo] = useState(false);
+  const [showNameWithLogo, setShowNameWithLogo] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null);
   const [pendingLogoDelete, setPendingLogoDelete] = useState(false);
@@ -106,6 +107,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
       setPromoterId(venue.promoter_id ?? null);
       setShowsHaveExternalPromoter(venue.shows_have_external_promoter ?? false);
       setHasLogo(venue.has_logo);
+      setShowNameWithLogo(venue.show_name_with_logo ?? false);
       setLogoPreview(null);
       setPendingLogoFile(null);
       setPendingLogoDelete(false);
@@ -242,6 +244,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           default_caller_special_instructions: defaultCallerSpecialInstructions.trim() || null,
           promoter_id: promoterId,
           shows_have_external_promoter: showsHaveExternalPromoter,
+          show_name_with_logo: showNameWithLogo,
           owner_emails: ownerEmails,
           contacts,
         };
@@ -734,7 +737,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
             <div className="form-section">
               <div className="label-with-help">
                 <h4>Venue Logo</h4>
-                <Tooltip text="The logo is displayed on the DJ show page in place of the venue name. Use a PNG with a transparent background for best results." />
+                <Tooltip text="The logo is displayed on the DJ show page in place of the venue name, unless you choose to show the name too. Use a PNG with a transparent background for best results." />
               </div>
               <p className="field-hint">
                 Recommended: PNG with transparent background, landscape orientation (e.g. 400×200 px).
@@ -772,6 +775,20 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
                 disabled={submitting}
                 style={{ marginTop: '0.5rem' }}
               />
+
+              {(logoPreview || (!pendingLogoDelete && hasLogo)) && (
+                <div className="form-group form-group-checkbox" style={{ marginTop: '0.5rem' }}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={showNameWithLogo}
+                      onChange={(e) => setShowNameWithLogo(e.target.checked)}
+                      disabled={submitting}
+                    />
+                    {' '}Show the venue name on the DJ show page as well as the logo
+                  </label>
+                </div>
+              )}
             </div>
           )}
 

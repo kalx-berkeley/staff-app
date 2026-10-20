@@ -26,6 +26,11 @@ class Venue(Base):
     default_movie_rating = Column(String, nullable=True)
     default_num_pass_pairs = Column(Integer, nullable=True)
     logo_filename = Column(String, nullable=True)
+    # When the venue has a logo, the DJ view shows the logo in place of the
+    # venue name unless this is set, in which case it shows both.
+    show_name_with_logo = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     requires_phone_number = Column(
         Boolean, nullable=False, default=False, server_default="false"
     )

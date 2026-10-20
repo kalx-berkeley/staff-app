@@ -280,6 +280,7 @@ def _build_show_response(
                 show.venue.default_dj_preassign_prohibition_days
             ),
             "has_logo": bool(show.venue.logo_filename),
+            "show_name_with_logo": show.venue.show_name_with_logo,
             "deleted": show.venue.deleted,
             "owner_emails": [o.promotions_staff_email for o in show.venue.owners],
             "contacts": [

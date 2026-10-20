@@ -154,15 +154,14 @@ const ShowDetail = () => {
         <div className="kalx-doc-fields">
           <span className="kalx-doc-label">Venue:</span>
           <span className="kalx-doc-value kalx-value-large">
-            {show.venue.has_logo ? (
+            {show.venue.has_logo && (
               <img
                 src={`/api/venues/${show.venue.id}/logo`}
-                alt={show.venue.name}
+                alt={show.venue.show_name_with_logo ? '' : show.venue.name}
                 className="venue-logo-display"
               />
-            ) : (
-              show.venue.name
             )}
+            {(!show.venue.has_logo || show.venue.show_name_with_logo) && show.venue.name}
           </span>
 
           <span className="kalx-doc-label">Address:</span>

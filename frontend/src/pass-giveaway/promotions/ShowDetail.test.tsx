@@ -111,6 +111,7 @@ const makeShow = (passes: PassResponse[]): ShowResponse => ({
     default_on_air_description: null,
     default_caller_special_instructions: null,
     has_logo: false,
+    show_name_with_logo: false,
     deleted: false,
     shows_have_external_promoter: false,
     owner_emails: [],

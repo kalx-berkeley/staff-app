@@ -396,6 +396,8 @@ def test_get_show(client: TestClient, test_venue, test_promotions_staff, db: Ses
     data = response.json()
     assert data["event_name"] == "Test Show"
     assert data["venue"]["name"] == test_venue.name
+    assert data["venue"]["has_logo"] is False
+    assert data["venue"]["show_name_with_logo"] is False
 
 
 def test_update_show(client: TestClient, test_venue, test_promotions_staff, db: Session):

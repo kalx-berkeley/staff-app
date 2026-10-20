@@ -63,6 +63,7 @@ class VenueCreate(BaseModel):
         None, description="Default promoter for shows at this venue"
     )
     shows_have_external_promoter: bool = False
+    show_name_with_logo: bool = False
     owner_emails: list[str] = Field(default_factory=list)
     contacts: list[VenueContactCreate] = Field(default_factory=list)
 
@@ -91,6 +92,7 @@ class VenueUpdate(BaseModel):
     default_caller_special_instructions: str | None = Field(None, max_length=1000)
     promoter_id: int | None = None
     shows_have_external_promoter: bool | None = None
+    show_name_with_logo: bool | None = None
     owner_emails: list[str] | None = None
     contacts: list[VenueContactCreate] | None = None
 
@@ -121,6 +123,7 @@ class VenueResponse(BaseModel):
     default_on_air_description: str | None = None
     default_caller_special_instructions: str | None = None
     has_logo: bool = False
+    show_name_with_logo: bool = False
     deleted: bool = False
     promoter_id: int | None = None
     promoter: PromoterResponse | None = None
@@ -152,6 +155,7 @@ class VenueResponse(BaseModel):
             default_on_air_description=venue.default_on_air_description,
             default_caller_special_instructions=venue.default_caller_special_instructions,
             has_logo=bool(venue.logo_filename),
+            show_name_with_logo=venue.show_name_with_logo,
             promoter_id=venue.promoter_id,
             promoter=(
                 PromoterResponse.from_orm_promoter(venue.promoter)

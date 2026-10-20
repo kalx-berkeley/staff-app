@@ -39,6 +39,7 @@ const makeVenue = (overrides: Partial<VenueResponse> = {}): VenueResponse => ({
   default_on_air_description: null,
   default_caller_special_instructions: null,
   has_logo: false,
+  show_name_with_logo: false,
   deleted: false,
   shows_have_external_promoter: false,
   owner_emails: [],
@@ -255,6 +256,59 @@ describe('VenueForm', () => {
         }));
       });
       await waitFor(() => expect(mockOnSuccess).toHaveBeenCalledTimes(2));
+    });
+  });
+
+  describe('Show Name With Logo', () => {
+    const nameWithLogoLabel = /show the venue name on the dj show page as well as the logo/i;
+
+    it('should not offer the option when the venue has no logo', async () => {
+      render(
+        <VenueForm venue={makeVenue()} onClose={mockOnClose} onSuccess={mockOnSuccess} />
+      );
+      await act(async () => {});
+
+      expect(screen.queryByLabelText(nameWithLogoLabel)).not.toBeInTheDocument();
+    });
+
+    it('should load and save the option when the venue has a logo', async () => {
+      vi.mocked(venuesAPI.update).mockResolvedValue(makeVenue());
+
+      render(
+        <VenueForm
+          venue={makeVenue({ has_logo: true })}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+
+      const checkbox = screen.getByLabelText(nameWithLogoLabel);
+      expect(checkbox).not.toBeChecked();
+      fireEvent.click(checkbox);
+
+      fireEvent.click(screen.getByRole('button', { name: /update/i }));
+      await waitFor(() => {
+        expect(venuesAPI.update).toHaveBeenCalledWith(1, expect.objectContaining({
+          show_name_with_logo: true,
+        }));
+      });
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalled());
+    });
+
+    it('should hide the option once the logo is removed', async () => {
+      render(
+        <VenueForm
+          venue={makeVenue({ has_logo: true, show_name_with_logo: true })}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+
+      expect(screen.getByLabelText(nameWithLogoLabel)).toBeChecked();
+      fireEvent.click(screen.getByRole('button', { name: /remove logo/i }));
+      expect(screen.queryByLabelText(nameWithLogoLabel)).not.toBeInTheDocument();
     });
   });
 

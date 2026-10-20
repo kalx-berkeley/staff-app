@@ -90,6 +90,7 @@ class VenueService:
                 default_caller_special_instructions=venue_data.default_caller_special_instructions,
                 promoter_id=venue_data.promoter_id,
                 shows_have_external_promoter=venue_data.shows_have_external_promoter,
+                show_name_with_logo=venue_data.show_name_with_logo,
             )
             db.add(venue)
             db.flush()  # get venue.id
@@ -215,6 +216,8 @@ class VenueService:
                 venue.promoter_id = venue_data.promoter_id
             if "shows_have_external_promoter" in venue_data.model_fields_set:
                 venue.shows_have_external_promoter = venue_data.shows_have_external_promoter
+            if venue_data.show_name_with_logo is not None:
+                venue.show_name_with_logo = venue_data.show_name_with_logo
 
             # Replace owners if provided
             if venue_data.owner_emails is not None:

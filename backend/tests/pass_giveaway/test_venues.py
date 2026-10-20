@@ -229,6 +229,38 @@ def test_venue_type_defaults_to_music_and_can_be_movie_theater(
     assert response.json()["default_movie_rating"] is None
 
 
+def test_show_name_with_logo_defaults_to_false_and_can_be_set(
+    client: TestClient, test_promotions_staff
+):
+    """A venue shows its logo alone on the DJ view unless set to show its name too."""
+    headers = {"X-Forwarded-User": test_promotions_staff.email}
+    create_response = client.post(
+        "/api/venues",
+        json={"name": "The Fillmore", "address": "1805 Geary Blvd"},
+        headers=headers,
+    )
+    assert create_response.status_code == 201
+    venue = create_response.json()
+    assert venue["show_name_with_logo"] is False
+
+    response = client.put(
+        f"/api/venues/{venue['id']}",
+        json={"show_name_with_logo": True},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["show_name_with_logo"] is True
+
+    # Updating other fields leaves it alone
+    response = client.put(
+        f"/api/venues/{venue['id']}",
+        json={"address": "1805 Geary Blvd, San Francisco"},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["show_name_with_logo"] is True
+
+
 def test_venue_type_rejects_unknown_value(client: TestClient, test_promotions_staff):
     response = client.post(
         "/api/venues",
