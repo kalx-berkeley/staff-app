@@ -10,6 +10,7 @@ const loadWorkforms = () => import('.');
 const MonthPage = lazySection(loadWorkforms, 'MonthPage');
 const HistoryPage = lazySection(loadWorkforms, 'HistoryPage');
 const ReviewPage = lazySection(loadWorkforms, 'ReviewPage');
+const PeoplePage = lazySection(loadWorkforms, 'PeoplePage');
 const SettingsPage = lazySection(loadWorkforms, 'SettingsPage');
 
 // The KALX Workforms sub-site, served under /workforms. Anyone who can't use
@@ -34,6 +35,7 @@ export default function WorkformsApp() {
               <>
                 <Route path="/review" element={<ReviewPage />} />
                 <Route path="/review/:month" element={<ReviewPage />} />
+                <Route path="/people" element={<PeoplePage />} />
               </>
             )}
             <Route path="/settings" element={<SettingsPage />} />

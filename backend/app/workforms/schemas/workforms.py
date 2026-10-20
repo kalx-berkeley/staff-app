@@ -130,6 +130,25 @@ class ReviewOverviewResponse(BaseModel):
     months: List[str]
 
 
+class DepartmentPerson(BaseModel):
+    staff_id: Optional[int] = None
+    staff_name: str
+    is_current_staff: bool
+    # How many of the months they reported hours in the department
+    months_reported: int
+    total_hours: float
+    # Their hours in the department in each month they reported any ("YYYY-MM")
+    hours: Dict[str, float]
+
+
+class DepartmentPeopleResponse(BaseModel):
+    department: str
+    # The months considered ("YYYY-MM"), oldest first, ending with last month
+    months: List[str]
+    min_months: int
+    people: List[DepartmentPerson]
+
+
 class PendingCountsResponse(BaseModel):
     month: str
     pending: Dict[str, int]

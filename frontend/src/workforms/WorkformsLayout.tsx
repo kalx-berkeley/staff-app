@@ -30,21 +30,26 @@ export default function WorkformsLayout({ children }: { children: ReactNode }) {
         <h1>{WORKFORMS_TITLE}</h1>
         <div className="workforms-preview-notice" role="note">
           <strong>Under construction — this is not the official way to submit workforms.</strong>{' '}
-          Workforms entered here don't count and don't replace the current process. Keep
-          submitting your workforms the usual way.
+          Workforms entered here don't count and don't replace the current process. Keep submitting
+          your workforms the usual way.
         </div>
         <ImpersonationNotice />
         <nav className="workforms-tabs" aria-label="Workforms">
           <NavLink to="/" end className={tab}>
-            My workform
+            {user?.is_department_head ? 'Staff view' : 'My workform'}
           </NavLink>
           <NavLink to="/history" className={tab}>
             Past workforms
           </NavLink>
           {user?.is_department_head && (
-            <NavLink to="/review" className={tab}>
-              Review
-            </NavLink>
+            <>
+              <NavLink to="/review" className={tab}>
+                Review
+              </NavLink>
+              <NavLink to="/people" className={tab}>
+                People
+              </NavLink>
+            </>
           )}
           <NavLink to="/settings" className={tab}>
             Settings

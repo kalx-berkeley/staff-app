@@ -114,3 +114,21 @@ export interface PendingCounts {
   month: string;
   pending: Record<string, number>;
 }
+
+export interface DepartmentPerson {
+  staff_id: number | null;
+  staff_name: string;
+  is_current_staff: boolean;
+  months_reported: number;
+  total_hours: number;
+  /** Hours in the department in each month they reported any, by "YYYY-MM". */
+  hours: Record<string, number>;
+}
+
+export interface DepartmentPeople {
+  department: string;
+  /** The months considered, oldest first, ending with last month. */
+  months: string[];
+  min_months: number;
+  people: DepartmentPerson[];
+}

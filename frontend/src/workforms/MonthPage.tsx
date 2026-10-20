@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useAuth } from '../common/contexts/authHooks';
 import { usePageTitle } from '../common/hooks/usePageTitle';
 import { formatLeave } from '../common/utils';
 import { workformsAPI } from './api';
@@ -42,6 +43,8 @@ function LoaNote({ entry }: { entry: Pick<Entry, 'loa_flag'> }) {
 // department head has reviewed it.
 export default function MonthPage() {
   const params = useParams();
+  const { user } = useAuth();
+  const isHead = !!user?.is_department_head;
   const [month, setMonth] = useState<string | null>(params.month ?? null);
   const [openMonths, setOpenMonths] = useState<WorkformSummary[]>([]);
   const [workform, setWorkform] = useState<Workform | null>(null);
@@ -166,8 +169,15 @@ export default function MonthPage() {
         <span className="workforms-month-total">
           {formatHours(monthTotal)} {monthTotal === 1 ? 'hour' : 'hours'}
         </span>
-        <RequiredHoursBadge total={monthTotal} onLeave={workform.loa_overlaps_month} />
+        {!isHead && <RequiredHoursBadge total={monthTotal} onLeave={workform.loa_overlaps_month} />}
       </div>
+
+      {isHead && (
+        <div className="info-message">
+          Department heads don't need to submit a workform. This is what staff see when they fill in
+          theirs, so you can see how it works.
+        </div>
+      )}
 
       {notice && (
         <div className="success-message" role="status">

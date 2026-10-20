@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.auth import is_current_staff
 from app.common.areas import WORKFORMS_AREA
 from app.common.services.audit_service import log_event
 from app.models.staff import Staff
@@ -19,7 +20,12 @@ from app.workforms.services.departments import (
     reviewable_departments,
 )
 from app.workforms.services.loa import entry_flag, month_overlaps
-from app.workforms.services.months import format_month, is_late, open_months
+from app.workforms.services.months import (
+    format_month,
+    is_late,
+    open_months,
+    previous_month,
+)
 
 # A reviewer opening a month refreshes it from Airtable at most this often
 REFRESH_INTERVAL_SECONDS = 60
@@ -277,3 +283,59 @@ async def decide(
         },
     )
     return _review_item(db, record, department, subject_staff, workform)
+
+
+def department_people(
+    db: Session, reviewer: Staff, department: str, months: int, min_months: int
+) -> Dict[str, Any]:
+    """
+    The people who reported hours in *department* in at least *min_months*
+    of the last *months* months, with their hours in each month.
+
+    The months end with last month, since the current month is still going.
+
+    :raises HTTPException: 403 if *reviewer* can't review *department*
+    """
+    own, fallback = reviewable_departments(db, reviewer)
+    if department not in own and department not in fallback:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You can't see who works in {department}",
+        )
+    window = [open_months()[1]]
+    while len(window) < months:
+        window.append(previous_month(window[-1]))
+    window.reverse()
+
+    hours: Dict[str, Dict[date, float]] = {}
+    for record in db.query(WorkformAirtableRecord).filter(
+        WorkformAirtableRecord.month.in_(window)
+    ):
+        block = (record.departments or {}).get(department)
+        if record.staff_airtable_record_id and records.has_hours(block):
+            by_month = hours.setdefault(record.staff_airtable_record_id, {})
+            by_month[record.month] = by_month.get(record.month, 0) + (
+                block.get("hours") or 0
+            )
+
+    people = _staff_by_record_id(db, set(hours))
+    result = []
+    for record_id, by_month in hours.items():
+        if len(by_month) < min_months:
+            continue
+        staff = people.get(record_id)
+        result.append({
+            "staff_id": staff.id if staff else None,
+            "staff_name": staff.name if staff else "Unknown staff member",
+            "is_current_staff": is_current_staff(staff),
+            "months_reported": len(by_month),
+            "total_hours": sum(by_month.values()),
+            "hours": {format_month(m): h for m, h in by_month.items()},
+        })
+    result.sort(key=lambda p: p["staff_name"].lower())
+    return {
+        "department": department,
+        "months": [format_month(m) for m in window],
+        "min_months": min_months,
+        "people": result,
+    }

@@ -4899,11 +4899,22 @@ body.staging-active .directory-detail-close {
   width: 100%;
 }
 
+/* Stays in view while a long list of people scrolls past */
 .workforms-review-detail {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
   background: #fff;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 1rem;
+}
+
+/* Below the fixed staging banner */
+body.staging-active .workforms-review-detail {
+  top: 3rem;
+  max-height: calc(100vh - 4rem);
 }
 
 .workforms-review-total {
@@ -4924,6 +4935,53 @@ body.staging-active .directory-detail-close {
   grid-template-columns: 5rem 4rem 1fr;
 }
 
+.workforms-people-scroll {
+  overflow-x: auto;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.workforms-people-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.workforms-people-table th,
+.workforms-people-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #eee;
+  text-align: left;
+}
+
+.workforms-people-table tbody tr:last-child > * {
+  border-bottom: none;
+}
+
+.workforms-people-table tbody th {
+  font-weight: 600;
+}
+
+.workforms-people-table .workforms-people-month,
+.workforms-people-hours {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.workforms-people-hours {
+  color: #999;
+}
+
+.workforms-people-worked {
+  color: #155724;
+  background-color: #eaf6ec;
+}
+
+.workforms-people-total {
+  color: #1a6fb0;
+  font-weight: 600;
+}
+
 .btn-primary.workforms-approve {
   background-color: var(--success-color);
 }
@@ -4940,6 +4998,11 @@ body.staging-active .directory-detail-close {
   .workforms-entry-fields,
   .workforms-review-panes {
     grid-template-columns: 1fr;
+  }
+
+  .workforms-review-detail {
+    position: static;
+    max-height: none;
   }
 
   .workforms-entry {

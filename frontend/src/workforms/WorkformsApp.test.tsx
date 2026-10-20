@@ -5,7 +5,7 @@ import { renderWithAuth } from '../test/render';
 import { usersAPI } from '../common/api';
 import type { UserResponse } from '../common/types';
 import { reviewAPI, workformsAPI } from './api';
-import type { ReviewItem, ReviewQueue, Workform } from './types';
+import type { DepartmentPeople, ReviewItem, ReviewQueue, Workform } from './types';
 
 vi.mock('../common/api', () => ({
   AUTH_DIAG_KEY: 'kalx_auth_diag',
@@ -30,6 +30,7 @@ vi.mock('./api', () => ({
     pending: vi.fn(),
     queue: vi.fn(),
     decide: vi.fn(),
+    people: vi.fn(),
   },
 }));
 
@@ -220,11 +221,22 @@ describe('KALX Workforms month page', () => {
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
   });
 
-  it('only offers the review tab to department heads', async () => {
+  it('only offers the review and people tabs to department heads', async () => {
     vi.mocked(workformsAPI.get).mockResolvedValue(workform());
     await renderAt('/workforms/');
     await screen.findByRole('heading', { name: 'October 2026' });
+    expect(screen.getByRole('link', { name: 'My workform' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Review' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'People' })).not.toBeInTheDocument();
+  });
+
+  it("tells department heads they don't need to submit a workform", async () => {
+    vi.mocked(workformsAPI.get).mockResolvedValue(workform());
+    await renderAt('/workforms/', user({ is_department_head: true }));
+    expect(await screen.findByText(/don't need to submit a workform/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Staff view' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'People' })).toBeInTheDocument();
+    expect(screen.queryByText(/6-hour minimum/)).not.toBeInTheDocument();
   });
 });
 
@@ -319,5 +331,76 @@ describe('KALX Workforms review page', () => {
     await renderAt('/workforms/review');
     expect(await screen.findByRole('heading', { name: 'October 2026' })).toBeInTheDocument();
     expect(reviewAPI.overview).not.toHaveBeenCalled();
+  });
+});
+
+describe('KALX Workforms people page', () => {
+  const people = (overrides: Partial<DepartmentPeople> = {}): DepartmentPeople => ({
+    department: 'Music',
+    months: ['2026-07', '2026-08', '2026-09'],
+    min_months: 2,
+    people: [
+      {
+        staff_id: 1,
+        staff_name: 'Sam',
+        is_current_staff: true,
+        months_reported: 2,
+        total_hours: 5,
+        hours: { '2026-08': 3, '2026-09': 2 },
+      },
+      {
+        staff_id: 2,
+        staff_name: 'Lee',
+        is_current_staff: false,
+        months_reported: 3,
+        total_hours: 9,
+        hours: { '2026-07': 4, '2026-08': 4, '2026-09': 1 },
+      },
+    ],
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(reviewAPI.overview).mockResolvedValue({
+      is_operations_head: false,
+      own_departments: ['Music', 'Promotions'],
+      fallback_departments: [],
+      default_month: '2026-09',
+      default_department: 'Promotions',
+      months: ['2026-10', '2026-09'],
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('lists who reported hours in 2 of the last 3 months by default', async () => {
+    vi.mocked(reviewAPI.people).mockResolvedValue(people());
+    await renderAt('/workforms/people', user({ is_department_head: true }));
+
+    const sam = (await screen.findByRole('rowheader', { name: 'Sam' })).closest('tr')!;
+    expect(reviewAPI.people).toHaveBeenCalledWith('Music', 3, 2);
+    expect(
+      within(sam)
+        .getAllByRole('cell')
+        .map((c) => c.textContent)
+    ).toEqual(['—', '3 h', '2 h', '5 h']);
+    expect(screen.getByText('Not current staff')).toBeInTheDocument();
+    expect(screen.getByText(/from July 2026 to September 2026/)).toBeInTheDocument();
+  });
+
+  it('keeps the months with hours within the months considered', async () => {
+    vi.mocked(reviewAPI.people).mockResolvedValue(people());
+    await renderAt('/workforms/people', user({ is_department_head: true }));
+    await screen.findByRole('rowheader', { name: 'Sam' });
+
+    vi.mocked(reviewAPI.people).mockResolvedValue(
+      people({ months: ['2026-09'], min_months: 1, people: [] })
+    );
+    fireEvent.change(screen.getByLabelText('Out of the last'), { target: { value: '1' } });
+    expect(await screen.findByText('No one matches.')).toBeInTheDocument();
+    expect(reviewAPI.people).toHaveBeenLastCalledWith('Music', 1, 1);
   });
 });

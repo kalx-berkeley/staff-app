@@ -11,7 +11,7 @@ from app.config import settings
 from app.models.audit_log import AuditLog
 from app.models.impersonation_session import ImpersonationSession
 from app.workforms.services import review_service
-from app.workforms.services.months import format_month, open_months
+from app.workforms.services.months import format_month, open_months, previous_month
 from app.workforms.services.records import refresh_all
 from tests.workforms.conftest import as_user, make_staff
 
@@ -256,3 +256,64 @@ def test_users_me_reports_department_heads(client: TestClient, people):
     assert me["is_department_head"] is True
     me = client.get("/api/users/me", headers=as_user("sam@example.com")).json()
     assert me["is_department_head"] is False
+
+
+def _people(client, who, department, **params):
+    return client.get(
+        f"/api/workforms/review/people/{department}", params=params, headers=as_user(who)
+    )
+
+
+def test_department_people(client: TestClient, db, people, airtable):
+    last = open_months()[1]
+    window = [last]
+    for _ in range(3):
+        window.insert(0, previous_month(window[0]))
+    make_staff(db, "lee@example.com", "Lee", "recLEE00000000000", statuses=())
+
+    def add(record_id, month, **departments):
+        fields = {"Name": [record_id], "Month": month.isoformat()}
+        for department, hours in departments.items():
+            fields[f"{department} : Hours"] = hours
+        airtable.add(fields)
+
+    # Sam: Music in the last two months; Pat: Music once; Lee (no longer
+    # staff): Music twice, but once outside the last three months
+    add("recSAM00000000000", window[-1], Music=2, Promotions=1)
+    add("recSAM00000000000", window[-2], Music=3)
+    add("recPAT00000000000", window[-1], Music=1)
+    add("recLEE00000000000", window[-1], Music=4)
+    add("recLEE00000000000", window[0], Music=5)
+    # The current month doesn't count
+    add("recPAT00000000000", open_months()[0], Music=1)
+    asyncio.run(refresh_all(db))
+
+    body = _people(client, "mel@example.com", "Music").json()
+    assert body["months"] == [format_month(m) for m in window[1:]]
+    assert body["min_months"] == 2
+    assert [p["staff_name"] for p in body["people"]] == ["Sam"]
+    (sam,) = body["people"]
+    assert sam["months_reported"] == 2
+    assert sam["total_hours"] == 5
+    assert sam["hours"] == {format_month(window[-1]): 2, format_month(window[-2]): 3}
+
+    body = _people(client, "mel@example.com", "Music", months=4, min_months=2).json()
+    assert [(p["staff_name"], p["is_current_staff"]) for p in body["people"]] == [
+        ("Lee", False),
+        ("Sam", True),
+    ]
+
+    body = _people(client, "mel@example.com", "Music", months=1, min_months=1).json()
+    assert [p["staff_name"] for p in body["people"]] == ["Lee", "Pat", "Sam"]
+
+
+def test_department_people_permissions_and_limits(client: TestClient, people, airtable):
+    assert _people(client, "sam@example.com", "Music").status_code == 403
+    assert _people(client, "mel@example.com", "Promotions").status_code == 403
+    # Operations heads can see any department
+    assert _people(client, "ola@example.com", "Promotions").status_code == 200
+    assert (
+        _people(client, "mel@example.com", "Music", months=2, min_months=3).status_code
+        == 422
+    )
+    assert _people(client, "mel@example.com", "Music", months=13).status_code == 422

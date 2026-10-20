@@ -1,6 +1,7 @@
 import apiClient, { handleAPIError } from '../common/api';
 import type {
   Decision,
+  DepartmentPeople,
   Departments,
   Entry,
   EntryInput,
@@ -51,6 +52,12 @@ export const reviewAPI = {
     call(
       apiClient.put<ReviewItem>(`/workforms/review/decisions/${seg(recordId)}/${seg(department)}`, {
         decision,
+      })
+    ),
+  people: (department: string, months: number, minMonths: number) =>
+    call(
+      apiClient.get<DepartmentPeople>(`/workforms/review/people/${seg(department)}`, {
+        params: { months, min_months: minMonths },
       })
     ),
 };

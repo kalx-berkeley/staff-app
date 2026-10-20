@@ -1,6 +1,6 @@
 """KALX Workforms API for department heads reviewing submitted hours."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.auth import get_staff_member
@@ -9,6 +9,7 @@ from app.models.staff import Staff
 from app.models.workform_airtable_record import WorkformAirtableRecord
 from app.workforms.schemas.workforms import (
     DecisionRequest,
+    DepartmentPeopleResponse,
     PendingCountsResponse,
     ReviewItem,
     ReviewOverviewResponse,
@@ -19,6 +20,9 @@ from app.workforms.services.departments import is_operations_head, reviewable_de
 from app.workforms.services.months import format_month, open_months, parse_month
 
 router = APIRouter(prefix="/api/workforms/review", tags=["workforms"])
+
+# The most months the department people list looks back
+MAX_PEOPLE_MONTHS = 12
 
 
 def get_reviewer(
@@ -59,6 +63,27 @@ def overview(reviewer: Staff = Depends(get_reviewer), db: Session = Depends(get_
         default_department=waiting[0] if waiting else own[0],
         months=[format_month(m) for m in sorted(months, reverse=True)],
     )
+
+
+# Before "/{month}/{department}", which would otherwise match it
+@router.get("/people/{department}", response_model=DepartmentPeopleResponse)
+def department_people(
+    department: str,
+    months: int = Query(3, ge=1, le=MAX_PEOPLE_MONTHS),
+    min_months: int = Query(2, ge=1, le=MAX_PEOPLE_MONTHS),
+    reviewer: Staff = Depends(get_reviewer),
+    db: Session = Depends(get_db),
+):
+    """
+    Who works in *department*: everyone who reported hours in it in at least
+    *min_months* of the last *months* months.
+    """
+    if min_months > months:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="The months with hours can't be more than the months considered",
+        )
+    return review_service.department_people(db, reviewer, department, months, min_months)
 
 
 @router.get("/{month}/pending", response_model=PendingCountsResponse)
