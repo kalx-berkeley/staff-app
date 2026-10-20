@@ -124,3 +124,56 @@ export function formatShowRating(show: RatedShow): string {
   }
   return show.age_restriction ? AGE_RESTRICTION_LABELS[show.age_restriction] : 'Not set';
 }
+
+// Louisiana's "LA" is left out: in a venue address it's Los Angeles
+const US_STATE_CODES = new Set([
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID',
+  'IL', 'IN', 'IA', 'KS', 'KY', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO',
+  'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA',
+  'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+]);
+
+const US_STATE_NAME =
+  /(?:^|\s)(?:alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|district of columbia|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|washington|west virginia|wisconsin|wyoming)$/i;
+
+const ZIP_CODE = /^\d{5}(?:-\d{4})?$/;
+
+// Whether a venue address ends the way a full US postal address does, with a
+// state and/or zip code ("…, Berkeley, CA 94704"). DJs read the address on
+// air, so the venue form warns about these. Only the end of the address is
+// checked, so a house number ("12345 Main St") or a street named after a
+// state ("123 Washington St") doesn't count.
+export function addressHasStateOrZip(address: string): boolean {
+  // Lines and commas both separate the parts of an address
+  const segments = address
+    .split(/[\n,]/)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  if (segments.length > 0 && /^(?:usa?|united states(?: of america)?)\.?$/i.test(segments[segments.length - 1])) {
+    segments.pop();
+  }
+  if (segments.length === 0) return false;
+
+  const tokens = segments[segments.length - 1].replace(/\./g, '').split(/\s+/);
+  const isOnlySegment = segments.length === 1;
+
+  // A zip code is the last word, but never the first word of the address,
+  // which is the house number
+  if (ZIP_CODE.test(tokens[tokens.length - 1]) && !(isOnlySegment && tokens.length === 1)) {
+    return true;
+  }
+
+  // A state comes after the street, so it's in a later part of the address
+  // ("123 Main St, Berkeley CA") or at the end of a single-line one
+  // ("123 Main St Berkeley CA"). Only a part that is just the state may be
+  // lowercase ("Berkeley, ca"); otherwise a lowercase word is more likely
+  // ordinary text ("Side door, around back in"). Without a comma a trailing
+  // "NE" is more likely part of the street ("Main St NE").
+  const last = tokens[tokens.length - 1];
+  if (US_STATE_CODES.has(last.toUpperCase())) {
+    const isUppercase = last === last.toUpperCase();
+    if (!isOnlySegment && (tokens.length === 1 || isUppercase)) return true;
+    if (isOnlySegment && tokens.length > 1 && isUppercase && last !== 'NE') return true;
+  }
+  return !isOnlySegment && US_STATE_NAME.test(segments[segments.length - 1]);
+}

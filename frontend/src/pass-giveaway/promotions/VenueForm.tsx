@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { venuesAPI, promotersAPI } from '../api';
 import { Tooltip, PersonAutocomplete, extractPersonEmail, DescriptionCheckFeedback, useDescriptionCheck } from '../components';
 import type { VenueResponse, VenueCreate, VenueUpdate, VenueContactCreate, AgeRestriction, MovieRating, PromoterResponse, PromotionsStaffOption, VenueType, WheelchairAccessible } from '../types';
-import { MOVIE_RATING_LABELS, VENUE_TYPE_LABELS } from '../utils';
+import { MOVIE_RATING_LABELS, VENUE_TYPE_LABELS, addressHasStateOrZip } from '../utils';
 import type { APIError, ValidationError } from '../../common/types';
 
 const venueLogoUrl = (id: number) => `/api/venues/${id}/logo`;
@@ -373,9 +373,9 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
               rows={2}
             />
             {errors.address && <span className="field-error">{errors.address}</span>}
-            {(/\bCA\b/.test(address) || /\b\d{5}\b/.test(address)) && (
+            {addressHasStateOrZip(address) && (
               <span className="field-warning">
-                This address appears to include the state (&ldquo;CA&rdquo;) or a zip code.
+                This address appears to include the state (such as &ldquo;CA&rdquo;) or a zip code.
                 Please remove these — the DJ reads this address on air and the state and zip code aren&apos;t needed.
               </span>
             )}

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  addressHasStateOrZip,
   canUsePassGiveawayAdmin,
   findRecentDjGiveaway,
   formatShowRating,
@@ -144,5 +145,41 @@ describe('formatShowRating', () => {
     expect(formatShowRating({ ...cinema, age_restriction: '21+', movie_rating: null })).toBe(
       'Not set',
     );
+  });
+});
+
+describe('addressHasStateOrZip', () => {
+  it.each([
+    '2367 Shattuck Ave, Berkeley, CA 94704',
+    '2367 Shattuck Ave, Berkeley, CA',
+    '2367 Shattuck Ave, Berkeley CA',
+    '2367 Shattuck Ave, Berkeley, ca',
+    '2367 Shattuck Ave, Berkeley 94704',
+    '2367 Shattuck Ave, Berkeley, CA 94704-1234',
+    '2367 Shattuck Ave\nBerkeley, CA 94704',
+    '2367 Shattuck Ave, Berkeley, CA 94704, USA',
+    '2367 Shattuck Ave, Berkeley, C.A.',
+    '2367 Shattuck Ave, Berkeley, California',
+    '2367 Shattuck Ave Berkeley CA 94704',
+    '2367 Shattuck Ave Berkeley CA',
+    '1 Main St, Portland, OR',
+  ])('flags %j', (address) => {
+    expect(addressHasStateOrZip(address)).toBe(true);
+  });
+
+  it.each([
+    '',
+    '2367 Shattuck Ave, Berkeley',
+    '12345 Main St',
+    '12345 Main St, Oakland',
+    '12345',
+    '123 Washington St, Oakland',
+    '123 California St',
+    '100 Main St NE',
+    '1 Ca St, Berkeley',
+    '2367 Shattuck Ave, Side door around back in',
+    '123 Sunset Blvd, LA',
+  ])('does not flag %j', (address) => {
+    expect(addressHasStateOrZip(address)).toBe(false);
   });
 });
