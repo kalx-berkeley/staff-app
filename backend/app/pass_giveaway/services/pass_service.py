@@ -454,9 +454,7 @@ class PassService:
         specialty_names = {
             r[0]
             for r in (
-                db.query(SpecialtyShow.name)
-                .filter(SpecialtyShow.deleted == False)  # noqa: E712
-                .all()
+                db.query(SpecialtyShow.name).filter(SpecialtyShow.current_filter()).all()
             )
         }
         return sorted(
@@ -567,9 +565,7 @@ class PassService:
             suggestions.append(suggestion)
 
         specialty_shows = (
-            db.query(SpecialtyShow)
-            .filter(SpecialtyShow.deleted == False)
-            .all()  # noqa: E712
+            db.query(SpecialtyShow).filter(SpecialtyShow.current_filter()).all()
         )
         for specialty_show in specialty_shows:
             matched_genres: set[str] = set()

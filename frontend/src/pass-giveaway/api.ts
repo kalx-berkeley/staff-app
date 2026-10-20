@@ -1074,9 +1074,12 @@ export const promotersAPI = {
 };
 
 export const specialtyShowsAPI = {
-  list: async (): Promise<SpecialtyShowResponse[]> => {
+  /** Current specialty shows, and retired ones too if `includeRetired`. */
+  list: async (includeRetired = false): Promise<SpecialtyShowResponse[]> => {
     try {
-      const response = await apiClient.get<SpecialtyShowResponse[]>('/specialty-shows');
+      const response = await apiClient.get<SpecialtyShowResponse[]>('/specialty-shows', {
+        params: includeRetired ? { include_retired: true } : undefined,
+      });
       return response.data;
     } catch (error) {
       return handleAPIError(error);
@@ -1131,6 +1134,18 @@ export const specialtyShowsAPI = {
   delete: async (id: number): Promise<void> => {
     try {
       await apiClient.delete(`/specialty-shows/${id}`);
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /** Retire a show that has ended, or make a retired one current again. */
+  setRetired: async (id: number, retired: boolean): Promise<SpecialtyShowResponse> => {
+    try {
+      const response = await apiClient.post<SpecialtyShowResponse>(
+        `/specialty-shows/${id}/${retired ? 'retire' : 'unretire'}`,
+      );
+      return response.data;
     } catch (error) {
       return handleAPIError(error);
     }

@@ -229,7 +229,7 @@ def enter_dj_lottery(
             db.query(SpecialtyShow)
             .filter(
                 SpecialtyShow.id == entry_data.specialty_show_id,
-                SpecialtyShow.deleted == False,  # noqa: E712
+                SpecialtyShow.current_filter(),
             )
             .first()
         )

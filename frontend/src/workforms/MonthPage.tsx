@@ -40,11 +40,15 @@ function LoaNote({ entry }: { entry: Pick<Entry, 'loa_flag'> }) {
 
 // One month's workform: add entries through the month, then submit it. A
 // submitted workform can still be changed and resubmitted until a
-// department head has reviewed it.
+// department head has reviewed it. At /staff/:staffId/month/:month, site
+// admins see someone else's month, read-only.
 export default function MonthPage() {
   const params = useParams();
   const { user } = useAuth();
-  const isHead = !!user?.is_department_head;
+  const staffId = params.staffId ? Number(params.staffId) : null;
+  const readOnly = staffId !== null;
+  const base = readOnly ? `/staff/${staffId}` : '';
+  const isHead = !readOnly && !!user?.is_department_head;
   const [month, setMonth] = useState<string | null>(params.month ?? null);
   const [openMonths, setOpenMonths] = useState<WorkformSummary[]>([]);
   const [workform, setWorkform] = useState<Workform | null>(null);
@@ -57,22 +61,24 @@ export default function MonthPage() {
   usePageTitle(month ? formatMonth(month) : null, WORKFORMS_TITLE);
 
   useEffect(() => {
-    workformsAPI
-      .mine()
+    (staffId !== null ? workformsAPI.staffWorkforms(staffId) : workformsAPI.mine())
       .then((mine) => {
         setOpenMonths(mine.workforms.filter((w) => mine.open_months.includes(w.month)));
         setMonth(params.month ?? mine.open_months[0]);
       })
       .catch((e) => setError(errorMessage(e)));
     // Statuses change as the workform is edited and submitted
-  }, [params.month, workform?.status]);
+  }, [params.month, workform?.status, staffId]);
 
   const load = useCallback(async () => {
     if (!month) return;
     try {
       const [loaded, depts] = await Promise.all([
-        workformsAPI.get(month),
-        departments ? Promise.resolve(departments) : workformsAPI.departments(),
+        staffId !== null ? workformsAPI.staffWorkform(staffId, month) : workformsAPI.get(month),
+        // Departments are only needed to add or edit entries
+        departments || readOnly
+          ? Promise.resolve(departments ?? { own: [], other: [] })
+          : workformsAPI.departments(),
       ]);
       setWorkform(loaded);
       setDepartments(depts);
@@ -80,7 +86,7 @@ export default function MonthPage() {
     } catch (e) {
       setError(errorMessage(e));
     }
-  }, [month, departments]);
+  }, [month, departments, staffId, readOnly]);
 
   useEffect(() => {
     load();
@@ -90,7 +96,7 @@ export default function MonthPage() {
   if (error && !workform) return <div className="error-message">{error}</div>;
   if (!workform || !departments || !month) return <p className="workforms-loading">Loading…</p>;
 
-  const editable = workform.is_open && workform.status !== 'locked';
+  const editable = !readOnly && workform.is_open && workform.status !== 'locked';
   const groups = groupEntries(workform.entries);
   const monthTotal = totalHours(workform.entries);
   const isSubmitted = workform.status === 'submitted' || workform.status === 'locked';
@@ -153,7 +159,7 @@ export default function MonthPage() {
           {openMonths.map((open) => (
             <Link
               key={open.month}
-              to={`/month/${open.month}`}
+              to={`${base}/month/${open.month}`}
               className={open.month === month ? 'workforms-month-link-active' : undefined}
               aria-current={open.month === month ? 'page' : undefined}
             >
@@ -171,6 +177,13 @@ export default function MonthPage() {
         </span>
         {!isHead && <RequiredHoursBadge total={monthTotal} onLeave={workform.loa_overlaps_month} />}
       </div>
+
+      {readOnly && (
+        <div className="info-message" role="note">
+          Viewing {workform.staff_name ?? 'this staff member'}’s workform. It’s read-only.{' '}
+          <Link to={base}>See their past workforms</Link>
+        </div>
+      )}
 
       {isHead && (
         <div className="info-message">
@@ -196,7 +209,7 @@ export default function MonthPage() {
           department head if something needs correcting.
         </div>
       )}
-      {workform.status === 'submitted' && !workform.has_unsent_changes && (
+      {workform.status === 'submitted' && !workform.has_unsent_changes && !readOnly && (
         <div className="info-message">
           Submitted. You can still change it and resubmit until a department head reviews it.
         </div>
@@ -369,7 +382,7 @@ export default function MonthPage() {
         </div>
       )}
 
-      {!params.month || workform.is_open ? null : (
+      {!params.month || workform.is_open || readOnly ? null : (
         <p>
           <Link to="/history">Back to past workforms</Link>
         </p>

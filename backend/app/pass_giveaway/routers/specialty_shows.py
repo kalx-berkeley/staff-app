@@ -1,6 +1,6 @@
 """Specialty show API endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
@@ -14,6 +14,10 @@ from app.pass_giveaway.schemas.specialty_show import (
     MySpecialtyShowResponse,
 )
 from app.common.services import audit_service
+from app.pass_giveaway.services.specialty_show_spinitron import (
+    resolve_urls,
+    set_spinitron_shows,
+)
 from app.pass_giveaway.services.spinitron_show_titles_service import (
     SpinitronShowTitlesService,
 )
@@ -77,14 +81,19 @@ def _sync_djs(db: Session, show: SpecialtyShow, dj_names: list[str]) -> None:
 
 
 @router.get("", response_model=list[SpecialtyShowResponse])
-def list_specialty_shows(db: Session = Depends(get_db)):
-    """List all active (non-deleted) specialty shows."""
-    return (
-        db.query(SpecialtyShow)
-        .filter(SpecialtyShow.deleted == False)  # noqa: E712
-        .order_by(SpecialtyShow.name)
-        .all()
-    )
+def list_specialty_shows(
+    include_retired: bool = Query(False), db: Session = Depends(get_db)
+):
+    """
+    List the current (not deleted or retired) specialty shows, and also the
+    retired ones if *include_retired* is set.
+    """
+    query = db.query(SpecialtyShow)
+    if include_retired:
+        query = query.filter(SpecialtyShow.deleted == False)  # noqa: E712
+    else:
+        query = query.filter(SpecialtyShow.current_filter())
+    return query.order_by(SpecialtyShow.name).all()
 
 
 @router.get("/my", response_model=list[SpecialtyShowResponse])
@@ -97,7 +106,7 @@ def list_my_specialty_shows(
         db.query(SpecialtyShow)
         .join(SpecialtyShowOwner, SpecialtyShow.id == SpecialtyShowOwner.specialty_show_id)
         .filter(
-            SpecialtyShow.deleted == False,  # noqa: E712
+            SpecialtyShow.current_filter(),
             SpecialtyShowOwner.staff_id == staff.id,
         )
         .order_by(SpecialtyShow.name)
@@ -138,9 +147,7 @@ def list_mine_specialty_shows(
 
     shows = (
         db.query(SpecialtyShow)
-        .filter(
-            SpecialtyShow.id.in_(show_ids), SpecialtyShow.deleted == False
-        )  # noqa: E712
+        .filter(SpecialtyShow.id.in_(show_ids), SpecialtyShow.current_filter())
         .order_by(SpecialtyShow.name)
         .all()
     )
@@ -149,6 +156,8 @@ def list_mine_specialty_shows(
             id=show.id,
             name=show.name,
             deleted=show.deleted,
+            retired=show.retired,
+            spinitron_shows=show.spinitron_shows,
             owner_emails=show.owner_emails,
             owner_details=show.owner_details,
             dj_names=show.dj_names,
@@ -182,7 +191,7 @@ def list_staff_emails(
 
 
 @router.post("", response_model=SpecialtyShowResponse, status_code=status.HTTP_201_CREATED)
-def create_specialty_show(
+async def create_specialty_show(
     data: SpecialtyShowCreate,
     promotions: Staff = Depends(get_promotions_staff),
     db: Session = Depends(get_db),
@@ -196,6 +205,12 @@ def create_specialty_show(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"A specialty show named '{data.name}' already exists.",
         )
+    spinitron_shows = await resolve_urls(data.spinitron_urls)
+    if not spinitron_shows:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Add the show's Spinitron link",
+        )
     now = datetime.now(timezone.utc)
     show = SpecialtyShow(name=data.name.strip(), created_at=now, updated_at=now)
     db.add(show)
@@ -203,6 +218,7 @@ def create_specialty_show(
 
     owner_emails = data.owner_emails or [promotions.email]
     _sync_owners(db, show, owner_emails)
+    set_spinitron_shows(db, show, spinitron_shows)
 
     db.commit()
     db.refresh(show)
@@ -214,7 +230,11 @@ def create_specialty_show(
         actor_role="promotions",
         entity_type="specialty_show",
         entity_id=show.id,
-        details={"name": show.name, "owner_emails": owner_emails},
+        details={
+            "name": show.name,
+            "owner_emails": owner_emails,
+            "spinitron_show_ids": [s.id for s in spinitron_shows],
+        },
     )
     return show
 
@@ -241,25 +261,44 @@ async def get_specialty_show_dj_history(show_id: int, db: Session = Depends(get_
     return await SpinitronShowTitlesService.get_dj_history_for_title(db, show.name)
 
 
-@router.put("/{show_id}", response_model=SpecialtyShowResponse)
-def update_specialty_show(
-    show_id: int,
-    data: SpecialtyShowUpdate,
-    role_and_staff: tuple = Depends(require_promotions_or_staff),
-    db: Session = Depends(get_db),
-):
-    """Update a specialty show (promotions staff or show owner)."""
-    role, actor = role_and_staff
+def _get_editable_show(db: Session, show_id: int, role: str, actor: Staff) -> SpecialtyShow:
+    """The show, if *actor* (promotions staff or one of its owners) may edit it."""
     show = db.query(SpecialtyShow).filter(SpecialtyShow.id == show_id).first()
     if not show:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Specialty show not found"
         )
-
     if role != "promotions" and not _is_show_owner(show, actor.email):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only promotions staff or specialty show owners can update this show",
+        )
+    return show
+
+
+@router.put("/{show_id}", response_model=SpecialtyShowResponse)
+async def update_specialty_show(
+    show_id: int,
+    data: SpecialtyShowUpdate,
+    role_and_staff: tuple = Depends(require_promotions_or_staff),
+    db: Session = Depends(get_db),
+):
+    """
+    Update a specialty show (promotions staff or show owner). A show must have
+    a Spinitron show, so saving a show that has none needs *spinitron_urls*.
+    """
+    role, actor = role_and_staff
+    show = _get_editable_show(db, show_id, role, actor)
+
+    spinitron_shows = None
+    if data.spinitron_urls is not None:
+        spinitron_shows = await resolve_urls(data.spinitron_urls)
+    if (spinitron_shows is None and not show.spinitron_show_rows) or (
+        spinitron_shows is not None and not spinitron_shows
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Add the show's Spinitron link",
         )
 
     if data.name is not None:
@@ -281,6 +320,9 @@ def update_specialty_show(
 
     if data.dj_names is not None:
         _sync_djs(db, show, data.dj_names)
+
+    if spinitron_shows is not None:
+        set_spinitron_shows(db, show, spinitron_shows)
 
     show.updated_at = datetime.now(timezone.utc)
     db.commit()
@@ -323,3 +365,55 @@ def delete_specialty_show(
         entity_id=show_id,
         details={"name": show.name},
     )
+
+
+def _set_retired(
+    db: Session, show_id: int, role_and_staff: tuple, retired: bool
+) -> SpecialtyShow:
+    role, actor = role_and_staff
+    show = _get_editable_show(db, show_id, role, actor)
+    if show.deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Specialty show not found"
+        )
+    if show.retired != retired:
+        show.retired_at = datetime.now(timezone.utc) if retired else None
+        show.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        audit_service.log_event(
+            db,
+            event_type="specialty_show_retired" if retired else "specialty_show_unretired",
+            area=PASS_GIVEAWAY_AREA,
+            actor_email=actor.email,
+            actor_role=role,
+            entity_type="specialty_show",
+            entity_id=show.id,
+            details={"name": show.name},
+        )
+    db.refresh(show)
+    return show
+
+
+@router.post("/{show_id}/retire", response_model=SpecialtyShowResponse)
+def retire_specialty_show(
+    show_id: int,
+    role_and_staff: tuple = Depends(require_promotions_or_staff),
+    db: Session = Depends(get_db),
+):
+    """
+    Retire a specialty show that has ended (promotions staff or show owner).
+
+    It's kept, and its Spinitron shows still count as a specialty show, but
+    passes can no longer be given to it and it's no longer suggested.
+    """
+    return _set_retired(db, show_id, role_and_staff, True)
+
+
+@router.post("/{show_id}/unretire", response_model=SpecialtyShowResponse)
+def unretire_specialty_show(
+    show_id: int,
+    role_and_staff: tuple = Depends(require_promotions_or_staff),
+    db: Session = Depends(get_db),
+):
+    """Make a retired specialty show current again (promotions staff or show owner)."""
+    return _set_retired(db, show_id, role_and_staff, False)

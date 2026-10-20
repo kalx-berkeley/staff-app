@@ -16,6 +16,11 @@ class SpecialtyShowCreate(BaseModel):
         default_factory=list,
         description="Email addresses of staff members who own this show",
     )
+    spinitron_urls: list[str] = Field(
+        ...,
+        min_length=1,
+        description="Spinitron show or playlist links, one or more per show",
+    )
 
 
 class SpecialtyShowUpdate(BaseModel):
@@ -30,6 +35,13 @@ class SpecialtyShowUpdate(BaseModel):
         None,
         description="Replace the full list of DJ names (null = no change)",
     )
+    spinitron_urls: list[str] | None = Field(
+        None,
+        description=(
+            "Replace the show's Spinitron shows with these show or playlist "
+            "links (null = no change). A show must have at least one."
+        ),
+    )
 
 
 class SpecialtyShowOwnerInfo(BaseModel):
@@ -41,6 +53,14 @@ class SpecialtyShowOwnerInfo(BaseModel):
     name: str | None = None
 
 
+class SpinitronShowInfo(BaseModel):
+    """One of a specialty show's Spinitron shows."""
+
+    id: int
+    title: str | None = None
+    url: str
+
+
 class SpecialtyShowResponse(BaseModel):
     """Schema for specialty show response."""
 
@@ -49,6 +69,8 @@ class SpecialtyShowResponse(BaseModel):
     id: int
     name: str
     deleted: bool = False
+    retired: bool = False
+    spinitron_shows: list[SpinitronShowInfo] = Field(default_factory=list)
     owner_emails: list[str] = Field(default_factory=list)
     owner_details: list[SpecialtyShowOwnerInfo] = Field(default_factory=list)
     dj_names: list[str] = Field(default_factory=list)

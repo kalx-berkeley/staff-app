@@ -12,7 +12,9 @@ import re
 from app.common import jobs as common_jobs
 from app.common.routers import admin as common_admin
 from app.common.routers import users
+from app.directory.routers import admin as directory_admin
 from app.directory.routers import directory
+from app.directory import jobs as directory_jobs
 from app.short_links.routers import admin as short_links_admin
 from app.short_links.routers import redirect as short_links_redirect
 from app.workforms.routers import review as workforms_review
@@ -45,19 +47,32 @@ from app.auth import check_apache_auth_layer
 from app.config import settings
 from app.rate_limiter import RateLimitExceeded
 from app.common.services.job_registry import register_job
+from app.common.services.profile_providers import (
+    register_monthly_hours_provider,
+    register_specialty_show_ids_provider,
+)
 from app.common.services.user_service import register_post_sync_hook
+from app.pass_giveaway.services.specialty_show_spinitron import specialty_show_ids
 from app.workforms.services.departments import (
     after_staff_sync as workforms_after_staff_sync,
 )
+from app.workforms.services.summary import monthly_hours as workforms_monthly_hours
 
 # Department heads and other workforms data are refreshed with the staff sync
 if settings.workforms_enabled:
     register_post_sync_hook(workforms_after_staff_sync)
 
+# The Staff Directory's profile page reads specialty shows (to tell them from
+# DJ shifts) and workforms hours through these
+register_specialty_show_ids_provider(specialty_show_ids)
+if settings.workforms_enabled:
+    register_monthly_hours_provider(workforms_monthly_hours)
+
 # Every sub-site's scheduled jobs are listed in KALX Staff Admin
 for job in (
     common_jobs.ADMIN_JOBS
     + pass_giveaway_jobs.ADMIN_JOBS
+    + directory_jobs.ADMIN_JOBS
     + (workforms_jobs.ADMIN_JOBS if settings.workforms_enabled else [])
 ):
     register_job(job)
@@ -278,6 +293,7 @@ app.include_router(alternates.router, dependencies=_auth_check)
 app.include_router(specialty_shows.router, dependencies=_auth_check)
 app.include_router(on_air.router, dependencies=_auth_check)
 app.include_router(directory.router, dependencies=_auth_check)
+app.include_router(directory_admin.router, dependencies=_auth_check)
 if settings.workforms_enabled:
     app.include_router(workforms_review.router, dependencies=_auth_check)
     app.include_router(workforms.router, dependencies=_auth_check)

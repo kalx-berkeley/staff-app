@@ -34,6 +34,10 @@ class Staff(Base):
     # Airtable: "First Name" and "Surname" as "First Last" (or "Name" as-is if
     # both are blank)
     name = Column(String, nullable=False)
+    # Airtable: "First Name" and "Surname" as they are, for the profile edit
+    # form (name is what the app displays)
+    first_name = Column(String, nullable=True)
+    surname = Column(String, nullable=True)
     # Airtable: "Pronouns", e.g. "she/her"
     pronouns = Column(String, nullable=True)
     # Airtable: "Phone"
@@ -55,6 +59,9 @@ class Staff(Base):
     # Derived: the same lookup as [{"id": persona_id, "name": persona_name}],
     # keeping each name with its persona (dj_name joins them with commas)
     dj_personas = Column(JSON, nullable=True)
+    # Airtable: "DJ Quiz", the years (e.g. [2025, 2026]) whose DJ Quiz the
+    # staff member has completed, sorted. Null when there are none.
+    dj_quiz_years = Column(JSON, nullable=True)
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )

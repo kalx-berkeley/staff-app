@@ -4433,6 +4433,274 @@ body.staging-active .directory-detail-close {
   font-style: italic;
 }
 
+.directory-profile-link {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  color: #1a6fb0;
+}
+
+/* Profile page (/directory/me and /directory/:staffId/profile) */
+.profile-page {
+  max-width: 900px;
+}
+
+.profile-section {
+  margin: 0 0 1.5rem;
+  padding: 1.25rem;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+}
+
+.profile-section > h2 {
+  margin: 0 0 1rem;
+  font-size: 1.2rem;
+}
+
+.profile-edit fieldset {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+/* Greyed out until editing is turned on */
+.profile-edit fieldset:disabled {
+  opacity: 0.6;
+}
+
+.profile-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0 1rem;
+}
+
+.profile-edit-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+}
+
+.profile-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.5rem 0 1.25rem;
+}
+
+.profile-edit-saved {
+  color: var(--success-color);
+  font-weight: 600;
+}
+
+.profile-photo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.persona-editor input {
+  width: 100%;
+}
+
+.persona-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.persona-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.3rem 0.15rem 0.65rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--light-bg);
+}
+
+.persona-chip a {
+  color: #1a6fb0;
+}
+
+.persona-chip button {
+  border: none;
+  background: none;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #555;
+}
+
+.persona-none {
+  margin: 0 0 0.5rem;
+  color: #777;
+}
+
+.persona-matches {
+  margin: 0.25rem 0 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.persona-matches button {
+  display: block;
+  width: 100%;
+  padding: 0.35rem 0.75rem;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.persona-matches button:hover,
+.persona-matches button:focus {
+  background: var(--light-bg);
+}
+
+/* Sublist DJ requirements */
+.eligibility-summary {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  border-left: 4px solid;
+}
+
+.eligibility-summary-met {
+  background: #eaf7ee;
+  border-color: var(--success-color);
+}
+
+.eligibility-summary-unmet {
+  background: #fdf0f0;
+  border-color: var(--danger-color);
+}
+
+.eligibility-rows,
+.eligibility-months {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.eligibility-row {
+  border-top: 1px solid #eee;
+}
+
+.eligibility-row summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.65rem 0;
+  cursor: pointer;
+}
+
+.eligibility-row-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.eligibility-row-title {
+  font-weight: 600;
+}
+
+.eligibility-row-status {
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.eligibility-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.eligibility-month .eligibility-mark {
+  width: 1.2rem;
+  height: 1.2rem;
+  font-size: 0.75rem;
+}
+
+.eligibility-mark-met {
+  background: var(--success-color);
+}
+
+.eligibility-mark-unmet {
+  background: var(--danger-color);
+}
+
+.eligibility-mark-unknown {
+  background: var(--secondary-color);
+}
+
+.eligibility-details {
+  padding: 0 0 1rem 2.25rem;
+  font-size: 0.9rem;
+}
+
+.eligibility-details h4 {
+  margin: 1rem 0 0.4rem;
+  font-size: 0.95rem;
+}
+
+.eligibility-note,
+.eligibility-empty {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.eligibility-table,
+.profile-workforms {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.eligibility-table th,
+.eligibility-table td,
+.profile-workforms th,
+.profile-workforms td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid #eee;
+  text-align: left;
+}
+
+.eligibility-month {
+  margin-bottom: 0.6rem;
+}
+
+.eligibility-departments {
+  margin: 0.2rem 0 0 1.6rem;
+  padding: 0;
+  list-style: none;
+  color: #555;
+}
+
+.profile-workforms-flag {
+  margin-left: 0.4rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: #fff1b8;
+  font-size: 0.75rem;
+}
+
 /* Narrow screens: show each staff member as a card instead of a table row */
 @media (max-width: 760px) {
   .directory-page {
@@ -5012,4 +5280,14 @@ body.staging-active .workforms-review-detail {
   .workforms-entry-buttons {
     grid-column: 1 / -1;
   }
+}
+
+/* Retired specialty shows, collapsed under the current ones */
+.retired-shows {
+  margin-top: 1.5rem;
+}
+
+.retired-shows summary {
+  cursor: pointer;
+  font-weight: 600;
 }

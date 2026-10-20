@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     # The department whose heads review departments that have no head, and
     # department heads' own hours.
     workforms_operations_department: str = "Operations"
+    # Whether staff can edit their own details (and site admins anyone's) on
+    # the Staff Directory's profile page. The form is always shown, but greyed
+    # out while this is off. Turn it on only once AIRTABLE_API_KEY can write to
+    # the staff table (AIRTABLE_TABLE_NAME).
+    directory_self_edit_enabled: bool = False
 
     # Spinitron
     spinitron_api_key: Optional[str] = None
@@ -62,9 +67,11 @@ class Settings(BaseSettings):
     spinitron_placeholder_persona_ids: str = "176287,186839,169919,195674,176342,193517"
     # Spinitron show titles that aren't a DJ or specialty show anyone could be
     # pre-assigned passes for — comma-separated, matched case-insensitively.
-    # FREEFORM is the default title of every regular DJ's show, and OVERNIGHTS
-    # is pre-recorded with no live DJ. They're left out of every DJ name
-    # suggestion and autocomplete.
+    # FREEFORM is the default title Spinitron gives a regular DJ's show, used
+    # when the DJ hasn't named it (DJs are encouraged to, so most regular shows
+    # have their own titles; a title other than FREEFORM doesn't make a show a
+    # specialty show). OVERNIGHTS is pre-recorded with no live DJ. They're left
+    # out of every DJ name suggestion and autocomplete.
     spinitron_non_dj_show_titles: str = "FREEFORM,OVERNIGHTS"
 
     # Authentication

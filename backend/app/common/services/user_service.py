@@ -63,6 +63,21 @@ def _date_field(fields: Dict[str, Any], name: str) -> Optional[date]:
         return None
 
 
+def _dj_quiz_years(value: Any) -> List[int]:
+    """
+    The years in the "DJ Quiz" multi-select, sorted; values that aren't a year
+    are ignored.
+    """
+    if not isinstance(value, list):
+        return []
+    years = set()
+    for item in value:
+        text = str(item).strip()
+        if re.fullmatch(r"\d{4}", text):
+            years.add(int(text))
+    return sorted(years)
+
+
 def _extract_spinitron_ids(raw: str) -> List[int]:
     """Extract Spinitron persona IDs from Spinitron DJ profile URLs in a markdown string."""
     return [int(m.group(1)) for m in _SPINITRON_URL_RE.finditer(raw)]
@@ -251,245 +266,9 @@ class UserService:
         seen_emails: set[str] = set()
 
         for record in records:
-            fields = record.get("fields", {})
-            record_id = record.get("id")
-            email = (
-                fields.get("Email address") or fields.get("email") or fields.get("Email")
+            UserService._upsert_record(
+                db, record, department_names, result, photo_updates, seen_emails
             )
-            if not email or not isinstance(email, str):
-                continue
-            email = email.strip().lower()
-
-            statuses = fields.get("Status", [])
-            if isinstance(statuses, str):
-                statuses = [s.strip() for s in statuses.split(",")]
-            elif not isinstance(statuses, list):
-                statuses = []
-            if not CURRENT_STAFF_STATUSES.intersection(statuses):
-                continue
-            seen_emails.add(email)
-
-            name = _staff_name(fields)
-            pronouns = _text_field(fields, "Pronouns") or None
-            loa_start = _date_field(fields, "LOA start")
-            loa_end = _date_field(fields, "LOA end")
-            phone = (fields.get("Phone") or "").strip()
-            titles_and_roles = fields.get("Titles and Roles")
-            if not isinstance(titles_and_roles, str) or not titles_and_roles.strip():
-                titles_and_roles = None
-            else:
-                titles_and_roles = titles_and_roles.strip()
-            photo_attachment = select_photo_attachment(fields.get("Photo"))
-
-            departments: Optional[List[str]] = fields.get("Department", [])
-            if isinstance(departments, str):
-                departments = [d.strip() for d in departments.split(",")]
-            elif not isinstance(departments, list):
-                departments = []
-            departments = [department_names.get(d, d) for d in departments]
-            unresolved = [
-                d
-                for d in departments
-                if isinstance(d, str) and _AIRTABLE_RECORD_ID_RE.match(d)
-            ]
-            if unresolved:
-                # Storing record IDs as department names would revoke roles
-                # (e.g. Promotions), so leave this member's departments as-is.
-                error_msg = (
-                    f"Could not resolve departments {unresolved} for {email}; "
-                    "left their departments unchanged"
-                )
-                logger.error(error_msg)
-                result["errors"].append(error_msg)
-                departments = None
-
-            # Extract Spinitron persona IDs from URLs in the "DJ Name" field
-            raw_dj_field = fields.get("DJ Name", "")
-            spinitron_ids: Optional[List[int]] = None
-            if raw_dj_field and isinstance(raw_dj_field, str):
-                ids = _extract_spinitron_ids(raw_dj_field)
-                if ids:
-                    spinitron_ids = ids
-
-            try:
-                # Everyone goes into the staff table. Match on the Airtable
-                # record ID so an email change in Airtable updates the existing
-                # row; rows synced before record IDs were stored match by email.
-                existing_staff = None
-                if record_id:
-                    existing_staff = (
-                        db.query(Staff)
-                        .filter(Staff.airtable_record_id == record_id)
-                        .first()
-                    )
-                if existing_staff is None:
-                    existing_staff = db.query(Staff).filter(Staff.email == email).first()
-                elif existing_staff.email != email:
-                    email_taken = (
-                        db.query(Staff)
-                        .filter(Staff.email == email, Staff.id != existing_staff.id)
-                        .first()
-                    )
-                    if email_taken:
-                        error_msg = (
-                            f"Can't change {existing_staff.email} to {email}: another "
-                            "staff record already has that email"
-                        )
-                        logger.error(error_msg)
-                        result["errors"].append(error_msg)
-                        continue
-                if existing_staff:
-                    # Detect field changes for audit logging
-                    changed: Dict[str, Any] = {}
-                    if existing_staff.email != email:
-                        changed["email"] = {"before": existing_staff.email, "after": email}
-                    if existing_staff.name != name:
-                        changed["name"] = {"before": existing_staff.name, "after": name}
-                    if existing_staff.phone != phone:
-                        changed["phone"] = {"before": existing_staff.phone, "after": phone}
-                    old_ids = existing_staff.spinitron_ids or []
-                    new_ids = spinitron_ids or []
-                    if old_ids != new_ids:
-                        changed["spinitron_ids"] = {"before": old_ids, "after": new_ids}
-                    if existing_staff.pronouns != pronouns:
-                        changed["pronouns"] = {
-                            "before": existing_staff.pronouns,
-                            "after": pronouns,
-                        }
-                    if existing_staff.titles_and_roles != titles_and_roles:
-                        changed["titles_and_roles"] = {
-                            "before": existing_staff.titles_and_roles,
-                            "after": titles_and_roles,
-                        }
-                    for field, value in (("loa_start", loa_start), ("loa_end", loa_end)):
-                        before = getattr(existing_staff, field)
-                        if before != value:
-                            changed[field] = {
-                                "before": before and before.isoformat(),
-                                "after": value and value.isoformat(),
-                            }
-                    existing_staff.email = email
-                    existing_staff.name = name
-                    existing_staff.pronouns = pronouns
-                    existing_staff.phone = phone
-                    existing_staff.titles_and_roles = titles_and_roles
-                    existing_staff.loa_start = loa_start
-                    existing_staff.loa_end = loa_end
-                    existing_staff.spinitron_ids = spinitron_ids
-                    if record_id:
-                        existing_staff.airtable_record_id = record_id
-                    staff_record = existing_staff
-                    is_new = False
-                else:
-                    staff_record = Staff(
-                        airtable_record_id=record_id,
-                        email=email,
-                        name=name,
-                        pronouns=pronouns,
-                        phone=phone,
-                        titles_and_roles=titles_and_roles,
-                        loa_start=loa_start,
-                        loa_end=loa_end,
-                        spinitron_ids=spinitron_ids,
-                    )
-                    db.add(staff_record)
-                    db.flush()
-                    changed = {}
-                    is_new = True
-                result["staff_upserted"].append(email)
-
-                # Sync department memberships
-                existing_depts = {
-                    d.department
-                    for d in (
-                        db.query(StaffDepartment)
-                        .filter(StaffDepartment.staff_id == staff_record.id)
-                        .all()
-                    )
-                }
-                if departments is None:
-                    departments = sorted(existing_depts)
-                depts_added = []
-                depts_removed = []
-                for dept in departments:
-                    if dept and dept not in existing_depts:
-                        db.add(StaffDepartment(staff_id=staff_record.id, department=dept))
-                        depts_added.append(dept)
-                # Remove departments no longer present
-                for old_dept in existing_depts:
-                    if old_dept not in departments:
-                        db.query(StaffDepartment).filter(
-                            StaffDepartment.staff_id == staff_record.id,
-                            StaffDepartment.department == old_dept,
-                        ).delete()
-                        depts_removed.append(old_dept)
-
-                if depts_added:
-                    changed["departments_added"] = depts_added
-                if depts_removed:
-                    changed["departments_removed"] = depts_removed
-
-                # Sync status values
-                existing_statuses = {
-                    s.status
-                    for s in (
-                        db.query(StaffStatus)
-                        .filter(StaffStatus.staff_id == staff_record.id)
-                        .all()
-                    )
-                }
-                statuses_added = []
-                statuses_removed = []
-                for stat in statuses:
-                    if stat and stat not in existing_statuses:
-                        db.add(StaffStatus(staff_id=staff_record.id, status=stat))
-                        statuses_added.append(stat)
-                for old_stat in existing_statuses:
-                    if old_stat not in statuses:
-                        db.query(StaffStatus).filter(
-                            StaffStatus.staff_id == staff_record.id,
-                            StaffStatus.status == old_stat,
-                        ).delete()
-                        statuses_removed.append(old_stat)
-
-                if statuses_added:
-                    changed["statuses_added"] = statuses_added
-                if statuses_removed:
-                    changed["statuses_removed"] = statuses_removed
-
-                # Track promotions department members for the result summary
-                if PROMOTIONS_DEPARTMENT in departments:
-                    result["promotions_upserted"].append(email)
-
-                db.commit()
-                photo_updates.append((staff_record.id, photo_attachment))
-
-                # Audit log after successful commit
-                if is_new:
-                    log_event(
-                        db,
-                        event_type="airtable_sync_added",
-                        area=COMMON_AREA,
-                        actor_role="system",
-                        entity_type="staff",
-                        entity_id=staff_record.id,
-                        details={"email": email, "name": name, "departments": departments},
-                    )
-                elif changed:
-                    log_event(
-                        db,
-                        event_type="airtable_sync_changed",
-                        area=COMMON_AREA,
-                        actor_role="system",
-                        entity_type="staff",
-                        entity_id=staff_record.id,
-                        details={"email": email, "changes": changed},
-                    )
-            except SQLAlchemyError as e:
-                db.rollback()
-                error_msg = f"DB error upserting {email}: {str(e)}"
-                logger.error(error_msg)
-                result["errors"].append(error_msg)
 
         # Deactivate staff who no longer appear in Airtable as "Active" or
         # "🆕". The loop above only reconciles departments/statuses for the
@@ -533,35 +312,7 @@ class UserService:
                     result["errors"].append(error_msg)
 
         # Phase 2: Resolve DJ names from Spinitron API
-        if settings.spinitron_api_key and result["staff_upserted"]:
-            from app.common.services.spinitron_service import SpinitronService
-
-            try:
-                persona_map = await SpinitronService.fetch_all_personas()
-                for email in result["staff_upserted"]:
-                    staff_record = db.query(Staff).filter(Staff.email == email).first()
-                    if staff_record is None:
-                        continue
-                    ids = staff_record.spinitron_ids or []
-                    personas = [
-                        {"id": sid, "name": persona_map[sid]}
-                        for sid in ids
-                        if sid in persona_map
-                    ]
-                    staff_record.dj_name = (
-                        ", ".join(p["name"] for p in personas) if personas else None
-                    )
-                    staff_record.dj_personas = personas or None
-                db.commit()
-                logger.info(
-                    "Updated DJ names from Spinitron for %d staff records",
-                    len(result["staff_upserted"]),
-                )
-            except Exception as e:
-                db.rollback()
-                error_msg = f"Spinitron DJ name resolution failed: {str(e)}"
-                logger.error(error_msg)
-                result["errors"].append(error_msg)
+        await UserService._resolve_dj_names(db, result["staff_upserted"], result)
 
         # Phase 3: Bring the staff directory photos on disk up to date
         await UserService._sync_photos(db, photo_updates, result)
@@ -593,6 +344,364 @@ class UserService:
             f"deactivated, {len(result['errors'])} errors"
         )
         return result
+
+    @staticmethod
+    def _upsert_record(
+        db: Session,
+        record: Dict[str, Any],
+        department_names: Dict[str, str],
+        result: Dict[str, Any],
+        photo_updates: List[tuple[int, Optional[Dict[str, Any]]]],
+        seen_emails: set[str],
+    ) -> None:
+        """
+        Insert or update the staff row for one Airtable record.
+
+        Records without an email, or whose Status is neither "Active" nor "🆕",
+        are skipped. See `sync_from_airtable` for the rest.
+
+        :param db: Database session.
+        :param record: The Airtable record ("id" and "fields").
+        :param department_names: Department record ID to name.
+        :param result: Sync result dict, added to as in `sync_from_airtable`.
+        :param photo_updates: Gets (staff ID, "Photo" attachment or None) appended.
+        :param seen_emails: Gets the record's email added when it's current staff.
+        """
+        from app.common.services.audit_service import log_event
+
+        fields = record.get("fields", {})
+        record_id = record.get("id")
+        email = fields.get("Email address") or fields.get("email") or fields.get("Email")
+        if not email or not isinstance(email, str):
+            return
+        email = email.strip().lower()
+
+        statuses = fields.get("Status", [])
+        if isinstance(statuses, str):
+            statuses = [s.strip() for s in statuses.split(",")]
+        elif not isinstance(statuses, list):
+            statuses = []
+        if not CURRENT_STAFF_STATUSES.intersection(statuses):
+            return
+        seen_emails.add(email)
+
+        name = _staff_name(fields)
+        first_name = _text_field(fields, "First Name") or None
+        surname = _text_field(fields, "Surname") or None
+        dj_quiz_years = _dj_quiz_years(fields.get("DJ Quiz"))
+        pronouns = _text_field(fields, "Pronouns") or None
+        loa_start = _date_field(fields, "LOA start")
+        loa_end = _date_field(fields, "LOA end")
+        phone = (fields.get("Phone") or "").strip()
+        titles_and_roles = fields.get("Titles and Roles")
+        if not isinstance(titles_and_roles, str) or not titles_and_roles.strip():
+            titles_and_roles = None
+        else:
+            titles_and_roles = titles_and_roles.strip()
+        photo_attachment = select_photo_attachment(fields.get("Photo"))
+
+        departments: Optional[List[str]] = fields.get("Department", [])
+        if isinstance(departments, str):
+            departments = [d.strip() for d in departments.split(",")]
+        elif not isinstance(departments, list):
+            departments = []
+        departments = [department_names.get(d, d) for d in departments]
+        unresolved = [
+            d for d in departments if isinstance(d, str) and _AIRTABLE_RECORD_ID_RE.match(d)
+        ]
+        if unresolved:
+            # Storing record IDs as department names would revoke roles
+            # (e.g. Promotions), so leave this member's departments as-is.
+            error_msg = (
+                f"Could not resolve departments {unresolved} for {email}; "
+                "left their departments unchanged"
+            )
+            logger.error(error_msg)
+            result["errors"].append(error_msg)
+            departments = None
+
+        # Extract Spinitron persona IDs from URLs in the "DJ Name" field
+        raw_dj_field = fields.get("DJ Name", "")
+        spinitron_ids: Optional[List[int]] = None
+        if raw_dj_field and isinstance(raw_dj_field, str):
+            ids = _extract_spinitron_ids(raw_dj_field)
+            if ids:
+                spinitron_ids = ids
+
+        try:
+            # Everyone goes into the staff table. Match on the Airtable
+            # record ID so an email change in Airtable updates the existing
+            # row; rows synced before record IDs were stored match by email.
+            existing_staff = None
+            if record_id:
+                existing_staff = (
+                    db.query(Staff).filter(Staff.airtable_record_id == record_id).first()
+                )
+            if existing_staff is None:
+                existing_staff = db.query(Staff).filter(Staff.email == email).first()
+            elif existing_staff.email != email:
+                email_taken = (
+                    db.query(Staff)
+                    .filter(Staff.email == email, Staff.id != existing_staff.id)
+                    .first()
+                )
+                if email_taken:
+                    error_msg = (
+                        f"Can't change {existing_staff.email} to {email}: another "
+                        "staff record already has that email"
+                    )
+                    logger.error(error_msg)
+                    result["errors"].append(error_msg)
+                    return
+            if existing_staff:
+                # Detect field changes for audit logging
+                changed: Dict[str, Any] = {}
+                if existing_staff.email != email:
+                    changed["email"] = {"before": existing_staff.email, "after": email}
+                if existing_staff.name != name:
+                    changed["name"] = {"before": existing_staff.name, "after": name}
+                if existing_staff.phone != phone:
+                    changed["phone"] = {"before": existing_staff.phone, "after": phone}
+                old_ids = existing_staff.spinitron_ids or []
+                new_ids = spinitron_ids or []
+                if old_ids != new_ids:
+                    changed["spinitron_ids"] = {"before": old_ids, "after": new_ids}
+                if (existing_staff.dj_quiz_years or []) != dj_quiz_years:
+                    changed["dj_quiz_years"] = {
+                        "before": existing_staff.dj_quiz_years or [],
+                        "after": dj_quiz_years,
+                    }
+                if existing_staff.pronouns != pronouns:
+                    changed["pronouns"] = {
+                        "before": existing_staff.pronouns,
+                        "after": pronouns,
+                    }
+                if existing_staff.titles_and_roles != titles_and_roles:
+                    changed["titles_and_roles"] = {
+                        "before": existing_staff.titles_and_roles,
+                        "after": titles_and_roles,
+                    }
+                for field, value in (("loa_start", loa_start), ("loa_end", loa_end)):
+                    before = getattr(existing_staff, field)
+                    if before != value:
+                        changed[field] = {
+                            "before": before and before.isoformat(),
+                            "after": value and value.isoformat(),
+                        }
+                existing_staff.email = email
+                existing_staff.name = name
+                existing_staff.first_name = first_name
+                existing_staff.surname = surname
+                existing_staff.dj_quiz_years = dj_quiz_years or None
+                existing_staff.pronouns = pronouns
+                existing_staff.phone = phone
+                existing_staff.titles_and_roles = titles_and_roles
+                existing_staff.loa_start = loa_start
+                existing_staff.loa_end = loa_end
+                existing_staff.spinitron_ids = spinitron_ids
+                if record_id:
+                    existing_staff.airtable_record_id = record_id
+                staff_record = existing_staff
+                is_new = False
+            else:
+                staff_record = Staff(
+                    airtable_record_id=record_id,
+                    email=email,
+                    name=name,
+                    first_name=first_name,
+                    surname=surname,
+                    dj_quiz_years=dj_quiz_years or None,
+                    pronouns=pronouns,
+                    phone=phone,
+                    titles_and_roles=titles_and_roles,
+                    loa_start=loa_start,
+                    loa_end=loa_end,
+                    spinitron_ids=spinitron_ids,
+                )
+                db.add(staff_record)
+                db.flush()
+                changed = {}
+                is_new = True
+            result["staff_upserted"].append(email)
+
+            # Sync department memberships
+            existing_depts = {
+                d.department
+                for d in (
+                    db.query(StaffDepartment)
+                    .filter(StaffDepartment.staff_id == staff_record.id)
+                    .all()
+                )
+            }
+            if departments is None:
+                departments = sorted(existing_depts)
+            depts_added = []
+            depts_removed = []
+            for dept in departments:
+                if dept and dept not in existing_depts:
+                    db.add(StaffDepartment(staff_id=staff_record.id, department=dept))
+                    depts_added.append(dept)
+            # Remove departments no longer present
+            for old_dept in existing_depts:
+                if old_dept not in departments:
+                    db.query(StaffDepartment).filter(
+                        StaffDepartment.staff_id == staff_record.id,
+                        StaffDepartment.department == old_dept,
+                    ).delete()
+                    depts_removed.append(old_dept)
+
+            if depts_added:
+                changed["departments_added"] = depts_added
+            if depts_removed:
+                changed["departments_removed"] = depts_removed
+
+            # Sync status values
+            existing_statuses = {
+                s.status
+                for s in (
+                    db.query(StaffStatus)
+                    .filter(StaffStatus.staff_id == staff_record.id)
+                    .all()
+                )
+            }
+            statuses_added = []
+            statuses_removed = []
+            for stat in statuses:
+                if stat and stat not in existing_statuses:
+                    db.add(StaffStatus(staff_id=staff_record.id, status=stat))
+                    statuses_added.append(stat)
+            for old_stat in existing_statuses:
+                if old_stat not in statuses:
+                    db.query(StaffStatus).filter(
+                        StaffStatus.staff_id == staff_record.id,
+                        StaffStatus.status == old_stat,
+                    ).delete()
+                    statuses_removed.append(old_stat)
+
+            if statuses_added:
+                changed["statuses_added"] = statuses_added
+            if statuses_removed:
+                changed["statuses_removed"] = statuses_removed
+
+            # Track promotions department members for the result summary
+            if PROMOTIONS_DEPARTMENT in departments:
+                result["promotions_upserted"].append(email)
+
+            db.commit()
+            photo_updates.append((staff_record.id, photo_attachment))
+
+            # Audit log after successful commit
+            if is_new:
+                log_event(
+                    db,
+                    event_type="airtable_sync_added",
+                    area=COMMON_AREA,
+                    actor_role="system",
+                    entity_type="staff",
+                    entity_id=staff_record.id,
+                    details={"email": email, "name": name, "departments": departments},
+                )
+            elif changed:
+                log_event(
+                    db,
+                    event_type="airtable_sync_changed",
+                    area=COMMON_AREA,
+                    actor_role="system",
+                    entity_type="staff",
+                    entity_id=staff_record.id,
+                    details={"email": email, "changes": changed},
+                )
+        except SQLAlchemyError as e:
+            db.rollback()
+            error_msg = f"DB error upserting {email}: {str(e)}"
+            logger.error(error_msg)
+            result["errors"].append(error_msg)
+
+    @staticmethod
+    async def sync_one(db: Session, airtable_record_id: str) -> Dict[str, Any]:
+        """
+        Re-sync one staff member from Airtable, as `sync_from_airtable` does
+        for everyone: their fields, departments, statuses, DJ names and photo.
+
+        Used after the app writes to their record. Unlike the full sync, it
+        doesn't deactivate anyone, run the post-sync hooks or log a job run.
+
+        :param db: Database session.
+        :param airtable_record_id: The staff member's Airtable record ID.
+        :returns: A sync result dict, as `sync_from_airtable` returns.
+        :raises HTTPException: 503 if Airtable isn't configured, 502 if the
+            call fails.
+        """
+        from app.common.services.staff_airtable import get_staff_record
+
+        result: Dict[str, Any] = {
+            "promotions_upserted": [],
+            "staff_upserted": [],
+            "deactivated": [],
+            "errors": [],
+        }
+        record = await get_staff_record(airtable_record_id)
+        if record is None:
+            result["errors"].append(f"Airtable record {airtable_record_id} not found")
+            return result
+
+        department_names: Dict[str, str] = {}
+        if any(
+            isinstance(d, str) and _AIRTABLE_RECORD_ID_RE.match(d)
+            for d in record["fields"].get("Department") or []
+        ):
+            try:
+                department_names = await UserService.fetch_department_names()
+            except HTTPException as e:
+                result["errors"].append(str(e.detail))
+
+        photo_updates: List[tuple[int, Optional[Dict[str, Any]]]] = []
+        UserService._upsert_record(
+            db, record, department_names, result, photo_updates, set()
+        )
+        await UserService._resolve_dj_names(db, result["staff_upserted"], result)
+        await UserService._sync_photos(db, photo_updates, result)
+        return result
+
+    @staticmethod
+    async def _resolve_dj_names(
+        db: Session, emails: List[str], result: Dict[str, Any]
+    ) -> None:
+        """
+        Look up the Spinitron persona names for these staff members'
+        spinitron_ids, and store them in dj_name and dj_personas.
+
+        :param db: Database session.
+        :param emails: The staff members to update.
+        :param result: Sync result dict; a failure is added to its "errors".
+        """
+        if not settings.spinitron_api_key or not emails:
+            return
+        from app.common.services.spinitron_service import SpinitronService
+
+        try:
+            persona_map = await SpinitronService.fetch_all_personas()
+            for email in emails:
+                staff_record = db.query(Staff).filter(Staff.email == email).first()
+                if staff_record is None:
+                    continue
+                ids = staff_record.spinitron_ids or []
+                personas = [
+                    {"id": sid, "name": persona_map[sid]}
+                    for sid in ids
+                    if sid in persona_map
+                ]
+                staff_record.dj_name = (
+                    ", ".join(p["name"] for p in personas) if personas else None
+                )
+                staff_record.dj_personas = personas or None
+            db.commit()
+            logger.info("Updated DJ names from Spinitron for %d staff records", len(emails))
+        except Exception as e:
+            db.rollback()
+            error_msg = f"Spinitron DJ name resolution failed: {str(e)}"
+            logger.error(error_msg)
+            result["errors"].append(error_msg)
 
     @staticmethod
     async def _sync_photos(

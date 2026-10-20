@@ -1,3 +1,5 @@
+import type { APIError } from './types';
+
 export function formatPhone(phone: string | null | undefined): string {
   if (!phone) return '—';
   const digits = phone.replace(/\D/g, '');
@@ -107,4 +109,13 @@ export function formatLeave(leave: LeaveDates): string {
   }
   if (leave.loa_start) return `from ${formatLeaveDate(leave.loa_start)}`;
   return leave.loa_end ? `until ${formatLeaveDate(leave.loa_end)}` : '';
+}
+
+/** A message for an error thrown by the API helpers. */
+export function errorMessage(error: unknown): string {
+  const detail = (error as APIError | undefined)?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && detail.length) return detail.map((d) => d.msg).join('; ');
+  if (error instanceof Error) return error.message;
+  return 'Something went wrong. Please try again.';
 }

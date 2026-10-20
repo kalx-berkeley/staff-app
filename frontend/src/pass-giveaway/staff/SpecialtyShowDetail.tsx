@@ -28,6 +28,9 @@ const SpecialtyShowDetail = () => {
   const [ownerInput, setOwnerInput] = useState('');
   const [staffOptions, setStaffOptions] = useState<SpecialtyShowOwnerInfo[]>([]);
 
+  // Spinitron shows state
+  const [spinitronInput, setSpinitronInput] = useState('');
+
   // DJs state
   const [djInput, setDjInput] = useState('');
   const [djSuggestions, setDjSuggestions] = useState<string[]>([]);
@@ -123,6 +126,31 @@ const SpecialtyShowDetail = () => {
         }),
       'Owner removed.',
       'Failed to remove owner'
+    );
+  };
+
+  const handleAddSpinitron = async () => {
+    if (!show || !spinitronInput.trim()) return;
+    await runMutation(
+      () =>
+        specialtyShowsAPI.update(show.id, {
+          spinitron_urls: [...show.spinitron_shows.map((s) => s.url), spinitronInput.trim()],
+        }),
+      'Spinitron show added.',
+      'Failed to add Spinitron show',
+      () => setSpinitronInput('')
+    );
+  };
+
+  const handleRemoveSpinitron = async (spinitronId: number) => {
+    if (!show) return;
+    await runMutation(
+      () =>
+        specialtyShowsAPI.update(show.id, {
+          spinitron_urls: show.spinitron_shows.filter((s) => s.id !== spinitronId).map((s) => s.url),
+        }),
+      'Spinitron show removed.',
+      'Failed to remove Spinitron show'
     );
   };
 
@@ -232,11 +260,72 @@ const SpecialtyShowDetail = () => {
       {!canEdit && (
         <p className="field-hint">You're viewing this specialty show. Only its owners or promotions staff can make changes.</p>
       )}
+      {show.retired && (
+        <p className="info-message">
+          This show is retired: it can no longer get passes. Un-retire it from the Specialty Shows list.
+        </p>
+      )}
 
       {successMessage && <div className="success-message">{successMessage}</div>}
       {formError && <div className="error-message">{formError}</div>}
 
       <div className="show-detail-content">
+        {/* Spinitron section */}
+        <div className="show-info-section">
+          <h3>Spinitron</h3>
+          <p className="field-hint">
+            The show's page in Spinitron, so the Staff Directory can tell this specialty show apart
+            from regular DJ shifts. Paste a link to the show or to one of its playlists. If the show
+            has moved to a new Spinitron show over the years, add each one.
+          </p>
+          {show.spinitron_shows.length === 0 && (
+            <p className="field-warning">
+              Add this show's Spinitron link{canEdit ? ' before making other changes' : ''}.
+            </p>
+          )}
+          <ul className="item-list">
+            {show.spinitron_shows.map((s) => (
+              <li key={s.id} className="item-list-row">
+                <a href={s.url} target="_blank" rel="noreferrer">
+                  {s.title || `Show ${s.id}`}
+                </a>
+                {canEdit && show.spinitron_shows.length > 1 && (
+                  <button
+                    className="btn-small btn-danger"
+                    onClick={() => handleRemoveSpinitron(s.id)}
+                    disabled={saving}
+                  >
+                    Remove
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          {canEdit && (
+            <div className="add-item-form">
+              <input
+                type="url"
+                value={spinitronInput}
+                onChange={(e) => setSpinitronInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); handleAddSpinitron(); }
+                }}
+                placeholder="https://spinitron.com/KALX/show/…"
+                aria-label="Spinitron show or playlist link"
+                className="input-text"
+                disabled={saving}
+              />
+              <button
+                className="btn-small btn-primary"
+                onClick={handleAddSpinitron}
+                disabled={saving || !spinitronInput.trim()}
+              >
+                Add Spinitron Link
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Owners section */}
         <div className="show-info-section">
           <h3>Owners</h3>

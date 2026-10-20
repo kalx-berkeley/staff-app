@@ -11,16 +11,15 @@ from app.models.job_log import JobLog
 from app.models.spinitron_playlist import SpinitronPlaylist
 from app.models.spinitron_show import SpinitronShow
 from app.models.staff import Staff
-from app.common.services import cache_service
 from app.common.services.spinitron_service import (
     SpinitronService,
     SpinitronShowItem,
+    cached_persona_names,
     dedupe_by_id,
+    placeholder_persona_ids,
 )
 
 logger = logging.getLogger(__name__)
-
-_PERSONAS_CACHE_KEY = "spinitron:personas"
 
 # How far back to look for playlists that are already airing. Generous
 # relative to any plausible show length, since a playlist that started
@@ -168,25 +167,8 @@ class SpinitronScheduleService:
 
     @staticmethod
     async def _cached_persona_names(db: Session) -> Dict[int, str]:
-        """
-        Read-through cache (~1 week TTL) over Spinitron's full persona directory.
-
-        Persona names change rarely, so one bulk `/personas` fetch (paginated
-        internally by `fetch_all_personas`), shared across every caller for a
-        week, replaces what would otherwise be a separate `/personas/{id}`
-        API call for every distinct unresolved persona on every cache miss.
-        """
-
-        async def producer() -> dict:
-            personas = await SpinitronService.fetch_all_personas()
-            return {
-                "personas": {str(persona_id): name for persona_id, name in personas.items()}
-            }
-
-        data = await cache_service.fetch_cached_async(
-            db, _PERSONAS_CACHE_KEY, producer, ttl_days=7
-        )
-        return {int(persona_id): name for persona_id, name in data["personas"].items()}
+        """Spinitron's persona directory, cached (see `cached_persona_names`)."""
+        return await cached_persona_names(db)
 
     @staticmethod
     def is_non_dj_show_title(name: str | None) -> bool:
@@ -208,11 +190,7 @@ class SpinitronScheduleService:
     @staticmethod
     def _placeholder_persona_ids() -> Set[int]:
         """Parse SPINITRON_PLACEHOLDER_PERSONA_IDS into a set of persona IDs."""
-        return {
-            int(raw_id.strip())
-            for raw_id in settings.spinitron_placeholder_persona_ids.split(",")
-            if raw_id.strip()
-        }
+        return placeholder_persona_ids()
 
     @staticmethod
     def _single_persona_staff_names(db: Session) -> Dict[int, str]:

@@ -41,6 +41,8 @@ export interface Workform {
   loa_start: string | null;
   loa_end: string | null;
   loa_overlaps_month: boolean;
+  // Set when a site admin views someone else's workform
+  staff_name?: string | null;
 }
 
 export interface WorkformSummary {
@@ -56,6 +58,8 @@ export interface WorkformSummary {
 export interface MyWorkforms {
   open_months: string[];
   workforms: WorkformSummary[];
+  // Set when a site admin views someone else's workforms
+  staff_name?: string | null;
 }
 
 export interface Departments {

@@ -23,6 +23,9 @@ vi.mock('./api', () => ({
     listUsers: vi.fn(),
     getAuditLog: vi.fn(),
     listShortLinks: vi.fn(),
+    listDjQuizDeadlines: vi.fn(),
+    setDjQuizDeadline: vi.fn(),
+    deleteDjQuizDeadline: vi.fn(),
   },
 }));
 
@@ -88,6 +91,10 @@ describe('KALX Staff Admin', () => {
     ]);
     vi.mocked(adminAPI.listUsers).mockResolvedValue([]);
     vi.mocked(adminAPI.listShortLinks).mockResolvedValue([]);
+    vi.mocked(adminAPI.listDjQuizDeadlines).mockResolvedValue([
+      { year: 2026, deadline: '2026-09-30' },
+      { year: 2025, deadline: '2025-07-31' },
+    ]);
   });
 
   afterEach(() => {
@@ -155,6 +162,30 @@ describe('KALX Staff Admin', () => {
 
     expect(await within(row).findByText('Synced 3 staff')).toBeInTheDocument();
     expect(adminAPI.triggerJob).toHaveBeenCalledWith('airtable_user_sync');
+  });
+
+  it('lets site admins set the DJ Quiz deadlines', async () => {
+    vi.mocked(adminAPI.setDjQuizDeadline).mockResolvedValue({ year: 2027, deadline: '2027-09-30' });
+    await renderAdmin();
+
+    const section = (await screen.findByRole('heading', { name: 'DJ Quiz Deadlines' })).closest(
+      'section',
+    )!;
+    expect(await within(section).findByText('September 30, 2026')).toBeInTheDocument();
+    fireEvent.change(within(section).getByLabelText('Year'), { target: { value: '2027' } });
+    fireEvent.change(within(section).getByLabelText('Deadline'), {
+      target: { value: '2027-09-30' },
+    });
+    fireEvent.click(within(section).getByRole('button', { name: 'Set deadline' }));
+
+    expect(await within(section).findByText('September 30, 2027')).toBeInTheDocument();
+    expect(adminAPI.setDjQuizDeadline).toHaveBeenCalledWith(2027, '2027-09-30');
+    expect(within(section).getAllByRole('row').map((r) => r.firstChild?.textContent)).toEqual([
+      'Year',
+      '2027',
+      '2026',
+      '2025',
+    ]);
   });
 
   it('shows the short links only to site admins', async () => {

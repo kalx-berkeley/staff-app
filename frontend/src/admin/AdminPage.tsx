@@ -3,6 +3,7 @@ import { useAuth } from '../common/contexts/authHooks';
 import { usePageTitle } from '../common/hooks/usePageTitle';
 import { HOME_TITLE, SUBSITES, subsiteForPath } from '../subsites';
 import AuditLogSection from './AuditLogSection';
+import DjQuizDeadlinesSection from './DjQuizDeadlinesSection';
 import ImpersonationSection from './ImpersonationSection';
 import JobsSection from './JobsSection';
 import ShortLinksSection from './ShortLinksSection';
@@ -39,6 +40,7 @@ export default function AdminPage() {
         <JobsSection />
         {user?.is_staging && user.is_site_admin && <ImpersonationSection />}
         {user?.is_site_admin && <ShortLinksSection />}
+        {user?.is_site_admin && <DjQuizDeadlinesSection />}
         <AuditLogSection />
       </main>
     </div>

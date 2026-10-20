@@ -73,3 +73,9 @@ export interface ShortLinkRequest {
   target_url: string;
   note: string | null;
 }
+
+/** When one year's DJ Quiz is due (the last day, Pacific time). */
+export interface DjQuizDeadline {
+  year: number;
+  deadline: string; // "YYYY-MM-DD"
+}
