@@ -59,6 +59,8 @@ class WorkformResponse(BaseModel):
     # True if a leave of absence overlaps the month, so the monthly hours
     # minimum doesn't apply
     loa_overlaps_month: bool = False
+    # Set when a site admin views someone else's workform
+    staff_name: Optional[str] = None
 
 
 class WorkformSummary(BaseModel):
@@ -74,6 +76,8 @@ class WorkformSummary(BaseModel):
 class MyWorkformsResponse(BaseModel):
     open_months: List[str]
     workforms: List[WorkformSummary]
+    # Set when a site admin views someone else's workforms
+    staff_name: Optional[str] = None
 
 
 class PreferencesRequest(BaseModel):

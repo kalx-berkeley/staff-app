@@ -38,6 +38,14 @@ export default function WorkformsApp() {
                 <Route path="/people" element={<PeoplePage />} />
               </>
             )}
+            {user?.is_site_admin && (
+              <>
+                {/* Someone else's workforms, read-only, linked from their
+                    Staff Directory profile */}
+                <Route path="/staff/:staffId" element={<HistoryPage />} />
+                <Route path="/staff/:staffId/month/:month" element={<MonthPage />} />
+              </>
+            )}
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

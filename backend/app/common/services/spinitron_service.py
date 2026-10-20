@@ -3,10 +3,12 @@
 import logging
 import re
 from datetime import datetime
-from typing import Dict, List, Optional, TypedDict
+from typing import Any, Dict, List, NotRequired, Optional, Set, TypedDict
 
 import httpx2 as httpx
+from sqlalchemy.orm import Session
 
+from app.common.services import cache_service
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -14,6 +16,39 @@ logger = logging.getLogger(__name__)
 SPINITRON_API_BASE = "https://spinitron.com/api"
 
 _PERSONA_ID_RE = re.compile(r"/personas/(\d+)")
+
+_PERSONAS_CACHE_KEY = "spinitron:personas"
+
+
+def placeholder_persona_ids() -> Set[int]:
+    """Parse SPINITRON_PLACEHOLDER_PERSONA_IDS into a set of persona IDs."""
+    return {
+        int(raw_id.strip())
+        for raw_id in settings.spinitron_placeholder_persona_ids.split(",")
+        if raw_id.strip()
+    }
+
+
+async def cached_persona_names(db: Session) -> Dict[int, str]:
+    """
+    Read-through cache (~1 week TTL) over Spinitron's full persona directory.
+
+    Persona names change rarely, so one bulk `/personas` fetch (paginated
+    internally by `fetch_all_personas`), shared across every caller for a
+    week, replaces what would otherwise be a separate `/personas/{id}`
+    API call for every distinct unresolved persona on every cache miss.
+    """
+
+    async def producer() -> dict:
+        personas = await SpinitronService.fetch_all_personas()
+        return {
+            "personas": {str(persona_id): name for persona_id, name in personas.items()}
+        }
+
+    data = await cache_service.fetch_cached_async(
+        db, _PERSONAS_CACHE_KEY, producer, ttl_days=7
+    )
+    return {int(persona_id): name for persona_id, name in data["personas"].items()}
 
 
 class SpinitronShowItem(TypedDict):
@@ -24,6 +59,10 @@ class SpinitronShowItem(TypedDict):
     end: datetime
     persona_id: Optional[int]
     title: Optional[str]
+    # Only on items from `/playlists`: the Spinitron show the playlist belongs
+    # to, and whether it aired with no live DJ (e.g. a roboshow)
+    show_id: NotRequired[Optional[int]]
+    automation: NotRequired[bool]
 
 
 class SpinitronSpinItem(TypedDict):
@@ -250,6 +289,12 @@ class SpinitronService:
                             end=datetime.strptime(end_str, "%Y-%m-%dT%H:%M:%S%z"),
                             persona_id=SpinitronService._extract_persona_id(item),
                             title=title,
+                            show_id=(
+                                int(item["show_id"])
+                                if item.get("show_id") is not None
+                                else None
+                            ),
+                            automation=bool(item.get("automation")),
                         )
                     )
 
@@ -313,6 +358,54 @@ class SpinitronService:
         playlists = await SpinitronService._fetch_playlists_pages(params)
         logger.info("Fetched %d future Spinitron playlist(s)", len(playlists))
         return playlists
+
+    @staticmethod
+    async def _fetch_one(path: str) -> Optional[Dict[str, Any]]:
+        """
+        GET one Spinitron item, such as `/shows/123`.
+
+        :returns: The item's JSON, or None if Spinitron has no such item.
+        :raises RuntimeError: If the API key isn't set or the API returns an error.
+        """
+        if not settings.spinitron_api_key:
+            raise RuntimeError("SPINITRON_API_KEY not configured")
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"{SPINITRON_API_BASE}{path}",
+                    headers=SpinitronService._request_headers(),
+                    timeout=30.0,
+                )
+                if response.status_code == 404:
+                    return None
+                response.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                raise RuntimeError(
+                    f"Spinitron API error {e.response.status_code}: {e.response.text}"
+                ) from e
+            except httpx.RequestError as e:
+                raise RuntimeError(f"Spinitron API request failed: {e}") from e
+        return response.json()
+
+    @staticmethod
+    async def fetch_show(show_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Fetch one Spinitron show (its id, title, category, and so on).
+
+        :returns: The show, or None if there's no show with that ID.
+        :raises RuntimeError: If the API key isn't set or the API returns an error.
+        """
+        return await SpinitronService._fetch_one(f"/shows/{show_id}")
+
+    @staticmethod
+    async def fetch_playlist(playlist_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Fetch one Spinitron playlist (including its show_id and persona_id).
+
+        :returns: The playlist, or None if there's no playlist with that ID.
+        :raises RuntimeError: If the API key isn't set or the API returns an error.
+        """
+        return await SpinitronService._fetch_one(f"/playlists/{playlist_id}")
 
     @staticmethod
     async def fetch_spins(start: datetime) -> List[SpinitronSpinItem]:

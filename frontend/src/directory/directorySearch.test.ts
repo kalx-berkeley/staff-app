@@ -17,6 +17,7 @@ const entry: DirectoryEntry = {
   on_leave: false,
   loa_start: null,
   loa_end: null,
+  dj_quiz_years: [],
 };
 
 describe('matchesSearch', () => {

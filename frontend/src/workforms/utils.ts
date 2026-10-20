@@ -1,4 +1,3 @@
-import type { APIError } from '../common/types';
 import type { Entry, ReviewItem, WorkformStatus, WorkformSummary } from './types';
 
 const STATUS_LABELS: Record<WorkformStatus, string> = {
@@ -95,11 +94,4 @@ export function nextPendingIndex(
   return null;
 }
 
-/** A message for an error thrown by the API helpers. */
-export function errorMessage(error: unknown): string {
-  const detail = (error as APIError | undefined)?.detail;
-  if (typeof detail === 'string') return detail;
-  if (Array.isArray(detail) && detail.length) return detail.map((d) => d.msg).join('; ');
-  if (error instanceof Error) return error.message;
-  return 'Something went wrong. Please try again.';
-}
+export { errorMessage } from '../common/utils';

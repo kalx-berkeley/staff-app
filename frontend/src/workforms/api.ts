@@ -37,6 +37,11 @@ export const workformsAPI = {
     call(apiClient.delete<void>(`/workforms/me/${seg(month)}/entries/${id}`)),
   submit: (month: string) => call(apiClient.post<Workform>(`/workforms/me/${seg(month)}/submit`)),
   preferences: () => call(apiClient.get<Preferences>('/workforms/preferences')),
+  /** Someone else's workforms, read-only (site admins). */
+  staffWorkforms: (staffId: number) =>
+    call(apiClient.get<MyWorkforms>(`/workforms/staff/${staffId}`)),
+  staffWorkform: (staffId: number, month: string) =>
+    call(apiClient.get<Workform>(`/workforms/staff/${staffId}/${seg(month)}`)),
   updatePreferences: (prefs: Omit<Preferences, 'is_department_head'>) =>
     call(apiClient.put<Preferences>('/workforms/preferences', prefs)),
 };

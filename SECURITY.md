@@ -253,6 +253,13 @@ If using Airtable sync:
   or "🆕" status; review endpoints also require being a department head (from the "Department Heads"
   table), and a head can't decide on their own hours unless they head Operations. Every
   submission and decision is recorded in `audit_log`.
+- Staff Directory profile pages (`/api/directory/{id}/profile`, which include the Sublist DJ
+  checklist and the person's workforms hours) are visible only to that person and to site admins,
+  as are the read-only workforms views at `/api/workforms/staff/...`. The site admin check uses
+  the real signed-in user, never someone they're impersonating.
+- Profile editing writes to the staff table and is off until `DIRECTORY_SELF_EDIT_ENABLED` is
+  set; it then needs a token with write access to `AIRTABLE_TABLE_NAME`. Staff can edit only
+  their own profile, site admins anyone's, and every change is recorded in `audit_log`.
 
 ### Incident Response
 

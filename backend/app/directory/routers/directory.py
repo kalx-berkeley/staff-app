@@ -3,15 +3,29 @@
 from datetime import date
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, selectinload
 
-from app.auth import current_staff_filter, get_staff_member
+from app.auth import (
+    current_staff_filter,
+    get_staff_member,
+    is_site_admin,
+    require_authentication,
+)
+from app.config import settings
 from app.database import get_db
 from app.models.staff import Staff
 from app.rate_limiter import create_rate_limit_dependency
-from app.directory.schemas.directory import DirectoryEntry, DjPersona
+from app.directory.schemas.directory import (
+    DirectoryEntry,
+    DjPersona,
+    PersonaOption,
+    PersonaResolveRequest,
+    ProfileResponse,
+    ProfileUpdate,
+)
+from app.directory.services import profile as profile_service
 from app.common.services.leave_service import (
     has_leave,
     leave_is_current_or_upcoming,
@@ -85,6 +99,25 @@ def _leave_fields(staff: Staff, today: date) -> dict:
     }
 
 
+def _entry(s: Staff, today: date) -> DirectoryEntry:
+    """A staff member's directory entry, as everyone sees it."""
+    return DirectoryEntry(
+        id=s.id,
+        name=s.name,
+        pronouns=s.pronouns,
+        email=s.email,
+        phone=s.phone,
+        dj_name=s.dj_name,
+        dj_personas=_dj_personas(s),
+        departments=sorted(d.department for d in s.departments),
+        statuses=sorted(st.status for st in s.statuses),
+        titles_and_roles=s.titles_and_roles,
+        photo_version=s.photo_attachment_id,
+        dj_quiz_years=s.dj_quiz_years or [],
+        **_leave_fields(s, today),
+    )
+
+
 @router.get(
     "",
     response_model=list[DirectoryEntry],
@@ -107,23 +140,7 @@ def list_directory(
     )
     staff_members.sort(key=lambda s: s.name.casefold())
     today = today_pt()
-    return [
-        DirectoryEntry(
-            id=s.id,
-            name=s.name,
-            pronouns=s.pronouns,
-            email=s.email,
-            phone=s.phone,
-            dj_name=s.dj_name,
-            dj_personas=_dj_personas(s),
-            departments=sorted(d.department for d in s.departments),
-            statuses=sorted(st.status for st in s.statuses),
-            titles_and_roles=s.titles_and_roles,
-            photo_version=s.photo_attachment_id,
-            **_leave_fields(s, today),
-        )
-        for s in staff_members
-    ]
+    return [_entry(s, today) for s in staff_members]
 
 
 @router.get("/{staff_id}/photo")
@@ -152,3 +169,151 @@ def get_photo(
         media_type="image/jpeg",
         headers={"Cache-Control": "private, max-age=604800"},
     )
+
+
+# --- Profile page ----------------------------------------------------------
+
+
+def _profile_target(
+    db: Session, staff_id: int, viewer: Staff, email: str
+) -> tuple[Staff, bool]:
+    """
+    The current staff member whose profile is wanted, and whether it's the
+    viewer's own. Only they and site admins may see it.
+
+    The viewer is who the user is acting as (someone they're impersonating,
+    on staging); the site admin check uses the real, signed-in user.
+
+    :raises HTTPException: 403 for anyone else, 404 if they aren't current staff.
+    """
+    is_self = viewer.id == staff_id
+    if not is_self:
+        real_user = db.query(Staff).filter(Staff.email == email).first()
+        if not is_site_admin(db, real_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only this staff member and site admins can see this profile",
+            )
+    staff = _current_staff_query(db).filter(Staff.id == staff_id).first()
+    if staff is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    return staff, is_self
+
+
+def _profile(db: Session, staff: Staff, is_self: bool) -> ProfileResponse:
+    return ProfileResponse(
+        entry=_entry(staff, today_pt()),
+        first_name=staff.first_name,
+        surname=staff.surname,
+        loa_start=staff.loa_start,
+        loa_end=staff.loa_end,
+        is_self=is_self,
+        can_edit=settings.directory_self_edit_enabled,
+        eligibility=(
+            profile_service.build_eligibility(db, staff)
+            if profile_service.shows_eligibility(staff)
+            else None
+        ),
+        workforms=profile_service.build_workforms_summary(db, staff),
+    )
+
+
+@router.get("/me/profile", response_model=ProfileResponse)
+def get_my_profile(
+    viewer: Staff = Depends(get_staff_member),
+    db: Session = Depends(get_db),
+):
+    """The user's own profile page."""
+    return _profile(db, viewer, True)
+
+
+@router.get("/{staff_id}/profile", response_model=ProfileResponse)
+def get_profile(
+    staff_id: int,
+    viewer: Staff = Depends(get_staff_member),
+    email: str = Depends(require_authentication),
+    db: Session = Depends(get_db),
+):
+    """A staff member's profile page. Only they and site admins can see it."""
+    staff, is_self = _profile_target(db, staff_id, viewer, email)
+    return _profile(db, staff, is_self)
+
+
+@router.patch("/{staff_id}/profile", response_model=ProfileResponse)
+async def update_profile(
+    staff_id: int,
+    update: ProfileUpdate,
+    viewer: Staff = Depends(get_staff_member),
+    email: str = Depends(require_authentication),
+    db: Session = Depends(get_db),
+):
+    """
+    Save a staff member's editable details to Airtable. Only they and site
+    admins can, and only once editing is turned on
+    (DIRECTORY_SELF_EDIT_ENABLED).
+    """
+    staff, is_self = _profile_target(db, staff_id, viewer, email)
+    profile_service.require_editing_enabled()
+    await profile_service.update_profile(db, staff, update, email)
+    db.refresh(staff)
+    return _profile(db, staff, is_self)
+
+
+@router.post("/{staff_id}/photo", response_model=ProfileResponse)
+async def upload_photo(
+    staff_id: int,
+    photo: UploadFile = File(...),
+    viewer: Staff = Depends(get_staff_member),
+    email: str = Depends(require_authentication),
+    db: Session = Depends(get_db),
+):
+    """
+    Replace a staff member's photo (JPEG or PNG, at most 5 MB). Same access
+    as editing the profile.
+    """
+    staff, is_self = _profile_target(db, staff_id, viewer, email)
+    profile_service.require_editing_enabled()
+    # Read one byte past the limit, so a larger file is refused without
+    # reading it all
+    data = await photo.read(profile_service.MAX_PHOTO_BYTES + 1)
+    await profile_service.replace_photo(
+        db, staff, photo.filename or "photo", photo.content_type, data, email
+    )
+    db.refresh(staff)
+    return _profile(db, staff, is_self)
+
+
+@router.get("/personas", response_model=list[PersonaOption])
+async def search_personas(
+    q: str = Query("", max_length=100),
+    _viewer: Staff = Depends(get_staff_member),
+    db: Session = Depends(get_db),
+):
+    """
+    Spinitron personas whose name contains *q* (ignoring case), for the DJ
+    Name editor. Placeholder personas are left out. At most 20.
+    """
+    needle = q.strip().casefold()
+    if not needle:
+        return []
+    names = await profile_service.persona_names(db)
+    matches = [
+        PersonaOption(id=pid, name=name)
+        for pid, name in names.items()
+        if needle in name.casefold()
+    ]
+    matches.sort(
+        key=lambda p: (not p.name.casefold().startswith(needle), p.name.casefold())
+    )
+    return matches[:20]
+
+
+@router.post("/personas/resolve", response_model=PersonaOption)
+async def resolve_persona(
+    request: PersonaResolveRequest,
+    _viewer: Staff = Depends(get_staff_member),
+    db: Session = Depends(get_db),
+):
+    """The persona a pasted Spinitron DJ link points to."""
+    persona_id, name = await profile_service.resolve_persona_url(db, request.url)
+    return PersonaOption(id=persona_id, name=name)

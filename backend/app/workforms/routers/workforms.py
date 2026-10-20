@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
-from app.auth import get_staff_member
+from app.auth import get_site_admin, get_staff_member
 from app.database import get_db
 from app.models.staff import Staff
 from app.models.workform import Workform, WorkformEntry
@@ -25,7 +25,7 @@ from app.workforms.schemas.workforms import (
 )
 from app.workforms.services import records, workform_service
 from app.workforms.services.departments import departments, is_department_head
-from app.workforms.services.loa import entry_flag, month_overlaps
+from app.workforms.services.loa import entry_flag
 from app.workforms.services.months import (
     deadline,
     format_month,
@@ -34,6 +34,7 @@ from app.workforms.services.months import (
     parse_month,
 )
 from app.workforms.services.notifications import get_preferences
+from app.workforms.services.summary import month_on_leave, workform_status
 
 router = APIRouter(prefix="/api/workforms", tags=["workforms"])
 
@@ -57,29 +58,6 @@ def _results(record: Optional[WorkformAirtableRecord]) -> dict[str, DepartmentRe
         for department, block in sorted((record.departments or {}).items())
         if records.has_hours(block) or block.get("approved")
     }
-
-
-def _status(workform: Optional[Workform], record: Optional[WorkformAirtableRecord]) -> str:
-    if record is not None:
-        return "locked" if records.is_locked(record) else "submitted"
-    if workform is not None and workform.entries:
-        return "draft"
-    return "not_started"
-
-
-def _on_leave(
-    month: date,
-    staff: Staff,
-    workform: Optional[Workform],
-    record: Optional[WorkformAirtableRecord],
-) -> bool:
-    """Whether a leave overlaps *month*: the leave recorded at submit once
-    submitted (as department heads see it), else the staff member's current one."""
-    if record is not None and workform is not None:
-        loa_start, loa_end = workform.loa_start_at_submit, workform.loa_end_at_submit
-    else:
-        loa_start, loa_end = staff.loa_start, staff.loa_end
-    return month_overlaps(month, loa_start, loa_end)
 
 
 def _entry_response(
@@ -108,9 +86,8 @@ def list_departments(
     )
 
 
-@router.get("/me", response_model=MyWorkformsResponse)
-def my_workforms(staff: Staff = Depends(get_staff_member), db: Session = Depends(get_db)):
-    """The user's open months and every workform they've saved or submitted."""
+def _workforms_for(db: Session, staff: Staff) -> MyWorkformsResponse:
+    """A staff member's open months and every workform they've saved or submitted."""
     months = open_months()
     workforms = {
         w.month: w for w in db.query(Workform).filter(Workform.staff_id == staff.id)
@@ -132,13 +109,13 @@ def my_workforms(staff: Staff = Depends(get_staff_member), db: Session = Depends
         summaries.append(
             WorkformSummary(
                 month=format_month(month),
-                status=_status(workform, record),
+                status=workform_status(workform, record),
                 is_open=month in months,
                 is_late=bool(record and record.created_time)
                 and is_late(month, record.created_time),
                 total_hours=total,
                 results=_results(record),
-                loa_overlaps_month=_on_leave(month, staff, workform, record),
+                loa_overlaps_month=month_on_leave(month, staff, workform, record),
             )
         )
     return MyWorkformsResponse(
@@ -146,12 +123,9 @@ def my_workforms(staff: Staff = Depends(get_staff_member), db: Session = Depends
     )
 
 
-@router.get("/me/{month}", response_model=WorkformResponse)
-def my_workform(
-    month: str, staff: Staff = Depends(get_staff_member), db: Session = Depends(get_db)
-):
-    """One month's workform: its entries, status and each department's decision."""
-    month_date = _month(month)
+def _workform_for(db: Session, staff: Staff, month_date: date) -> WorkformResponse:
+    """One month of a staff member's workform: its entries, status and each
+    department's decision."""
     workform = workform_service.get_workform(db, staff, month_date)
     record = records.record_for(db, staff.airtable_record_id, month_date)
     months = open_months()
@@ -160,7 +134,7 @@ def my_workform(
         is_open=month_date in months,
         is_current_month=month_date == months[0],
         deadline=deadline(month_date),
-        status=_status(workform, record),
+        status=workform_status(workform, record),
         has_unsent_changes=record is not None
         and workform_service.has_unsent_changes(workform),
         submitted_at=record.created_time if record else None,
@@ -174,8 +148,64 @@ def my_workform(
         results=_results(record),
         loa_start=staff.loa_start,
         loa_end=staff.loa_end,
-        loa_overlaps_month=_on_leave(month_date, staff, workform, record),
+        loa_overlaps_month=month_on_leave(month_date, staff, workform, record),
     )
+
+
+@router.get("/me", response_model=MyWorkformsResponse)
+def my_workforms(staff: Staff = Depends(get_staff_member), db: Session = Depends(get_db)):
+    """The user's open months and every workform they've saved or submitted."""
+    return _workforms_for(db, staff)
+
+
+@router.get("/me/{month}", response_model=WorkformResponse)
+def my_workform(
+    month: str, staff: Staff = Depends(get_staff_member), db: Session = Depends(get_db)
+):
+    """One month's workform: its entries, status and each department's decision."""
+    return _workform_for(db, staff, _month(month))
+
+
+def _other_staff(db: Session, staff_id: int) -> Staff:
+    staff = db.get(Staff, staff_id)
+    if staff is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Staff member not found"
+        )
+    return staff
+
+
+@router.get("/staff/{staff_id}", response_model=MyWorkformsResponse)
+def staff_workforms(
+    staff_id: int,
+    _admin: Staff = Depends(get_site_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Another staff member's workforms, as they see them on their history page.
+    Site admins only, and read-only.
+    """
+    staff = _other_staff(db, staff_id)
+    response = _workforms_for(db, staff)
+    response.staff_name = staff.name
+    return response
+
+
+@router.get("/staff/{staff_id}/{month}", response_model=WorkformResponse)
+def staff_workform(
+    staff_id: int,
+    month: str,
+    _admin: Staff = Depends(get_site_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    One month of another staff member's workform. Site admins only, and
+    read-only.
+    """
+    staff = _other_staff(db, staff_id)
+    response = _workform_for(db, staff, _month(month))
+    response.staff_name = staff.name
+    return response
 
 
 @router.post(

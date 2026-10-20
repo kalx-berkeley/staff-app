@@ -4,6 +4,7 @@ import type {
   AuditLogItem,
   ImpersonateRequest,
   JobRunResult,
+  DjQuizDeadline,
   JobStatus,
   ShortLink,
   ShortLinkRequest,
@@ -94,6 +95,36 @@ export const adminAPI = {
   deleteShortLink: async (id: number): Promise<void> => {
     try {
       await apiClient.delete(`/short-links/${id}`);
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  // The Staff Directory's DJ Quiz deadlines (site admins)
+  listDjQuizDeadlines: async (): Promise<DjQuizDeadline[]> => {
+    try {
+      const response = await apiClient.get<DjQuizDeadline[]>('/directory/admin/dj-quiz-deadlines');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  setDjQuizDeadline: async (year: number, deadline: string): Promise<DjQuizDeadline> => {
+    try {
+      const response = await apiClient.put<DjQuizDeadline>(
+        `/directory/admin/dj-quiz-deadlines/${year}`,
+        { deadline },
+      );
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  deleteDjQuizDeadline: async (year: number): Promise<void> => {
+    try {
+      await apiClient.delete(`/directory/admin/dj-quiz-deadlines/${year}`);
     } catch (error) {
       return handleAPIError(error);
     }

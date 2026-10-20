@@ -150,6 +150,24 @@ async def sync_spinitron_schedule():
         db.close()
 
 
+async def sync_dj_shifts():
+    """
+    Scheduled task to copy the previous and current quarter's Spinitron
+    playlists for the Staff Directory's Sublist DJ shift requirement.
+    Runs nightly at 3:30 AM Pacific.
+    """
+    from app.database import SessionLocal
+    from app.directory.services.shift_sync import sync_shift_playlists
+
+    db = SessionLocal()
+    try:
+        await sync_shift_playlists(db)
+    except Exception as e:
+        logger.error(f"DJ shift sync failed: {str(e)}", exc_info=True)
+    finally:
+        db.close()
+
+
 async def refresh_workform_records():
     """
     Scheduled task to refresh the local copy of the Airtable workforms table.
@@ -628,6 +646,16 @@ def start_scheduler():
         replace_existing=True,
     )
 
+    # Copy the Spinitron playlists the Sublist DJ shift requirement checks,
+    # daily at 3:30 AM Pacific
+    scheduler.add_job(
+        sync_dj_shifts,
+        trigger=CronTrigger(hour=3, minute=30, timezone=_PT),
+        id="dj_shift_sync",
+        name="Sync DJ shifts from Spinitron",
+        replace_existing=True,
+    )
+
     if settings.workforms_enabled:
         # Refresh the local copy of the Airtable workforms table daily at 2:30 AM
         # Pacific, after the Airtable sync has refreshed the department heads
@@ -652,7 +680,8 @@ def start_scheduler():
     logger.info(
         "Scheduler started - Feature bin sync at 1 AM PT, KALX Live sync at 1:30 AM PT,"
         " Airtable sync at 2 AM PT, stale preassignment expiry at 3 AM PT, unclosed past"
-        " show notifications at 4 AM PT, Spinitron schedule sync every 6 hours"
+        " show notifications at 4 AM PT, Spinitron schedule sync every 6 hours,"
+        " DJ shift sync at 3:30 AM PT"
         + (
             ", workforms refresh at 2:30 AM PT, workform emails at 9 AM PT"
             if settings.workforms_enabled

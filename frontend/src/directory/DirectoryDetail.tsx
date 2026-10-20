@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import type { DirectoryEntry } from './types';
 import { formatLeave } from '../common/utils';
 import MarkdownContent from '../common/components/MarkdownContent';
@@ -11,12 +12,14 @@ interface DirectoryDetailProps {
   // null when the URL names someone who isn't in the directory
   entry: DirectoryEntry | null;
   isMe: boolean;
+  // Whether to link to the full profile page: yours, or anyone's for site admins
+  canSeeProfile: boolean;
   onClose: () => void;
 }
 
 // Everything the directory knows about one staff member, in a panel over the
 // table. Its URL (/directory/:staffId) can be shared.
-const DirectoryDetail = ({ entry, isMe, onClose }: DirectoryDetailProps) => {
+const DirectoryDetail = ({ entry, isMe, canSeeProfile, onClose }: DirectoryDetailProps) => {
   const closeRef = useRef<HTMLButtonElement>(null);
   const ineligible = entry && djIneligibility(entry);
   const leaveStatus = !!entry && hasOnLeaveStatus(entry);
@@ -62,6 +65,14 @@ const DirectoryDetail = ({ entry, isMe, onClose }: DirectoryDetailProps) => {
                   {isMe && <span className="directory-me-tag">You</span>}
                 </h2>
                 {entry.pronouns && <div className="directory-pronouns">{entry.pronouns}</div>}
+                {canSeeProfile && (
+                  <Link
+                    className="directory-profile-link"
+                    to={isMe ? '/me' : `/${entry.id}/profile`}
+                  >
+                    {isMe ? 'View my full profile' : 'View full profile'}
+                  </Link>
+                )}
               </div>
             </div>
 
@@ -86,6 +97,15 @@ const DirectoryDetail = ({ entry, isMe, onClose }: DirectoryDetailProps) => {
                   <p className="directory-dj-ineligible">{DJ_INELIGIBLE_NOTES[ineligible]}</p>
                 )}
               </dd>
+
+              {(entry.dj_name || entry.dj_quiz_years.length > 0) && (
+                <>
+                  <dt>DJ Quiz</dt>
+                  <dd>
+                    {entry.dj_quiz_years.length > 0 ? entry.dj_quiz_years.join(', ') : 'None on record'}
+                  </dd>
+                </>
+              )}
 
               <dt>Departments</dt>
               <dd>{entry.departments.length > 0 ? entry.departments.join(', ') : '—'}</dd>

@@ -607,11 +607,7 @@ async def suggest_preassign_by_date(
     names = await SpinitronUpcomingScheduleService.get_names_for_date(db, date.isoformat())
     specialty_names = {
         row[0].lower()
-        for row in (
-            db.query(SpecialtyShow.name)
-            .filter(SpecialtyShow.deleted == False)  # noqa: E712
-            .all()
-        )
+        for row in db.query(SpecialtyShow.name).filter(SpecialtyShow.current_filter()).all()
     }
     return [
         DjSuggestion(name=name, is_specialty=name.lower() in specialty_names)
@@ -720,7 +716,7 @@ def set_self_preassignment(
             db.query(SpecialtyShow)
             .filter(
                 SpecialtyShow.id == data.specialty_show_id,
-                SpecialtyShow.deleted == False,  # noqa: E712
+                SpecialtyShow.current_filter(),
             )
             .first()
         )

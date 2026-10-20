@@ -24,6 +24,8 @@ vi.mock('./api', () => ({
     submit: vi.fn(),
     preferences: vi.fn(),
     updatePreferences: vi.fn(),
+    staffWorkforms: vi.fn(),
+    staffWorkform: vi.fn(),
   },
   reviewAPI: {
     overview: vi.fn(),
@@ -402,5 +404,69 @@ describe('KALX Workforms people page', () => {
     fireEvent.change(screen.getByLabelText('Out of the last'), { target: { value: '1' } });
     expect(await screen.findByText('No one matches.')).toBeInTheDocument();
     expect(reviewAPI.people).toHaveBeenLastCalledWith('Music', 1, 1);
+  });
+});
+
+describe("KALX Workforms: a site admin viewing someone else's workforms", () => {
+  const admin = user({ email: 'boss@example.com', is_site_admin: true });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(workformsAPI.staffWorkforms).mockResolvedValue({
+      open_months: ['2026-10'],
+      staff_name: 'Zed Zulu',
+      workforms: [
+        {
+          month: '2026-10',
+          status: 'draft',
+          is_open: true,
+          is_late: false,
+          total_hours: 3.5,
+          results: {},
+          loa_overlaps_month: false,
+        },
+      ],
+    });
+    vi.mocked(workformsAPI.staffWorkform).mockResolvedValue(
+      workform({ staff_name: 'Zed Zulu' }),
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('shows their month read-only', async () => {
+    await renderAt('/workforms/staff/5/month/2026-10', admin);
+
+    expect(await screen.findByText(/Viewing Zed Zulu’s workform/)).toBeInTheDocument();
+    expect(workformsAPI.staffWorkform).toHaveBeenCalledWith(5, '2026-10');
+    expect(workformsAPI.departments).not.toHaveBeenCalled();
+    expect(screen.getByText('Ran the table')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Submit workform/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Add work')).not.toBeInTheDocument();
+  });
+
+  it('shows their past workforms', async () => {
+    await renderAt('/workforms/staff/5', admin);
+
+    expect(await screen.findByText(/Viewing Zed Zulu’s workforms/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'October 2026' })).toHaveAttribute(
+      'href',
+      '/workforms/staff/5/month/2026-10',
+    );
+    expect(screen.queryByRole('link', { name: 'Finish and submit it' })).not.toBeInTheDocument();
+  });
+
+  it('is only for site admins', async () => {
+    vi.mocked(workformsAPI.mine).mockResolvedValue({ open_months: ['2026-10'], workforms: [] });
+    vi.mocked(workformsAPI.get).mockResolvedValue(workform());
+    vi.mocked(workformsAPI.departments).mockResolvedValue({ own: ['Promotions'], other: [] });
+    await renderAt('/workforms/staff/5', user());
+
+    await waitFor(() => expect(window.location.pathname).toBe('/workforms'));
+    expect(workformsAPI.staffWorkforms).not.toHaveBeenCalled();
+    await screen.findByText('Add work');
   });
 });

@@ -4,12 +4,23 @@
 export interface SpecialtyShowCreate {
   name: string;
   owner_emails?: string[];
+  // Spinitron show or playlist links; a show needs at least one
+  spinitron_urls: string[];
 }
 
 export interface SpecialtyShowUpdate {
   name?: string;
   owner_emails?: string[] | null;
   dj_names?: string[] | null;
+  // Replaces the show's Spinitron shows (null = no change)
+  spinitron_urls?: string[] | null;
+}
+
+/** One of a specialty show's Spinitron shows. */
+export interface SpinitronShowInfo {
+  id: number;
+  title: string | null;
+  url: string;
 }
 
 export interface SpecialtyShowOwnerInfo {
@@ -21,6 +32,9 @@ export interface SpecialtyShowResponse {
   id: number;
   name: string;
   deleted: boolean;
+  // Retired shows ran and ended: kept, but no longer offered for passes
+  retired: boolean;
+  spinitron_shows: SpinitronShowInfo[];
   owner_emails: string[];
   owner_details: SpecialtyShowOwnerInfo[];
   dj_names: string[];

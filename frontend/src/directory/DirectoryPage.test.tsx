@@ -35,6 +35,7 @@ const entry = (overrides: Partial<DirectoryEntry>): DirectoryEntry => ({
   on_leave: false,
   loa_start: null,
   loa_end: null,
+  dj_quiz_years: [],
   ...overrides,
 });
 
@@ -357,12 +358,34 @@ describe('DirectoryPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('links to your own record', async () => {
+  it('links to your own profile', async () => {
     await renderDirectory('/directory/1');
 
     const panel = await screen.findByRole('dialog', { name: /Amy Adams/ });
     expect(within(panel).getByText('You')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'My record' })).toHaveAttribute('href', '/directory/1');
+    expect(within(panel).getByRole('link', { name: 'View my full profile' })).toHaveAttribute(
+      'href',
+      '/directory/me',
+    );
+    expect(screen.getByRole('link', { name: 'My profile' })).toHaveAttribute('href', '/directory/me');
+  });
+
+  it("doesn't link to other people's profiles, except for site admins", async () => {
+    await renderDirectory('/directory/2');
+    const panel = await screen.findByRole('dialog', { name: /Bea Brown/ });
+    expect(within(panel).queryByRole('link', { name: /full profile/ })).not.toBeInTheDocument();
+    expect(within(panel).getByText('None on record')).toBeInTheDocument();
+    cleanup();
+
+    window.history.pushState({}, '', '/directory/2');
+    vi.mocked(usersAPI.getMe).mockResolvedValue({ ...staffUser, is_site_admin: true });
+    vi.mocked(directoryAPI.list).mockResolvedValue(ENTRIES);
+    await renderWithAuth(<App />);
+    const adminPanel = await screen.findByRole('dialog', { name: /Bea Brown/ });
+    expect(within(adminPanel).getByRole('link', { name: 'View full profile' })).toHaveAttribute(
+      'href',
+      '/directory/2/profile',
+    );
   });
 
   it('says so when a linked person is not in the directory', async () => {

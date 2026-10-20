@@ -246,7 +246,7 @@ export default function DirectoryPage() {
         <div className="directory-title-row">
           <h1>{DIRECTORY_TITLE}</h1>
           {myId !== null && (
-            <Link className="btn-secondary btn-small" to={`/${myId}${search}`}>My record</Link>
+            <Link className="btn-secondary btn-small" to="/me">My profile</Link>
           )}
         </div>
         <ImpersonationNotice />
@@ -369,7 +369,12 @@ export default function DirectoryPage() {
       )}
 
       {detailEntry !== undefined && (
-        <DirectoryDetail entry={detailEntry} isMe={detailEntry?.id === myId} onClose={closeDetail} />
+        <DirectoryDetail
+          entry={detailEntry}
+          isMe={detailEntry?.id === myId}
+          canSeeProfile={detailEntry?.id === myId || !!user?.is_site_admin}
+          onClose={closeDetail}
+        />
       )}
     </div>
   );

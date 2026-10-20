@@ -16,6 +16,7 @@ const SpecialtyShowList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
+  const [newSpinitronUrl, setNewSpinitronUrl] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
@@ -30,7 +31,7 @@ const SpecialtyShowList = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await specialtyShowsAPI.list();
+      const data = await specialtyShowsAPI.list(true);
       setShows(data);
     } catch (err) {
       const apiError = err as APIError;
@@ -76,12 +77,13 @@ const SpecialtyShowList = () => {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = newName.trim();
-    if (!name) return;
+    const spinitronUrl = newSpinitronUrl.trim();
+    if (!name || !spinitronUrl) return;
     setSubmitting(true);
     setFormError(null);
     setShowTitleSuggestions(false);
     try {
-      const created = await specialtyShowsAPI.create({ name });
+      const created = await specialtyShowsAPI.create({ name, spinitron_urls: [spinitronUrl] });
       navigate(`/staff/specialty-shows/${created.id}`);
     } catch (err) {
       const apiError = err as APIError;
@@ -105,6 +107,21 @@ const SpecialtyShowList = () => {
     }
   };
 
+  const handleSetRetired = async (id: number, retired: boolean) => {
+    setFormError(null);
+    try {
+      await specialtyShowsAPI.setRetired(id, retired);
+      await loadShows();
+    } catch (err) {
+      const apiError = err as APIError;
+      setFormError(
+        typeof apiError.detail === 'string'
+          ? apiError.detail
+          : `Failed to ${retired ? 'retire' : 'un-retire'} specialty show`,
+      );
+    }
+  };
+
   if (loading) return <div className="loading">Loading specialty shows...</div>;
 
   if (error) {
@@ -117,6 +134,9 @@ const SpecialtyShowList = () => {
   }
 
   const deleteTarget = shows.find((s) => s.id === deleteConfirmId);
+  const currentShows = shows.filter((s) => !s.retired);
+  const retiredShows = shows.filter((s) => s.retired);
+  const missingSpinitron = shows.filter((s) => s.spinitron_shows.length === 0);
 
   return (
     <div className="venue-list">
@@ -129,7 +149,18 @@ const SpecialtyShowList = () => {
         Their names appear alongside DJ names in all DJ name autocomplete fields. When
         adding one, use its exact on-air schedule name (the "New specialty show name"
         field suggests titles from the upcoming Spinitron schedule) so it matches.
+        Each show also needs its Spinitron link (a show or playlist page), which is how the
+        Staff Directory tells specialty shows apart from regular DJ shifts. Retire a show
+        when it ends: it stays on record but can no longer get passes.
       </p>
+
+      {missingSpinitron.length > 0 && (
+        <div className="field-warning" role="alert">
+          These shows don't have a Spinitron link yet, so their playlists count as regular DJ
+          shifts for the DJ sublist: {missingSpinitron.map((s) => s.name).join(', ')}. Open each
+          one to add it.
+        </div>
+      )}
 
       {isPromotions && (
         <form onSubmit={handleCreate} className="venue-filter" style={{ alignItems: 'flex-start', gap: '0.5rem' }}>
@@ -170,7 +201,20 @@ const SpecialtyShowList = () => {
               </ul>
             )}
           </div>
-          <button type="submit" className="btn-primary" disabled={submitting || !newName.trim()}>
+          <input
+            type="url"
+            placeholder="Spinitron show or playlist link"
+            aria-label="Spinitron show or playlist link"
+            value={newSpinitronUrl}
+            onChange={(e) => setNewSpinitronUrl(e.target.value)}
+            className="venue-filter-input"
+            disabled={submitting}
+          />
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={submitting || !newName.trim() || !newSpinitronUrl.trim()}
+          >
             {submitting ? 'Adding...' : 'Add'}
           </button>
           {formError && (
@@ -179,11 +223,11 @@ const SpecialtyShowList = () => {
         </form>
       )}
 
-      {shows.length === 0 ? (
+      {currentShows.length === 0 ? (
         <p className="empty-message">No specialty shows yet.</p>
       ) : (
         <div className="venue-grid">
-          {shows.map((show) => (
+          {currentShows.map((show) => (
             <div key={show.id} className="venue-card">
               <h3>{show.name}</h3>
               {isMyDjShow(show) && (
@@ -194,6 +238,12 @@ const SpecialtyShowList = () => {
                   <Link to={`/staff/specialty-shows/${show.id}`} className="btn-primary btn-small">
                     Manage
                   </Link>
+                  <button
+                    onClick={() => handleSetRetired(show.id, true)}
+                    className="btn-secondary btn-small"
+                  >
+                    Retire
+                  </button>
                   {isPromotions && (
                     <button
                       onClick={() => setDeleteConfirmId(show.id)}
@@ -213,6 +263,27 @@ const SpecialtyShowList = () => {
             </div>
           ))}
         </div>
+      )}
+
+      {retiredShows.length > 0 && (
+        <details className="retired-shows">
+          <summary>Retired shows ({retiredShows.length})</summary>
+          <ul className="item-list">
+            {retiredShows.map((show) => (
+              <li key={show.id} className="item-list-row">
+                <Link to={`/staff/specialty-shows/${show.id}`}>{show.name}</Link>
+                {canManage(show) && (
+                  <button
+                    onClick={() => handleSetRetired(show.id, false)}
+                    className="btn-secondary btn-small"
+                  >
+                    Un-retire
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
 
       {deleteConfirmId !== null && deleteTarget && (

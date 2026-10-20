@@ -7,6 +7,7 @@ import { subsiteForPath } from '../subsites';
 
 const loadDirectory = () => import('.');
 const DirectoryPage = lazySection(loadDirectory, 'DirectoryPage');
+const ProfilePage = lazySection(loadDirectory, 'ProfilePage');
 
 // The KALX Staff Directory sub-site, served under /directory. Anyone who can't
 // use it is sent to the home page, which offers what they can use.
@@ -23,6 +24,9 @@ export default function DirectoryApp() {
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
           <Route path="/" element={<DirectoryPage />} />
+          {/* Your own profile; site admins can open anyone's */}
+          <Route path="/me" element={<ProfilePage />} />
+          <Route path="/:staffId/profile" element={<ProfilePage />} />
           <Route path="/:staffId" element={<DirectoryPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

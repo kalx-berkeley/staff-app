@@ -24,6 +24,7 @@ from .staff_genre_preference import StaffGenrePreference
 from .specialty_show import SpecialtyShow
 from .specialty_show_owner import SpecialtyShowOwner
 from .specialty_show_dj import SpecialtyShowDJ
+from .specialty_show_spinitron_show import SpecialtyShowSpinitronShow
 from .external_api_cache import ExternalApiCache
 from .feature_bin_release import FeatureBinRelease
 from .kalx_live_appearance import KalxLiveAppearance
@@ -36,6 +37,8 @@ from .workform_airtable_record import WorkformAirtableRecord
 from .workform_department import DepartmentHead, WorkformDepartment
 from .workform_preferences import WorkformPreferences
 from .short_link import ShortLink
+from .dj_quiz_deadline import DjQuizDeadline
+from .dj_shift_playlist import DjShiftPlaylist
 
 __all__ = [
     "AuditLog",
@@ -62,6 +65,7 @@ __all__ = [
     "SpecialtyShow",
     "SpecialtyShowOwner",
     "SpecialtyShowDJ",
+    "SpecialtyShowSpinitronShow",
     "ExternalApiCache",
     "FeatureBinRelease",
     "KalxLiveAppearance",
@@ -76,4 +80,6 @@ __all__ = [
     "DepartmentHead",
     "WorkformPreferences",
     "ShortLink",
+    "DjQuizDeadline",
+    "DjShiftPlaylist",
 ]

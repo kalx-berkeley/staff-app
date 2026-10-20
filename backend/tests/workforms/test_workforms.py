@@ -427,3 +427,66 @@ def test_preferences(client: TestClient, amy):
         headers=as_user(AMY),
     )
     assert response.json()["reminder_emails_enabled"] is False
+
+
+def test_site_admins_can_view_someones_workforms(client: TestClient, amy, airtable, db):
+    make_staff(
+        db,
+        "boss@example.com",
+        "Boss",
+        "recBOSS0000000000",
+        statuses=("Active", "Paid Staff"),
+    )
+    client.post(
+        f"/api/workforms/me/{_month_path()}/entries",
+        json={"department": "Promotions", "hours": 2, "description": "Tabling"},
+        headers=as_user(AMY),
+    )
+    history = client.get(
+        f"/api/workforms/staff/{amy.id}", headers=as_user("boss@example.com")
+    )
+    assert history.status_code == 200
+    assert history.json()["staff_name"] == "Amy Adams"
+    month = client.get(
+        f"/api/workforms/staff/{amy.id}/{_month_path()}",
+        headers=as_user("boss@example.com"),
+    ).json()
+    assert month["staff_name"] == "Amy Adams"
+    assert [e["description"] for e in month["entries"]] == ["Tabling"]
+
+
+def test_only_site_admins_can_view_someones_workforms(client: TestClient, amy, db):
+    make_staff(db, "bob@example.com", "Bob", "recBOB00000000000")
+    for path in (
+        f"/api/workforms/staff/{amy.id}",
+        f"/api/workforms/staff/{amy.id}/{_month_path()}",
+    ):
+        assert client.get(path, headers=as_user("bob@example.com")).status_code == 403
+
+
+def test_monthly_hours_for_the_directory(client: TestClient, amy, airtable, db):
+    from app.workforms.services.summary import monthly_hours
+
+    old = previous_month(previous_month(_this_month()))
+    airtable.add({
+        "Name": [AMY_ID],
+        "Month": old.isoformat(),
+        "Promotions : Hours": 4,
+        "Promotions : Approved": ["Approved"],
+        "Music : Hours": 2,
+    })
+    asyncio.run(refresh_all(db))
+    client.post(
+        f"/api/workforms/me/{_month_path()}/entries",
+        json={"department": "Promotions", "hours": 1.5, "description": "Tabling"},
+        headers=as_user(AMY),
+    )
+    hours = monthly_hours(db, amy, [_this_month(), old])
+    assert hours[_this_month()].status == "draft"
+    assert hours[_this_month()].reported_hours == 1.5
+    assert hours[old].status == "locked"
+    assert hours[old].reported_hours == 6
+    assert [(d.department, d.hours, d.decision) for d in hours[old].departments] == [
+        ("Music", 2, None),
+        ("Promotions", 4, "Approved"),
+    ]
