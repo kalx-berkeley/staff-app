@@ -325,9 +325,9 @@ class TestPromotion:
 
         ben = _primary(db, show, people["Ben"])
         assert ben is not None and ben.has_guest and _guest_hold(db, ben) is not None
-        assert (
-            "has also been reserved" in _emails_to(mock_send, people["Ben"])[0]["body_text"]
-        )
+        body = _emails_to(mock_send, people["Ben"])[0]["body_text"]
+        assert "guest pass is also being held for Ben+1" in body
+        assert "will be on the guest list" in body
 
     def test_seat_displaces_guest_hold_and_cascades(self, client, db, venue, people):
         show = _make_show(db, venue, 3)

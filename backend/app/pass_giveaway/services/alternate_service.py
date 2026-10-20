@@ -781,7 +781,20 @@ class AlternateService:
             "",
         ]
         if promotion.guest_requested and promotion.guest_granted:
-            lines.append(f"A guest pass for {guest_label} has also been reserved.")
+            lines.append(f"A guest pass is also being held for {guest_label}.")
+            lines.append("")
+            bumped_line = (
+                " Because you said you can only attend with your guest, your staff pass"
+                " would be released too."
+                if entry.only_attend_with_guest
+                else ""
+            )
+            lines.append(
+                "Staff take priority over guests, so until the show closes, your guest's"
+                " pass may go to another staff member who needs one. If that happens,"
+                f" we'll email you.{bumped_line} When the show closes, we'll email you to"
+                " confirm your guest."
+            )
             lines.append("")
         elif promotion.guest_requested:
             lines.append(
@@ -790,7 +803,10 @@ class AlternateService:
             )
             lines.append("")
         lines.extend([
-            "No further action is needed — your name is on the guest list.",
+            (
+                "No further action is needed. Your name will be on the guest list sent to"
+                " the venue when the show closes."
+            ),
             "",
             (
                 "If you can no longer attend, please release your pass so it can go to the"

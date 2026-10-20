@@ -753,7 +753,10 @@ class PassService:
                 "",
                 guest_line,
                 "",
-                "You still have your own staff pass and are on the guest list.",
+                (
+                    "You still have your own staff pass, and your name will be on the"
+                    " guest list sent to the venue when the show closes."
+                ),
             ])
             subject = f"Your guest pass is no longer available: {show.event_name}"
 

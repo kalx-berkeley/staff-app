@@ -480,7 +480,16 @@ class LotteryService:
 
             if entry.id in staff_pass:
                 if entry.id in guest_pass:
-                    # Cases 3 & 6: staff won, guest won
+                    # Cases 3 & 6: staff won, guest won. The guest pass is a
+                    # hold that another staff member can still take until the
+                    # show closes.
+                    if entry.only_attend_with_guest:
+                        bumped_line = (
+                            " Because you said you can only attend with your guest,"
+                            " your staff pass would be released too."
+                        )
+                    else:
+                        bumped_line = ""
                     body = "\n".join([
                         (
                             "Congratulations! You have been selected in the"
@@ -488,13 +497,21 @@ class LotteryService:
                         ),
                         "",
                         (
-                            f"Your staff pass and a guest pass for {guest_label} have both"
-                            " been reserved."
+                            "Your staff pass has been reserved, and a guest pass is being"
+                            f" held for {guest_label}."
                         ),
                         "",
                         (
-                            "No further action is needed — both your name and your guest's"
-                            " name are on the guest list."
+                            "Staff take priority over guests, so until the show closes,"
+                            " your guest's pass may go to another staff member who needs"
+                            f" one. If that happens, we'll email you.{bumped_line}"
+                            " When the show closes, we'll email you to confirm your"
+                            " guest."
+                        ),
+                        "",
+                        (
+                            "No further action is needed. Your name will be on the guest"
+                            " list sent to the venue when the show closes."
                         ),
                     ])
                     subject = f"You won passes to {show.event_name}!"
@@ -512,12 +529,12 @@ class LotteryService:
                             "Unfortunately, there were not enough passes to also reserve a"
                             f" guest pass for {guest_label}."
                         ),
-                        (
-                            "You may still attend, but your guest will not be on the guest"
-                            " list."
-                        ),
+                        "You may still attend on your own.",
                         "",
-                        "No further action is needed — your name is on the guest list.",
+                        (
+                            "No further action is needed. Your name will be on the guest"
+                            " list sent to the venue when the show closes."
+                        ),
                     ])
                     subject = f"You won a pass to {show.event_name}!"
                 else:
@@ -530,7 +547,10 @@ class LotteryService:
                         "",
                         "Your staff pass has been reserved.",
                         "",
-                        "No further action is needed — your name is on the guest list.",
+                        (
+                            "No further action is needed. Your name will be on the guest"
+                            " list sent to the venue when the show closes."
+                        ),
                     ])
                     subject = f"You won a pass to {show.event_name}!"
             else:
@@ -550,7 +570,7 @@ class LotteryService:
                         ),
                         "your staff pass has been returned to the pool.",
                         "",
-                        "Neither you nor your guest will be on the guest list.",
+                        "Neither you nor your guest received a pass.",
                         "",
                         "Thank you for entering!",
                     ])
@@ -565,7 +585,7 @@ class LotteryService:
                             " selected."
                         ),
                         f"As you indicated you can only attend with {guest_label},",
-                        "neither you nor your guest will be on the guest list.",
+                        "neither you nor your guest received a pass.",
                         "",
                         "Thank you for entering!",
                     ])

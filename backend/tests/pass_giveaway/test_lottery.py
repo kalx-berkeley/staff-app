@@ -951,6 +951,9 @@ class TestLotteryNotifications:
         assert "Congratulations" in kw["body_text"]
         assert "staff pass has been reserved" in kw["body_text"]
         assert "guest pass" not in kw["body_text"].lower()
+        # The guest list isn't sent to the venue until the show closes.
+        assert "will be on the guest list" in kw["body_text"]
+        assert "is on the guest list" not in kw["body_text"]
 
     # Case 2: staff lost, no guest requested.
 
@@ -983,6 +986,10 @@ class TestLotteryNotifications:
         assert "Congratulations" in kw["body_text"]
         assert "guest pass" in kw["body_text"].lower()
         assert "Joe+1" in kw["body_text"]
+        # The guest pass is only a hold until the show closes.
+        assert "held for Joe+1" in kw["body_text"]
+        assert "until the show closes" in kw["body_text"]
+        assert "are on the guest list" not in kw["body_text"]
 
     # Case 4: staff won, guest did not (has_guest=True, only_attend_with_guest=False).
 
