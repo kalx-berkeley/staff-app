@@ -23,7 +23,7 @@ from app.workforms.schemas.workforms import (
     WorkformResponse,
     WorkformSummary,
 )
-from app.workforms.services import records, workform_service
+from app.workforms.services import records, work_types, workform_service
 from app.workforms.services.departments import departments, is_department_head
 from app.workforms.services.loa import entry_flag
 from app.workforms.services.months import (
@@ -77,12 +77,13 @@ def _entry_response(
 def list_departments(
     staff: Staff = Depends(get_staff_member), db: Session = Depends(get_db)
 ):
-    """Every workform department, the user's own first."""
+    """Every workform department, the user's own first, and their work types."""
     mine = {d.department for d in staff.departments}
     all_departments = departments(db)
     return DepartmentsResponse(
         own=[d for d in all_departments if d in mine],
         other=[d for d in all_departments if d not in mine],
+        work_types=work_types.all_work_types(db),
     )
 
 

@@ -62,9 +62,18 @@ export interface MyWorkforms {
   staff_name?: string | null;
 }
 
+/** The types of work staff can choose from in a department. */
+export interface WorkTypes {
+  work_types: string[];
+  /** Whether staff may describe their work in their own words instead. */
+  allow_free_text: boolean;
+}
+
 export interface Departments {
   own: string[];
   other: string[];
+  /** The work types of the departments that have any. */
+  work_types: Record<string, WorkTypes>;
 }
 
 export interface Preferences {

@@ -14,8 +14,9 @@ from app.workforms.schemas.workforms import (
     ReviewItem,
     ReviewOverviewResponse,
     ReviewQueueResponse,
+    WorkTypes,
 )
-from app.workforms.services import review_service
+from app.workforms.services import review_service, work_types
 from app.workforms.services.departments import is_operations_head, reviewable_departments
 from app.workforms.services.months import format_month, open_months, parse_month
 
@@ -84,6 +85,45 @@ def department_people(
             detail="The months with hours can't be more than the months considered",
         )
     return review_service.department_people(db, reviewer, department, months, min_months)
+
+
+def _managed_department(db: Session, reviewer: Staff, department: str) -> str:
+    """*department*, if the reviewer can set its work types."""
+    own, fallback = reviewable_departments(db, reviewer)
+    if department not in own + fallback:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You can't change the {department} work types",
+        )
+    return department
+
+
+# Before "/{month}/{department}", which would otherwise match it
+@router.get("/work-types/{department}", response_model=WorkTypes)
+def get_work_types(
+    department: str,
+    reviewer: Staff = Depends(get_reviewer),
+    db: Session = Depends(get_db),
+):
+    """The types of work staff can choose from in *department*."""
+    return work_types.work_types(db, _managed_department(db, reviewer, department))
+
+
+@router.put("/work-types/{department}", response_model=WorkTypes)
+def update_work_types(
+    department: str,
+    request: WorkTypes,
+    reviewer: Staff = Depends(get_reviewer),
+    db: Session = Depends(get_db),
+):
+    """Set *department*'s work types and whether staff may describe other work."""
+    return work_types.update(
+        db,
+        reviewer,
+        _managed_department(db, reviewer, department),
+        request.work_types,
+        request.allow_free_text,
+    )
 
 
 @router.get("/{month}/pending", response_model=PendingCountsResponse)

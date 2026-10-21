@@ -10,7 +10,7 @@ from app.common.areas import WORKFORMS_AREA
 from app.common.services.audit_service import log_event
 from app.models.staff import Staff
 from app.models.workform import Workform, WorkformEntry
-from app.workforms.services import airtable_client, records
+from app.workforms.services import airtable_client, records, work_types
 from app.workforms.services.departments import departments
 from app.workforms.services.months import format_month, last_day_of_month, open_months
 
@@ -78,6 +78,8 @@ def validate_entry(
         problem = "Describe the work you did"
     elif work_date is not None and not (month <= work_date <= last_day_of_month(month)):
         problem = f"The date must be in {month:%B %Y}"
+    else:
+        problem = work_types.description_problem(db, department, description)
     if problem:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=problem

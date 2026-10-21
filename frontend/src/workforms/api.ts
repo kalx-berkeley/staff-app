@@ -12,6 +12,7 @@ import type {
   ReviewOverview,
   ReviewQueue,
   Workform,
+  WorkTypes,
 } from './types';
 
 const call = async <T>(request: Promise<{ data: T }>): Promise<T> => {
@@ -65,4 +66,8 @@ export const reviewAPI = {
         params: { months, min_months: minMonths },
       })
     ),
+  workTypes: (department: string) =>
+    call(apiClient.get<WorkTypes>(`/workforms/review/work-types/${seg(department)}`)),
+  updateWorkTypes: (department: string, workTypes: WorkTypes) =>
+    call(apiClient.put<WorkTypes>(`/workforms/review/work-types/${seg(department)}`, workTypes)),
 };

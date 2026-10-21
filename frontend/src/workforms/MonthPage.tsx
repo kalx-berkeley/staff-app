@@ -77,7 +77,7 @@ export default function MonthPage() {
         staffId !== null ? workformsAPI.staffWorkform(staffId, month) : workformsAPI.get(month),
         // Departments are only needed to add or edit entries
         departments || readOnly
-          ? Promise.resolve(departments ?? { own: [], other: [] })
+          ? Promise.resolve(departments ?? { own: [], other: [], work_types: {} })
           : workformsAPI.departments(),
       ]);
       setWorkform(loaded);

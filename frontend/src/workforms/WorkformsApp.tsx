@@ -11,6 +11,7 @@ const MonthPage = lazySection(loadWorkforms, 'MonthPage');
 const HistoryPage = lazySection(loadWorkforms, 'HistoryPage');
 const ReviewPage = lazySection(loadWorkforms, 'ReviewPage');
 const PeoplePage = lazySection(loadWorkforms, 'PeoplePage');
+const WorkTypesPage = lazySection(loadWorkforms, 'WorkTypesPage');
 const SettingsPage = lazySection(loadWorkforms, 'SettingsPage');
 
 // The KALX Workforms sub-site, served under /workforms. Anyone who can't use
@@ -36,6 +37,7 @@ export default function WorkformsApp() {
                 <Route path="/review" element={<ReviewPage />} />
                 <Route path="/review/:month" element={<ReviewPage />} />
                 <Route path="/people" element={<PeoplePage />} />
+                <Route path="/work-types" element={<WorkTypesPage />} />
               </>
             )}
             {user?.is_site_admin && (

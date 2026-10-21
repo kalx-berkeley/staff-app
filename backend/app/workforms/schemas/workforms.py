@@ -24,10 +24,19 @@ class EntryResponse(BaseModel):
     loa_flag: Optional[str] = None
 
 
+class WorkTypes(BaseModel):
+    # The types of work staff can choose as an entry's description, in order
+    work_types: List[str]
+    # Whether staff may describe their work in their own words instead
+    allow_free_text: bool
+
+
 class DepartmentsResponse(BaseModel):
     # The user's own departments first, then the rest, each sorted by name
     own: List[str]
     other: List[str]
+    # The work types of the departments that have any
+    work_types: Dict[str, WorkTypes] = Field(default_factory=dict)
 
 
 class DepartmentResult(BaseModel):

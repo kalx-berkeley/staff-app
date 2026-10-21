@@ -33,6 +33,8 @@ vi.mock('./api', () => ({
     queue: vi.fn(),
     decide: vi.fn(),
     people: vi.fn(),
+    workTypes: vi.fn(),
+    updateWorkTypes: vi.fn(),
   },
 }));
 
@@ -117,6 +119,7 @@ describe('KALX Workforms month page', () => {
     vi.mocked(workformsAPI.departments).mockResolvedValue({
       own: ['Promotions'],
       other: ['Music', 'Special Events'],
+      work_types: {},
     });
   });
 
@@ -192,6 +195,59 @@ describe('KALX Workforms month page', () => {
         work_date: null,
       })
     );
+  });
+
+  it("offers the department's work types, with free text when allowed", async () => {
+    vi.mocked(workformsAPI.departments).mockResolvedValue({
+      own: ['Promotions'],
+      other: ['Music'],
+      work_types: {
+        Promotions: { work_types: ['Tabling', 'Postering'], allow_free_text: true },
+        Music: { work_types: ['Filing CDs'], allow_free_text: false },
+      },
+    });
+    vi.mocked(workformsAPI.get).mockResolvedValue(workform({ entries: [], status: 'not_started' }));
+    vi.mocked(workformsAPI.addEntry).mockResolvedValue(workform().entries[0]);
+    await renderAt('/workforms/');
+    await screen.findByRole('heading', { name: 'Add work' });
+
+    fireEvent.change(screen.getByLabelText('Hours'), { target: { value: '1' } });
+    expect(screen.queryByLabelText('Describe the work')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Choose the type of work');
+
+    fireEvent.change(screen.getByLabelText('What did you do?'), { target: { value: 'Tabling' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(workformsAPI.addEntry).toHaveBeenLastCalledWith('2026-10', {
+        department: 'Promotions',
+        hours: 1,
+        description: 'Tabling',
+        work_date: null,
+      })
+    );
+
+    fireEvent.change(screen.getByLabelText('Hours'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('What did you do?'), { target: { value: ' other' } });
+    fireEvent.change(screen.getByLabelText('Describe the work'), {
+      target: { value: 'Made a flyer' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(workformsAPI.addEntry).toHaveBeenLastCalledWith('2026-10', {
+        department: 'Promotions',
+        hours: 2,
+        description: 'Made a flyer',
+        work_date: null,
+      })
+    );
+
+    // Music only allows its work types
+    fireEvent.change(screen.getByLabelText('Department'), { target: { value: 'Music' } });
+    const options = within(screen.getByLabelText('What did you do?'))
+      .getAllByRole('option')
+      .map((o) => o.textContent);
+    expect(options).toEqual(['Choose the type of work…', 'Filing CDs']);
   });
 
   it('confirms before submitting, warning when late', async () => {
@@ -328,7 +384,7 @@ describe('KALX Workforms review page', () => {
 
   it('sends people who aren’t heads back to their workform', async () => {
     vi.mocked(workformsAPI.mine).mockResolvedValue({ open_months: ['2026-10'], workforms: [] });
-    vi.mocked(workformsAPI.departments).mockResolvedValue({ own: [], other: ['Music'] });
+    vi.mocked(workformsAPI.departments).mockResolvedValue({ own: [], other: ['Music'], work_types: {} });
     vi.mocked(workformsAPI.get).mockResolvedValue(workform({ entries: [], status: 'not_started' }));
     await renderAt('/workforms/review');
     expect(await screen.findByRole('heading', { name: 'October 2026' })).toBeInTheDocument();
@@ -462,11 +518,74 @@ describe("KALX Workforms: a site admin viewing someone else's workforms", () => 
   it('is only for site admins', async () => {
     vi.mocked(workformsAPI.mine).mockResolvedValue({ open_months: ['2026-10'], workforms: [] });
     vi.mocked(workformsAPI.get).mockResolvedValue(workform());
-    vi.mocked(workformsAPI.departments).mockResolvedValue({ own: ['Promotions'], other: [] });
+    vi.mocked(workformsAPI.departments).mockResolvedValue({
+      own: ['Promotions'],
+      other: [],
+      work_types: {},
+    });
     await renderAt('/workforms/staff/5', user());
 
     await waitFor(() => expect(window.location.pathname).toBe('/workforms'));
     expect(workformsAPI.staffWorkforms).not.toHaveBeenCalled();
     await screen.findByText('Add work');
+  });
+});
+
+describe('KALX Workforms work types page', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(reviewAPI.overview).mockResolvedValue({
+      is_operations_head: false,
+      own_departments: ['Music', 'Promotions'],
+      fallback_departments: [],
+      default_month: '2026-09',
+      default_department: 'Music',
+      months: ['2026-10', '2026-09'],
+    });
+    vi.mocked(reviewAPI.workTypes).mockResolvedValue({
+      work_types: ['Filing CDs', 'Reviews'],
+      allow_free_text: true,
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('is only for department heads', async () => {
+    vi.mocked(workformsAPI.mine).mockResolvedValue({ open_months: ['2026-10'], workforms: [] });
+    vi.mocked(workformsAPI.departments).mockResolvedValue({
+      own: [],
+      other: ['Music'],
+      work_types: {},
+    });
+    vi.mocked(workformsAPI.get).mockResolvedValue(workform({ entries: [], status: 'not_started' }));
+    await renderAt('/workforms/work-types');
+    expect(await screen.findByRole('heading', { name: 'October 2026' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Work types' })).not.toBeInTheDocument();
+    expect(reviewAPI.workTypes).not.toHaveBeenCalled();
+  });
+
+  it('adds, reorders and removes work types, and saves them', async () => {
+    vi.mocked(reviewAPI.updateWorkTypes).mockImplementation(async (_d, workTypes) => workTypes);
+    await renderAt('/workforms/work-types', user({ is_department_head: true }));
+
+    expect(await screen.findByText('Filing CDs')).toBeInTheDocument();
+    expect(reviewAPI.workTypes).toHaveBeenCalledWith('Music');
+    const freeText = screen.getByLabelText(/describe other work in their own words/);
+    expect(freeText).toBeChecked();
+
+    fireEvent.change(screen.getByLabelText('New work type'), { target: { value: ' Library ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Move Library up' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Filing CDs' }));
+    fireEvent.click(freeText);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Saved.');
+    expect(reviewAPI.updateWorkTypes).toHaveBeenCalledWith('Music', {
+      work_types: ['Library', 'Reviews'],
+      allow_free_text: false,
+    });
   });
 });

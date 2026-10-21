@@ -49,6 +49,9 @@ export default function WorkformsLayout({ children }: { children: ReactNode }) {
               <NavLink to="/people" className={tab}>
                 People
               </NavLink>
+              <NavLink to="/work-types" className={tab}>
+                Work types
+              </NavLink>
             </>
           )}
           <NavLink to="/settings" className={tab}>

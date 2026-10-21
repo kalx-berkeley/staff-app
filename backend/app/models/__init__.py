@@ -36,6 +36,7 @@ from .workform import Workform, WorkformEntry
 from .workform_airtable_record import WorkformAirtableRecord
 from .workform_department import DepartmentHead, WorkformDepartment
 from .workform_preferences import WorkformPreferences
+from .workform_work_types import WorkformWorkTypes
 from .short_link import ShortLink
 from .dj_quiz_deadline import DjQuizDeadline
 from .dj_shift_playlist import DjShiftPlaylist
@@ -79,6 +80,7 @@ __all__ = [
     "WorkformDepartment",
     "DepartmentHead",
     "WorkformPreferences",
+    "WorkformWorkTypes",
     "ShortLink",
     "DjQuizDeadline",
     "DjShiftPlaylist",

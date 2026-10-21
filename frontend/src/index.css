@@ -5064,6 +5064,42 @@ body.staging-active .directory-detail-close {
   margin: 0.75rem 0;
 }
 
+.workforms-work-type-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+
+.workforms-work-type-list > li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  border-top: 1px solid #eee;
+  padding: 0.4rem 0;
+  overflow-wrap: anywhere;
+}
+
+.workforms-work-type-add {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.workforms-work-type-add input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.workforms-work-type-free-text {
+  display: block;
+  margin: 0.75rem 0;
+}
+
 .workforms-review-toolbar {
   display: flex;
   flex-wrap: wrap;

@@ -214,6 +214,7 @@ def test_departments_list_own_first(client: TestClient, amy):
     assert response.json() == {
         "own": ["Promotions"],
         "other": ["Music", "Operations", "Special Events"],
+        "work_types": {},
     }
 
 
