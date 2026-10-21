@@ -153,7 +153,8 @@ https://raw.githubusercontent.com/spinitron/v2api/refs/heads/master/docs/spinitr
   `automation` to the parsed item (`SpinitronShowItem`, or a new
   `SpinitronPlaylistItem` if adding them to the shared one clutters its other
   callers).
-- `/playlists/{id}` resolves a pasted playlist URL to its `show_id` (Q25).
+- `/playlists/{id}` resolves a pasted playlist URL to its `show_id` (Q25),
+  and a pasted `/m/playlist/view/<id>` URL to its `persona_id` (DJ Name).
 - `/shows/{id}` gets a show's title, to confirm a pasted URL.
 - `/personas`: `fetch_all_personas()` already returns `{id: name}`, which the
   persona type-ahead uses, cached through `cache_service`.
@@ -253,7 +254,9 @@ directory. `specialty_show_spinitron_shows` belongs to the pass giveaway.
   - `GET /api/directory/personas?q=`: the persona type-ahead, without
     placeholders, up to 20 results.
   - `POST /api/directory/personas/resolve` `{url}`: returns the persona for a
-    pasted `…/KALX/dj/<id>/…` URL, or 400.
+    pasted `…/KALX/dj/<id>/…` URL, or the persona of the playlist in a pasted
+    Spinitron manager URL (`https://spinitron.com/m/playlist/view/<id>`, which
+    isn't public, so the app asks the API), or 400.
 - `routers/admin.py` (prefix `/api/directory/admin`, site admins):
   `GET /dj-quiz-deadlines`, `PUT /dj-quiz-deadlines/{year}` `{deadline}` and
   `DELETE /dj-quiz-deadlines/{year}`, each audit-logged.

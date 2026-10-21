@@ -12,6 +12,7 @@ from app.common.services import profile_providers, staff_airtable
 from app.common.services.audit_service import log_event
 from app.common.services.leave_service import on_leave, today_pt
 from app.common.services.spinitron_service import (
+    SpinitronService,
     cached_persona_names,
     placeholder_persona_ids,
 )
@@ -40,6 +41,11 @@ WORKFORM_SUMMARY_MONTHS = 12
 
 _PERSONA_URL_RE = re.compile(
     r"^https?://(?:widgets\.)?spinitron\.com/KALX/dj/(\d+)(?:[/?#]|$)"
+)
+# A playlist's page in Spinitron's (logged in) manager, which DJs see while
+# they're on air. The playlist's persona comes from the API.
+_PLAYLIST_URL_RE = re.compile(
+    r"^https?://(?:widgets\.)?spinitron\.com/m/playlist/view/(\d+)(?:[/?#]|$)"
 )
 _ALLOWED_PHOTO_TYPES = {"image/jpeg": b"\xff\xd8\xff", "image/png": b"\x89PNG\r\n\x1a\n"}
 MAX_PHOTO_BYTES = 5 * 1024 * 1024
@@ -361,20 +367,27 @@ async def persona_names(db: Session) -> Dict[int, str]:
 
 async def resolve_persona_url(db: Session, url: str) -> Tuple[int, str]:
     """
-    The persona a pasted Spinitron DJ link points to.
+    The persona a pasted Spinitron DJ link points to, or the DJ of a pasted
+    Spinitron playlist link.
 
-    :raises HTTPException: 400 if it isn't a DJ link, or is a placeholder or
-        unknown persona.
+    :raises HTTPException: 400 if it isn't a DJ or playlist link, or is a
+        placeholder or unknown persona, and 502 if Spinitron fails.
     """
-    match = _PERSONA_URL_RE.match(url.strip())
-    if not match:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "That isn't a Spinitron DJ link, like https://spinitron.com/KALX/dj/123456/"
-            ),
-        )
-    persona_id = int(match.group(1))
+    url = url.strip()
+    match = _PERSONA_URL_RE.match(url)
+    if match:
+        persona_id = int(match.group(1))
+    else:
+        playlist_match = _PLAYLIST_URL_RE.match(url)
+        if not playlist_match:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "That isn't a Spinitron DJ link, like"
+                    " https://spinitron.com/KALX/dj/123456/"
+                ),
+            )
+        persona_id = await _playlist_persona_id(int(playlist_match.group(1)))
     if persona_id in placeholder_persona_ids():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -387,6 +400,29 @@ async def resolve_persona_url(db: Session, url: str) -> Tuple[int, str]:
             detail="Spinitron has no DJ with that link",
         )
     return persona_id, names[persona_id]
+
+
+async def _playlist_persona_id(playlist_id: int) -> int:
+    """
+    The persona of a Spinitron playlist.
+
+    :raises HTTPException: 400 if there's no such playlist or it has no
+        persona, and 502 if Spinitron fails.
+    """
+    try:
+        playlist = await SpinitronService.fetch_playlist(playlist_id)
+    except RuntimeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Couldn't look up that playlist in Spinitron: {e}",
+        )
+    persona_id = SpinitronService.extract_persona_id(playlist) if playlist else None
+    if persona_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Spinitron has no playlist with a DJ at that link",
+        )
+    return persona_id
 
 
 async def update_profile(

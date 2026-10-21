@@ -151,7 +151,7 @@ class SpinitronService:
         return personas
 
     @staticmethod
-    def _extract_persona_id(item: dict) -> Optional[int]:
+    def extract_persona_id(item: dict) -> Optional[int]:
         """Extract a persona ID from a Spinitron item.
 
         Prefers a direct `persona_id` field (seen on `/playlists` items);
@@ -230,7 +230,7 @@ class SpinitronService:
                             id=int(show_id),
                             start=datetime.strptime(start_str, "%Y-%m-%dT%H:%M:%S%z"),
                             end=datetime.strptime(end_str, "%Y-%m-%dT%H:%M:%S%z"),
-                            persona_id=SpinitronService._extract_persona_id(item),
+                            persona_id=SpinitronService.extract_persona_id(item),
                             title=title,
                         )
                     )
@@ -287,7 +287,7 @@ class SpinitronService:
                             id=int(playlist_id),
                             start=datetime.strptime(start_str, "%Y-%m-%dT%H:%M:%S%z"),
                             end=datetime.strptime(end_str, "%Y-%m-%dT%H:%M:%S%z"),
-                            persona_id=SpinitronService._extract_persona_id(item),
+                            persona_id=SpinitronService.extract_persona_id(item),
                             title=title,
                             show_id=(
                                 int(item["show_id"])

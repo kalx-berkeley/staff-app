@@ -531,12 +531,64 @@ def test_resolving_a_persona_link(client: TestClient, db: Session, dj, personas)
     assert response.json() == {"id": 222, "name": "Zed, Esq."}
 
 
+def test_resolving_a_playlist_link(client: TestClient, db: Session, dj, personas):
+    with patch(
+        "app.directory.services.profile.SpinitronService.fetch_playlist",
+        new_callable=AsyncMock,
+        return_value={"id": 22868763, "persona_id": 111},
+    ) as fetch:
+        response = client.post(
+            "/api/directory/personas/resolve",
+            json={"url": "https://spinitron.com/m/playlist/view/22868763"},
+            headers=_as("dj@example.com"),
+        )
+    fetch.assert_awaited_once_with(22868763)
+    assert response.json() == {"id": 111, "name": "DJ Zed"}
+
+
+@pytest.mark.parametrize(
+    "playlist",
+    [None, {"id": 1}, {"id": 1, "persona_id": 176287}, {"id": 1, "persona_id": 999}],
+)
+def test_resolving_a_bad_playlist_link(
+    client: TestClient, db: Session, dj, personas, playlist
+):
+    with patch(
+        "app.directory.services.profile.SpinitronService.fetch_playlist",
+        new_callable=AsyncMock,
+        return_value=playlist,
+    ):
+        response = client.post(
+            "/api/directory/personas/resolve",
+            json={"url": "https://spinitron.com/m/playlist/view/1"},
+            headers=_as("dj@example.com"),
+        )
+    assert response.status_code == 400
+
+
+def test_resolving_a_playlist_link_when_spinitron_fails(
+    client: TestClient, db: Session, dj, personas
+):
+    with patch(
+        "app.directory.services.profile.SpinitronService.fetch_playlist",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("down"),
+    ):
+        response = client.post(
+            "/api/directory/personas/resolve",
+            json={"url": "https://spinitron.com/m/playlist/view/1"},
+            headers=_as("dj@example.com"),
+        )
+    assert response.status_code == 502
+
+
 @pytest.mark.parametrize(
     "url",
     [
         "https://spinitron.com/KALX/dj/176287/",
         "https://spinitron.com/KALX/dj/999/",
         "https://example.com/KALX/dj/111/",
+        "https://spinitron.com/m/playlist/edit/22868763",
     ],
 )
 def test_resolving_a_bad_persona_link(client: TestClient, db: Session, dj, personas, url):
