@@ -374,6 +374,7 @@ async def auto_close_show(show_id: int):
             )
             return
         ShowService.close_show(db, show_id)
+        unschedule_lottery_job(show_id)
         db.refresh(show)
         ShowService._notify_venue_owners_of_auto_close(db, show)
         from app.pass_giveaway.routers.shows import run_close_side_effects

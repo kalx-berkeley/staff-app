@@ -14,7 +14,9 @@ from app.models.show_attempt import ShowAttempt
 from app.models.venue import Venue
 from app.models.notification_preferences import NotificationPreferences
 from app.models.job_log import JobLog
+from app.models.lottery_entry import LotteryEntry
 from app.pass_giveaway.schemas.show import ShowCreate, ShowUpdate
+from app.pass_giveaway.services.lottery_service import LotteryService
 from app.pass_giveaway.services.pass_service import PassService, format_phone
 from app.common.services import notification_service
 from app.config import settings
@@ -369,6 +371,19 @@ class ShowService:
                         " shows can be closed."
                     ),
                 )
+
+            # Draw any entries still waiting on the lottery first. The scheduled
+            # draw skips shows that are no longer published, so closing during
+            # the lottery window would otherwise leave every entrant without a pass.
+            has_pending_entries = (
+                db.query(LotteryEntry.id)
+                .filter(LotteryEntry.show_id == show_id, LotteryEntry.status == "pending")
+                .first()
+                is not None
+            )
+            if has_pending_entries:
+                LotteryService.run_lottery(db, show_id)
+                db.refresh(show)
 
             show.status = "closed"
             show.updated_at = datetime.now(timezone.utc)

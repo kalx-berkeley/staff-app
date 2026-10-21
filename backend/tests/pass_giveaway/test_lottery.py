@@ -1380,6 +1380,63 @@ class TestStartupMissedLottery:
         assert run_startup() == []
 
 
+class TestCloseDuringLottery:
+    """Closing a show while its lottery window is open draws the lottery first."""
+
+    UNSCHEDULE = "app.pass_giveaway.routers.shows.unschedule_lottery_job"
+
+    def _close(self, client, show: Show, promotions_staff: Staff):
+        with (
+            patch(self.UNSCHEDULE) as unschedule,
+            patch("app.common.services.notification_service.send_email"),
+        ):
+            response = client.post(
+                f"/api/shows/{show.id}/close",
+                headers={"X-Forwarded-User": promotions_staff.email},
+            )
+        unschedule.assert_called_once_with(show.id)
+        return response
+
+    def test_close_awards_passes_to_entrants(
+        self, client, db, venue, promotions_staff, joe, alice, bob
+    ):
+        show = _make_lottery_show(db, venue, num_staff_passes=2)
+        _make_staff_entry(db, show, joe)
+        _make_staff_entry(db, show, alice)
+        _make_staff_entry(db, show, bob)
+
+        response = self._close(client, show, promotions_staff)
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "closed"
+        assert _count_passes(db, show, "staff", "claimed") == 2
+        statuses = sorted(
+            e.status for e in db.query(LotteryEntry).filter(LotteryEntry.show_id == show.id)
+        )
+        assert statuses == ["lost", "won", "won"]
+
+    def test_close_without_entries(self, client, db, venue, promotions_staff):
+        show = _make_lottery_show(db, venue, num_staff_passes=2)
+
+        with patch.object(LotteryService, "run_lottery") as run_lottery:
+            response = self._close(client, show, promotions_staff)
+
+        assert response.status_code == 200
+        run_lottery.assert_not_called()
+
+    def test_auto_close_awards_passes_to_entrants(self, db, venue, joe):
+        from app.pass_giveaway.services.show_service import ShowService
+
+        show = _make_lottery_show(db, venue, num_staff_passes=1)
+        _make_staff_entry(db, show, joe)
+
+        with patch("app.common.services.notification_service.send_email"):
+            ShowService.close_show(db, show.id)
+
+        assert show.status == "closed"
+        assert _primary_pass(db, show, joe).status == "claimed"
+
+
 class TestLotteryJobScheduling:
     """Publish and reopen schedule the draw at a UTC-aware deadline."""
 
