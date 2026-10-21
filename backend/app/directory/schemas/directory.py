@@ -145,7 +145,7 @@ class ProfileResponse(BaseModel):
     loa_end: Optional[date] = None
     is_self: bool
     # Whether the viewer can save changes (editing is on, and they're this
-    # person or a site admin)
+    # person or Paid Staff)
     can_edit: bool
     # None unless the person has a Spinitron persona or the Sublist DJ status
     eligibility: Optional[EligibilityResponse] = None

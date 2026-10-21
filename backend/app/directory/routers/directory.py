@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.auth import (
     current_staff_filter,
     get_staff_member,
+    is_paid_staff,
     is_site_admin,
     require_authentication,
 )
@@ -174,21 +175,33 @@ def get_photo(
 # --- Profile page ----------------------------------------------------------
 
 
+def _real_user(db: Session, email: str) -> Staff | None:
+    """The real, signed-in user, never someone they're impersonating."""
+    return db.query(Staff).filter(Staff.email == email).first()
+
+
 def _profile_target(
-    db: Session, staff_id: int, viewer: Staff, email: str
+    db: Session, staff_id: int, viewer: Staff, email: str, editing: bool = False
 ) -> tuple[Staff, bool]:
     """
     The current staff member whose profile is wanted, and whether it's the
-    viewer's own. Only they and site admins may see it.
+    viewer's own. Only they and site admins may see it, and only they and
+    Paid Staff may edit it.
 
     The viewer is who the user is acting as (someone they're impersonating,
-    on staging); the site admin check uses the real, signed-in user.
+    on staging); the site admin and Paid Staff checks use the real, signed-in
+    user.
 
     :raises HTTPException: 403 for anyone else, 404 if they aren't current staff.
     """
     is_self = viewer.id == staff_id
     if not is_self:
-        real_user = db.query(Staff).filter(Staff.email == email).first()
+        real_user = _real_user(db, email)
+        if editing and not is_paid_staff(real_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only this staff member and Paid Staff can edit this profile",
+            )
         if not is_site_admin(db, real_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -200,7 +213,7 @@ def _profile_target(
     return staff, is_self
 
 
-def _profile(db: Session, staff: Staff, is_self: bool) -> ProfileResponse:
+def _profile(db: Session, staff: Staff, is_self: bool, email: str) -> ProfileResponse:
     return ProfileResponse(
         entry=_entry(staff, today_pt()),
         first_name=staff.first_name,
@@ -208,7 +221,8 @@ def _profile(db: Session, staff: Staff, is_self: bool) -> ProfileResponse:
         loa_start=staff.loa_start,
         loa_end=staff.loa_end,
         is_self=is_self,
-        can_edit=settings.directory_self_edit_enabled,
+        can_edit=settings.directory_self_edit_enabled
+        and (is_self or is_paid_staff(_real_user(db, email))),
         eligibility=(
             profile_service.build_eligibility(db, staff)
             if profile_service.shows_eligibility(staff)
@@ -221,10 +235,11 @@ def _profile(db: Session, staff: Staff, is_self: bool) -> ProfileResponse:
 @router.get("/me/profile", response_model=ProfileResponse)
 def get_my_profile(
     viewer: Staff = Depends(get_staff_member),
+    email: str = Depends(require_authentication),
     db: Session = Depends(get_db),
 ):
     """The user's own profile page."""
-    return _profile(db, viewer, True)
+    return _profile(db, viewer, True, email)
 
 
 @router.get("/{staff_id}/profile", response_model=ProfileResponse)
@@ -236,7 +251,7 @@ def get_profile(
 ):
     """A staff member's profile page. Only they and site admins can see it."""
     staff, is_self = _profile_target(db, staff_id, viewer, email)
-    return _profile(db, staff, is_self)
+    return _profile(db, staff, is_self, email)
 
 
 @router.patch("/{staff_id}/profile", response_model=ProfileResponse)
@@ -248,15 +263,15 @@ async def update_profile(
     db: Session = Depends(get_db),
 ):
     """
-    Save a staff member's editable details to Airtable. Only they and site
-    admins can, and only once editing is turned on
+    Save a staff member's editable details to Airtable. Only they and Paid
+    Staff can, and only once editing is turned on
     (DIRECTORY_SELF_EDIT_ENABLED).
     """
-    staff, is_self = _profile_target(db, staff_id, viewer, email)
+    staff, is_self = _profile_target(db, staff_id, viewer, email, editing=True)
     profile_service.require_editing_enabled()
     await profile_service.update_profile(db, staff, update, email)
     db.refresh(staff)
-    return _profile(db, staff, is_self)
+    return _profile(db, staff, is_self, email)
 
 
 @router.post("/{staff_id}/photo", response_model=ProfileResponse)
@@ -271,7 +286,7 @@ async def upload_photo(
     Replace a staff member's photo (JPEG or PNG, at most 5 MB). Same access
     as editing the profile.
     """
-    staff, is_self = _profile_target(db, staff_id, viewer, email)
+    staff, is_self = _profile_target(db, staff_id, viewer, email, editing=True)
     profile_service.require_editing_enabled()
     # Read one byte past the limit, so a larger file is refused without
     # reading it all
@@ -280,7 +295,7 @@ async def upload_photo(
         db, staff, photo.filename or "photo", photo.content_type, data, email
     )
     db.refresh(staff)
-    return _profile(db, staff, is_self)
+    return _profile(db, staff, is_self, email)
 
 
 @router.get("/personas", response_model=list[PersonaOption])

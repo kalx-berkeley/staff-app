@@ -259,7 +259,8 @@ If using Airtable sync:
   the real signed-in user, never someone they're impersonating.
 - Profile editing writes to the staff table and is off until `DIRECTORY_SELF_EDIT_ENABLED` is
   set; it then needs a token with write access to `AIRTABLE_TABLE_NAME`. Staff can edit only
-  their own profile, site admins anyone's, and every change is recorded in `audit_log`.
+  their own profile, and Active Paid Staff anyone's (other site admins can see other people's
+  profiles but not edit them). The Paid Staff check uses the real signed-in user. Every change is recorded in `audit_log`.
 
 ### Incident Response
 

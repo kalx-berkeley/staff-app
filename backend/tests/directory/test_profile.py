@@ -337,9 +337,7 @@ def test_saving_a_profile_writes_changed_fields_to_airtable(
     assert set(entry.details["changes"]) == {"pronouns", "phone", "dj_persona_ids"}
 
 
-def test_site_admins_can_edit_anyone(
-    client: TestClient, db: Session, dj, editing, personas
-):
+def test_paid_staff_can_edit_anyone(client: TestClient, db: Session, dj, editing, personas):
     _make_staff(db, "boss@example.com", "Boss", statuses=("Active", "Paid Staff"))
     with (
         patch(
@@ -355,9 +353,31 @@ def test_site_admins_can_edit_anyone(
             headers=_as("boss@example.com"),
         )
     assert response.status_code == 200
+    assert response.json()["can_edit"] is True
     entry = db.query(AuditLog).filter(AuditLog.event_type == "profile_updated").one()
     assert entry.actor_email == "boss@example.com"
-    assert entry.actor_role == "site_admin"
+    assert entry.actor_role == "paid_staff"
+
+
+def test_other_site_admins_can_see_but_not_edit(
+    client: TestClient, db: Session, dj, editing, monkeypatch
+):
+    monkeypatch.setattr(config.settings, "site_admin_emails", "admin@example.com")
+    _make_staff(db, "admin@example.com", "Admin")
+    headers = _as("admin@example.com")
+    response = client.get(f"/api/directory/{dj.id}/profile", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["can_edit"] is False
+    response = client.patch(
+        f"/api/directory/{dj.id}/profile", json=_UPDATE, headers=headers
+    )
+    assert response.status_code == 403
+    response = client.post(
+        f"/api/directory/{dj.id}/photo",
+        files={"photo": ("me.jpg", _jpeg(), "image/jpeg")},
+        headers=headers,
+    )
+    assert response.status_code == 403
 
 
 def test_other_staff_cant_edit(client: TestClient, db: Session, dj, editing):

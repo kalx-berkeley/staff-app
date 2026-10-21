@@ -57,7 +57,7 @@ Terms:
 | Q13 | The checklist shows a summary at the top, one ✓/✗ row per requirement with a one-line status, and an expandable details section per row with the full rule and its evidence. It also shows "Eligible until <date>". |
 | Q14 | The checklist and the workforms summary are visible to the person and to all site admins, and nobody else. |
 | Q15 | Specialty shows get Spinitron show IDs, set by pasting a Spinitron URL, and the ID is required when a show is created. Playlists are matched to specialty shows by `show_id`. |
-| Q16 | Site admins open anyone's profile at `/directory/:staffId/profile`. The sidebar shows site admins a "View full profile" link. The backend returns 403 to anyone who is neither that person nor a site admin. Once editing is on, site admins can edit other people's profiles too. Viewing a profile isn't audit-logged. |
+| Q16 | Site admins open anyone's profile at `/directory/:staffId/profile`. The sidebar shows site admins a "View full profile" link. The backend returns 403 to anyone who is neither that person nor a site admin. Once editing is on, Active Paid Staff can edit other people's profiles too; other site admins can only see them. Viewing a profile isn't audit-logged. |
 | Q17 | For the two older months, a department's hours count only if it Approved them. A department that hasn't decided yet makes the month ✗, with "awaiting <Dept>". For the most recent month, a department's decision counts where there is one (Denied hours drop out), and submitted hours count where there isn't. |
 | Q18 | The workforms summary covers the last 12 months, one row each: month, hours reported, hours approved, status (draft, submitted, late, LOA) and a link to that month in `/workforms/`. It's shown whether or not the person is a DJ. Site admins see it on other people's profiles, and its links take them to that person's workforms (Q29). |
 | Q19 | While editing is off, the form says: "Editing isn't available here yet. To update these details, fill out this form: https://docs.google.com/forms/d/e/1FAIpQLSf7IIE8IrSPqODgGCLB1MZvFe2OlyCxfCHRYbSS5cGVs_QfQg/viewform" |
@@ -71,7 +71,7 @@ Terms:
 | Q27 | Existing specialty shows start with no IDs. Saving any edit to one requires at least one ID, and the specialty shows page warns about shows without one. Until a show has an ID, its playlists can count as qualifying shifts. That gap is accepted, and the IDs will be filled in right after deploying. |
 | Q28 | The directory gets specialty show IDs (and workforms hours) through provider hooks in `common`, which the sub-sites that own the data register from `main.py`. Sub-sites still never import each other. |
 | Q29 | `/workforms/` gets new view-only pages for site admins: another person's month (the MonthPage layout with a "Viewing <name>'s workform" banner) and their history, with new endpoints that take a staff ID. |
-| Q30 | When a site admin edits someone else's profile, it's audit-logged. The person isn't emailed. |
+| Q30 | When Paid Staff edit someone else's profile, it's audit-logged. The person isn't emailed. |
 | Q31 | Photo upload is built now, behind the same flag. It accepts JPEG or PNG up to 5 MB, and the new photo replaces the current one. There's no cropping: the photo sync already makes the square thumbnail. |
 | Q32 | Validation: First Name is required, and Surname is optional. Pronouns are free text, up to 40 characters. Phone is optional; if given, it must be a US 10-digit number, saved in the format `formatPhone` displays. DJ Name can have zero or more personas, and placeholder personas are refused. |
 | Q33 | **Retired** is separate from the existing **deleted** flag. Deleted is for mistakes, so its Spinitron IDs are ignored. A retired show's IDs still mark its playlists as specialty. |
@@ -220,7 +220,7 @@ directory. `specialty_show_spinitron_shows` belongs to the pass giveaway.
     `id`).
   - New `ProfileResponse`: the entry, plus the editable values as Airtable holds them
     (`first_name`, `surname`, `pronouns`, `phone`), the full `loa_start`/`loa_end`,
-    `can_edit` (flag on, and the viewer is that person or a site admin),
+    `can_edit` (flag on, and the viewer is that person or Paid Staff),
     `is_self`, `eligibility` (or null when Q6 doesn't apply) and
     `workforms` (12 `MonthSummary` rows).
   - New `ProfileUpdate`, with Q32's validation.
@@ -244,7 +244,8 @@ directory. `specialty_show_spinitron_shows` belongs to the pass giveaway.
   - `GET /api/directory/me/profile` and `GET /api/directory/{staff_id}/profile`:
     403 unless the viewer is that person or a site admin (`is_site_admin`
     checks the real signed-in user). 404 if the person isn't current staff.
-  - `PATCH /api/directory/{staff_id}/profile`: same access check. 403 with
+  - `PATCH /api/directory/{staff_id}/profile`: 403 unless the viewer is that
+    person or Active Paid Staff (`is_paid_staff`, real signed-in user). 403 with
     "Editing isn't available yet" when the flag is off. Returns the new
     `ProfileResponse`.
   - `POST /api/directory/{staff_id}/photo` (multipart): same access check

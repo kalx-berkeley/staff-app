@@ -36,8 +36,8 @@ const initialValues = (profile: Profile): Values => ({
 
 const blankToNull = (value: string): string | null => value.trim() || null;
 
-// The fields staff can change about themselves (and site admins about
-// anyone). The whole form is greyed out until the app can write to Airtable
+// The fields staff can change about themselves (and Paid Staff about
+// anyone). The whole form is greyed out unless the viewer can save changes
 // (profile.can_edit), with a link to ask for changes another way.
 const ProfileEditForm = ({ profile, onSaved }: ProfileEditFormProps) => {
   const idPrefix = useId();

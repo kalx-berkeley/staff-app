@@ -331,6 +331,18 @@ def is_site_admin(db: Session, staff: Staff | None) -> bool:
     )
 
 
+def is_paid_staff(staff: Staff | None) -> bool:
+    """
+    Return True if *staff* has both the "Paid Staff" and "Active" statuses.
+
+    Only they can edit other people's KALX Staff Directory profiles.
+    """
+    if staff is None:
+        return False
+    statuses = _staff_statuses(staff)
+    return PAID_STAFF_STATUS in statuses and ACTIVE_STATUS in statuses
+
+
 def is_promotions_admin(staff: Staff | None) -> bool:
     """
     Return True if *staff* is a promotions admin: an Active or "🆕" member of
