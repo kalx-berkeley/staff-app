@@ -38,7 +38,7 @@ const PassReleaseForm = ({ pass, isAuthenticated, onReleased }: PassReleaseProps
     setError(null);
 
     if (!form.acknowledged) {
-      setError('Please acknowledge that the promotions owner will be notified.');
+      setError("Please acknowledge that the show's KALX promotions reps will be notified.");
       return;
     }
     if (!form.reason.trim()) {
@@ -88,7 +88,7 @@ const PassReleaseForm = ({ pass, isAuthenticated, onReleased }: PassReleaseProps
             onChange={(e) => setForm((prev) => ({ ...prev, acknowledged: e.target.checked }))}
             disabled={loading || isClosed}
           />
-          I understand that the promotions owner will be notified of this release.
+          I understand that the show's KALX promotions reps will be notified of this release.
         </label>
       </div>
 

@@ -827,7 +827,7 @@ const ShowDetail = () => {
           <div className="pass-claim-section">
             <h3>Reserve Pass Pair for On-Air Giveaway</h3>
             <p className="pass-unavailable-note">
-              Promotions venue owners cannot reserve pass pairs for shows at their own venues.
+              KALX promotions reps cannot reserve pass pairs for shows at the venues they rep.
             </p>
           </div>
         )}

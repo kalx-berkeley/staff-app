@@ -47,7 +47,7 @@ async def _run_notify_unclosed_past_shows(db: Session) -> JobRunResult:
     count = ShowService.notify_unclosed_past_shows(db, trigger="manual")
     return JobRunResult(
         success=True,
-        message=f"Notified venue owners for {count} unclosed past show(s)",
+        message=f"Notified KALX promotions reps for {count} unclosed past show(s)",
     )
 
 
@@ -84,7 +84,7 @@ ADMIN_JOBS = [
     ),
     AdminJob(
         id="notify_unclosed_past_shows",
-        name="Notify venue owners of unclosed past shows",
+        name="Notify KALX promotions reps of unclosed past shows",
         area=PASS_GIVEAWAY_AREA,
         run=_run_notify_unclosed_past_shows,
     ),

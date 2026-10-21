@@ -37,9 +37,9 @@ const ConfirmModal = ({ action, show, userEmail, onConfirm, onCancel }: ConfirmM
           </div>
           {!isVenueOwner && (
             <div className="error-message" style={{ marginBottom: '1rem' }}>
-              <strong>Note:</strong> You are not listed as an owner of{' '}
+              <strong>Note:</strong> You are not listed as a KALX promotions rep for{' '}
               <strong>{show.venue.name}</strong>. Closing a show at a venue you
-              don't own is unusual — please confirm this is intentional.
+              don't rep is unusual — please confirm this is intentional.
             </div>
           )}
           <p>
@@ -356,7 +356,7 @@ const ShowDetail = () => {
     }
 
     if (isVenueOwner && userDjName && preassignDj.trim().toLowerCase() === userDjName.toLowerCase()) {
-      setActionError('Promotions venue owners cannot pre-assign passes to their own DJ name.');
+      setActionError("You can't pre-assign passes to your own DJ name for a venue you rep.");
       return;
     }
 
@@ -905,7 +905,7 @@ const ShowDetail = () => {
         </h3>
         {isVenueOwner && userDjName && (
           <p className="field-hint">
-            As a venue owner, you cannot pre-assign pass pairs to your own DJ name ({userDjName}).
+            As a KALX promotions rep for this venue, you cannot pre-assign pass pairs to your own DJ name ({userDjName}).
           </p>
         )}
         <div className="passes-list">

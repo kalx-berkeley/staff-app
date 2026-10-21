@@ -86,8 +86,8 @@ const PromoterList = () => {
               {promoter.owner_emails.length > 0 && (
                 <p className="venue-address">
                   {promoter.owner_emails.length === 1
-                    ? '1 owner'
-                    : `${promoter.owner_emails.length} owners`}
+                    ? '1 KALX rep'
+                    : `${promoter.owner_emails.length} KALX reps`}
                 </p>
               )}
               <button

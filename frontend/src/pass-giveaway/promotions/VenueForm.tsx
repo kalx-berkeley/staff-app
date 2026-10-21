@@ -417,8 +417,8 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
               ))}
             </select>
             <span className="field-hint">
-              When set, pass winner names for shows at this venue are sent to the promoter's owners
-              rather than this venue's owners.
+              When set, pass winner names for shows at this venue are sent to the promoter's KALX
+              promotions reps rather than this venue's.
             </span>
           </div>
 
@@ -793,7 +793,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           )}
 
           <div className="form-section">
-            <h4>Owners</h4>
+            <h4>KALX Promotions Reps</h4>
             <p className="field-hint">
               Promotions staff with access to manage this venue. Type a name or email address.
             </p>
@@ -803,7 +803,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
                 onChange={setNewOwnerInput}
                 onSubmit={handleAddOwner}
                 options={promotionsStaff}
-                placeholder="Add owner by name or email..."
+                placeholder="Add rep by name or email..."
                 disabled={submitting}
                 style={{ flex: 1 }}
               />

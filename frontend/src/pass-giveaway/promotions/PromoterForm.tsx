@@ -306,7 +306,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
       </div>
 
       <fieldset className="form-fieldset">
-        <legend>Owners</legend>
+        <legend>KALX Promotions Reps</legend>
         <p className="field-hint">
           Promotions staff members who own the relationship with this promoter and receive pass
           winner notifications for their shows. Type a name or email address.
@@ -317,7 +317,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
             onChange={setNewOwnerInput}
             onSubmit={handleAddOwner}
             options={promotionsStaff}
-            placeholder="Add owner by name or email..."
+            placeholder="Add rep by name or email..."
             disabled={submitting}
             style={{ flex: 1 }}
           />

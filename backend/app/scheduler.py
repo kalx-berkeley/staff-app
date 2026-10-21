@@ -632,7 +632,7 @@ def start_scheduler():
         notify_unclosed_past_shows,
         trigger=CronTrigger(hour=4, minute=0, timezone=_PT),
         id="notify_unclosed_past_shows",
-        name="Notify venue owners of unclosed past shows",
+        name="Notify KALX promotions reps of unclosed past shows",
         replace_existing=True,
     )
 

@@ -146,7 +146,7 @@ const ShowList = () => {
           <button
             className={showMineOnly ? 'btn-primary' : 'btn-secondary'}
             onClick={() => setShowMineOnly(true)}
-            title="Show only shows at venues where you are listed as an owner"
+            title="Show only shows at venues where you are listed as a KALX promotions rep"
           >
             My Shows
           </button>

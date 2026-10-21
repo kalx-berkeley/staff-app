@@ -215,7 +215,7 @@ const ProfileSettings = ({ section }: { section: 'Promotions' | 'Staff' }) => {
             <li>Lottery results — whether you won or lost a pass (or on-air pass pair) lottery you entered</li>
             <li>Lottery entry cancellations — if a show you entered a lottery for is cancelled before the drawing</li>
             <li>
-              Venue owner alerts, if you manage a venue — show cancellations, pass count
+              KALX promotions rep alerts, if you rep a venue or promoter — show cancellations, pass count
               reductions affecting assigned or claimed passes, auto-closed show guest
               lists, reminders for shows not yet closed after their date, and pass
               winner releases

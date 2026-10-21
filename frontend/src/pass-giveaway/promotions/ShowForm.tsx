@@ -38,8 +38,8 @@ const DeleteConfirmModal = ({ eventName, passes, onConfirm, onCancel }: DeleteCo
           <div className="error-message" style={{ marginBottom: '1rem' }}>
             <strong>Action required:</strong> This show has passes that have already been
             distributed. You will need to personally contact the following people to let
-            them know the show has been cancelled. The venue owner will also receive an
-            email notification.
+            them know the show has been cancelled. The show's KALX promotions reps will
+            also receive an email notification.
             {givenAwayPasses.length > 0 && (
               <>
                 <p style={{ marginTop: '0.5rem', marginBottom: '0.25rem' }}><strong>On-air winners:</strong></p>
@@ -106,8 +106,8 @@ const PassAdjustmentModal = ({ eventName, adjustment, onClose }: PassAdjustmentM
       </div>
       <p>
         The number of passes for <strong>{eventName}</strong> was reduced. The following
-        people have been affected. A notification email has been sent to the venue
-        owners. Please contact these individuals to let them know.
+        people have been affected. A notification email has been sent to the show's KALX
+        promotions reps. Please contact these individuals to let them know.
       </p>
       {adjustment.affected_djs.length > 0 && (
         <div style={{ marginBottom: '1rem' }}>
@@ -1045,11 +1045,11 @@ const ShowForm = () => {
                 onChange={(e) => setAutoClose(e.target.checked)}
                 disabled={submitting}
               />
-              Automatically close show and email{' '}
+              Automatically close show at this time and email the guest list to the
+              KALX promotions reps for this{' '}
               {promoterId !== null || (venueId !== '' && venues.find((v) => v.id === venueId)?.promoter_id != null)
                 ? 'promoter'
-                : 'venue'}{' '}
-              owners at this time
+                : 'venue'}
             </label>
           </div>
           {errors.planned_close_date && (
