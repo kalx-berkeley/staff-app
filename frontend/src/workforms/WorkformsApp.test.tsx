@@ -33,6 +33,7 @@ vi.mock('./api', () => ({
     queue: vi.fn(),
     decide: vi.fn(),
     people: vi.fn(),
+    addToDepartment: vi.fn(),
     workTypes: vi.fn(),
     updateWorkTypes: vi.fn(),
   },
@@ -405,6 +406,7 @@ describe('KALX Workforms people page', () => {
         months_reported: 2,
         total_hours: 5,
         hours: { '2026-08': 3, '2026-09': 2 },
+        in_department: true,
       },
       {
         staff_id: 2,
@@ -413,8 +415,28 @@ describe('KALX Workforms people page', () => {
         months_reported: 3,
         total_hours: 9,
         hours: { '2026-07': 4, '2026-08': 4, '2026-09': 1 },
+        in_department: false,
+      },
+      {
+        staff_id: 3,
+        staff_name: 'Kim',
+        is_current_staff: true,
+        months_reported: 2,
+        total_hours: 4,
+        hours: { '2026-07': 2, '2026-09': 2 },
+        in_department: false,
+      },
+      {
+        staff_id: 4,
+        staff_name: 'Ana',
+        is_current_staff: true,
+        months_reported: 2,
+        total_hours: 6,
+        hours: { '2026-08': 3, '2026-09': 3 },
+        in_department: false,
       },
     ],
+    can_add_to_department: false,
     ...overrides,
   });
 
@@ -444,9 +466,54 @@ describe('KALX Workforms people page', () => {
       within(sam)
         .getAllByRole('cell')
         .map((c) => c.textContent)
-    ).toEqual(['—', '3 h', '2 h', '5 h']);
+    ).toEqual(['—', '3 h', '2 h', '5 h', 'Yes']);
     expect(screen.getByText('Not current staff')).toBeInTheDocument();
     expect(screen.getByText(/from July 2026 to September 2026/)).toBeInTheDocument();
+  });
+
+  it('offers adding people missing from the department, greyed out until available', async () => {
+    vi.mocked(reviewAPI.people).mockResolvedValue(people());
+    await renderAt('/workforms/people', user({ is_department_head: true }));
+
+    const lee = (await screen.findByRole('rowheader', { name: /Lee/ })).closest('tr')!;
+    // Lee isn't current staff, so can't be added
+    expect(within(lee).queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add Kim to Music' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add all 2 people missing from Music' })).toBeDisabled();
+    expect(screen.getByText("Adding people to departments isn't available yet.")).toBeInTheDocument();
+  });
+
+  it('adds one person to the department', async () => {
+    vi.mocked(reviewAPI.people).mockResolvedValue(people({ can_add_to_department: true }));
+    vi.mocked(reviewAPI.addToDepartment).mockResolvedValue({ added: [3] });
+    await renderAt('/workforms/people', user({ is_department_head: true }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add Kim to Music' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Add Kim to Music' })).not.toBeInTheDocument()
+    );
+    expect(reviewAPI.addToDepartment).toHaveBeenCalledWith('Music', [3]);
+    const kim = screen.getByRole('rowheader', { name: 'Kim' }).closest('tr')!;
+    expect(within(kim).getAllByRole('cell')[4]).toHaveTextContent('Yes');
+    expect(screen.getByRole('button', { name: 'Add the 1 person missing from Music' })).toBeEnabled();
+  });
+
+  it('adds everyone missing from the department at once', async () => {
+    vi.mocked(reviewAPI.people).mockResolvedValue(people({ can_add_to_department: true }));
+    vi.mocked(reviewAPI.addToDepartment).mockResolvedValue({ added: [4, 3] });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await renderAt('/workforms/people', user({ is_department_head: true }));
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Add all 2 people missing from Music' })
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /missing from Music/ })).not.toBeInTheDocument()
+    );
+    expect(confirm).toHaveBeenCalledWith('Add 2 people to Music in Airtable?');
+    expect(reviewAPI.addToDepartment).toHaveBeenCalledWith('Music', [3, 4]);
+    expect(screen.queryByRole('button', { name: /^Add / })).not.toBeInTheDocument();
+    confirm.mockRestore();
   });
 
   it('keeps the months with hours within the months considered', async () => {

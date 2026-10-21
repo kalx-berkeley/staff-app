@@ -221,7 +221,7 @@ def _profile(db: Session, staff: Staff, is_self: bool, email: str) -> ProfileRes
         loa_start=staff.loa_start,
         loa_end=staff.loa_end,
         is_self=is_self,
-        can_edit=settings.directory_self_edit_enabled
+        can_edit=settings.airtable_staff_edit_enabled
         and (is_self or is_paid_staff(_real_user(db, email))),
         eligibility=(
             profile_service.build_eligibility(db, staff)
@@ -265,7 +265,7 @@ async def update_profile(
     """
     Save a staff member's editable details to Airtable. Only they and Paid
     Staff can, and only once editing is turned on
-    (DIRECTORY_SELF_EDIT_ENABLED).
+    (AIRTABLE_STAFF_EDIT_ENABLED).
     """
     staff, is_self = _profile_target(db, staff_id, viewer, email, editing=True)
     profile_service.require_editing_enabled()

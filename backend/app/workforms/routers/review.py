@@ -8,6 +8,8 @@ from app.database import get_db
 from app.models.staff import Staff
 from app.models.workform_airtable_record import WorkformAirtableRecord
 from app.workforms.schemas.workforms import (
+    AddToDepartmentRequest,
+    AddToDepartmentResponse,
     DecisionRequest,
     DepartmentPeopleResponse,
     PendingCountsResponse,
@@ -21,9 +23,6 @@ from app.workforms.services.departments import is_operations_head, reviewable_de
 from app.workforms.services.months import format_month, open_months, parse_month
 
 router = APIRouter(prefix="/api/workforms/review", tags=["workforms"])
-
-# The most months the department people list looks back
-MAX_PEOPLE_MONTHS = 12
 
 
 def get_reviewer(
@@ -70,8 +69,8 @@ def overview(reviewer: Staff = Depends(get_reviewer), db: Session = Depends(get_
 @router.get("/people/{department}", response_model=DepartmentPeopleResponse)
 def department_people(
     department: str,
-    months: int = Query(3, ge=1, le=MAX_PEOPLE_MONTHS),
-    min_months: int = Query(2, ge=1, le=MAX_PEOPLE_MONTHS),
+    months: int = Query(3, ge=1, le=review_service.MAX_PEOPLE_MONTHS),
+    min_months: int = Query(2, ge=1, le=review_service.MAX_PEOPLE_MONTHS),
     reviewer: Staff = Depends(get_reviewer),
     db: Session = Depends(get_db),
 ):
@@ -85,6 +84,23 @@ def department_people(
             detail="The months with hours can't be more than the months considered",
         )
     return review_service.department_people(db, reviewer, department, months, min_months)
+
+
+@router.post("/people/{department}/members", response_model=AddToDepartmentResponse)
+async def add_to_department(
+    department: str,
+    request: AddToDepartmentRequest,
+    reviewer: Staff = Depends(get_reviewer),
+    db: Session = Depends(get_db),
+):
+    """
+    Add people from *department*'s People list to the department in their
+    Airtable "Department" field.
+    """
+    added = await review_service.add_to_department(
+        db, reviewer, department, request.staff_ids
+    )
+    return AddToDepartmentResponse(added=added)
 
 
 def _managed_department(db: Session, reviewer: Staff, department: str) -> str:

@@ -2,6 +2,7 @@
 
 import asyncio
 from datetime import date
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -317,3 +318,137 @@ def test_department_people_permissions_and_limits(client: TestClient, people, ai
         == 422
     )
     assert _people(client, "mel@example.com", "Music", months=13).status_code == 422
+
+
+def test_department_people_shows_department_membership(
+    client: TestClient, db, people, airtable
+):
+    make_staff(db, "kim@example.com", "Kim", "recKIM00000000000", departments=("Music",))
+    _music_hours(db, airtable, "recSAM00000000000", "recKIM00000000000")
+
+    body = _people(client, "mel@example.com", "Music", months=1, min_months=1).json()
+    assert body["can_add_to_department"] is False
+    assert [(p["staff_name"], p["in_department"]) for p in body["people"]] == [
+        ("Kim", True),
+        ("Sam", False),
+    ]
+
+
+@pytest.fixture
+def adding(monkeypatch):
+    """Adding people to departments is turned on, with Airtable mocked."""
+    monkeypatch.setattr(settings, "airtable_staff_edit_enabled", True)
+    staff_records = {
+        "recSAM00000000000": {"Department": ["recSPECIAL0000000"]},
+        "recKIM00000000000": {"Department": ["recMUSIC000000000"]},
+    }
+
+    async def get_staff_record(record_id):
+        return {"id": record_id, "fields": staff_records[record_id]}
+
+    with (
+        patch(
+            "app.common.services.user_service.UserService.fetch_department_names",
+            new_callable=AsyncMock,
+            return_value={
+                "recMUSIC000000000": "Music",
+                "recSPECIAL0000000": "Special Events",
+            },
+        ),
+        patch(
+            "app.common.services.staff_airtable.get_staff_record",
+            side_effect=get_staff_record,
+        ),
+        patch(
+            "app.common.services.staff_airtable.update_staff_record",
+            new_callable=AsyncMock,
+        ) as update,
+        patch(
+            "app.common.services.user_service.UserService.sync_one",
+            new_callable=AsyncMock,
+        ) as sync_one,
+    ):
+        yield {"update": update, "sync_one": sync_one, "records": staff_records}
+
+
+def _add(client, who, department, staff_ids):
+    return client.post(
+        f"/api/workforms/review/people/{department}/members",
+        json={"staff_ids": staff_ids},
+        headers=as_user(who),
+    )
+
+
+def _music_hours(db, airtable, *record_ids):
+    for record_id in record_ids:
+        airtable.add({
+            "Name": [record_id],
+            "Month": open_months()[1].isoformat(),
+            "Music : Hours": 2,
+        })
+    asyncio.run(refresh_all(db))
+
+
+def test_adding_to_department_is_off_until_turned_on(
+    client: TestClient, db, people, airtable
+):
+    _music_hours(db, airtable, "recSAM00000000000")
+    response = _add(client, "mel@example.com", "Music", [people["sam"].id])
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Adding people to departments isn't available yet"
+
+
+def test_head_adds_people_to_their_department(
+    client: TestClient, db, people, airtable, adding
+):
+    kim = make_staff(
+        db, "kim@example.com", "Kim", "recKIM00000000000", departments=("Music",)
+    )
+    _music_hours(db, airtable, "recSAM00000000000", "recKIM00000000000")
+
+    body = _people(client, "mel@example.com", "Music", months=1, min_months=1).json()
+    assert body["can_add_to_department"] is True
+
+    response = _add(client, "mel@example.com", "Music", [people["sam"].id, kim.id])
+    assert response.status_code == 200, response.text
+    # Kim is already in Music, so only Sam is added, keeping their other department
+    assert response.json() == {"added": [people["sam"].id]}
+    adding["update"].assert_awaited_once_with(
+        "recSAM00000000000", {"Department": ["recSPECIAL0000000", "recMUSIC000000000"]}
+    )
+    adding["sync_one"].assert_awaited_once()
+    entry = (
+        db.query(AuditLog).filter(AuditLog.event_type == "staff_added_to_department").one()
+    )
+    assert entry.area == "KALX Workforms"
+    assert entry.actor_email == "mel@example.com"
+    assert entry.details == {"email": "sam@example.com", "department": "Music"}
+
+
+def test_adding_to_department_only_adds_people_on_the_list(
+    client: TestClient, db, people, airtable, adding
+):
+    lee = make_staff(db, "lee@example.com", "Lee", "recLEE00000000000", statuses=())
+    _music_hours(db, airtable, "recSAM00000000000", "recLEE00000000000")
+
+    # Pat reported no Music hours, and Lee isn't current staff
+    for staff in (people["pat"], lee):
+        assert _add(client, "mel@example.com", "Music", [staff.id]).status_code == 422
+    assert _add(client, "mel@example.com", "Music", [999999]).status_code == 404
+    # Mel doesn't head Promotions, and Sam isn't a head
+    assert (
+        _add(client, "mel@example.com", "Promotions", [people["sam"].id]).status_code == 403
+    )
+    assert _add(client, "sam@example.com", "Music", [people["sam"].id]).status_code == 403
+    assert _add(client, "mel@example.com", "Music", []).status_code == 422
+    adding["update"].assert_not_awaited()
+
+
+def test_adding_to_department_refuses_a_department_field_of_names(
+    client: TestClient, db, people, airtable, adding
+):
+    adding["records"]["recSAM00000000000"]["Department"] = ["Special Events"]
+    _music_hours(db, airtable, "recSAM00000000000")
+    response = _add(client, "mel@example.com", "Music", [people["sam"].id])
+    assert response.status_code == 502
+    adding["update"].assert_not_awaited()

@@ -50,7 +50,7 @@ def today(monkeypatch):
 
 @pytest.fixture
 def editing(monkeypatch):
-    monkeypatch.setattr(config.settings, "directory_self_edit_enabled", True)
+    monkeypatch.setattr(config.settings, "airtable_staff_edit_enabled", True)
 
 
 @pytest.fixture

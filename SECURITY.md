@@ -257,7 +257,7 @@ If using Airtable sync:
   checklist and the person's workforms hours) are visible only to that person and to site admins,
   as are the read-only workforms views at `/api/workforms/staff/...`. The site admin check uses
   the real signed-in user, never someone they're impersonating.
-- Profile editing writes to the staff table and is off until `DIRECTORY_SELF_EDIT_ENABLED` is
+- Profile editing writes to the staff table and is off until `AIRTABLE_STAFF_EDIT_ENABLED` is
   set; it then needs a token with write access to `AIRTABLE_TABLE_NAME`. Staff can edit only
   their own profile, and Active Paid Staff anyone's (other site admins can see other people's
   profiles but not edit them). The Paid Staff check uses the real signed-in user. Every change is recorded in `audit_log`.

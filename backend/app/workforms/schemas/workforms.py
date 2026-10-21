@@ -152,6 +152,8 @@ class DepartmentPerson(BaseModel):
     total_hours: float
     # Their hours in the department in each month they reported any ("YYYY-MM")
     hours: Dict[str, float]
+    # Whether the department is in their Airtable "Department" field
+    in_department: bool
 
 
 class DepartmentPeopleResponse(BaseModel):
@@ -160,6 +162,18 @@ class DepartmentPeopleResponse(BaseModel):
     months: List[str]
     min_months: int
     people: List[DepartmentPerson]
+    # Whether the reviewer can add people to the department yet
+    # (AIRTABLE_STAFF_EDIT_ENABLED)
+    can_add_to_department: bool
+
+
+class AddToDepartmentRequest(BaseModel):
+    staff_ids: List[int] = Field(min_length=1)
+
+
+class AddToDepartmentResponse(BaseModel):
+    # The staff added, leaving out those already in the department
+    added: List[int]
 
 
 class PendingCountsResponse(BaseModel):

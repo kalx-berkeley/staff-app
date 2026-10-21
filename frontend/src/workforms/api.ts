@@ -66,6 +66,12 @@ export const reviewAPI = {
         params: { months, min_months: minMonths },
       })
     ),
+  addToDepartment: (department: string, staffIds: number[]) =>
+    call(
+      apiClient.post<{ added: number[] }>(`/workforms/review/people/${seg(department)}/members`, {
+        staff_ids: staffIds,
+      })
+    ),
   workTypes: (department: string) =>
     call(apiClient.get<WorkTypes>(`/workforms/review/work-types/${seg(department)}`)),
   updateWorkTypes: (department: string, workTypes: WorkTypes) =>

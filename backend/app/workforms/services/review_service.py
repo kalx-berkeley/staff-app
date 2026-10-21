@@ -1,5 +1,6 @@
 """Department heads reviewing the hours staff submitted for their departments."""
 
+import re
 import time
 from datetime import date
 from typing import Any, Dict, List, Optional
@@ -9,7 +10,10 @@ from sqlalchemy.orm import Session
 
 from app.auth import is_current_staff
 from app.common.areas import WORKFORMS_AREA
+from app.common.services import staff_airtable
 from app.common.services.audit_service import log_event
+from app.common.services.user_service import UserService
+from app.config import settings
 from app.models.staff import Staff
 from app.models.workform import Workform
 from app.models.workform_airtable_record import WorkformAirtableRecord
@@ -26,6 +30,14 @@ from app.workforms.services.months import (
     open_months,
     previous_month,
 )
+
+# The most months the department people list looks back
+MAX_PEOPLE_MONTHS = 12
+
+# The staff table's field linking to the departments its staff work in
+STAFF_DEPARTMENT_FIELD = "Department"
+
+_AIRTABLE_RECORD_ID_RE = re.compile(r"^rec[A-Za-z0-9]{14}$")
 
 # A reviewer opening a month refreshes it from Airtable at most this often
 REFRESH_INTERVAL_SECONDS = 60
@@ -285,6 +297,48 @@ async def decide(
     return _review_item(db, record, department, subject_staff, workform)
 
 
+def _check_can_see_people(db: Session, reviewer: Staff, department: str) -> None:
+    own, fallback = reviewable_departments(db, reviewer)
+    if department not in own and department not in fallback:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You can't see who works in {department}",
+        )
+
+
+def _people_window(months: int) -> List[date]:
+    """The last *months* months, oldest first, ending with last month."""
+    window = [open_months()[1]]
+    while len(window) < months:
+        window.append(previous_month(window[-1]))
+    window.reverse()
+    return window
+
+
+def _department_hours(
+    db: Session, department: str, window: List[date]
+) -> Dict[str, Dict[date, float]]:
+    """
+    Each staff record ID's hours in *department* in each month of *window*
+    they reported any.
+    """
+    hours: Dict[str, Dict[date, float]] = {}
+    for record in db.query(WorkformAirtableRecord).filter(
+        WorkformAirtableRecord.month.in_(window)
+    ):
+        block = (record.departments or {}).get(department)
+        if record.staff_airtable_record_id and records.has_hours(block):
+            by_month = hours.setdefault(record.staff_airtable_record_id, {})
+            by_month[record.month] = by_month.get(record.month, 0) + (
+                block.get("hours") or 0
+            )
+    return hours
+
+
+def _in_department(staff: Optional[Staff], department: str) -> bool:
+    return staff is not None and any(d.department == department for d in staff.departments)
+
+
 def department_people(
     db: Session, reviewer: Staff, department: str, months: int, min_months: int
 ) -> Dict[str, Any]:
@@ -296,27 +350,9 @@ def department_people(
 
     :raises HTTPException: 403 if *reviewer* can't review *department*
     """
-    own, fallback = reviewable_departments(db, reviewer)
-    if department not in own and department not in fallback:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"You can't see who works in {department}",
-        )
-    window = [open_months()[1]]
-    while len(window) < months:
-        window.append(previous_month(window[-1]))
-    window.reverse()
-
-    hours: Dict[str, Dict[date, float]] = {}
-    for record in db.query(WorkformAirtableRecord).filter(
-        WorkformAirtableRecord.month.in_(window)
-    ):
-        block = (record.departments or {}).get(department)
-        if record.staff_airtable_record_id and records.has_hours(block):
-            by_month = hours.setdefault(record.staff_airtable_record_id, {})
-            by_month[record.month] = by_month.get(record.month, 0) + (
-                block.get("hours") or 0
-            )
+    _check_can_see_people(db, reviewer, department)
+    window = _people_window(months)
+    hours = _department_hours(db, department, window)
 
     people = _staff_by_record_id(db, set(hours))
     result = []
@@ -331,6 +367,7 @@ def department_people(
             "months_reported": len(by_month),
             "total_hours": sum(by_month.values()),
             "hours": {format_month(m): h for m, h in by_month.items()},
+            "in_department": _in_department(staff, department),
         })
     result.sort(key=lambda p: p["staff_name"].lower())
     return {
@@ -338,4 +375,105 @@ def department_people(
         "months": [format_month(m) for m in window],
         "min_months": min_months,
         "people": result,
+        "can_add_to_department": settings.airtable_staff_edit_enabled,
     }
+
+
+async def add_to_department(
+    db: Session, reviewer: Staff, department: str, staff_ids: List[int]
+) -> List[int]:
+    """
+    Add *department* to these staff members' Airtable "Department" field.
+
+    Each must be current staff who reported hours in *department* in the
+    last MAX_PEOPLE_MONTHS months, as the People page lists them. Those
+    already in the department are left as they are.
+
+    :returns: The IDs of the staff added, in name order.
+    :raises HTTPException: 403 if adding isn't turned on or *reviewer* can't
+        review *department*, 404 if a staff member doesn't exist, 422 if one
+        can't be added, 502 if Airtable fails.
+    """
+    if not settings.airtable_staff_edit_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Adding people to departments isn't available yet",
+        )
+    _check_can_see_people(db, reviewer, department)
+
+    staff = db.query(Staff).filter(Staff.id.in_(set(staff_ids))).all()
+    if len(staff) != len(set(staff_ids)):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Staff member not found"
+        )
+    reported = _department_hours(db, department, _people_window(MAX_PEOPLE_MONTHS))
+    for member in staff:
+        if (
+            not is_current_staff(member)
+            or not member.airtable_record_id
+            or member.airtable_record_id not in reported
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=(
+                    f"{member.name} can't be added to {department}: only current "
+                    f"staff who reported {department} hours recently can be"
+                ),
+            )
+    to_add = sorted(
+        (m for m in staff if not _in_department(m, department)),
+        key=lambda m: m.name.lower(),
+    )
+    if not to_add:
+        return []
+
+    names = await UserService.fetch_department_names()
+    department_id = next((rid for rid, name in names.items() if name == department), None)
+    if department_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                f"Airtable's {settings.airtable_departments_table_name} table has no"
+                f" {department}"
+            ),
+        )
+
+    added = []
+    for member in to_add:
+        record = await staff_airtable.get_staff_record(member.airtable_record_id)
+        if record is None:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Airtable has no staff record for {member.name}",
+            )
+        linked = record["fields"].get(STAFF_DEPARTMENT_FIELD) or []
+        if not isinstance(linked, list) or not all(
+            isinstance(d, str) and _AIRTABLE_RECORD_ID_RE.match(d) for d in linked
+        ):
+            # Writing names back into a linked-record field would fail, or
+            # drop their other departments
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=(
+                    f"Airtable's {STAFF_DEPARTMENT_FIELD} field isn't a list of linked"
+                    " departments"
+                ),
+            )
+        if department_id not in linked:
+            await staff_airtable.update_staff_record(
+                member.airtable_record_id,
+                {STAFF_DEPARTMENT_FIELD: linked + [department_id]},
+            )
+        await UserService.sync_one(db, member.airtable_record_id)
+        log_event(
+            db,
+            event_type="staff_added_to_department",
+            area=WORKFORMS_AREA,
+            actor_email=reviewer.email,
+            actor_role="department_head",
+            entity_type="staff",
+            entity_id=member.id,
+            details={"email": member.email, "department": department},
+        )
+        added.append(member.id)
+    return added

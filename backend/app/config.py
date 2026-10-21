@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     # Table that the staff table's "Department" linked-record field links to.
     # Its "Department" (primary) field holds each department's name.
     airtable_departments_table_name: str = "All departments"
+    # Whether the app may change the staff table (AIRTABLE_TABLE_NAME): staff
+    # editing their details on the Staff Directory's profile page (and Paid
+    # Staff anyone's), and department heads adding people to their department
+    # from the workforms People page. Those controls are always shown, but
+    # greyed out while this is off. Turn it on only once AIRTABLE_API_KEY can
+    # write to the staff table.
+    airtable_staff_edit_enabled: bool = False
     # Where the Airtable sync stores resized staff directory photos. Relative
     # paths are relative to the backend's working directory; in deployments
     # that's backend/, so this is backend/data/staff_photos alongside the
@@ -51,11 +58,6 @@ class Settings(BaseSettings):
     # home page card and KALX Staff Admin section. Off by default; deploy.yml
     # turns it on in staging only while the sub-site is under construction.
     directory_enabled: bool = False
-    # Whether staff can edit their own details (and site admins anyone's) on
-    # the Staff Directory's profile page. The form is always shown, but greyed
-    # out while this is off. Turn it on only once AIRTABLE_API_KEY can write to
-    # the staff table (AIRTABLE_TABLE_NAME).
-    directory_self_edit_enabled: bool = False
 
     # Spinitron
     spinitron_api_key: Optional[str] = None

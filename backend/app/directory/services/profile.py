@@ -311,7 +311,7 @@ def build_workforms_summary(
 
 
 def require_editing_enabled() -> None:
-    if not settings.directory_self_edit_enabled:
+    if not settings.airtable_staff_edit_enabled:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Editing isn't available yet",

@@ -136,6 +136,8 @@ export interface DepartmentPerson {
   total_hours: number;
   /** Hours in the department in each month they reported any, by "YYYY-MM". */
   hours: Record<string, number>;
+  /** Whether the department is in their Airtable "Department" field. */
+  in_department: boolean;
 }
 
 export interface DepartmentPeople {
@@ -144,4 +146,6 @@ export interface DepartmentPeople {
   months: string[];
   min_months: number;
   people: DepartmentPerson[];
+  /** Whether the reviewer can add people to the department yet. */
+  can_add_to_department: boolean;
 }

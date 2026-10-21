@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { usePageTitle } from '../common/hooks/usePageTitle';
 import { reviewAPI } from './api';
-import type { DepartmentPeople, ReviewOverview } from './types';
+import type { DepartmentPeople, DepartmentPerson, ReviewOverview } from './types';
 import { errorMessage, formatHours, formatMonth } from './utils';
 import { WORKFORMS_TITLE } from './WorkformsLayout';
 
@@ -24,13 +24,22 @@ function clampCount(value: string | null, max: number, fallback: number): number
 
 const range = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
 
+/** Whether *person* can be added to the department: current staff missing it. */
+const canBeAdded = (person: DepartmentPerson): person is DepartmentPerson & { staff_id: number } =>
+  !person.in_department && person.is_current_staff && person.staff_id !== null;
+
+const NOT_AVAILABLE = "Adding people to departments isn't available yet";
+
 // Who works in a department: everyone who reported hours in it in at least
-// some of the most recent months, with their hours in each month.
+// some of the most recent months, with their hours in each month, and
+// whether the department is in their Airtable "Department" field. Heads can
+// add the department to those missing it.
 export default function PeoplePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [overview, setOverview] = useState<ReviewOverview | null>(null);
   const [result, setResult] = useState<DepartmentPeople | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   usePageTitle('People', WORKFORMS_TITLE);
 
   const months = clampCount(searchParams.get('months'), MAX_MONTHS, DEFAULT_MONTHS);
@@ -70,6 +79,35 @@ export default function PeoplePage() {
       next[key as keyof typeof next] = String(value);
     }
     setSearchParams(next);
+  };
+
+  const addToDepartment = async (staffIds: number[]) => {
+    if (!result) return;
+    setAdding(true);
+    try {
+      await reviewAPI.addToDepartment(result.department, staffIds);
+      // Everyone asked about is in the department now, including anyone who
+      // was added since the list loaded
+      setResult({
+        ...result,
+        people: result.people.map((p) =>
+          p.staff_id !== null && staffIds.includes(p.staff_id) ? { ...p, in_department: true } : p
+        ),
+      });
+      setError(null);
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const addable = result ? result.people.filter(canBeAdded) : [];
+  const addAll = () => {
+    if (!result) return;
+    const count = addable.length === 1 ? '1 person' : `${addable.length} people`;
+    if (!window.confirm(`Add ${count} to ${result.department} in Airtable?`)) return;
+    addToDepartment(addable.map((p) => p.staff_id));
   };
 
   return (
@@ -139,8 +177,26 @@ export default function PeoplePage() {
             {result.months.length === 1
               ? `month of ${formatMonth(result.months[0])}`
               : `${result.months.length} months from ${formatMonth(result.months[0])} to ${formatMonth(result.months[result.months.length - 1])}`}
-            , whether or not the hours were approved. This month isn't counted until it's over.
+            , whether or not the hours were approved. This month isn't counted until it's over. “In
+            department” is whether {result.department} is in their Airtable Department field.
           </p>
+          {addable.length > 0 && (
+            <div className="workforms-people-add-all">
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={!result.can_add_to_department || adding}
+                title={result.can_add_to_department ? undefined : NOT_AVAILABLE}
+                onClick={addAll}
+              >
+                Add {addable.length === 1 ? 'the 1 person' : `all ${addable.length} people`} missing
+                from {result.department}
+              </button>
+              {!result.can_add_to_department && (
+                <span className="workforms-hint">{NOT_AVAILABLE}.</span>
+              )}
+            </div>
+          )}
           {result.people.length === 0 ? (
             <p className="workforms-empty">No one matches.</p>
           ) : (
@@ -159,6 +215,7 @@ export default function PeoplePage() {
                     <th scope="col" className="workforms-people-month">
                       Total
                     </th>
+                    <th scope="col">In department</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -184,6 +241,27 @@ export default function PeoplePage() {
                       ))}
                       <td className="workforms-people-hours workforms-people-total">
                         {formatHours(person.total_hours)} h
+                      </td>
+                      <td className="workforms-people-member">
+                        {person.in_department ? (
+                          'Yes'
+                        ) : (
+                          <>
+                            No
+                            {canBeAdded(person) && (
+                              <button
+                                type="button"
+                                className="btn-secondary btn-small"
+                                disabled={!result.can_add_to_department || adding}
+                                title={result.can_add_to_department ? undefined : NOT_AVAILABLE}
+                                aria-label={`Add ${person.staff_name} to ${result.department}`}
+                                onClick={() => addToDepartment([person.staff_id])}
+                              >
+                                Add
+                              </button>
+                            )}
+                          </>
+                        )}
                       </td>
                     </tr>
                   ))}

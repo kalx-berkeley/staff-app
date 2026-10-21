@@ -163,7 +163,8 @@ https://raw.githubusercontent.com/spinitron/v2api/refs/heads/master/docs/spinitr
 
 ### Config (`app/config.py`)
 
-- `directory_self_edit_enabled: bool = False` (Q4). Add it to `.env.example`.
+- `airtable_staff_edit_enabled: bool = False` (Q4; first named
+  `directory_self_edit_enabled`, then shared with workforms). Add it to `.env.example`.
   Production and staging leave it off until the token can write.
 
 ### Audit areas (`app/common/areas.py`)
@@ -418,7 +419,7 @@ while anything is pending (no act() warnings):
   - The KALX Staff Admin sections.
 - `SECURITY.md`: profiles, the checklist and workforms are visible to the
   person and to site admins only.
-- `.env.example`: `DIRECTORY_SELF_EDIT_ENABLED`.
+- `.env.example`: `AIRTABLE_STAFF_EDIT_ENABLED`.
 - `backend/app/config.py`: the comment on `spinitron_non_dj_show_titles` now
   says FREEFORM is only the default title (already done).
 
@@ -433,4 +434,5 @@ while anything is pending (no act() warnings):
 4. Check the DJ Quiz deadlines in KALX Staff Admin.
 5. Later, to turn editing on: give `AIRTABLE_API_KEY` (or a separate write token)
    write access to the Online Staff App Directory table, and set
-   `DIRECTORY_SELF_EDIT_ENABLED=true`.
+   `AIRTABLE_STAFF_EDIT_ENABLED=true`. This also turns on adding people to
+   departments from the workforms People page.
