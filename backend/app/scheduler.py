@@ -646,15 +646,16 @@ def start_scheduler():
         replace_existing=True,
     )
 
-    # Copy the Spinitron playlists the Sublist DJ shift requirement checks,
-    # daily at 3:30 AM Pacific
-    scheduler.add_job(
-        sync_dj_shifts,
-        trigger=CronTrigger(hour=3, minute=30, timezone=_PT),
-        id="dj_shift_sync",
-        name="Sync DJ shifts from Spinitron",
-        replace_existing=True,
-    )
+    if settings.directory_enabled:
+        # Copy the Spinitron playlists the Sublist DJ shift requirement checks,
+        # daily at 3:30 AM Pacific
+        scheduler.add_job(
+            sync_dj_shifts,
+            trigger=CronTrigger(hour=3, minute=30, timezone=_PT),
+            id="dj_shift_sync",
+            name="Sync DJ shifts from Spinitron",
+            replace_existing=True,
+        )
 
     if settings.workforms_enabled:
         # Refresh the local copy of the Airtable workforms table daily at 2:30 AM
@@ -680,8 +681,8 @@ def start_scheduler():
     logger.info(
         "Scheduler started - Feature bin sync at 1 AM PT, KALX Live sync at 1:30 AM PT,"
         " Airtable sync at 2 AM PT, stale preassignment expiry at 3 AM PT, unclosed past"
-        " show notifications at 4 AM PT, Spinitron schedule sync every 6 hours,"
-        " DJ shift sync at 3:30 AM PT"
+        " show notifications at 4 AM PT, Spinitron schedule sync every 6 hours"
+        + (", DJ shift sync at 3:30 AM PT" if settings.directory_enabled else "")
         + (
             ", workforms refresh at 2:30 AM PT, workform emails at 9 AM PT"
             if settings.workforms_enabled

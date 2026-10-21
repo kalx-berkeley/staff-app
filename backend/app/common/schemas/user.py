@@ -49,6 +49,8 @@ class UserInfo(BaseModel):
     is_staging: bool = False
     # Whether the KALX Workforms sub-site is on (settings.workforms_enabled)
     workforms_enabled: bool = False
+    # Whether the KALX Staff Directory sub-site is on (settings.directory_enabled)
+    directory_enabled: bool = False
     impersonating_email: str | None = None
     is_impersonating_dj_network: bool = False
     is_impersonating_station_office_network: bool = False

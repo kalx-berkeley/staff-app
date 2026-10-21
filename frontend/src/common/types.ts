@@ -35,6 +35,7 @@ export interface UserResponse {
   is_station_office_network: boolean;
   is_staging?: boolean;
   workforms_enabled?: boolean;
+  directory_enabled?: boolean;
   impersonating_email?: string | null;
   is_impersonating_dj_network?: boolean;
   is_impersonating_station_office_network?: boolean;

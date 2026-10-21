@@ -40,7 +40,7 @@ export default function AdminPage() {
         <JobsSection />
         {user?.is_staging && user.is_site_admin && <ImpersonationSection />}
         {user?.is_site_admin && <ShortLinksSection />}
-        {user?.is_site_admin && <DjQuizDeadlinesSection />}
+        {user?.directory_enabled && user.is_site_admin && <DjQuizDeadlinesSection />}
         <AuditLogSection />
       </main>
     </div>

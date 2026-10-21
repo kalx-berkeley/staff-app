@@ -30,6 +30,7 @@ const staffUser: UserResponse = {
   role: 'staff',
   is_dj_network: false,
   is_station_office_network: false,
+  directory_enabled: true,
   profile: { id: 5, name: 'Zed Zulu', phone: '', dj_name: 'DJ Zed', is_sublist_dj: true },
 };
 

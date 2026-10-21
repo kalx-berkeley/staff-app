@@ -231,6 +231,7 @@ def get_current_user(
         is_station_office_network=effective_is_station_office,
         is_staging=is_staging,
         workforms_enabled=settings.workforms_enabled,
+        directory_enabled=settings.directory_enabled,
         impersonating_email=impersonating_email,
         is_impersonating_dj_network=is_impersonating_dj_network,
         is_impersonating_station_office_network=is_impersonating_station_office_network,

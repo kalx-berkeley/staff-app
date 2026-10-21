@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     # The department whose heads review departments that have no head, and
     # department heads' own hours.
     workforms_operations_department: str = "Operations"
+    # Whether the KALX Staff Directory sub-site is on: its API, scheduled jobs,
+    # home page card and KALX Staff Admin section. Off by default; deploy.yml
+    # turns it on in staging only while the sub-site is under construction.
+    directory_enabled: bool = False
     # Whether staff can edit their own details (and site admins anyone's) on
     # the Staff Directory's profile page. The form is always shown, but greyed
     # out while this is off. Turn it on only once AIRTABLE_API_KEY can write to

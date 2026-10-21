@@ -36,6 +36,7 @@ const user = (overrides: Partial<UserResponse> = {}): UserResponse => ({
   is_station_office_network: false,
   is_department_head: true,
   is_site_admin: true,
+  directory_enabled: true,
   profile: { id: 1, name: 'Hal Head', phone: '', dj_name: null, is_sublist_dj: false },
   ...overrides,
 });

@@ -64,15 +64,16 @@ if settings.workforms_enabled:
 
 # The Staff Directory's profile page reads specialty shows (to tell them from
 # DJ shifts) and workforms hours through these
-register_specialty_show_ids_provider(specialty_show_ids)
-if settings.workforms_enabled:
-    register_monthly_hours_provider(workforms_monthly_hours)
+if settings.directory_enabled:
+    register_specialty_show_ids_provider(specialty_show_ids)
+    if settings.workforms_enabled:
+        register_monthly_hours_provider(workforms_monthly_hours)
 
 # Every sub-site's scheduled jobs are listed in KALX Staff Admin
 for job in (
     common_jobs.ADMIN_JOBS
     + pass_giveaway_jobs.ADMIN_JOBS
-    + directory_jobs.ADMIN_JOBS
+    + (directory_jobs.ADMIN_JOBS if settings.directory_enabled else [])
     + (workforms_jobs.ADMIN_JOBS if settings.workforms_enabled else [])
 ):
     register_job(job)
@@ -292,8 +293,9 @@ app.include_router(lottery.router, dependencies=_auth_check)
 app.include_router(alternates.router, dependencies=_auth_check)
 app.include_router(specialty_shows.router, dependencies=_auth_check)
 app.include_router(on_air.router, dependencies=_auth_check)
-app.include_router(directory.router, dependencies=_auth_check)
-app.include_router(directory_admin.router, dependencies=_auth_check)
+if settings.directory_enabled:
+    app.include_router(directory.router, dependencies=_auth_check)
+    app.include_router(directory_admin.router, dependencies=_auth_check)
 if settings.workforms_enabled:
     app.include_router(workforms_review.router, dependencies=_auth_check)
     app.include_router(workforms.router, dependencies=_auth_check)

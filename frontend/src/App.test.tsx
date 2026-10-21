@@ -479,7 +479,7 @@ describe('App - Role-Based UI Elements', () => {
     it('should show a card linking to each available sub-site at /', async () => {
       window.history.pushState({}, '', '/');
 
-      await renderAppWithUser({ ...staffUser, workforms_enabled: true });
+      await renderAppWithUser({ ...staffUser, workforms_enabled: true, directory_enabled: true });
 
       await waitFor(() => {
         expect(screen.getByRole('heading', { name: 'KALX Staff Portal' })).toBeInTheDocument();
@@ -502,13 +502,25 @@ describe('App - Role-Based UI Elements', () => {
     it('should leave out KALX Workforms where the backend has it turned off', async () => {
       window.history.pushState({}, '', '/');
 
-      await renderAppWithUser(staffUser);
+      await renderAppWithUser({ ...staffUser, directory_enabled: true });
 
       await waitFor(() => {
         expect(screen.getByRole('heading', { name: 'KALX Staff Portal' })).toBeInTheDocument();
       });
       expect(screen.getByRole('link', { name: /KALX Staff Directory/i })).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: /KALX Workforms/i })).not.toBeInTheDocument();
+    });
+
+    it('should leave out KALX Staff Directory where the backend has it turned off', async () => {
+      window.history.pushState({}, '', '/');
+
+      await renderAppWithUser({ ...staffUser, workforms_enabled: true });
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'KALX Staff Portal' })).toBeInTheDocument();
+      });
+      expect(screen.getByRole('link', { name: /KALX Workforms/i })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /KALX Staff Directory/i })).not.toBeInTheDocument();
     });
 
     it('should show the access page at / for unauthorized users', async () => {
