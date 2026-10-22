@@ -6,6 +6,34 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.9.0] - 2026-10-22
+
+### Changed
+
+- Let 🆕 (new, not yet Active) staff use the staff app with the same roles and access as Active staff. The Airtable sync now imports them too. Only Active staff can claim staff passes, enter the staff pass lottery, join the alternate list, be site admins or use the Sublist DJ actions. The directory marks 🆕 staff with a badge ([eff5d69](https://github.com/kalx-berkeley/staff-app/commit/eff5d69))
+- Stop telling staff pass lottery and alternate winners that they and their guest are on the guest list before the show closes. The emails now explain that a guest pass is only held until then, and that another staff member can still take it ([a93ec43](https://github.com/kalx-berkeley/staff-app/commit/a93ec43))
+- Require a Spinitron link for each specialty show, and let promotions staff and a show's owners retire specialty shows and make them current again ([9bc3352](https://github.com/kalx-berkeley/staff-app/commit/9bc3352))
+- Call venue and promoter owners "KALX promotions reps" in the pass giveaway, so they aren't mistaken for the venue's owners ([c1a458f](https://github.com/kalx-berkeley/staff-app/commit/c1a458f))
+- Warn about a venue address's state or zip code only when it's at the end of the address, so house numbers no longer trigger the warning ([0d8078d](https://github.com/kalx-berkeley/staff-app/commit/0d8078d))
+- Turn off the KALX Staff Directory in production while it's under construction, with the new `DIRECTORY_ENABLED` setting (off by default; deploys turn it on in staging only). When off, its API, scheduled jobs and profile page aren't registered, and the sub-site and its KALX Staff Admin section are hidden ([775f659](https://github.com/kalx-berkeley/staff-app/commit/775f659))
+- Refresh KALX Workforms from Airtable nightly instead of every 15 minutes ([3176ceb](https://github.com/kalx-berkeley/staff-app/commit/3176ceb))
+
+### Added
+
+- Let venues be movie theaters. Shows at a movie theater have a movie rating (G, PG, PG-13, R, NC-17 or Not Rated) instead of an age restriction, and movie theaters have a default movie rating ([ef0e965](https://github.com/kalx-berkeley/staff-app/commit/ef0e965))
+- Let wheelchair accessibility be Unknown for shows and venues ([adf2a17](https://github.com/kalx-berkeley/staff-app/commit/adf2a17))
+- Add an option for venues with a logo to show their name next to the logo on the DJ show and giveaway pages. It's off by default, so existing venues still show only their logo ([67757a8](https://github.com/kalx-berkeley/staff-app/commit/67757a8))
+- Add a profile page to the KALX Staff Directory at `/directory/me`, which site admins can open for anyone. It shows more than the directory does, the Sublist DJ requirements with their evidence, and a year of workforms. It also has an edit form, where a DJ name can be added from a Spinitron DJ or playlist link. Only the person and Active Paid Staff can save changes, and saving stays off until the new `AIRTABLE_STAFF_EDIT_ENABLED` setting is turned on. Site admins also get read-only views of anyone's workforms and set DJ Quiz deadlines in KALX Staff Admin ([9bc3352](https://github.com/kalx-berkeley/staff-app/commit/9bc3352), [1c38d7b](https://github.com/kalx-berkeley/staff-app/commit/1c38d7b), [ac009cb](https://github.com/kalx-berkeley/staff-app/commit/ac009cb))
+- Add a People tab for KALX Workforms department heads, which lists who reported hours in their department in N of the last M months (2 of 3 by default). Heads can add people to their department from it once `AIRTABLE_STAFF_EDIT_ENABLED` is on ([1890ece](https://github.com/kalx-berkeley/staff-app/commit/1890ece), [31db04e](https://github.com/kalx-berkeley/staff-app/commit/31db04e))
+- Add a Work types tab where KALX Workforms department heads offer predefined types of work for their departments, and choose whether staff can also describe other work in their own words (the default) ([99637ce](https://github.com/kalx-berkeley/staff-app/commit/99637ce))
+
+### Fixed
+
+- Fix closing a show during its lottery window leaving every lottery entrant without a pass. Its lottery is now drawn first ([492892b](https://github.com/kalx-berkeley/staff-app/commit/492892b))
+- Fix reopening a show with the lottery on returning an error, and publishing a show with the lottery on drawing it about 7 hours late ([46291e0](https://github.com/kalx-berkeley/staff-app/commit/46291e0))
+- Fix emptying a show's on-air description or caller special instructions, or a venue's win frequency, keeping the old value ([5e56327](https://github.com/kalx-berkeley/staff-app/commit/5e56327))
+- Keep the KALX Workforms review card on screen while the list scrolls, and make clear that department heads don't need to submit a workform ([1890ece](https://github.com/kalx-berkeley/staff-app/commit/1890ece))
+
 ## [1.8.0] - 2026-10-18
 
 ### Changed
@@ -223,6 +251,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.9.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/kalx-berkeley/staff-app/compare/v1.6.0...v1.6.1
