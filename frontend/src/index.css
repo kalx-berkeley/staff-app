@@ -407,7 +407,8 @@ body.staging-active .dj-layout {
   white-space: nowrap;
 }
 
-.google-logout-link {
+.google-logout-link,
+.sign-in-link {
   background: none;
   border: none;
   padding: 0;
@@ -419,7 +420,8 @@ body.staging-active .dj-layout {
   align-self: flex-start;
 }
 
-.google-logout-link:hover {
+.google-logout-link:hover,
+.sign-in-link:hover {
   color: rgba(255, 255, 255, 0.85);
 }
 

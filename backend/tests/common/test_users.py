@@ -231,11 +231,14 @@ def test_get_current_user_dj_network_unauthenticated(client: TestClient):
 
 
 def test_get_current_user_outside_dj_network_unauthenticated(client: TestClient):
-    """Request with no Google identity and a non-DJ-network IP is rejected at the auth layer."""
+    """
+    Signed out outside the trusted networks (an expired session): 401, so the
+    frontend reloads the page and Apache asks for a Google login.
+    """
     response = client.get("/api/users/me", headers={"X-Forwarded-For": "10.0.0.5"})
 
-    assert response.status_code == 400
-    assert "authentication layer" in response.json()["detail"]
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Sign in required"
 
 
 def test_get_current_user_impersonating_dj_network_only(

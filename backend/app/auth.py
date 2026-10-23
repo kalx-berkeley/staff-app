@@ -59,15 +59,21 @@ def check_apache_auth_layer(
     X-Forwarded-For IP matching is kept as a fallback for the test environment,
     where Apache is not in the path and tests inject the header directly.
 
-    If none of the above are present, the Apache authentication layer has been
-    bypassed — this indicates a server misconfiguration.
+    Apache passes /api/ requests without a session through from any network
+    (OIDCUnAuthAction pass), so a request with none of the above but with
+    X-Forwarded-For, which mod_proxy always adds, is someone signed out
+    elsewhere, usually after their session expired. They get a 401, which the
+    frontend answers by reloading the page so Apache asks them to sign in.
+    Without X-Forwarded-For too, the request didn't come through Apache at all
+    — this indicates a server misconfiguration.
 
     :param request: Incoming HTTP request (for logging the path)
     :param x_forwarded_user: OIDC email set by Apache mod_auth_openidc
     :param x_forwarded_for: Real client IP set by Apache mod_proxy (fallback)
     :param x_dj_network: Set to "1" by Apache for DJ studio network requests
     :param x_station_office_network: Set to "1" by Apache for station office network requests
-    :raises HTTPException: 400 if no recognized identity or network is present
+    :raises HTTPException: 401 if Apache forwarded a request with no recognized
+        identity or network, or 400 if the request didn't come through Apache
     """
     has_google_identity = bool(x_forwarded_user)
     from_dj_network = x_dj_network == "1"
@@ -79,18 +85,30 @@ def check_apache_auth_layer(
     if not from_station_office and client_ip:
         from_station_office = is_ip_in_network(client_ip, settings.station_office_network)
 
-    if not has_google_identity and not from_dj_network and not from_station_office:
-        logger.critical(
-            "SECURITY: API request received with no Google identity and no recognized "
-            "network IP. Apache authentication layer may have been bypassed. "
-            "Path: %s, X-Forwarded-For: %r",
+    if has_google_identity or from_dj_network or from_station_office:
+        return
+
+    if client_ip:
+        logger.info(
+            "API request from %s with no Google session outside the trusted networks. "
+            "Path: %s",
+            client_ip,
             request.url.path,
-            x_forwarded_for,
         )
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Request did not pass through the expected authentication layer",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sign in required",
         )
+
+    logger.critical(
+        "SECURITY: API request received with no X-Forwarded-For. "
+        "Apache authentication layer may have been bypassed. Path: %s",
+        request.url.path,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Request did not pass through the expected authentication layer",
+    )
 
 
 def _staff_statuses(staff: Staff) -> set[str]:

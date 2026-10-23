@@ -43,9 +43,12 @@ def test_staff_site_proxies_short_links(conf):
     # DJ studio computers can follow short links instead of being sent to the
     # DJ view
     assert "RewriteCond %{REQUEST_URI} !^/go/" in lines
-    # Only trusted-network clients skip the Google login; the backend then
-    # asks them to sign in.
+    # Only DJ studio computers, which can't sign in, skip the Google login; the
+    # backend then tells them short links don't work there. Everyone else,
+    # the station office included, signs in first.
     block = text.split("<Location /go/>")[1].split("</Location>")[0]
-    assert "<If \"-R '${KALX_STATION_OFFICE_NETWORK}'\">" in block
+    assert "<If \"-R '${KALX_DJ_STUDIO_NETWORK}'\">" in block
+    assert "KALX_STATION_OFFICE_NETWORK" not in block
+    assert block.count("OIDCUnAuthAction pass") == 1
     assert block.index("OIDCUnAuthAction pass") > block.index("<If ")
     assert block.index("OIDCUnAuthAction pass") < block.index("</If>")

@@ -4,6 +4,7 @@ import { impersonationAPI } from '../../common/api';
 import { useAuth } from '../../common/contexts/authHooks';
 import { isImpersonating, isStagingSublistDjStaff, showsPassGiveawayAdminLink } from '../utils';
 import { HOME_TITLE, SUBSITES, subsiteForPath } from '../../subsites';
+import { signInUrl } from '../../common/signIn';
 import FeedbackModal from './FeedbackModal';
 import { useCurrentView, VIEW_LABELS } from './currentView';
 import type { AppView } from './currentView';
@@ -114,6 +115,15 @@ const AppNav = ({ showGoogleLogout = false }: AppNavProps) => {
   const onDjNetwork = user?.is_dj_network && !user?.is_impersonating_dj_network;
   const showSubsiteLinks = !!user?.email && !onDjNetwork;
   const currentSubsite = subsiteForPath(window.location.pathname);
+
+  // Apache doesn't ask for a login on these pages from the station office
+  // network, so a guest there may be staff whose session ran out. Offer them a
+  // way in. DJ studio computers can't sign in at all.
+  const offerSignIn =
+    !user?.email &&
+    !!user?.is_station_office_network &&
+    !user?.is_dj_network &&
+    !isImpersonating(user);
   const otherSubsites = SUBSITES.filter(
     (subsite) => subsite !== currentSubsite && subsite.isAvailable(user),
   );
@@ -162,6 +172,14 @@ const AppNav = ({ showGoogleLogout = false }: AppNavProps) => {
           </div>
         ) : (
           <span className="user-email" title={email}>{displayName}</span>
+        )}
+        {offerSignIn && (
+          <a
+            className="sign-in-link"
+            href={signInUrl(window.location.pathname + window.location.search)}
+          >
+            Staff? Sign in
+          </a>
         )}
         {showGoogleLogout && user?.is_dj_network && user?.email && (
           <button

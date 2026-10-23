@@ -115,8 +115,8 @@ the system from specific IP addresses without a Google login. This is critical f
 workflow where the studio computer is shared and signing in with a personal account is impractical.
 
 Both Apache and the backend check this CIDR independently:
-- **Apache**: marks DJ studio network requests as authenticated (`IS_DJ_NETWORK` env var) and
-  serves DJ-accessible paths without requiring an OIDC session.
+- **Apache**: serves DJ-accessible paths without requiring an OIDC session
+  (`OIDCUnAuthAction pass`) and marks DJ studio network requests for the backend (`X-DJ-Network`).
 - **Backend**: verifies the originating IP in the defense-in-depth check and grants DJ-specific
   endpoint access (`check_dj_access`) for requests from this range.
 

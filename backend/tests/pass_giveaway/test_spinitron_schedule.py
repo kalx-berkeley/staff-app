@@ -574,7 +574,7 @@ class TestOnAirEndpoint:
 
     def test_requires_dj_access(self, client: TestClient):
         response = client.get("/api/dj/on-air", headers={"X-Forwarded-For": "8.8.8.8"})
-        assert response.status_code == 400
+        assert response.status_code == 401
 
     def test_playlist_preferred_over_show_for_current(
         self, client: TestClient, db: Session

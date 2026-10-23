@@ -397,7 +397,7 @@ class TestSpinMatchesEndpoint:
         response = client.get(
             "/api/dj/spin-matches", headers={"X-Forwarded-For": "8.8.8.8"}
         )
-        assert response.status_code == 400
+        assert response.status_code == 401
 
     def test_returns_matches_as_json(
         self, db: Session, client: TestClient, monkeypatch, test_venue
@@ -433,7 +433,7 @@ class TestDismissSpinMatchEndpoint:
             params={"show_id": 1},
             headers={"X-Forwarded-For": "8.8.8.8"},
         )
-        assert response.status_code == 400
+        assert response.status_code == 401
 
     def test_dismiss_clears_match_from_next_poll(
         self, db: Session, client: TestClient, monkeypatch, test_venue

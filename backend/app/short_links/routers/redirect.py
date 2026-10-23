@@ -1,8 +1,8 @@
 """
 The /go/<slug> redirects. Apache proxies /go/ here (outside /api/), and lets
-DJ studio and station office network requests through without a login, so
-this route is the access check: only current (Active or 🆕) staff can follow a
-short link.
+DJ studio network requests through without a login (nobody can sign in from
+there), so this route is the access check: only current (Active or 🆕) staff
+can follow a short link.
 """
 
 import re
@@ -148,10 +148,16 @@ def follow_short_link(
 ):
     """Redirect (302) to the short link's target. Slugs ignore case."""
     if not x_forwarded_user:
+        # Only DJ studio computers get here unsigned: everywhere else Apache
+        # sends people through the Google login first
         return _page(
             status.HTTP_401_UNAUTHORIZED,
             "Sign in required",
-            _message("Short links are for KALX staff. Sign in to follow this link."),
+            _message(
+                "Short links are for KALX staff, and the DJ studio computers "
+                "can't sign in to follow them. Open this link on another "
+                "computer or your phone."
+            ),
         )
     try:
         get_staff_member(x_forwarded_user, db)

@@ -572,4 +572,51 @@ describe('App - Role-Based UI Elements', () => {
       expect(screen.queryByRole('link', { name: 'KALX Staff Portal' })).not.toBeInTheDocument();
     });
   });
+
+  describe('Sign-in link', () => {
+    const guest = (networks: Partial<UserResponse>): UserResponse => ({
+      email: null,
+      role: 'dj',
+      is_dj_network: false,
+      is_station_office_network: false,
+      profile: null,
+      ...networks,
+    });
+
+    it('should offer station office guests a sign-in that returns to the page', async () => {
+      window.history.pushState({}, '', '/pass-giveaway/dj/winner-search?phone=510');
+
+      await renderAppWithUser(guest({ is_station_office_network: true }));
+
+      const link = await screen.findByRole('link', { name: 'Staff? Sign in' });
+      expect(link).toHaveAttribute(
+        'href',
+        '/sign-in?next=%2Fpass-giveaway%2Fdj%2Fwinner-search%3Fphone%3D510',
+      );
+    });
+
+    it('should not offer DJ studio guests a sign-in, since they cannot sign in there', async () => {
+      window.history.pushState({}, '', '/pass-giveaway/dj/shows');
+
+      await renderAppWithUser(guest({ is_dj_network: true, is_station_office_network: true }));
+
+      await screen.findByRole('heading', { name: /Radio Pass Giveaway/i });
+      expect(screen.queryByRole('link', { name: 'Staff? Sign in' })).not.toBeInTheDocument();
+    });
+
+    it('should not offer signed-in users a sign-in', async () => {
+      window.history.pushState({}, '', '/pass-giveaway/staff/shows');
+
+      await renderAppWithUser({
+        email: 'staff@example.com',
+        role: 'staff',
+        is_dj_network: false,
+        is_station_office_network: true,
+        profile: null,
+      });
+
+      await screen.findByRole('heading', { name: /Radio Pass Giveaway/i });
+      expect(screen.queryByRole('link', { name: 'Staff? Sign in' })).not.toBeInTheDocument();
+    });
+  });
 });
