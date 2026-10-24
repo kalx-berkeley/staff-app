@@ -6,6 +6,14 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.9.1] - 2026-10-23
+
+### Fixed
+
+- Fix `/go/` short links telling staff in the station office to sign in without letting them. The station office network now goes through the Google login for short links like the rest of the site; only DJ studio computers, which can't sign in, skip it and are told to open the link elsewhere. Apache's `staff.conf` and `staff.stage.conf` must be updated when this is deployed ([d185836](https://github.com/kalx-berkeley/staff-app/commit/d185836))
+- Fix station office guests on pass giveaway pages having no way to sign in. Staff whose session ran out now get a "Staff? Sign in" link that signs them in and returns them to the page ([d185836](https://github.com/kalx-berkeley/staff-app/commit/d185836))
+- Fix staff whose session expired in an open tab getting an error instead of being asked to sign in again, and the expired session being logged as a possible bypass of Apache ([d185836](https://github.com/kalx-berkeley/staff-app/commit/d185836))
+
 ## [1.9.0] - 2026-10-22
 
 ### Changed
