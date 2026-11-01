@@ -2729,6 +2729,16 @@ fieldset.radio-group legend {
   font-weight: 500;
 }
 
+/* DJ shows page: available pairs pre-assigned to other DJs, which this DJ can't give away */
+.pairs-reserved-note {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+.pass-availability .pairs-reserved-note {
+  margin-top: 0.25rem;
+}
+
 /* View toggle (Cards / List buttons) */
 .view-toggle {
   display: flex;

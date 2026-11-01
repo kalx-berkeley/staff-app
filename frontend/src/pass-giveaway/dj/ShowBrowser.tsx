@@ -112,6 +112,21 @@ const ShowBrowser = () => {
   };
 
   const assignedShowIds = new Set(myAssignedPasses.map((p) => p.show_id));
+  const myPairCountByShow = new Map<number, number>();
+  for (const p of myAssignedPasses) {
+    myPairCountByShow.set(p.show_id, (myPairCountByShow.get(p.show_id) ?? 0) + 1);
+  }
+  // The pairs this DJ can give away: the ones no DJ has, plus their own.
+  // The rest of the available pairs are pre-assigned to other DJs.
+  const pairCounts = (show: ShowSummary) => {
+    const yours = Math.min(
+      show.unassigned_pair_count + (myPairCountByShow.get(show.id) ?? 0),
+      show.available_pair_count
+    );
+    return { yours, reservedForOthers: show.available_pair_count - yours };
+  };
+  const reservedLabel = (count: number) =>
+    `${count} pre-assigned to ${djName.trim() ? 'other DJs' : 'DJs'}`;
   const todayStr = getLocalTodayStr();
   const assignedTodayShowIds = new Set(
     myAssignedPasses.filter((p) => p.preassigned_date === todayStr).map((p) => p.show_id)
@@ -435,14 +450,15 @@ const ShowBrowser = () => {
                 <th>Time</th>
                 <th>
                   Pairs
-                  <Tooltip text="Available pass pairs for on-air giveaway" />
+                  <Tooltip text="Pass pairs you can give away on air. Pairs pre-assigned to other DJs aren't counted." />
                 </th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {sortedShows.map((show) => {
-                const noPairs = show.available_pair_count === 0;
+                const { yours, reservedForOthers } = pairCounts(show);
+                const noPairs = yours === 0;
                 const hasAssignment = assignedShowIds.has(show.id);
                 return (
                   <tr
@@ -471,12 +487,23 @@ const ShowBrowser = () => {
                     <td>{show.venue.name}</td>
                     <td>{show.show_start_date ? formatDateRange(show.show_start_date, show.show_date) : formatDateShort(show.show_date)}</td>
                     <td>{show.show_start_date ? '—' : formatTime(show.show_time!)}</td>
-                    <td>{show.available_pair_count}</td>
+                    <td>
+                      {yours}
+                      {reservedForOthers > 0 && (
+                        <span className="pairs-reserved-note" title={reservedLabel(reservedForOthers)}> ({reservedForOthers} pre-assigned)</span>
+                      )}
+                    </td>
                     <td>
                       <div className="show-row-actions">
-                        <Link to={`/dj/shows/${show.id}`} className="btn-primary btn-small">
-                          Give Away
-                        </Link>
+                        {noPairs ? (
+                          <Link to={`/dj/shows/${show.id}`} className="btn-secondary btn-small">
+                            View
+                          </Link>
+                        ) : (
+                          <Link to={`/dj/shows/${show.id}`} className="btn-primary btn-small">
+                            Give Away
+                          </Link>
+                        )}
                         {renderClothespinButton(show, true)}
                       </div>
                     </td>
@@ -489,13 +516,20 @@ const ShowBrowser = () => {
       ) : (
         <div className="shows-grid">
           {sortedShows.map((show) => {
-            const noPairs = show.available_pair_count === 0;
+            const { yours, reservedForOthers } = pairCounts(show);
+            const noPairs = yours === 0;
             const hasAssignment = assignedShowIds.has(show.id);
             return (
               <div
                 key={show.id}
                 className={`show-card${noPairs ? ' show-card-dimmed' : ''}${hasAssignment ? ' show-card-has-assignment' : ''}${show.co_announce ? ' show-card-co-announce' : ''}`}
-                title={noPairs ? 'No pass pairs available for this show' : undefined}
+                title={
+                  !noPairs
+                    ? undefined
+                    : reservedForOthers > 0
+                      ? 'Every pass pair left is pre-assigned to another DJ'
+                      : 'No pass pairs available for this show'
+                }
               >
                 <div className="show-card-header">
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', flexWrap: 'wrap', flex: 1 }}>
@@ -552,10 +586,13 @@ const ShowBrowser = () => {
                     <div className="availability-badge">
                       <span className="badge-label">
                         Pass Pairs Available:
-                        <Tooltip text="Each pass pair admits 2 people to the show. You give away one pair per winner." />
+                        <Tooltip text="Each pass pair admits 2 people to the show. You give away one pair per winner. Pairs pre-assigned to other DJs aren't counted." />
                       </span>
-                      <span className="badge-count">{show.available_pair_count}</span>
+                      <span className="badge-count">{yours}</span>
                     </div>
+                    {reservedForOthers > 0 && (
+                      <div className="pairs-reserved-note">{reservedLabel(reservedForOthers)}</div>
+                    )}
                   </div>
 
                   {hasAssignment && (
@@ -566,9 +603,15 @@ const ShowBrowser = () => {
                 </div>
 
                 <div className="show-card-footer show-card-actions">
-                  <Link to={`/dj/shows/${show.id}`} className="btn-primary">
-                    Give Away Passes
-                  </Link>
+                  {noPairs ? (
+                    <Link to={`/dj/shows/${show.id}`} className="btn-secondary">
+                      View Show
+                    </Link>
+                  ) : (
+                    <Link to={`/dj/shows/${show.id}`} className="btn-primary">
+                      Give Away Passes
+                    </Link>
+                  )}
                   {renderClothespinButton(show, false)}
                 </div>
               </div>

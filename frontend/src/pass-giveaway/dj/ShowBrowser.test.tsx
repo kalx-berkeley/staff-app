@@ -57,6 +57,7 @@ describe('ShowBrowser', () => {
       available_pair_count: 3,
       available_staff_count: 3,
       guest_hold_staff_count: 0,
+      unassigned_pair_count: 3,
       clothespin_available: true,
       co_announce: false,
       published_at: null,
@@ -86,6 +87,7 @@ describe('ShowBrowser', () => {
       available_pair_count: 2,
       available_staff_count: 2,
       guest_hold_staff_count: 0,
+      unassigned_pair_count: 2,
       clothespin_available: true,
       co_announce: false,
       published_at: null,
@@ -115,6 +117,7 @@ describe('ShowBrowser', () => {
       available_pair_count: 1,
       available_staff_count: 1,
       guest_hold_staff_count: 0,
+      unassigned_pair_count: 1,
       clothespin_available: true,
       co_announce: false,
       published_at: null,
@@ -144,6 +147,7 @@ describe('ShowBrowser', () => {
       available_pair_count: 0,
       available_staff_count: 0,
       guest_hold_staff_count: 0,
+      unassigned_pair_count: 0,
       clothespin_available: true,
       co_announce: false,
       published_at: null,
@@ -599,6 +603,70 @@ describe('ShowBrowser', () => {
       expect(within(assignedRow).getByRole('link', { name: 'Give Away Passes' })).toBeInTheDocument();
       const showRow = clothespinButton('Rock Concert')!.closest('tr')!;
       expect(within(showRow).getByRole('link', { name: 'Give Away' })).toBeInTheDocument();
+    });
+
+    describe('pairs pre-assigned to other DJs', () => {
+      // Both available pairs are pre-assigned, so none is open to any DJ.
+      const reservedShow: ShowSummary = {
+        ...mockShows[0],
+        id: 6,
+        event_name: 'Sold Out Sounds',
+        available_pair_count: 2,
+        unassigned_pair_count: 0,
+        clothespin_available: false,
+      };
+
+      // The show's card in the main list, not in "Your Pre-assigned Shows".
+      const card = (eventName: string) =>
+        screen
+          .getAllByText(eventName)
+          .map((el) => el.closest('.show-card') as HTMLElement)
+          .find((el) => el && !el.closest('.assigned-shows-section'))!;
+
+      beforeEach(() => {
+        vi.mocked(showsAPI.list).mockResolvedValue([mockShows[0], mockShows[1], reservedShow]);
+      });
+
+      it('offers View Show instead of Give Away when every pair is pre-assigned to other DJs', async () => {
+        await renderWithDj();
+        await screen.findByText('Sold Out Sounds');
+
+        const reservedCard = card('Sold Out Sounds');
+        expect(within(reservedCard).queryByRole('link', { name: 'Give Away Passes' })).not.toBeInTheDocument();
+        expect(within(reservedCard).getByRole('link', { name: 'View Show' })).toHaveAttribute('href', '/dj/shows/6');
+        expect(within(reservedCard).getByText('2 pre-assigned to other DJs')).toBeInTheDocument();
+        expect(reservedCard).toHaveClass('show-card-dimmed');
+        expect(reservedCard).toHaveAttribute('title', 'Every pass pair left is pre-assigned to another DJ');
+
+        const openCard = card('Rock Concert');
+        expect(within(openCard).getByRole('link', { name: 'Give Away Passes' })).toBeInTheDocument();
+        expect(openCard.querySelector('.pairs-reserved-note')).toBeNull();
+      });
+
+      it("counts the DJ's own pre-assigned pairs as theirs to give away", async () => {
+        vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([
+          reservedPass(),
+          reservedPass({ id: 22, show_id: 6, show_event_name: 'Sold Out Sounds' }),
+        ]);
+        await renderWithDj();
+        await waitFor(() => expect(screen.getAllByText('Sold Out Sounds')).toHaveLength(2));
+
+        const reservedCard = card('Sold Out Sounds');
+        expect(within(reservedCard).getByRole('link', { name: 'Give Away Passes' })).toBeInTheDocument();
+        expect(within(reservedCard).getByText('1 pre-assigned to other DJs')).toBeInTheDocument();
+        expect(reservedCard).not.toHaveClass('show-card-dimmed');
+      });
+
+      it('shows the pre-assigned pairs and a View link in the list view', async () => {
+        localStorage.setItem('kalx_dj_view_mode', 'compact');
+        await renderWithDj();
+        await screen.findByText('Sold Out Sounds');
+
+        const row = screen.getByText('Sold Out Sounds').closest('tr')!;
+        expect(within(row).queryByRole('link', { name: 'Give Away' })).not.toBeInTheDocument();
+        expect(within(row).getByRole('link', { name: 'View' })).toBeInTheDocument();
+        expect(within(row).getByText('(2 pre-assigned)')).toHaveAttribute('title', '2 pre-assigned to other DJs');
+      });
     });
   });
 });

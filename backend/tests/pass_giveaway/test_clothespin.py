@@ -230,6 +230,7 @@ def test_a_reservation_for_another_day_does_not_block(client, db, show, dj):
 def test_show_rules_block_clothespin(client, db, show, dj, change, detail):
     """The show's rules refuse Clothespin, and the show list says it isn't available."""
     assert _summary(client, show.id)["clothespin_available"] is True
+    assert _summary(client, show.id)["unassigned_pair_count"] == 2
 
     change(show)
     db.commit()
@@ -257,6 +258,7 @@ def test_show_list_reports_no_unclaimed_pairs(client, db, show, dj):
 
     summary = _summary(client, show.id)
     assert summary["available_pair_count"] == 2
+    assert summary["unassigned_pair_count"] == 0
     assert summary["clothespin_available"] is False
 
 

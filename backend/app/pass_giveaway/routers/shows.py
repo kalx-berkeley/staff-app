@@ -445,6 +445,7 @@ def _build_show_summary(
         "available_pair_count": pair_count,
         "available_staff_count": staff_count,
         "guest_hold_staff_count": guest_hold_count,
+        "unassigned_pair_count": unclaimed_pair_count,
         "clothespin_available": (
             unclaimed_pair_count > 0
             and PassService.clothespin_blocker(show, today_pt()) is None

@@ -439,6 +439,12 @@ class ShowSummary(BaseModel):
     available_pair_count: int = 0
     available_staff_count: int = 0
     guest_hold_staff_count: int = 0
+    unassigned_pair_count: int = Field(
+        default=0,
+        description=(
+            "Available pass pairs not pre-assigned to any DJ, so any DJ can give them away"
+        ),
+    )
     clothespin_available: bool = Field(
         default=False,
         description=(
