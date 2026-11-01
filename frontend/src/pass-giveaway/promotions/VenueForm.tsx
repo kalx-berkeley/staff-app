@@ -471,7 +471,10 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           </div>
 
           <div className="form-group">
-            <label htmlFor="venue-win-frequency">Win Frequency Limit (days)</label>
+            <div className="label-with-help">
+              <label htmlFor="venue-win-frequency">Win Frequency Limit (days)</label>
+              <Tooltip text="Stops the same listener from winning on-air passes to this venue too often. When a DJ records a winner, the caller's phone number is checked against earlier on-air winners at this venue. If their last win was for a show fewer than this many days from this show's date, the DJ sees a warning with the earlier show and its date. The DJ can still override the warning and give the passes away, and each override is recorded in the audit log. The days count between show dates, not the days the passes were won. Staff passes don't count. Leave blank for no limit." />
+            </div>
             <input
               type="number"
               id="venue-win-frequency"
