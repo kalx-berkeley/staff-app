@@ -27,8 +27,8 @@ class DirectoryEntry(BaseModel):
     departments: list[str] = []
     statuses: list[str] = []
     titles_and_roles: str | None = None
-    # Changes whenever the photo does, for cache-busting the photo URL; None
-    # when the staff member has no photo.
+    # Changes whenever the photo or its resized format does, for the photo
+    # URL (see staff_photo_service.photo_version); None when there's no photo.
     photo_version: str | None = None
     # Leave of absence that hasn't ended yet (None once it's past); either
     # date may be None for a one-sided leave. on_leave is True during it.

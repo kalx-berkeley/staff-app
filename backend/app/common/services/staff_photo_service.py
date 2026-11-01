@@ -25,9 +25,30 @@ register_heif_opener()
 
 # Square thumbnail for the directory table; bounding box for the detail panel.
 # Both are about twice their largest display size, for high-DPI screens.
+# Raise PHOTO_FORMAT_VERSION whenever these sizes, the crop or the JPEG
+# settings change, so browsers fetch the new copies instead of keeping cached
+# ones for up to a year. The sync re-saves photos only when their attachment
+# changes, so regenerate existing photos too.
 THUMB_SIZE = 128
 MEDIUM_SIZE = 480
 PHOTO_SIZES = ("thumb", "medium")
+PHOTO_FORMAT_VERSION = 1
+
+
+def photo_version(attachment_id: Optional[str]) -> Optional[str]:
+    """
+    Return the version of a staff member's photo, used in its URL.
+
+    The version changes whenever the photo's Airtable attachment or the
+    resized format (PHOTO_FORMAT_VERSION) does, so photo responses can be
+    cached for a long time.
+
+    :param attachment_id: The staff member's photo_attachment_id.
+    :returns: The version, or None when there's no photo.
+    """
+    if not attachment_id:
+        return None
+    return f"{attachment_id}.{PHOTO_FORMAT_VERSION}"
 
 
 def photo_path(staff_id: int, size: str) -> Path:

@@ -33,9 +33,14 @@ from app.common.services.leave_service import (
     on_leave,
     today_pt,
 )
-from app.common.services.staff_photo_service import photo_path
+from app.common.services.staff_photo_service import photo_path, photo_version
 
 router = APIRouter(prefix="/api/directory", tags=["directory"])
+
+# A photo URL with the current version never changes content, so browsers can
+# keep it for a year without rechecking. Any other URL may, so it isn't cached.
+_VERSIONED_PHOTO_CACHE = "private, max-age=31536000, immutable"
+_UNVERSIONED_PHOTO_CACHE = "no-cache"
 
 # The list holds every current staff member's contact details, so it's rate
 # limited to discourage scraping. A page load makes one request.
@@ -113,7 +118,7 @@ def _entry(s: Staff, today: date) -> DirectoryEntry:
         departments=sorted(d.department for d in s.departments),
         statuses=sorted(st.status for st in s.statuses),
         titles_and_roles=s.titles_and_roles,
-        photo_version=s.photo_attachment_id,
+        photo_version=photo_version(s.photo_attachment_id),
         dj_quiz_years=s.dj_quiz_years or [],
         **_leave_fields(s, today),
     )
@@ -148,27 +153,35 @@ def list_directory(
 def get_photo(
     staff_id: int,
     size: Literal["thumb", "medium"] = Query("thumb"),
+    v: str | None = Query(None),
     _viewer: Staff = Depends(get_staff_member),
     db: Session = Depends(get_db),
 ):
     """
     Return a current staff member's directory photo. Current staff only.
 
-    The response may be cached, since the directory links to it with the
-    photo's version in the query string.
+    The directory links to it with the photo's version in the query string.
+    When *v* is the current version, the response is cached for a year;
+    otherwise it isn't cached, so a stale or missing version is never stored
+    under the wrong URL.
 
     :param staff_id: Staff ID.
     :param size: "thumb" (a square crop) or "medium".
+    :param v: The photo version the URL was built with.
     :raises HTTPException: 404 if the staff member isn't current staff or has no photo.
     """
     staff_member = _current_staff_query(db).filter(Staff.id == staff_id).first()
     path = photo_path(staff_id, size)
     if not staff_member or not staff_member.photo_attachment_id or not path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No photo")
+    if v is not None and v == photo_version(staff_member.photo_attachment_id):
+        cache_control = _VERSIONED_PHOTO_CACHE
+    else:
+        cache_control = _UNVERSIONED_PHOTO_CACHE
     return FileResponse(
         path,
         media_type="image/jpeg",
-        headers={"Cache-Control": "private, max-age=604800"},
+        headers={"Cache-Control": cache_control},
     )
 
 

@@ -15,7 +15,7 @@ from app.models.impersonation_session import ImpersonationSession
 from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
 from app.models.staff_status import StaffStatus
-from app.common.services.staff_photo_service import photo_path
+from app.common.services.staff_photo_service import PHOTO_FORMAT_VERSION, photo_path
 
 
 def _make_staff(
@@ -96,7 +96,7 @@ def test_directory_lists_active_staff_sorted_by_name(client: TestClient, db: Ses
     ]
     assert zed["departments"] == ["Music", "News"]
     assert zed["statuses"] == ["Active", "Paid Staff"]
-    assert zed["photo_version"] == "attA"
+    assert zed["photo_version"] == f"attA.{PHOTO_FORMAT_VERSION}"
     assert entries[0]["photo_version"] is None
 
 
@@ -239,6 +239,57 @@ def test_photo_is_served_to_active_staff(client: TestClient, db: Session, photo_
     assert thumb.headers["content-type"] == "image/jpeg"
     assert Image.open(BytesIO(thumb.content)).size == (128, 128)
     assert Image.open(BytesIO(medium.content)).size == (360, 480)
+
+
+def test_photo_with_current_version_is_cached_for_a_year(
+    client: TestClient, db: Session, photo_dir
+):
+    from app.common.services.staff_photo_service import save_photo
+
+    staff = _make_staff(db, "amy@example.com", "Amy Adams", photo_attachment_id="attA")
+    save_photo(staff.id, _jpeg_bytes())
+    version = client.get("/api/directory", headers=_as("amy@example.com")).json()[0][
+        "photo_version"
+    ]
+
+    response = client.get(
+        f"/api/directory/{staff.id}/photo?size=medium&v={version}",
+        headers=_as("amy@example.com"),
+    )
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "private, max-age=31536000, immutable"
+
+
+@pytest.mark.parametrize("query", ["", "?v=attOld.1", "?v=attA.0"])
+def test_photo_without_current_version_is_not_cached(
+    client: TestClient, db: Session, photo_dir, query
+):
+    from app.common.services.staff_photo_service import save_photo
+
+    staff = _make_staff(db, "amy@example.com", "Amy Adams", photo_attachment_id="attA")
+    save_photo(staff.id, _jpeg_bytes())
+
+    response = client.get(
+        f"/api/directory/{staff.id}/photo{query}", headers=_as("amy@example.com")
+    )
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-cache"
+
+
+def test_photo_version_changes_with_attachment_and_format(monkeypatch):
+    from app.common.services import staff_photo_service
+
+    assert staff_photo_service.photo_version(None) is None
+    assert staff_photo_service.photo_version("") is None
+    before = staff_photo_service.photo_version("attA")
+    assert staff_photo_service.photo_version("attB") != before
+
+    monkeypatch.setattr(
+        staff_photo_service, "PHOTO_FORMAT_VERSION", PHOTO_FORMAT_VERSION + 1
+    )
+    assert staff_photo_service.photo_version("attA") != before
 
 
 def test_photo_404s_without_a_photo_or_for_inactive_staff(
