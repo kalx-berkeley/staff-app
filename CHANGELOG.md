@@ -6,6 +6,19 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.10.0] - 2026-11-01
+
+### Changed
+
+- Make a show belong to its own promoter's KALX promotions reps, or its venue's when it has no promoter. A venue's default promoter now only pre-fills new shows. My Shows, show emails and promotions contacts follow this rule, and a show with a promoter uses the promoter's guest list requirements ([267f093](https://github.com/kalx-berkeley/staff-app/commit/267f093))
+- Call a staff member and their guest a pair of passes on guest lists, and stop the auto-close email listing the guest hold as a second pass ([267f093](https://github.com/kalx-berkeley/staff-app/commit/267f093))
+- Explain on the show form that any genre can be typed, separated by commas ([267f093](https://github.com/kalx-berkeley/staff-app/commit/267f093))
+- Explain the venue form's Win Frequency Limit in a tooltip ([a71570a](https://github.com/kalx-berkeley/staff-app/commit/a71570a))
+
+### Added
+
+- Let venues and promoters include only staff pass winners' email addresses in the guest list, without DJs asking on-air winners for one. Venues and promoters that required email addresses still collect them from all winners ([267f093](https://github.com/kalx-berkeley/staff-app/commit/267f093))
+
 ## [1.9.1] - 2026-10-23
 
 ### Fixed
@@ -259,6 +272,8 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.10.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.9.1...v1.10.0
+[1.9.1]: https://github.com/kalx-berkeley/staff-app/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.6.1...v1.7.0
