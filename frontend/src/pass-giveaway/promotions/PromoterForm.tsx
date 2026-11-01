@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { promotersAPI, venuesAPI } from '../api';
-import { Tooltip, PersonAutocomplete, extractPersonEmail } from '../components';
-import type { PromoterResponse, PromoterCreate, PromoterUpdate, PromoterContactCreate, PromotionsStaffOption } from '../types';
+import { Tooltip, PersonAutocomplete, extractPersonEmail, EmailAddressRequirementField } from '../components';
+import type { EmailAddressRequirement, PromoterResponse, PromoterCreate, PromoterUpdate, PromoterContactCreate, PromotionsStaffOption } from '../types';
 import type { APIError, ValidationError } from '../../common/types';
 
 interface PromoterFormProps {
@@ -24,7 +24,8 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
   const [showSourcingInstructions, setShowSourcingInstructions] = useState('');
   const [passCallInstructions, setPassCallInstructions] = useState('');
   const [requiresPhoneNumber, setRequiresPhoneNumber] = useState(false);
-  const [requiresEmailAddress, setRequiresEmailAddress] = useState(false);
+  const [emailAddressRequirement, setEmailAddressRequirement] =
+    useState<EmailAddressRequirement>('none');
   const [staffGuestRequiresName, setStaffGuestRequiresName] = useState(false);
   const [ownerEmails, setOwnerEmails] = useState<string[]>([]);
   const [newOwnerInput, setNewOwnerInput] = useState('');
@@ -43,7 +44,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
       setShowSourcingInstructions(promoter.show_sourcing_instructions || '');
       setPassCallInstructions(promoter.pass_call_instructions || '');
       setRequiresPhoneNumber(promoter.requires_phone_number ?? false);
-      setRequiresEmailAddress(promoter.requires_email_address ?? false);
+      setEmailAddressRequirement(promoter.email_address_requirement ?? 'none');
       setStaffGuestRequiresName(promoter.staff_guest_requires_name ?? false);
       setOwnerEmails(promoter.owner_emails || []);
       setContacts(
@@ -130,7 +131,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
           show_sourcing_instructions: showSourcingInstructions.trim() || null,
           pass_call_instructions: passCallInstructions.trim() || null,
           requires_phone_number: requiresPhoneNumber,
-          requires_email_address: requiresEmailAddress,
+          email_address_requirement: emailAddressRequirement,
           staff_guest_requires_name: staffGuestRequiresName,
           owner_emails: ownerEmails,
           contacts,
@@ -142,7 +143,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
           show_sourcing_instructions: showSourcingInstructions.trim() || null,
           pass_call_instructions: passCallInstructions.trim() || null,
           requires_phone_number: requiresPhoneNumber,
-          requires_email_address: requiresEmailAddress,
+          email_address_requirement: emailAddressRequirement,
           staff_guest_requires_name: staffGuestRequiresName,
           owner_emails: ownerEmails,
           contacts,
@@ -272,22 +273,12 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
             {' '}Include winner's phone number in guest list
           </label>
         </div>
-        <div className="form-group form-group-checkbox">
-          <label>
-            <input
-              type="checkbox"
-              checked={requiresEmailAddress}
-              onChange={(e) => setRequiresEmailAddress(e.target.checked)}
-              disabled={submitting}
-            />
-            {' '}Require and include winner's email address in guest list
-          </label>
-          {requiresEmailAddress && (
-            <span className="field-hint">
-              DJs will be prompted to collect an email address from on-air winners. Staff claimants' email addresses are collected automatically.
-            </span>
-          )}
-        </div>
+        <EmailAddressRequirementField
+          idPrefix="promoter"
+          value={emailAddressRequirement}
+          onChange={setEmailAddressRequirement}
+          disabled={submitting}
+        />
         <div className="form-group form-group-checkbox">
           <label>
             <input

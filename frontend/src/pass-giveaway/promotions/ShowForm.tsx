@@ -410,11 +410,13 @@ const ShowForm = () => {
     }
   };
 
+  // Adds each comma-separated genre in value, so pasting "rock, punk" adds both
   const addGenre = (value: string) => {
-    const normalized = value.trim().toLowerCase();
-    if (normalized && !genres.includes(normalized)) {
-      setGenres((prev) => [...prev, normalized]);
-    }
+    const toAdd = value
+      .split(',')
+      .map((g) => g.trim().toLowerCase())
+      .filter(Boolean);
+    setGenres((prev) => [...new Set([...prev, ...toAdd])]);
     setGenreInput('');
   };
 
@@ -508,9 +510,11 @@ const ShowForm = () => {
 
   const handleSave = async (publish: boolean) => {
     // Finalize any in-progress genre input before validating
-    const finalGenres = genreInput.trim()
-      ? [...new Set([...genres, genreInput.trim()])]
-      : [...genres];
+    const pendingGenres = genreInput
+      .split(',')
+      .map((g) => g.trim().toLowerCase())
+      .filter(Boolean);
+    const finalGenres = [...new Set([...genres, ...pendingGenres])];
     if (genreInput.trim()) {
       setGenres(finalGenres);
       setGenreInput('');
@@ -711,6 +715,7 @@ const ShowForm = () => {
               onKeyDown={handleGenreKeyDown}
               onBlur={() => { if (genreInput.trim()) addGenre(genreInput); }}
               placeholder={genres.length === 0 ? 'Type a genre and press Enter…' : ''}
+              aria-describedby="genre-hint"
               disabled={submitting}
               className="genre-text-input"
             />
@@ -722,6 +727,10 @@ const ShowForm = () => {
                 ))}
             </datalist>
           </div>
+          <span className="field-hint" id="genre-hint">
+            Type any genre, not just the suggestions, and press Enter or type a comma to add it.
+            Separate several genres with commas.
+          </span>
           {errors.genre && <span className="field-error">{errors.genre}</span>}
         </div>
 

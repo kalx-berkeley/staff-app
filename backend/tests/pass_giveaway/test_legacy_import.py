@@ -76,7 +76,7 @@ WINNER = OnAirWinnerImport(recipient_name="Caller", recipient_phone="555-1234")
 
 
 def test_import_requires_winner_email_when_the_venue_does(db: Session, staff: Staff):
-    venue = _venue(db, requires_email_address=True)
+    venue = _venue(db, email_address_requirement="all")
 
     with pytest.raises(HTTPException) as exc:
         import_legacy_show(_import(venue, on_air_winners=[WINNER]), staff, db)
@@ -87,7 +87,7 @@ def test_import_requires_winner_email_when_the_venue_does(db: Session, staff: St
 
 
 def test_import_accepts_winner_email_when_the_venue_requires_it(db: Session, staff: Staff):
-    venue = _venue(db, requires_email_address=True)
+    venue = _venue(db, email_address_requirement="all")
     winner = WINNER.model_copy(update={"recipient_email": "caller@example.com"})
 
     result = import_legacy_show(_import(venue, on_air_winners=[winner]), staff, db)

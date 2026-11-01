@@ -18,8 +18,11 @@ class Promoter(Base):
     requires_phone_number = Column(
         Boolean, nullable=False, default=False, server_default="false"
     )
-    requires_email_address = Column(
-        Boolean, nullable=False, default=False, server_default="false"
+    # Which winners' email addresses the guest list needs: "none", "staff_passes"
+    # (staff claimants only, whose addresses we already have) or "all" (DJs
+    # must also collect one from every on-air winner)
+    email_address_requirement = Column(
+        String, nullable=False, default="none", server_default="none"
     )
     staff_guest_requires_name = Column(
         Boolean, nullable=False, default=False, server_default="false"
@@ -41,6 +44,16 @@ class Promoter(Base):
     contacts = relationship(
         "PromoterContact", back_populates="promoter", cascade="all, delete-orphan"
     )
+
+    @property
+    def requires_email_address(self) -> bool:
+        """Whether DJs must collect an email address from on-air winners."""
+        return self.email_address_requirement == "all"
+
+    @property
+    def includes_staff_email_address(self) -> bool:
+        """Whether the guest list includes staff claimants' email addresses."""
+        return self.email_address_requirement in ("staff_passes", "all")
 
     @property
     def owner_emails(self) -> list[str]:

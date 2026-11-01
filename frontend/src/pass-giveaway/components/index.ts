@@ -13,6 +13,7 @@ export { default as FeatureBinBadge } from './FeatureBinBadge';
 export { default as KalxLiveBadge } from './KalxLiveBadge';
 export { default as ProfileSettings } from './ProfileSettings';
 export { default as GenreTagInput } from './GenreTagInput';
+export { default as EmailAddressRequirementField } from './EmailAddressRequirementField';
 export { default as PersonAutocomplete } from '../../common/components/PersonAutocomplete';
 export type { PersonOption } from '../../common/components/PersonAutocomplete';
 export { extractPersonEmail } from '../../common/components/personUtils';

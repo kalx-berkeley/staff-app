@@ -37,8 +37,8 @@ vi.mock('react-router-dom', async () => {
 
 describe('ShowForm', () => {
   const mockVenues: VenueResponse[] = [
-    { id: 1, name: 'Venue A', address: '123 Main St', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, venue_type: 'music', default_age_restriction: null, default_movie_rating: null, default_num_pass_pairs: null, requires_phone_number: false, requires_email_address: false, staff_guest_requires_name: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, default_on_air_description: null, default_caller_special_instructions: null, has_logo: false, show_name_with_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], contacts: [] },
-    { id: 2, name: 'Venue B', address: '456 Oak Ave', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, venue_type: 'music', default_age_restriction: null, default_movie_rating: null, default_num_pass_pairs: null, requires_phone_number: false, requires_email_address: false, staff_guest_requires_name: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, default_on_air_description: null, default_caller_special_instructions: null, has_logo: false, show_name_with_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], contacts: [] },
+    { id: 1, name: 'Venue A', address: '123 Main St', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, venue_type: 'music', default_age_restriction: null, default_movie_rating: null, default_num_pass_pairs: null, requires_phone_number: false, email_address_requirement: 'none', requires_email_address: false, staff_guest_requires_name: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, default_on_air_description: null, default_caller_special_instructions: null, has_logo: false, show_name_with_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], contacts: [] },
+    { id: 2, name: 'Venue B', address: '456 Oak Ave', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, venue_type: 'music', default_age_restriction: null, default_movie_rating: null, default_num_pass_pairs: null, requires_phone_number: false, email_address_requirement: 'none', requires_email_address: false, staff_guest_requires_name: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, default_on_air_description: null, default_caller_special_instructions: null, has_logo: false, show_name_with_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], contacts: [] },
   ];
 
   beforeEach(() => {
@@ -254,6 +254,7 @@ describe('ShowForm', () => {
         extra_staff_passes: 0,
         num_staff_passes: 1,
         promotions_contacts: [],
+        guest_list_requirements: { requires_phone_number: false, email_address_requirement: 'none', requires_email_address: false, staff_guest_requires_name: false },
         attempts: [],
         status: 'draft',
         passes: [],
@@ -798,6 +799,27 @@ describe('ShowForm', () => {
       expect(showsAPI.create).toHaveBeenCalledWith(
         expect.objectContaining({ movie_rating: 'R', age_restriction: null }),
       );
+    });
+  });
+
+  describe('Genre', () => {
+    it('explains that any genre can be typed and commas separate them', async () => {
+      renderShowForm();
+
+      expect(await screen.findByLabelText(/genre/i)).toHaveAccessibleDescription(
+        /type any genre.*separate several genres with commas/i,
+      );
+    });
+
+    it('adds each comma-separated genre typed or pasted in', async () => {
+      renderShowForm();
+
+      const genreInput = await screen.findByLabelText(/genre/i);
+      fireEvent.change(genreInput, { target: { value: 'Shoegaze, dream pop,' } });
+      fireEvent.blur(genreInput);
+
+      expect(await screen.findByRole('button', { name: 'Remove shoegaze' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Remove dream pop' })).toBeInTheDocument();
     });
   });
 });

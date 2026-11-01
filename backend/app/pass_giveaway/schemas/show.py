@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.common.schemas.types import UtcDatetime
 from app.pass_giveaway.schemas.lottery import LotteryEntryResponse
+from app.pass_giveaway.schemas.promoter import EmailAddressRequirement
 from app.pass_giveaway.schemas.venue import (
     AgeRestriction,
     MovieRating,
@@ -316,6 +317,16 @@ class KalxLiveAppearanceResponse(BaseModel):
     event_date: date
 
 
+class GuestListRequirements(BaseModel):
+    """The guest list settings of the show's promoter or, with none, its venue."""
+
+    requires_phone_number: bool = False
+    email_address_requirement: EmailAddressRequirement = "none"
+    # DJs must collect an email address from on-air winners
+    requires_email_address: bool = False
+    staff_guest_requires_name: bool = False
+
+
 class PromotionsContact(BaseModel):
     """Contact info for a promotions staff owner of the venue."""
 
@@ -347,7 +358,10 @@ class ShowResponse(BaseModel):
     num_staff_passes: int = 0
     promotions_contacts: list[PromotionsContact] = Field(
         default_factory=list,
-        description="Promotions staff contacts (effective promoter owners)",
+        description="Promotions staff contacts (the show's promoter's or venue's reps)",
+    )
+    guest_list_requirements: GuestListRequirements = Field(
+        default_factory=GuestListRequirements
     )
     status: str
     available_pair_count: int = Field(

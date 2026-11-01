@@ -237,15 +237,10 @@ class AlternateService:
                 ),
             )
         guest_name = guest_name.strip() if guest_name else None
-        if (
-            has_guest
-            and show.venue
-            and show.venue.staff_guest_requires_name
-            and not guest_name
-        ):
+        if has_guest and show.promoted_by.staff_guest_requires_name and not guest_name:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="This venue requires a name for your +1 guest",
+                detail="This show requires a name for your +1 guest",
             )
 
         now = datetime.now(timezone.utc)
@@ -277,15 +272,10 @@ class AlternateService:
         """Change an entry's +1 details without changing its place in line."""
         guest_name = guest_name.strip() if guest_name else None
         show = entry.show
-        if (
-            has_guest
-            and show.venue
-            and show.venue.staff_guest_requires_name
-            and not guest_name
-        ):
+        if has_guest and show.promoted_by.staff_guest_requires_name and not guest_name:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="This venue requires a name for your +1 guest",
+                detail="This show requires a name for your +1 guest",
             )
         entry.has_guest = has_guest
         entry.guest_name = guest_name if has_guest else None

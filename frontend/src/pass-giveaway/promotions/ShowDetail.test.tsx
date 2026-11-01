@@ -102,6 +102,7 @@ const makeShow = (passes: PassResponse[]): ShowResponse => ({
     venue_type: 'music', default_age_restriction: null, default_movie_rating: null,
     default_num_pass_pairs: null,
     requires_phone_number: false,
+    email_address_requirement: 'none',
     requires_email_address: false,
     staff_guest_requires_name: false,
     default_lottery_enabled: false,
@@ -129,6 +130,7 @@ const makeShow = (passes: PassResponse[]): ShowResponse => ({
   extra_staff_passes: 0,
   num_staff_passes: passes.length,
   promotions_contacts: [],
+  guest_list_requirements: { requires_phone_number: false, email_address_requirement: 'none', requires_email_address: false, staff_guest_requires_name: false },
   attempts: [],
   status: 'published',
   passes,
@@ -426,6 +428,68 @@ describe('Promotions ShowDetail — staff +1 guests', () => {
     expect(screen.getAllByText('Claimed by:')).toHaveLength(1);
     expect(screen.getByText('+1 guest hold')).toBeInTheDocument();
     expect(screen.getByText('+1 guest of:').parentElement).toHaveTextContent('+1 guest of: John Doe');
+  });
+});
+
+describe('Promotions ShowDetail — guest list', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const closedShow = (emailAddressRequirement: 'none' | 'staff_passes' | 'all') => {
+    const staff = { ...basePass, pass_type: 'staff' as const, status: 'claimed' as const };
+    const show = makeShow([
+      {
+        ...basePass, id: 1, status: 'given_away', recipient_name: 'Caller',
+        recipient_phone: '5551234567', recipient_email: 'caller@example.com',
+      },
+      { ...staff, id: 2, staff_id: 7, staff_name: 'Solo', staff_email: 'solo@example.com' },
+      { ...staff, id: 3, staff_id: 8, staff_name: 'John Doe', staff_email: 'john@example.com', has_guest: true },
+      { ...staff, id: 4, staff_id: 8, staff_name: 'John Doe', guest_of_pass_id: 3 },
+    ]);
+    return {
+      ...show,
+      status: 'closed' as const,
+      guest_list_requirements: {
+        ...show.guest_list_requirements,
+        email_address_requirement: emailAddressRequirement,
+      },
+    };
+  };
+
+  it('counts a staff member and their guest as a pair of passes', async () => {
+    vi.mocked(showsAPI.get).mockResolvedValue(closedShow('none'));
+
+    await renderShowDetail();
+
+    expect((await screen.findByText(/1 pair of passes for Caller/)).textContent).toBe(
+      [
+        '1 pair of passes for Caller and a guest',
+        '1 pass for Solo',
+        '1 pair of passes for John Doe and a guest',
+      ].join('\n'),
+    );
+  });
+
+  it('includes only staff pass winners\' email addresses when the show\'s promoter or venue wants just those', async () => {
+    vi.mocked(showsAPI.get).mockResolvedValue(closedShow('staff_passes'));
+
+    await renderShowDetail();
+
+    const list = await screen.findByText(/1 pair of passes for Caller/);
+    expect(list).toHaveTextContent('1 pass for Solo (solo@example.com)');
+    expect(list).toHaveTextContent('John Doe and a guest (john@example.com)');
+    expect(list).not.toHaveTextContent('caller@example.com');
+  });
+
+  it('includes every winner\'s email address when the show\'s promoter or venue wants them all', async () => {
+    vi.mocked(showsAPI.get).mockResolvedValue(closedShow('all'));
+
+    await renderShowDetail();
+
+    const list = await screen.findByText(/1 pair of passes for Caller/);
+    expect(list).toHaveTextContent('Caller and a guest (caller@example.com)');
+    expect(list).toHaveTextContent('1 pass for Solo (solo@example.com)');
   });
 });
 

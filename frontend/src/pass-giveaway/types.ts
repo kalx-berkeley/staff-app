@@ -57,12 +57,26 @@ export interface PromoterContactResponse extends PromoterContactCreate {
   id: number;
 }
 
+// Which winners' email addresses the guest list needs. Staff claimants'
+// addresses are already known; "all" also has DJs collect one from every
+// on-air winner.
+export type EmailAddressRequirement = 'none' | 'staff_passes' | 'all';
+
+// The guest list settings of the show's promoter or, when it has none, its venue
+export interface GuestListRequirements {
+  requires_phone_number: boolean;
+  email_address_requirement: EmailAddressRequirement;
+  // DJs must collect an email address from on-air winners
+  requires_email_address: boolean;
+  staff_guest_requires_name: boolean;
+}
+
 export interface PromoterCreate {
   name: string;
   show_sourcing_instructions?: string | null;
   pass_call_instructions?: string | null;
   requires_phone_number?: boolean;
-  requires_email_address?: boolean;
+  email_address_requirement?: EmailAddressRequirement;
   staff_guest_requires_name?: boolean;
   owner_emails?: string[];
   contacts?: PromoterContactCreate[];
@@ -73,7 +87,7 @@ export interface PromoterUpdate {
   show_sourcing_instructions?: string | null;
   pass_call_instructions?: string | null;
   requires_phone_number?: boolean;
-  requires_email_address?: boolean;
+  email_address_requirement?: EmailAddressRequirement;
   staff_guest_requires_name?: boolean;
   owner_emails?: string[];
   contacts?: PromoterContactCreate[];
@@ -85,6 +99,8 @@ export interface PromoterResponse {
   show_sourcing_instructions: string | null;
   pass_call_instructions: string | null;
   requires_phone_number: boolean;
+  email_address_requirement: EmailAddressRequirement;
+  // Derived: DJs must collect an email address from on-air winners
   requires_email_address: boolean;
   staff_guest_requires_name: boolean;
   deleted: boolean;
@@ -116,7 +132,7 @@ export interface VenueCreate {
   default_movie_rating?: MovieRating | null;
   default_num_pass_pairs?: number | null;
   requires_phone_number?: boolean;
-  requires_email_address?: boolean;
+  email_address_requirement?: EmailAddressRequirement;
   staff_guest_requires_name?: boolean;
   default_lottery_enabled?: boolean;
   default_lottery_window_hours?: number;
@@ -143,7 +159,7 @@ export interface VenueUpdate {
   default_movie_rating?: MovieRating | null;
   default_num_pass_pairs?: number | null;
   requires_phone_number?: boolean;
-  requires_email_address?: boolean;
+  email_address_requirement?: EmailAddressRequirement;
   staff_guest_requires_name?: boolean;
   default_lottery_enabled?: boolean;
   default_lottery_window_hours?: number;
@@ -171,6 +187,8 @@ export interface VenueResponse {
   default_movie_rating: MovieRating | null;
   default_num_pass_pairs: number | null;
   requires_phone_number: boolean;
+  email_address_requirement: EmailAddressRequirement;
+  // Derived: DJs must collect an email address from on-air winners
   requires_email_address: boolean;
   staff_guest_requires_name: boolean;
   default_lottery_enabled: boolean;
@@ -458,6 +476,7 @@ export interface ShowResponse {
   extra_staff_passes: number;
   num_staff_passes: number;
   promotions_contacts: PromotionsContact[];
+  guest_list_requirements: GuestListRequirements;
   status: ShowStatus;
   passes: PassResponse[];
   attempts: ShowAttempt[];

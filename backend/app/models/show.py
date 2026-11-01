@@ -20,6 +20,7 @@ from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.promoter import Promoter
+    from app.models.venue import Venue
 
 
 class Show(Base):
@@ -98,6 +99,11 @@ class Show(Base):
         return self.num_pass_pairs + (self.extra_staff_passes or 0)
 
     @property
-    def effective_promoter(self) -> "Promoter | None":
-        """Return the promoter responsible for this show: show-level override → venue default → None."""
-        return self.promoter or (self.venue.promoter if self.venue else None)
+    def promoted_by(self) -> "Promoter | Venue":
+        """The show's own promoter or, when it has none, the venue.
+
+        Its KALX promotions reps own the show, and its guest list settings
+        apply. The venue's default promoter only pre-fills a new show's
+        promoter, so it plays no part here.
+        """
+        return self.promoter or self.venue

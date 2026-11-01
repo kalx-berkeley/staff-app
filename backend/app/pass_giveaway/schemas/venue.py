@@ -3,7 +3,7 @@
 from typing import Literal
 
 from pydantic import BaseModel, Field, ConfigDict
-from app.pass_giveaway.schemas.promoter import PromoterResponse
+from app.pass_giveaway.schemas.promoter import EmailAddressRequirement, PromoterResponse
 
 # Whether a show's venue is wheelchair accessible, "unknown" when nobody has
 # found out
@@ -51,7 +51,7 @@ class VenueCreate(BaseModel):
     default_movie_rating: MovieRating | None = None
     default_num_pass_pairs: int | None = None
     requires_phone_number: bool = False
-    requires_email_address: bool = False
+    email_address_requirement: EmailAddressRequirement = "none"
     staff_guest_requires_name: bool = False
     default_lottery_enabled: bool = False
     default_lottery_window_hours: int = 24
@@ -82,7 +82,7 @@ class VenueUpdate(BaseModel):
     default_movie_rating: MovieRating | None = None
     default_num_pass_pairs: int | None = None
     requires_phone_number: bool | None = None
-    requires_email_address: bool | None = None
+    email_address_requirement: EmailAddressRequirement | None = None
     staff_guest_requires_name: bool | None = None
     default_lottery_enabled: bool | None = None
     default_lottery_window_hours: int | None = None
@@ -114,6 +114,8 @@ class VenueResponse(BaseModel):
     default_movie_rating: MovieRating | None = None
     default_num_pass_pairs: int | None = None
     requires_phone_number: bool = False
+    email_address_requirement: EmailAddressRequirement = "none"
+    # Derived from email_address_requirement: DJs must collect on-air winners' emails
     requires_email_address: bool = False
     staff_guest_requires_name: bool = False
     default_lottery_enabled: bool = False
@@ -146,6 +148,7 @@ class VenueResponse(BaseModel):
             default_movie_rating=venue.default_movie_rating,
             default_num_pass_pairs=venue.default_num_pass_pairs,
             requires_phone_number=venue.requires_phone_number,
+            email_address_requirement=venue.email_address_requirement,
             requires_email_address=venue.requires_email_address,
             staff_guest_requires_name=venue.staff_guest_requires_name,
             default_lottery_enabled=venue.default_lottery_enabled,

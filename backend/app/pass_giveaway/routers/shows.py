@@ -153,11 +153,9 @@ def _notify_claimers_of_cancellation(db, show) -> None:
 
 
 def _build_promotions_contacts(show) -> list[dict]:
-    """Build promotions contact list from effective promoter owners (or venue owners)."""
-    effective_promoter = show.effective_promoter
-    owners = effective_promoter.owners if effective_promoter else show.venue.owners
+    """Build promotions contact list from the reps of the show's promoter or venue."""
     contacts = []
-    for owner in owners:
+    for owner in show.promoted_by.owners:
         if owner.staff:
             s = owner.staff
             contacts.append({"email": s.email, "name": s.name, "phone": s.phone})
@@ -272,6 +270,7 @@ def _build_show_response(
             "default_movie_rating": show.venue.default_movie_rating,
             "default_num_pass_pairs": show.venue.default_num_pass_pairs,
             "requires_phone_number": show.venue.requires_phone_number,
+            "email_address_requirement": show.venue.email_address_requirement,
             "requires_email_address": show.venue.requires_email_address,
             "staff_guest_requires_name": show.venue.staff_guest_requires_name,
             "default_lottery_enabled": show.venue.default_lottery_enabled,
@@ -306,6 +305,12 @@ def _build_show_response(
         "extra_staff_passes": show.extra_staff_passes,
         "num_staff_passes": show.num_staff_passes,
         "promotions_contacts": _build_promotions_contacts(show),
+        "guest_list_requirements": {
+            "requires_phone_number": show.promoted_by.requires_phone_number,
+            "email_address_requirement": show.promoted_by.email_address_requirement,
+            "requires_email_address": show.promoted_by.requires_email_address,
+            "staff_guest_requires_name": show.promoted_by.staff_guest_requires_name,
+        },
         "status": show.status,
         "planned_close_date": show.planned_close_date,
         "planned_close_time": show.planned_close_time,
@@ -442,10 +447,8 @@ def _build_show_summary(
     }
 
 
-def _compute_mine_set(staff_id: int, db: Session) -> set[int]:
-    """Return venue IDs that are 'mine' for a staff member (direct or via promoter)."""
-    from app.models.venue import Venue as VenueModel
-
+def _compute_mine_set(staff_id: int, db: Session) -> tuple[set[int], set[int]]:
+    """Return the IDs of the venues and promoters a staff member is a rep for."""
     owned_venue_ids = {
         row[0]
         for row in (
@@ -460,25 +463,17 @@ def _compute_mine_set(staff_id: int, db: Session) -> set[int]:
             .all()
         )
     }
-    via_promoter_venue_ids = {
-        row[0]
-        for row in (
-            db.query(VenueModel.id)
-            .filter(VenueModel.promoter_id.in_(owned_promoter_ids))
-            .all()
-        )
-    }
-    return owned_venue_ids, owned_promoter_ids, via_promoter_venue_ids
+    return owned_venue_ids, owned_promoter_ids
 
 
-def _show_is_mine(
-    show,
-    owned_venue_ids: set[int],
-    owned_promoter_ids: set[int],
-    via_promoter_venue_ids: set[int],
-) -> bool:
+def _show_is_mine(show, owned_venue_ids: set[int], owned_promoter_ids: set[int]) -> bool:
+    """Whether the rep represents the show's own promoter or, with none, its venue.
+
+    Venue and promoter defaults don't count: a show at the rep's venue with
+    a different promoter is that promoter's reps' show.
+    """
     if show.promoter_id is None:
-        return show.venue_id in owned_venue_ids or show.venue_id in via_promoter_venue_ids
+        return show.venue_id in owned_venue_ids
     return show.promoter_id in owned_promoter_ids
 
 
@@ -497,18 +492,14 @@ def list_shows(
     kalx_live_index = KalxLiveService.build_index(db)
     staff = _get_promotions_staff_by_email(db, email) if email else None
     if staff:
-        owned_venue_ids, owned_promoter_ids, via_promoter_venue_ids = _compute_mine_set(
-            staff.id, db
-        )
+        owned_venue_ids, owned_promoter_ids = _compute_mine_set(staff.id, db)
         return [
             _build_show_summary(
                 show,
                 pair_count=counts.get(show.id, [0, 0, 0])[0],
                 staff_count=counts.get(show.id, [0, 0, 0])[1],
                 guest_hold_count=counts.get(show.id, [0, 0, 0])[2],
-                is_mine=_show_is_mine(
-                    show, owned_venue_ids, owned_promoter_ids, via_promoter_venue_ids
-                ),
+                is_mine=_show_is_mine(show, owned_venue_ids, owned_promoter_ids),
                 feature_bin_index=feature_bin_index,
                 kalx_live_index=kalx_live_index,
             )

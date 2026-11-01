@@ -1,6 +1,12 @@
 """Pydantic schemas for Promoter API."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field, ConfigDict
+
+# Which winners' email addresses the guest list needs: none, staff claimants
+# only, or every winner (DJs then collect one from each on-air winner)
+EmailAddressRequirement = Literal["none", "staff_passes", "all"]
 
 
 class PromoterContactCreate(BaseModel):
@@ -29,7 +35,7 @@ class PromoterCreate(BaseModel):
     show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     requires_phone_number: bool = False
-    requires_email_address: bool = False
+    email_address_requirement: EmailAddressRequirement = "none"
     staff_guest_requires_name: bool = False
     owner_emails: list[str] = Field(default_factory=list)
     contacts: list[PromoterContactCreate] = Field(default_factory=list)
@@ -42,7 +48,7 @@ class PromoterUpdate(BaseModel):
     show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     requires_phone_number: bool | None = None
-    requires_email_address: bool | None = None
+    email_address_requirement: EmailAddressRequirement | None = None
     staff_guest_requires_name: bool | None = None
     owner_emails: list[str] | None = None
     contacts: list[PromoterContactCreate] | None = None
@@ -58,6 +64,8 @@ class PromoterResponse(BaseModel):
     show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     requires_phone_number: bool = False
+    email_address_requirement: EmailAddressRequirement = "none"
+    # Derived from email_address_requirement: DJs must collect on-air winners' emails
     requires_email_address: bool = False
     staff_guest_requires_name: bool = False
     deleted: bool = False
@@ -72,6 +80,7 @@ class PromoterResponse(BaseModel):
             show_sourcing_instructions=promoter.show_sourcing_instructions,
             pass_call_instructions=promoter.pass_call_instructions,
             requires_phone_number=promoter.requires_phone_number,
+            email_address_requirement=promoter.email_address_requirement,
             requires_email_address=promoter.requires_email_address,
             staff_guest_requires_name=promoter.staff_guest_requires_name,
             deleted=promoter.deleted,

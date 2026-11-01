@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { venuesAPI, promotersAPI } from '../api';
-import { Tooltip, PersonAutocomplete, extractPersonEmail, DescriptionCheckFeedback, useDescriptionCheck } from '../components';
-import type { VenueResponse, VenueCreate, VenueUpdate, VenueContactCreate, AgeRestriction, MovieRating, PromoterResponse, PromotionsStaffOption, VenueType, WheelchairAccessible } from '../types';
+import { Tooltip, PersonAutocomplete, extractPersonEmail, EmailAddressRequirementField, DescriptionCheckFeedback, useDescriptionCheck } from '../components';
+import type { EmailAddressRequirement, VenueResponse, VenueCreate, VenueUpdate, VenueContactCreate, AgeRestriction, MovieRating, PromoterResponse, PromotionsStaffOption, VenueType, WheelchairAccessible } from '../types';
 import { MOVIE_RATING_LABELS, VENUE_TYPE_LABELS, addressHasStateOrZip } from '../utils';
 import type { APIError, ValidationError } from '../../common/types';
 
@@ -34,7 +34,8 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   const [defaultMovieRating, setDefaultMovieRating] = useState<'' | MovieRating>('');
   const [defaultNumPassPairs, setDefaultNumPassPairs] = useState('');
   const [requiresPhoneNumber, setRequiresPhoneNumber] = useState(false);
-  const [requiresEmailAddress, setRequiresEmailAddress] = useState(false);
+  const [emailAddressRequirement, setEmailAddressRequirement] =
+    useState<EmailAddressRequirement>('none');
   const [staffGuestRequiresName, setStaffGuestRequiresName] = useState(false);
   const [defaultLotteryEnabled, setDefaultLotteryEnabled] = useState(false);
   const [defaultLotteryWindowHours, setDefaultLotteryWindowHours] = useState('24');
@@ -79,7 +80,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
       setDefaultMovieRating(venue.default_movie_rating ?? '');
       setDefaultNumPassPairs(venue.default_num_pass_pairs != null ? String(venue.default_num_pass_pairs) : '');
       setRequiresPhoneNumber(venue.requires_phone_number ?? false);
-      setRequiresEmailAddress(venue.requires_email_address ?? false);
+      setEmailAddressRequirement(venue.email_address_requirement ?? 'none');
       setStaffGuestRequiresName(venue.staff_guest_requires_name ?? false);
       setDefaultLotteryEnabled(venue.default_lottery_enabled ?? false);
       setDefaultLotteryWindowHours(String(venue.default_lottery_window_hours ?? 24));
@@ -234,7 +235,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           default_movie_rating: defaultMovieRatingValue,
           default_num_pass_pairs: defaultNumPassPairsValue,
           requires_phone_number: requiresPhoneNumber,
-          requires_email_address: requiresEmailAddress,
+          email_address_requirement: emailAddressRequirement,
           staff_guest_requires_name: staffGuestRequiresName,
           default_lottery_enabled: defaultLotteryEnabled,
           default_lottery_window_hours: defaultLotteryEnabled ? (parseInt(defaultLotteryWindowHours) || 24) : 24,
@@ -262,7 +263,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           default_movie_rating: defaultMovieRatingValue,
           default_num_pass_pairs: defaultNumPassPairsValue,
           requires_phone_number: requiresPhoneNumber,
-          requires_email_address: requiresEmailAddress,
+          email_address_requirement: emailAddressRequirement,
           staff_guest_requires_name: staffGuestRequiresName,
           default_lottery_enabled: defaultLotteryEnabled,
           default_lottery_window_hours: defaultLotteryEnabled ? (parseInt(defaultLotteryWindowHours) || 24) : 24,
@@ -417,8 +418,9 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
               ))}
             </select>
             <span className="field-hint">
-              When set, pass winner names for shows at this venue are sent to the promoter's KALX
-              promotions reps rather than this venue's.
+              New shows at this venue start with this promoter. A show with a promoter belongs to
+              that promoter's KALX promotions reps, who get its guest list, and uses the promoter's
+              guest list requirements rather than this venue's.
             </span>
           </div>
 
@@ -596,7 +598,8 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           <div className="form-section">
             <h4>Guest List Requirements (optional)</h4>
             <p className="field-hint">
-              These settings control what information appears in the guest list sent to this venue when a show closes.
+              These settings control what information appears in the guest list when a show at this venue closes,
+              unless the show has a promoter, whose own settings apply instead.
               They're all optional. Leave every box unchecked if the venue doesn't need any of them.
             </p>
             <div className="form-group form-group-checkbox">
@@ -610,22 +613,12 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
                 {' '}Include winner's phone number in guest list
               </label>
             </div>
-            <div className="form-group form-group-checkbox">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={requiresEmailAddress}
-                  onChange={(e) => setRequiresEmailAddress(e.target.checked)}
-                  disabled={submitting}
-                />
-                {' '}Require and include winner's email address in guest list
-              </label>
-              {requiresEmailAddress && (
-                <span className="field-hint">
-                  DJs will be prompted to collect an email address from on-air winners. Staff claimants' email addresses are collected automatically.
-                </span>
-              )}
-            </div>
+            <EmailAddressRequirementField
+              idPrefix="venue"
+              value={emailAddressRequirement}
+              onChange={setEmailAddressRequirement}
+              disabled={submitting}
+            />
             <div className="form-group form-group-checkbox">
               <label>
                 <input

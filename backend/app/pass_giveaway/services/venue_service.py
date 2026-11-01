@@ -80,7 +80,7 @@ class VenueService:
                 default_movie_rating=venue_data.default_movie_rating,
                 default_num_pass_pairs=venue_data.default_num_pass_pairs,
                 requires_phone_number=venue_data.requires_phone_number,
-                requires_email_address=venue_data.requires_email_address,
+                email_address_requirement=venue_data.email_address_requirement,
                 staff_guest_requires_name=venue_data.staff_guest_requires_name,
                 default_lottery_enabled=venue_data.default_lottery_enabled,
                 default_lottery_window_hours=venue_data.default_lottery_window_hours,
@@ -190,8 +190,8 @@ class VenueService:
                 venue.default_num_pass_pairs = venue_data.default_num_pass_pairs
             if "requires_phone_number" in venue_data.model_fields_set:
                 venue.requires_phone_number = venue_data.requires_phone_number
-            if "requires_email_address" in venue_data.model_fields_set:
-                venue.requires_email_address = venue_data.requires_email_address
+            if venue_data.email_address_requirement is not None:
+                venue.email_address_requirement = venue_data.email_address_requirement
             if "staff_guest_requires_name" in venue_data.model_fields_set:
                 venue.staff_guest_requires_name = venue_data.staff_guest_requires_name
             if "default_lottery_enabled" in venue_data.model_fields_set:

@@ -236,7 +236,7 @@ const GiveawayPage = () => {
                     onSuccess={() => navigate(`/dj/shows/${id}`)}
                     djName={djName}
                     winFrequencyDays={show.venue.win_frequency_days}
-                    requiresEmail={show.venue.requires_email_address}
+                    requiresEmail={show.guest_list_requirements.requires_email_address}
                     readOnly={isPromotionsPreview}
                   />
                 ) : (

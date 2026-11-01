@@ -10,6 +10,7 @@ from app.models.audit_log import AuditLog
 from app.models.lottery_entry import LotteryEntry
 from app.models.notification_preferences import NotificationPreferences
 from app.models.pass_model import Pass
+from app.models.promoter import Promoter
 from app.models.show import Show
 from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
@@ -225,6 +226,17 @@ class TestQueueOpen:
             _join(client, show, people["Ben"], has_guest=True, guest_name="Bo").status_code
             == 201
         )
+
+    def test_guest_name_rule_comes_from_the_shows_promoter(self, client, db, venue, people):
+        venue.staff_guest_requires_name = True
+        promoter = Promoter(name="Promoter", staff_guest_requires_name=False)
+        db.add(promoter)
+        db.flush()
+        show = _make_show(db, venue, 1)
+        show.promoter_id = promoter.id
+        db.commit()
+        _claim(client, db, show, people["Ann"])
+        assert _join(client, show, people["Ben"], has_guest=True).status_code == 201
 
 
 # ── Promotion ─────────────────────────────────────────────────────────────────

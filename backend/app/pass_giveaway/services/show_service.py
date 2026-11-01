@@ -622,8 +622,7 @@ class ShowService:
         body = "\n".join(lines)
         subject = f"Show cancelled: {show.event_name}"
 
-        effective_promoter = show.effective_promoter
-        owners = effective_promoter.owners if effective_promoter else show.venue.owners
+        owners = show.promoted_by.owners
         for owner in owners:
             if not owner.staff:
                 continue
@@ -678,8 +677,7 @@ class ShowService:
         body = "\n".join(lines)
         subject = f"Pass count reduced: {show.event_name}"
 
-        effective_promoter = show.effective_promoter
-        owners = effective_promoter.owners if effective_promoter else show.venue.owners
+        owners = show.promoted_by.owners
         for owner in owners:
             if not owner.staff:
                 continue
@@ -835,34 +833,54 @@ class ShowService:
             for p in show.passes
             if p.pass_type == "pair" and p.status == "given_away" and p.on_air_winner
         ]
+        # A staff member's +1 guest hold is listed with their own pass
         claimed = [
-            p for p in show.passes if p.pass_type == "staff" and p.status == "claimed"
+            p
+            for p in show.passes
+            if p.pass_type == "staff"
+            and p.status == "claimed"
+            and p.guest_of_pass_id is None
         ]
 
-        req_phone = show.venue.requires_phone_number
-        req_email = show.venue.requires_email_address
+        rules = show.promoted_by
+        req_phone = rules.requires_phone_number
+
+        def with_extras(entry: str, phone: str | None, email: str | None) -> str:
+            extras = []
+            if req_phone and phone:
+                extras.append(format_phone(phone))
+            if email:
+                extras.append(email)
+            return f"{entry} ({', '.join(extras)})" if extras else entry
 
         for p in given_away:
             w = p.on_air_winner
-            entry = f"1 pair of passes for {w.recipient_name} and a guest"
-            extras = []
-            if req_phone:
-                extras.append(format_phone(w.recipient_phone))
-            if req_email and w.recipient_email:
-                extras.append(w.recipient_email)
-            if extras:
-                entry += f" ({', '.join(extras)})"
-            lines.append(entry)
+            lines.append(
+                with_extras(
+                    f"1 pair of passes for {w.recipient_name} and a guest",
+                    w.recipient_phone,
+                    w.recipient_email if rules.requires_email_address else None,
+                )
+            )
         for p in claimed:
-            entry = f"1 pass for {p.staff_name}"
-            extras = []
-            if req_phone and p.staff_phone:
-                extras.append(format_phone(p.staff_phone))
-            if req_email and p.staff_email:
-                extras.append(p.staff_email)
-            if extras:
-                entry += f" ({', '.join(extras)})"
-            lines.append(entry)
+            staff_email = p.staff_email if rules.includes_staff_email_address else None
+            if p.has_guest and rules.staff_guest_requires_name and p.guest_name:
+                lines.append(
+                    with_extras(f"1 pass for {p.staff_name}", p.staff_phone, staff_email)
+                )
+                lines.append(f"1 pass for {p.guest_name}")
+            elif p.has_guest:
+                lines.append(
+                    with_extras(
+                        f"1 pair of passes for {p.staff_name} and a guest",
+                        p.staff_phone,
+                        staff_email,
+                    )
+                )
+            else:
+                lines.append(
+                    with_extras(f"1 pass for {p.staff_name}", p.staff_phone, staff_email)
+                )
 
         if not given_away and not claimed:
             lines.append("No passes were given away for this show.")
@@ -883,8 +901,7 @@ class ShowService:
         show_url = f"{settings.frontend_base_url}/pass-giveaway/promotions/shows/{show.id}"
         body = ShowService._build_guest_list_text(show) + f"\n\nView this show: {show_url}"
 
-        effective_promoter = show.effective_promoter
-        owners = effective_promoter.owners if effective_promoter else show.venue.owners
+        owners = show.promoted_by.owners
         for owner in owners:
             if not owner.staff:
                 continue
@@ -926,8 +943,7 @@ class ShowService:
                 "Please close this show when you are done with it."
             )
             sent_to_anyone = False
-            effective_promoter = show.effective_promoter
-            owners = effective_promoter.owners if effective_promoter else show.venue.owners
+            owners = show.promoted_by.owners
             for owner in owners:
                 if not owner.staff:
                     continue

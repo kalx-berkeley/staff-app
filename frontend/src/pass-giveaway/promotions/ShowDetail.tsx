@@ -23,8 +23,9 @@ interface ConfirmModalProps {
 }
 
 const ConfirmModal = ({ action, show, userEmail, onConfirm, onCancel }: ConfirmModalProps) => {
-  const isVenueOwner = userEmail
-    ? show.venue.owner_emails.includes(userEmail)
+  // promotions_contacts are the reps of the show's promoter or, with none, its venue
+  const isShowRep = userEmail
+    ? show.promotions_contacts.some((c) => c.email === userEmail)
     : true;
 
   if (action === 'close') {
@@ -35,11 +36,11 @@ const ConfirmModal = ({ action, show, userEmail, onConfirm, onCancel }: ConfirmM
             <h3>Close Show</h3>
             <button className="btn-close" onClick={onCancel}>×</button>
           </div>
-          {!isVenueOwner && (
+          {!isShowRep && (
             <div className="error-message" style={{ marginBottom: '1rem' }}>
               <strong>Note:</strong> You are not listed as a KALX promotions rep for{' '}
-              <strong>{show.venue.name}</strong>. Closing a show at a venue you
-              don't rep is unusual — please confirm this is intentional.
+              {show.promoter_id != null ? "this show's promoter" : <strong>{show.venue.name}</strong>}.
+              Closing a show you don't rep is unusual — please confirm this is intentional.
             </div>
           )}
           <p>
@@ -623,25 +624,27 @@ const ShowDetail = () => {
     ? (scheduleDates?.filter((d) => d <= maxPreassignDate!) ?? null)
     : null;
 
-  const reqPhone = show?.venue.requires_phone_number ?? false;
-  const reqEmail = show?.venue.requires_email_address ?? false;
-  const staffGuestRequiresName = show?.venue.staff_guest_requires_name ?? false;
+  const reqPhone = show?.guest_list_requirements.requires_phone_number ?? false;
+  const emailRequirement = show?.guest_list_requirements.email_address_requirement ?? 'none';
+  const includeOnAirEmail = emailRequirement === 'all';
+  const includeStaffEmail = emailRequirement !== 'none';
+  const staffGuestRequiresName = show?.guest_list_requirements.staff_guest_requires_name ?? false;
 
   const buildExtras = (phone: string | null, email: string | null): string => {
     const parts: string[] = [];
     if (reqPhone && phone) parts.push(formatPhone(phone));
-    if (reqEmail && email) parts.push(email);
+    if (email) parts.push(email);
     return parts.length > 0 ? ` (${parts.join(', ')})` : '';
   };
 
   const buildStaffPassLines = (p: typeof staffPasses[number]): string[] => {
     if (!p.staff_name) return [];
-    const primaryLine = `1 pass for ${p.staff_name}${buildExtras(p.staff_phone, p.staff_email)}`;
-    if (!p.has_guest) return [primaryLine];
+    const extras = buildExtras(p.staff_phone, includeStaffEmail ? p.staff_email : null);
+    if (!p.has_guest) return [`1 pass for ${p.staff_name}${extras}`];
     if (staffGuestRequiresName && p.guest_name) {
-      return [primaryLine, `1 pass for ${p.guest_name}`];
+      return [`1 pass for ${p.staff_name}${extras}`, `1 pass for ${p.guest_name}`];
     }
-    return [`1 pass for ${p.staff_name} and a guest${buildExtras(p.staff_phone, p.staff_email)}`];
+    return [`1 pair of passes for ${p.staff_name} and a guest${extras}`];
   };
 
   const primaryStaffPasses = staffPasses.filter(
@@ -651,7 +654,7 @@ const ShowDetail = () => {
   const guestListLines = [
     ...passPairs
       .filter((p) => p.status === 'given_away' && p.recipient_name)
-      .map((p) => `1 pair of passes for ${p.recipient_name} and a guest${buildExtras(p.recipient_phone, p.recipient_email)}`),
+      .map((p) => `1 pair of passes for ${p.recipient_name} and a guest${buildExtras(p.recipient_phone, includeOnAirEmail ? p.recipient_email : null)}`),
     ...primaryStaffPasses.flatMap((p) => buildStaffPassLines(p)),
   ];
 

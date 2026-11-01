@@ -261,7 +261,7 @@ const ShowDetail = () => {
 
   const handleGuestClaimSubmit = async (passId: number) => {
     if (!show) return;
-    const needsName = show.venue.staff_guest_requires_name;
+    const needsName = show.guest_list_requirements.staff_guest_requires_name;
     if (needsName && !guestName.trim()) {
       setPassActionError('Guest name is required for this venue');
       return;
@@ -418,7 +418,7 @@ const ShowDetail = () => {
 
   const handleEnterStaffLottery = async () => {
     if (!show) return;
-    if (show.venue.staff_guest_requires_name && lotteryHasGuest && !lotteryGuestName.trim()) {
+    if (show.guest_list_requirements.staff_guest_requires_name && lotteryHasGuest && !lotteryGuestName.trim()) {
       setLotteryActionError('Guest name is required for this venue');
       return;
     }
@@ -1222,7 +1222,7 @@ const ShowDetail = () => {
                 </fieldset>
                 {lotteryHasGuest && (
                   <>
-                    {show.venue.staff_guest_requires_name && (
+                    {show.guest_list_requirements.staff_guest_requires_name && (
                       <div className="form-group">
                         <label htmlFor="lottery-guest-name">Guest name (required by this venue):</label>
                         <input
@@ -1379,7 +1379,7 @@ const ShowDetail = () => {
                               bumped. You'll be notified immediately if that happens, and again when
                               the show closes to confirm whether your guest can attend.
                             </p>
-                            {show.venue.staff_guest_requires_name && (
+                            {show.guest_list_requirements.staff_guest_requires_name && (
                               <div className="form-group">
                                 <label htmlFor="guest-name">Guest name (required by this venue):</label>
                                 <input
@@ -1473,7 +1473,7 @@ const ShowDetail = () => {
               {alternateFormMode === 'join' ? (
                 <AlternateGuestForm
                   idPrefix="alternate-join"
-                  requireGuestName={show.venue.staff_guest_requires_name}
+                  requireGuestName={show.guest_list_requirements.staff_guest_requires_name}
                   submitLabel="Join Alternate List"
                   busy={alternateActionLoading}
                   onSubmit={handleJoinAlternates}
@@ -1510,7 +1510,7 @@ const ShowDetail = () => {
               alternateFormMode === 'edit' ? (
                 <AlternateGuestForm
                   idPrefix="alternate-edit"
-                  requireGuestName={show.venue.staff_guest_requires_name}
+                  requireGuestName={show.guest_list_requirements.staff_guest_requires_name}
                   initial={{
                     has_guest: entry.has_guest,
                     guest_name: entry.guest_name,

@@ -30,6 +30,7 @@ const makeVenue = (overrides: Partial<VenueResponse> = {}): VenueResponse => ({
   venue_type: 'music', default_age_restriction: null, default_movie_rating: null,
   default_num_pass_pairs: null,
   requires_phone_number: false,
+  email_address_requirement: 'none',
   requires_email_address: false,
   staff_guest_requires_name: false,
   default_lottery_enabled: false,

@@ -57,7 +57,7 @@ class PromoterService:
                 show_sourcing_instructions=promoter_data.show_sourcing_instructions,
                 pass_call_instructions=promoter_data.pass_call_instructions,
                 requires_phone_number=promoter_data.requires_phone_number,
-                requires_email_address=promoter_data.requires_email_address,
+                email_address_requirement=promoter_data.email_address_requirement,
                 staff_guest_requires_name=promoter_data.staff_guest_requires_name,
             )
             db.add(promoter)
@@ -147,8 +147,8 @@ class PromoterService:
                 promoter.pass_call_instructions = promoter_data.pass_call_instructions
             if promoter_data.requires_phone_number is not None:
                 promoter.requires_phone_number = promoter_data.requires_phone_number
-            if promoter_data.requires_email_address is not None:
-                promoter.requires_email_address = promoter_data.requires_email_address
+            if promoter_data.email_address_requirement is not None:
+                promoter.email_address_requirement = promoter_data.email_address_requirement
             if promoter_data.staff_guest_requires_name is not None:
                 promoter.staff_guest_requires_name = promoter_data.staff_guest_requires_name
 
