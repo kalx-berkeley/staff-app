@@ -714,6 +714,25 @@ export const passesAPI = {
     }
   },
 
+  /**
+   * Clothespin: reserve one unclaimed pass pair of a show for a DJ for today
+   * (DJ studio only).
+   *
+   * @param showId - Show ID
+   * @param djName - DJ or specialty show name typed in the DJ view
+   * @returns Promise resolving to the reserved pass pair
+   */
+  clothespin: async (showId: number, djName: string): Promise<PassResponse> => {
+    try {
+      const response = await apiClient.post<PassResponse>(`/shows/${showId}/clothespin`, {
+        dj_name: djName,
+      });
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
   removePreassignment: async (passId: number, djName?: string): Promise<PassResponse> => {
     try {
       const response = await apiClient.delete<PassResponse>(

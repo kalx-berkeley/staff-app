@@ -524,6 +524,8 @@ export interface ShowSummary {
   available_pair_count: number;
   available_staff_count: number;
   guest_hold_staff_count: number;
+  /** Whether a DJ can Clothespin (reserve for today) a pass pair from the DJ view. */
+  clothespin_available: boolean;
   co_announce: boolean;
   published_at: string | null;
   bands: ShowBand[];

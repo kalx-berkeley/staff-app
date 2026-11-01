@@ -151,7 +151,8 @@ DJ studio guests can also:
 - give away passes, record failed giveaway attempts and check winner eligibility;
 - see their own giveaways and the on-air DJ;
 - see and dismiss spin matches;
-- remove their own pass pre-assignment.
+- reserve an unclaimed pass pair for today under a current DJ or specialty show name
+  ("Clothespin"), and remove their own pass pre-assignment.
 
 Guests cannot reach anything else, including the KALX Staff Directory, KALX Workforms, user
 profiles and preferences, promoters, the admin pages, or any create/edit/delete action for shows, venues and

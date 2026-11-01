@@ -48,6 +48,17 @@ class PreassignmentData(BaseModel):
     assignment_date: date = Field(..., description="Date for the assignment")
 
 
+class ClothespinData(BaseModel):
+    """Schema for a DJ reserving a pass pair for themselves for today from the DJ view."""
+
+    dj_name: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="The DJ or specialty show name typed in the DJ view",
+    )
+
+
 class SelfPreassignmentData(BaseModel):
     """Schema for a Sublist DJ pre-assigning a pass pair to themselves or a specialty show."""
 

@@ -52,6 +52,7 @@ const makeShow = (overrides: Partial<ShowSummary> = {}): ShowSummary => ({
   available_pair_count: 2,
   available_staff_count: 2,
   guest_hold_staff_count: 0,
+  clothespin_available: false,
   co_announce: false,
   published_at: null,
   bands: [],

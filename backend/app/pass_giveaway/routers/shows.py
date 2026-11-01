@@ -23,6 +23,8 @@ from app.pass_giveaway.schemas.show import (
 )
 from app.pass_giveaway.services.language_analysis_service import analyze_description
 from app.pass_giveaway.services.show_service import ShowService
+from app.pass_giveaway.services.pass_service import PassService
+from app.common.services.leave_service import today_pt
 from app.pass_giveaway.services.lottery_service import LotteryService
 from app.pass_giveaway.services.feature_bin_service import (
     FeatureBinService,
@@ -349,7 +351,12 @@ def _build_show_response(
 
 
 def _precompute_pass_counts(db: Session, show_ids: list[int]) -> dict[int, list[int]]:
-    """Return {show_id: [pair_count, staff_count, guest_hold_count]} in two queries."""
+    """
+    Return {show_id: [pair_count, staff_count, guest_hold_count, unclaimed_pair_count]}
+    in three queries.
+
+    An unclaimed pair is an available pass pair that isn't pre-assigned to anyone.
+    """
     from sqlalchemy import func
     from app.models.pass_model import Pass
 
@@ -363,7 +370,7 @@ def _precompute_pass_counts(db: Session, show_ids: list[int]) -> dict[int, list[
     )
     counts: dict[int, list[int]] = {}
     for show_id, pass_type, cnt in available_rows:
-        counts.setdefault(show_id, [0, 0, 0])
+        counts.setdefault(show_id, [0, 0, 0, 0])
         if pass_type == "pair":
             counts[show_id][0] = cnt
         elif pass_type == "staff":
@@ -381,8 +388,23 @@ def _precompute_pass_counts(db: Session, show_ids: list[int]) -> dict[int, list[
         .all()
     )
     for show_id, cnt in guest_rows:
-        counts.setdefault(show_id, [0, 0, 0])
+        counts.setdefault(show_id, [0, 0, 0, 0])
         counts[show_id][2] = cnt
+
+    unclaimed_rows = (
+        db.query(Pass.show_id, func.count(Pass.id))
+        .filter(
+            Pass.show_id.in_(show_ids),
+            Pass.pass_type == "pair",
+            Pass.status == "available",
+            Pass.preassigned_dj.is_(None),
+        )
+        .group_by(Pass.show_id)
+        .all()
+    )
+    for show_id, cnt in unclaimed_rows:
+        counts.setdefault(show_id, [0, 0, 0, 0])
+        counts[show_id][3] = cnt
 
     return counts
 
@@ -392,6 +414,7 @@ def _build_show_summary(
     pair_count: int = 0,
     staff_count: int = 0,
     guest_hold_count: int = 0,
+    unclaimed_pair_count: int = 0,
     is_mine: bool = False,
     feature_bin_index: FeatureBinIndex | None = None,
     kalx_live_index: KalxLiveIndex | None = None,
@@ -422,6 +445,10 @@ def _build_show_summary(
         "available_pair_count": pair_count,
         "available_staff_count": staff_count,
         "guest_hold_staff_count": guest_hold_count,
+        "clothespin_available": (
+            unclaimed_pair_count > 0
+            and PassService.clothespin_blocker(show, today_pt()) is None
+        ),
         "co_announce": show.co_announce,
         "published_at": show.published_at,
         "bands": [
@@ -496,9 +523,10 @@ def list_shows(
         return [
             _build_show_summary(
                 show,
-                pair_count=counts.get(show.id, [0, 0, 0])[0],
-                staff_count=counts.get(show.id, [0, 0, 0])[1],
-                guest_hold_count=counts.get(show.id, [0, 0, 0])[2],
+                pair_count=counts.get(show.id, [0, 0, 0, 0])[0],
+                staff_count=counts.get(show.id, [0, 0, 0, 0])[1],
+                guest_hold_count=counts.get(show.id, [0, 0, 0, 0])[2],
+                unclaimed_pair_count=counts.get(show.id, [0, 0, 0, 0])[3],
                 is_mine=_show_is_mine(show, owned_venue_ids, owned_promoter_ids),
                 feature_bin_index=feature_bin_index,
                 kalx_live_index=kalx_live_index,
@@ -508,9 +536,10 @@ def list_shows(
     return [
         _build_show_summary(
             show,
-            pair_count=counts.get(show.id, [0, 0, 0])[0],
-            staff_count=counts.get(show.id, [0, 0, 0])[1],
-            guest_hold_count=counts.get(show.id, [0, 0, 0])[2],
+            pair_count=counts.get(show.id, [0, 0, 0, 0])[0],
+            staff_count=counts.get(show.id, [0, 0, 0, 0])[1],
+            guest_hold_count=counts.get(show.id, [0, 0, 0, 0])[2],
+            unclaimed_pair_count=counts.get(show.id, [0, 0, 0, 0])[3],
             feature_bin_index=feature_bin_index,
             kalx_live_index=kalx_live_index,
         )
@@ -546,9 +575,10 @@ def search_shows(
     return [
         _build_show_summary(
             show,
-            pair_count=counts.get(show.id, [0, 0, 0])[0],
-            staff_count=counts.get(show.id, [0, 0, 0])[1],
-            guest_hold_count=counts.get(show.id, [0, 0, 0])[2],
+            pair_count=counts.get(show.id, [0, 0, 0, 0])[0],
+            staff_count=counts.get(show.id, [0, 0, 0, 0])[1],
+            guest_hold_count=counts.get(show.id, [0, 0, 0, 0])[2],
+            unclaimed_pair_count=counts.get(show.id, [0, 0, 0, 0])[3],
             feature_bin_index=feature_bin_index,
             kalx_live_index=kalx_live_index,
         )
@@ -800,7 +830,6 @@ def update_show(
     db: Session = Depends(get_db),
 ):
     """Update a show (promotions staff only)."""
-    from app.pass_giveaway.services.pass_service import PassService
 
     existing = ShowService.get_show(db, show_id)
 

@@ -2194,6 +2194,46 @@ fieldset.radio-group legend {
   border-top: 1px solid var(--border-color);
 }
 
+/* A card footer or list-row cell with more than one action (the DJ view's
+   Give Away + Clothespin / Release Reservation): the buttons sit side by side
+   and wrap onto a second line in a narrow card or row rather than overflow. */
+.show-card-actions,
+.show-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.show-row-actions {
+  gap: 0.35rem;
+}
+
+/* The DJ shows page's Clothespin / Release Reservation result. It sticks to
+   the top of the scrolling content, so a DJ who clicked a show far down the
+   page still sees it. */
+.dj-action-message {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 50;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* On a phone the list view's table is wider than the screen: stack each row's
+   buttons to keep the action column narrow, and let the table scroll sideways
+   rather than clip the buttons. */
+@media (max-width: 600px) {
+  .shows-list {
+    overflow-x: auto;
+  }
+
+  .show-row-actions {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+}
+
 .show-genre {
   font-size: 0.8rem;
   color: #6c757d;

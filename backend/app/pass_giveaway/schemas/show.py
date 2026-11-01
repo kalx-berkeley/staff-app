@@ -439,6 +439,13 @@ class ShowSummary(BaseModel):
     available_pair_count: int = 0
     available_staff_count: int = 0
     guest_hold_staff_count: int = 0
+    clothespin_available: bool = Field(
+        default=False,
+        description=(
+            "Whether a DJ can reserve a pass pair for today from the DJ view: an"
+            " unclaimed pair is left and the show's rules allow it"
+        ),
+    )
     co_announce: bool
     published_at: UtcDatetime | None = None
     bands: list[ShowBandResponse] = Field(default_factory=list)

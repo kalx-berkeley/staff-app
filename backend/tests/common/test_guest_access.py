@@ -88,6 +88,7 @@ DJ_GUEST_ROUTES = SHARED_GUEST_ROUTES | {
     "POST /api/passes/{pass_id}/giveaway",
     "DELETE /api/passes/{pass_id}/preassign",
     "POST /api/shows/{show_id}/attempt",
+    "POST /api/shows/{show_id}/clothespin",
     "GET /api/venues/{venue_id}/check-winner",
 }
 

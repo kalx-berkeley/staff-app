@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { renderAndSettle } from '../../test/render';
 import { BrowserRouter } from 'react-router-dom';
 import ShowBrowser from './ShowBrowser';
 import { showsAPI, venuesAPI, passesAPI, autocompleteAPI } from '../api';
-import type { ShowSummary } from '../types';
+import type { ShowSummary, PassResponse } from '../types';
+import { DJ_NAME_KEY } from '../components';
 
 // Mock the API
 vi.mock('../api', () => ({
@@ -16,6 +18,8 @@ vi.mock('../api', () => ({
   },
   passesAPI: {
     getMyGiveaways: vi.fn(),
+    clothespin: vi.fn(),
+    removePreassignment: vi.fn(),
   },
   autocompleteAPI: {
     getDJNames: vi.fn(),
@@ -53,6 +57,7 @@ describe('ShowBrowser', () => {
       available_pair_count: 3,
       available_staff_count: 3,
       guest_hold_staff_count: 0,
+      clothespin_available: true,
       co_announce: false,
       published_at: null,
       bands: [],
@@ -81,6 +86,7 @@ describe('ShowBrowser', () => {
       available_pair_count: 2,
       available_staff_count: 2,
       guest_hold_staff_count: 0,
+      clothespin_available: true,
       co_announce: false,
       published_at: null,
       bands: [],
@@ -109,6 +115,7 @@ describe('ShowBrowser', () => {
       available_pair_count: 1,
       available_staff_count: 1,
       guest_hold_staff_count: 0,
+      clothespin_available: true,
       co_announce: false,
       published_at: null,
       bands: [],
@@ -137,6 +144,7 @@ describe('ShowBrowser', () => {
       available_pair_count: 0,
       available_staff_count: 0,
       guest_hold_staff_count: 0,
+      clothespin_available: true,
       co_announce: false,
       published_at: null,
       bands: [],
@@ -417,6 +425,180 @@ describe('ShowBrowser', () => {
         expect(screen.getByText('3')).toBeInTheDocument(); // Rock Concert
         expect(screen.getByText('2')).toBeInTheDocument(); // Jazz Night
       });
+    });
+  });
+
+  describe('Clothespin and Release Reservation', () => {
+    const localToday = () => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
+    const reservedPass = (overrides: Partial<PassResponse> = {}): PassResponse => ({
+      id: 20,
+      show_id: 2,
+      pass_type: 'pair',
+      status: 'available',
+      recipient_name: null,
+      recipient_phone: null,
+      recipient_email: null,
+      given_away_by_dj: null,
+      given_away_at: null,
+      staff_id: null,
+      staff_name: null,
+      staff_phone: null,
+      staff_email: null,
+      claimed_at: null,
+      has_guest: false,
+      guest_name: null,
+      only_attend_with_guest: false,
+      guest_of_pass_id: null,
+      preassigned_dj: 'DJ Wolfman',
+      preassigned_date: localToday(),
+      preassigned_specialty_show_id: null,
+      preassigned_specialty_show_name: null,
+      show_event_name: 'Jazz Night',
+      show_date: '2025-01-15',
+      show_venue_name: 'Jazz Club',
+      ...overrides,
+    });
+
+    // Rock Concert and Jazz Night allow Clothespin; Folk Fest doesn't.
+    const clothespinShows: ShowSummary[] = [
+      mockShows[0],
+      mockShows[1],
+      { ...mockShows[0], id: 5, event_name: 'Folk Fest', clothespin_available: false },
+    ];
+
+    const clothespinButton = (eventName: string) =>
+      screen.queryByRole('button', { name: `Clothespin a pass pair for ${eventName}` });
+
+    // The DJ's pre-assigned passes load 300 ms after the name is set, so wait
+    // for the section to show them before checking anything that depends on them.
+    const renderWithDj = async () => {
+      localStorage.setItem(DJ_NAME_KEY, 'DJ Wolfman');
+      await renderAndSettle(
+        <BrowserRouter>
+          <ShowBrowser />
+        </BrowserRouter>
+      );
+      await screen.findByText('Your Pre-assigned Shows');
+      await screen.findByText('Rock Concert');
+    };
+
+    beforeEach(() => {
+      vi.mocked(showsAPI.list).mockResolvedValue(clothespinShows);
+      vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([reservedPass()]);
+    });
+
+    it('shows Clothespin only where it is allowed and not already reserved for today', async () => {
+      await renderWithDj();
+
+      expect(clothespinButton('Rock Concert')).toBeInTheDocument();
+      expect(clothespinButton('Rock Concert')).toHaveAttribute(
+        'title',
+        "Reserve one pass pair under your DJ name for today's on-air giveaway"
+      );
+      // Already reserved for this DJ for today.
+      expect(clothespinButton('Jazz Night')).not.toBeInTheDocument();
+      // The show's rules don't allow it, or no unclaimed pair is left.
+      expect(clothespinButton('Folk Fest')).not.toBeInTheDocument();
+      expect(passesAPI.getMyGiveaways).toHaveBeenCalledWith('DJ Wolfman');
+    });
+
+    it('still shows Clothespin when the DJ only has a reservation for another day', async () => {
+      vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([
+        reservedPass({ preassigned_date: '2099-01-01' }),
+      ]);
+      await renderWithDj();
+
+      expect(clothespinButton('Jazz Night')).toBeInTheDocument();
+    });
+
+    it('hides Clothespin when no DJ name is set', async () => {
+      await renderAndSettle(
+        <BrowserRouter>
+          <ShowBrowser />
+        </BrowserRouter>
+      );
+      await screen.findByText('Rock Concert');
+
+      expect(screen.queryAllByRole('button', { name: /^Clothespin/ })).toHaveLength(0);
+      expect(passesAPI.getMyGiveaways).not.toHaveBeenCalled();
+    });
+
+    it('reserves a pair, confirms it and refreshes the page', async () => {
+      const newPass = reservedPass({ id: 21, show_id: 1, show_event_name: 'Rock Concert' });
+      vi.mocked(passesAPI.clothespin).mockResolvedValue(newPass);
+      await renderWithDj();
+      vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([reservedPass(), newPass]);
+
+      fireEvent.click(clothespinButton('Rock Concert')!);
+
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        'Reserved a pass pair for Rock Concert for DJ Wolfman today.'
+      );
+      expect(passesAPI.clothespin).toHaveBeenCalledWith(1, 'DJ Wolfman');
+      await waitFor(() => expect(clothespinButton('Rock Concert')).not.toBeInTheDocument());
+      expect(showsAPI.list).toHaveBeenCalledTimes(2);
+      // The list refreshed in place, without the loading screen.
+      expect(screen.queryByText('Loading shows...')).not.toBeInTheDocument();
+    });
+
+    it('shows the reason when Clothespin is refused', async () => {
+      vi.mocked(passesAPI.clothespin).mockRejectedValue({
+        detail: '‘DJ Wolfman’ isn\'t a known DJ or specialty show name',
+      });
+      await renderWithDj();
+
+      fireEvent.click(clothespinButton('Rock Concert')!);
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        '‘DJ Wolfman’ isn\'t a known DJ or specialty show name'
+      );
+      expect(await screen.findByRole('button', { name: 'Clothespin a pass pair for Rock Concert' })).toBeEnabled();
+    });
+
+    it('releases a reservation after the DJ confirms', async () => {
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      vi.mocked(passesAPI.removePreassignment).mockResolvedValue(
+        reservedPass({ preassigned_dj: null, preassigned_date: null })
+      );
+      await renderWithDj();
+      vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([]);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Release reservation for Jazz Night' }));
+
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        'Released your pass pair for Jazz Night.'
+      );
+      expect(confirmSpy).toHaveBeenCalled();
+      expect(passesAPI.removePreassignment).toHaveBeenCalledWith(20, 'DJ Wolfman');
+      await waitFor(() =>
+        expect(screen.queryByText('Your Pre-assigned Shows')).not.toBeInTheDocument()
+      );
+      confirmSpy.mockRestore();
+    });
+
+    it('keeps the reservation when the DJ cancels the confirmation', async () => {
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+      await renderWithDj();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Release reservation for Jazz Night' }));
+
+      expect(passesAPI.removePreassignment).not.toHaveBeenCalled();
+      expect(screen.getByText('Your Pre-assigned Shows')).toBeInTheDocument();
+      confirmSpy.mockRestore();
+    });
+
+    it('shows both buttons in the list view too', async () => {
+      localStorage.setItem('kalx_dj_view_mode', 'compact');
+      await renderWithDj();
+
+      const assignedRow = screen.getByRole('button', { name: 'Release reservation for Jazz Night' }).closest('tr')!;
+      expect(within(assignedRow).getByRole('link', { name: 'Give Away Passes' })).toBeInTheDocument();
+      const showRow = clothespinButton('Rock Concert')!.closest('tr')!;
+      expect(within(showRow).getByRole('link', { name: 'Give Away' })).toBeInTheDocument();
     });
   });
 });

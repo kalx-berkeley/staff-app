@@ -42,10 +42,24 @@ const ShowBrowser = () => {
   );
   const [dateFrom, setDateFrom] = useState(getDefaultDateFrom());
   const [dateTo, setDateTo] = useState('');
+  // Bumped to re-fetch the DJ's pre-assigned passes after Clothespin or a release.
+  const [assignedRefresh, setAssignedRefresh] = useState(0);
+  const [clothespinShowId, setClothespinShowId] = useState<number | null>(null);
+  const [releasePassId, setReleasePassId] = useState<number | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
 
-  const loadShows = async () => {
+  // A success message clears itself after a few seconds; an error stays until the next action.
+  useEffect(() => {
+    if (actionMessage?.kind !== 'success') return;
+    const timer = setTimeout(() => setActionMessage(null), 4000);
+    return () => clearTimeout(timer);
+  }, [actionMessage]);
+
+  // `silent` refreshes the list in place, without the loading screen, after
+  // Clothespin or a release changes which shows still have unclaimed pairs.
+  const loadShows = async ({ silent = false }: { silent?: boolean } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const params = {
         date_from: dateFrom || undefined,
@@ -55,12 +69,13 @@ const ShowBrowser = () => {
       const publishedOnly = data.filter((show) => show.status === 'published');
       setRawShows(publishedOnly);
     } catch (err) {
+      if (silent) return;
       const apiError = err as APIError;
       setError(
         typeof apiError.detail === 'string' ? apiError.detail : 'Failed to load shows'
       );
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -89,7 +104,7 @@ const ShowBrowser = () => {
         .catch(() => setMyAssignedPasses([]));
     }, 300);
     return () => clearTimeout(timer);
-  }, [djName]);
+  }, [djName, assignedRefresh]);
 
   const handleViewMode = (mode: 'card' | 'compact') => {
     setViewMode(mode);
@@ -97,6 +112,87 @@ const ShowBrowser = () => {
   };
 
   const assignedShowIds = new Set(myAssignedPasses.map((p) => p.show_id));
+  const todayStr = getLocalTodayStr();
+  const assignedTodayShowIds = new Set(
+    myAssignedPasses.filter((p) => p.preassigned_date === todayStr).map((p) => p.show_id)
+  );
+
+  // Clothespin needs a DJ name, a show whose rules allow it with an unclaimed
+  // pair left, and no pair already reserved for this DJ for today.
+  const canClothespin = (show: ShowSummary) =>
+    !!djName.trim() && show.clothespin_available && !assignedTodayShowIds.has(show.id);
+
+  const apiErrorText = (err: unknown, fallback: string) => {
+    const detail = (err as APIError).detail;
+    return typeof detail === 'string' ? detail : fallback;
+  };
+
+  const handleClothespin = async (show: ShowSummary) => {
+    const name = djName.trim();
+    setClothespinShowId(show.id);
+    setActionMessage(null);
+    try {
+      const pass = await passesAPI.clothespin(show.id, name);
+      setActionMessage({
+        kind: 'success',
+        text: `Reserved a pass pair for ${show.event_name} for ${pass.preassigned_dj ?? name} today.`,
+      });
+      setAssignedRefresh((n) => n + 1);
+      await loadShows({ silent: true });
+    } catch (err) {
+      setActionMessage({ kind: 'error', text: apiErrorText(err, 'Failed to reserve a pass pair') });
+    } finally {
+      setClothespinShowId(null);
+    }
+  };
+
+  const handleRelease = async (pass: PassResponse) => {
+    const showName = pass.show_event_name || 'this show';
+    if (!window.confirm(`Release your reserved pass pair for ${showName}? Any DJ could then give it away.`)) {
+      return;
+    }
+    setReleasePassId(pass.id);
+    setActionMessage(null);
+    try {
+      await passesAPI.removePreassignment(pass.id, djName.trim());
+      setActionMessage({ kind: 'success', text: `Released your pass pair for ${showName}.` });
+      setAssignedRefresh((n) => n + 1);
+      await loadShows({ silent: true });
+    } catch (err) {
+      setActionMessage({ kind: 'error', text: apiErrorText(err, 'Failed to release the reservation') });
+    } finally {
+      setReleasePassId(null);
+    }
+  };
+
+  const clothespinTitle = "Reserve one pass pair under your DJ name for today's on-air giveaway";
+
+  const renderClothespinButton = (show: ShowSummary, small: boolean) =>
+    canClothespin(show) && (
+      <button
+        type="button"
+        className={small ? 'btn-secondary btn-small' : 'btn-secondary'}
+        onClick={() => handleClothespin(show)}
+        disabled={clothespinShowId !== null}
+        title={clothespinTitle}
+        aria-label={`Clothespin a pass pair for ${show.event_name}`}
+      >
+        {clothespinShowId === show.id ? 'Reserving…' : 'Clothespin'}
+      </button>
+    );
+
+  const renderReleaseButton = (pass: PassResponse, small: boolean) => (
+    <button
+      type="button"
+      className={small ? 'btn-danger btn-small' : 'btn-danger'}
+      onClick={() => handleRelease(pass)}
+      disabled={releasePassId !== null}
+      title="Remove this reservation so the pass pair becomes available to any DJ"
+      aria-label={`Release reservation for ${pass.show_event_name || 'this show'}`}
+    >
+      {releasePassId === pass.id ? 'Releasing…' : 'Release Reservation'}
+    </button>
+  );
 
   const formatDate = (dateStr: string) => {
     const [_y, _m, _d] = dateStr.split('-').map(Number); const date = new Date(_y, _m - 1, _d);
@@ -155,6 +251,15 @@ const ShowBrowser = () => {
       </div>
 
       <DjNameInput value={djName} onChange={setDjName} id="dj-shows-name" />
+
+      {actionMessage && (
+        <div
+          className={`dj-action-message ${actionMessage.kind === 'success' ? 'success-message' : 'error-message'}`}
+          role={actionMessage.kind === 'success' ? 'status' : 'alert'}
+        >
+          {actionMessage.text}
+        </div>
+      )}
 
       <SearchBar shows={allShows} onSearch={setFilteredShows} externalGenre={selectedGenre} onGenreChange={setCurrentGenre} />
 
@@ -244,9 +349,12 @@ const ShowBrowser = () => {
                           <td>{pass.show_date ? formatDateShort(pass.show_date) : '—'}</td>
                           <td>{pass.preassigned_date ? formatDateShort(pass.preassigned_date) : '—'}</td>
                           <td>
-                            <Link to={`/dj/shows/${pass.show_id}`} className="btn-primary btn-small">
-                              Give Away Passes
-                            </Link>
+                            <div className="show-row-actions">
+                              <Link to={`/dj/shows/${pass.show_id}`} className="btn-primary btn-small">
+                                Give Away Passes
+                              </Link>
+                              {renderReleaseButton(pass, true)}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -288,10 +396,11 @@ const ShowBrowser = () => {
                       </div>
                     </div>
 
-                    <div className="show-card-footer">
+                    <div className="show-card-footer show-card-actions">
                       <Link to={`/dj/shows/${pass.show_id}`} className="btn-primary">
                         Give Away Passes
                       </Link>
+                      {renderReleaseButton(pass, false)}
                     </div>
                   </div>
                   );
@@ -305,7 +414,7 @@ const ShowBrowser = () => {
       {error ? (
         <div className="error">
           <p>Error: {error}</p>
-          <button onClick={loadShows} className="btn-primary">
+          <button onClick={() => loadShows()} className="btn-primary">
             Retry
           </button>
         </div>
@@ -364,9 +473,12 @@ const ShowBrowser = () => {
                     <td>{show.show_start_date ? '—' : formatTime(show.show_time!)}</td>
                     <td>{show.available_pair_count}</td>
                     <td>
-                      <Link to={`/dj/shows/${show.id}`} className="btn-primary btn-small">
-                        Give Away
-                      </Link>
+                      <div className="show-row-actions">
+                        <Link to={`/dj/shows/${show.id}`} className="btn-primary btn-small">
+                          Give Away
+                        </Link>
+                        {renderClothespinButton(show, true)}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -453,10 +565,11 @@ const ShowBrowser = () => {
                   )}
                 </div>
 
-                <div className="show-card-footer">
+                <div className="show-card-footer show-card-actions">
                   <Link to={`/dj/shows/${show.id}`} className="btn-primary">
                     Give Away Passes
                   </Link>
+                  {renderClothespinButton(show, false)}
                 </div>
               </div>
             );

@@ -9,6 +9,7 @@ from app.common.areas import PASS_GIVEAWAY_AREA
 from app.database import get_db
 from app.pass_giveaway.schemas.pass_schema import (
     ClaimData,
+    ClothespinData,
     DjLeave,
     DjSuggestion,
     GiveawayData,
@@ -820,6 +821,53 @@ def set_self_preassignment(
         area=PASS_GIVEAWAY_AREA,
         actor_email=staff.email,
         actor_role="staff",
+        entity_type="pass",
+        entity_id=pass_item.id,
+        details=audit_details,
+    )
+
+    return PassResponse.model_validate(pass_item)
+
+
+@router.post("/shows/{show_id}/clothespin", response_model=PassResponse)
+def clothespin_pass(
+    show_id: int,
+    data: ClothespinData,
+    dj_access: bool = Depends(check_dj_giveaway_access),
+    db: Session = Depends(get_db),
+):
+    """
+    Reserve one unclaimed pass pair of a show for a DJ for today ("Clothespin").
+
+    A shortcut from the DJ shows page for reserving a pair on the staff show
+    page. Requires DJ studio network access (or, in staging, Sublist DJ staff),
+    like recording a giveaway. The DJ name comes from the DJ view's name field
+    and must be a current staff member's DJ name or a current specialty show.
+
+    Args:
+        show_id: Show ID
+        data: The DJ name
+        dj_access: DJ studio access validation
+
+    Returns:
+        The reserved pass pair
+    """
+    pass_item = PassService.clothespin(db, show_id, data.dj_name)
+
+    audit_details: dict = {
+        "dj": pass_item.preassigned_dj,
+        "assignment_date": str(pass_item.preassigned_date),
+        "show_id": pass_item.show_id,
+        "source": "clothespin",
+    }
+    if pass_item.preassigned_specialty_show_id:
+        audit_details["specialty_show_id"] = pass_item.preassigned_specialty_show_id
+
+    audit_service.log_event(
+        db,
+        event_type="pass_preassigned",
+        area=PASS_GIVEAWAY_AREA,
+        actor_role="dj",
         entity_type="pass",
         entity_id=pass_item.id,
         details=audit_details,

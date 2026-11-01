@@ -241,8 +241,9 @@ class PassService:
         Get all passes given away by or pre-assigned to a specific DJ.
 
         Returns given_away passes where DJ is the giver, plus available passes
-        that are currently pre-assigned to this DJ on published shows (a closed,
-        draft or deleted show's pre-assignments can no longer be given away).
+        that are currently pre-assigned to this DJ (ignoring case) on published
+        shows (a closed, draft or deleted show's pre-assignments can no longer be
+        given away).
 
         Args:
             db: Database session
@@ -251,7 +252,7 @@ class PassService:
         Returns:
             List of passes given away by or pre-assigned to the DJ
         """
-        from sqlalchemy import or_
+        from sqlalchemy import func, or_
 
         return (
             db.query(Pass)
@@ -259,7 +260,10 @@ class PassService:
             .filter(
                 or_(
                     (Pass.given_away_by_dj == dj_name) & (Pass.status == "given_away"),
-                    (Pass.preassigned_dj == dj_name)
+                    # Ignoring case, like removing a pre-assignment from the DJ
+                    # studio: Clothespin saves the name's official spelling,
+                    # which may differ in case from what the DJ typed.
+                    (func.lower(Pass.preassigned_dj) == dj_name.lower())
                     & (Pass.status == "available")
                     & (Show.status == "published"),
                 )
@@ -928,6 +932,177 @@ class PassService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database error occurred while claiming pass_item",
             )
+
+    @staticmethod
+    def clothespin_blocker(show: Show, today: date) -> str | None:
+        """
+        Return why a DJ can't Clothespin a pass pair for *show* on *today*, or None.
+
+        Clothespin reserves a pass pair for the DJ for today, from the DJ view.
+        It follows the same rules as reserving from the staff show page: no
+        reservations while the show's DJ lottery is open, within the show's
+        `dj_preassign_prohibition_days` of its planned close date, or after the
+        show has closed or its planned close date has passed. Whether an
+        unclaimed pass pair is left is checked separately.
+
+        Args:
+            show: The show
+            today: Today's date in Pacific time
+
+        Returns:
+            A message explaining the block, or None if Clothespin is allowed
+        """
+        from app.pass_giveaway.services.lottery_service import LotteryService
+
+        if show.status != "published":
+            return "Passes can only be reserved for published shows"
+        if show.planned_close_date is not None and today > show.planned_close_date:
+            return "This show's planned close date has passed"
+        if LotteryService.is_lottery_active(show):
+            return "This show's DJ lottery is still open"
+        if show.dj_preassign_prohibition_days is not None and show.planned_close_date:
+            days_before_close = (show.planned_close_date - today).days
+            if days_before_close < show.dj_preassign_prohibition_days:
+                return (
+                    "Reservations are not allowed within"
+                    f" {show.dj_preassign_prohibition_days} day(s) of this show's"
+                    f" planned close date ({show.planned_close_date})"
+                )
+        return None
+
+    @staticmethod
+    def resolve_dj_or_specialty_name(
+        db: Session, name: str
+    ) -> tuple[str, int | None] | None:
+        """
+        Match a typed DJ name to a current staff member's DJ name or a current
+        specialty show, ignoring case.
+
+        DJ names of current staff (Active or 🆕) are checked first, then
+        specialty show names.
+
+        Args:
+            db: Database session
+            name: The name as typed
+
+        Returns:
+            (official spelling, specialty show ID or None), or None if nothing matches
+        """
+        from app.auth import current_staff_filter
+
+        wanted = name.strip().lower()
+        if not wanted:
+            return None
+        rows = (
+            db.query(Staff.dj_name)
+            .filter(Staff.dj_name.isnot(None), current_staff_filter())
+            .all()
+        )
+        for (dj_names,) in rows:
+            for dj_name in dj_names.split(","):
+                if dj_name.strip().lower() == wanted:
+                    return dj_name.strip(), None
+        for specialty in (
+            db.query(SpecialtyShow).filter(SpecialtyShow.current_filter()).all()
+        ):
+            if specialty.name.strip().lower() == wanted:
+                return specialty.name, specialty.id
+        return None
+
+    @staticmethod
+    def clothespin(db: Session, show_id: int, dj_name: str) -> Pass:
+        """
+        Reserve one unclaimed pass pair of a show for a DJ for today.
+
+        A pair counts as unclaimed when it is available and not pre-assigned to
+        anyone. The reservation is made with a conditional update, so two DJs
+        clicking at once never get the same pair.
+
+        Args:
+            db: Database session
+            show_id: Show ID
+            dj_name: The DJ name as typed in the DJ view
+
+        Returns:
+            The reserved pass pair
+
+        Raises:
+            HTTPException: 404 if the show doesn't exist, 400 if the name isn't a
+                known DJ or specialty show, 409 if the show's rules don't allow it,
+                the DJ already has a pair reserved for today, or no unclaimed pair
+                is left
+        """
+        show = db.query(Show).filter(Show.id == show_id).first()
+        if not show:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Show not found"
+            )
+
+        resolved = PassService.resolve_dj_or_specialty_name(db, dj_name)
+        if resolved is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"‘{dj_name.strip()}’ isn't a known DJ or specialty show name",
+            )
+        official_name, specialty_show_id = resolved
+
+        today = today_pt()
+        blocker = PassService.clothespin_blocker(show, today)
+        if blocker:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=blocker)
+
+        pairs = (
+            db.query(Pass)
+            .filter(
+                Pass.show_id == show.id,
+                Pass.pass_type == "pair",
+                Pass.status == "available",
+            )
+            .order_by(Pass.id)
+            .all()
+        )
+        if any(
+            p.preassigned_dj
+            and p.preassigned_dj.lower() == official_name.lower()
+            and p.preassigned_date == today
+            for p in pairs
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"{official_name} already has a pass pair reserved for today",
+            )
+
+        for candidate in pairs:
+            if candidate.preassigned_dj:
+                continue
+            updated = (
+                db.query(Pass)
+                .filter(
+                    Pass.id == candidate.id,
+                    Pass.status == "available",
+                    Pass.preassigned_dj.is_(None),
+                )
+                .update(
+                    {
+                        Pass.preassigned_dj: official_name,
+                        Pass.preassigned_date: today,
+                        Pass.preassigned_by_staff_id: None,
+                        Pass.preassigned_specialty_show_id: specialty_show_id,
+                        Pass.updated_at: datetime.now(timezone.utc),
+                    },
+                    synchronize_session=False,
+                )
+            )
+            if updated:
+                db.commit()
+                db.refresh(candidate)
+                return candidate
+
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No unclaimed pass pairs are left for this show",
+        )
 
     @staticmethod
     def set_preassignment(
