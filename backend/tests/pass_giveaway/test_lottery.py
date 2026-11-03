@@ -1496,3 +1496,66 @@ class TestLotteryJobScheduling:
         assert run_date.tzinfo is not None
         assert before + timedelta(hours=24) <= run_date
         assert run_date <= datetime.now(timezone.utc) + timedelta(hours=24)
+
+
+# ── Unpublish / delete with pending entries ───────────────────────────────────
+
+
+class TestPendingEntriesCancelled:
+    """Pending entrants are emailed and removed when a show is unpublished or deleted."""
+
+    def test_delete_emails_entrants_and_removes_entries(
+        self, client, db, venue, promotions_staff, joe, alice
+    ):
+        show = _make_lottery_show(db, venue, num_staff_passes=1)
+        _make_staff_entry(db, show, joe)
+        _make_dj_entry(db, show, alice, dj_name="DJ Alice")
+
+        with patch("app.common.services.notification_service.send_email") as mock_send:
+            response = client.delete(
+                f"/api/shows/{show.id}",
+                headers={"X-Forwarded-User": promotions_staff.email},
+            )
+        assert response.status_code == 204
+
+        by_recipient = {c.kwargs["to_email"]: c.kwargs for c in mock_send.call_args_list}
+        for staff in (joe, alice):
+            kw = by_recipient[staff.email]
+            assert kw["subject"].startswith("Lottery entry cancelled")
+            assert "has been cancelled" in kw["subject"]
+            assert "republished" not in kw["body_text"]
+        assert db.query(LotteryEntry).filter_by(show_id=show.id).count() == 0
+
+    def test_delete_skips_entrants_with_email_disabled(
+        self, client, db, venue, promotions_staff, joe
+    ):
+        show = _make_lottery_show(db, venue, num_staff_passes=1)
+        _make_staff_entry(db, show, joe)
+        db.add(NotificationPreferences(staff_id=joe.id, email_enabled=False))
+        db.commit()
+
+        with patch("app.common.services.notification_service.send_email") as mock_send:
+            client.delete(
+                f"/api/shows/{show.id}",
+                headers={"X-Forwarded-User": promotions_staff.email},
+            )
+        assert joe.email not in {c.kwargs["to_email"] for c in mock_send.call_args_list}
+        assert db.query(LotteryEntry).filter_by(show_id=show.id).count() == 0
+
+    def test_unpublish_emails_entrants_that_they_can_reenter(
+        self, client, db, venue, promotions_staff, joe
+    ):
+        show = _make_lottery_show(db, venue, num_staff_passes=1)
+        _make_staff_entry(db, show, joe)
+
+        with patch("app.common.services.notification_service.send_email") as mock_send:
+            response = client.post(
+                f"/api/shows/{show.id}/unpublish",
+                headers={"X-Forwarded-User": promotions_staff.email},
+            )
+        assert response.status_code == 200
+
+        [call] = [c for c in mock_send.call_args_list if c.kwargs["to_email"] == joe.email]
+        assert "unpublished" in call.kwargs["subject"]
+        assert "republished" in call.kwargs["body_text"]
+        assert db.query(LotteryEntry).filter_by(show_id=show.id).count() == 0

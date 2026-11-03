@@ -3,6 +3,7 @@
 import logging
 import random
 from datetime import date, datetime, timedelta, timezone
+from typing import Literal
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -231,10 +232,35 @@ class LotteryService:
 
     @staticmethod
     def notify_entries_cancelled(
-        db: Session, show: Show, entries: list[LotteryEntry]
+        db: Session,
+        show: Show,
+        entries: list[LotteryEntry],
+        reason: Literal["unpublished", "deleted"] = "unpublished",
     ) -> None:
-        """Notify entrants that their lottery entry was cancelled (show unpublished)."""
+        """Notify entrants that their lottery entry was cancelled.
+
+        ``reason`` is why: the show was unpublished (it may be republished) or
+        deleted (it has been cancelled).
+        """
         from app.common.services import notification_service
+
+        if reason == "deleted":
+            explanation = (
+                "The show has been cancelled and all pending lottery entries have"
+                " been removed."
+            )
+            subject = f"Lottery entry cancelled — {show.event_name} has been cancelled"
+            closing: list[str] = []
+        else:
+            explanation = (
+                "The show has been unpublished and all pending lottery entries have"
+                " been removed."
+            )
+            subject = f"Lottery entry cancelled — {show.event_name} has been unpublished"
+            closing = [
+                "",
+                "If the show is republished, you will be able to enter the lottery again.",
+            ]
 
         for entry in entries:
             if not entry.staff or not entry.staff.email:
@@ -252,16 +278,12 @@ class LotteryService:
                     f" {show.show_date} has been cancelled."
                 ),
                 "",
-                (
-                    "The show has been unpublished and all pending lottery entries have"
-                    " been removed."
-                ),
-                "",
-                "If the show is republished, you will be able to enter the lottery again.",
+                explanation,
+                *closing,
             ])
             notification_service.send_email(
                 to_email=entry.staff.email,
-                subject=f"Lottery entry cancelled — {show.event_name} has been unpublished",
+                subject=subject,
                 body_text=body,
                 db=db,
                 area=PASS_GIVEAWAY_AREA,

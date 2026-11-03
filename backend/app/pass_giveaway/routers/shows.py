@@ -2,6 +2,7 @@
 
 import logging
 from datetime import date
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -152,6 +153,25 @@ def _notify_claimers_of_cancellation(db, show) -> None:
             subject=f"Show cancelled: {show.event_name}",
             lines=lines,
         )
+
+
+def _cancel_pending_lottery_entries(
+    db, show, reason: Literal["unpublished", "deleted"]
+) -> None:
+    """Email a show's pending lottery entrants, then remove their entries."""
+    from app.models.lottery_entry import LotteryEntry
+
+    pending_entries = (
+        db.query(LotteryEntry)
+        .filter(LotteryEntry.show_id == show.id, LotteryEntry.status == "pending")
+        .all()
+    )
+    if not pending_entries:
+        return
+    LotteryService.notify_entries_cancelled(db, show, pending_entries, reason=reason)
+    for entry in pending_entries:
+        db.delete(entry)
+    db.commit()
 
 
 def _build_promotions_contacts(show) -> list[dict]:
@@ -1062,21 +1082,8 @@ def unpublish_show(
     db: Session = Depends(get_db),
 ):
     """Unpublish a show, returning it to draft status (promotions staff only)."""
-    from app.models.lottery_entry import LotteryEntry
-
-    # Collect and notify pending lottery entrants before unpublishing
-    pending_entries = (
-        db.query(LotteryEntry)
-        .filter(LotteryEntry.show_id == show_id, LotteryEntry.status == "pending")
-        .all()
-    )
-
     show = ShowService.get_show(db, show_id)
-    if pending_entries:
-        LotteryService.notify_entries_cancelled(db, show, pending_entries)
-        for entry in pending_entries:
-            db.delete(entry)
-        db.commit()
+    _cancel_pending_lottery_entries(db, show, reason="unpublished")
 
     show = ShowService.unpublish_show(db, show_id)
     unschedule_auto_close_job(show_id)
@@ -1148,6 +1155,7 @@ def delete_show(
     event_name = show.event_name
     ShowService.delete_show(db, show_id, actor_email=promotions.email)
     _notify_claimers_of_cancellation(db, show)
+    _cancel_pending_lottery_entries(db, show, reason="deleted")
     AlternateService.cancel_on_delete(db, show)
     unschedule_auto_close_job(show_id)
     unschedule_lottery_job(show_id)
