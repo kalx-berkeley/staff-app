@@ -801,6 +801,8 @@ class PassService:
             HTTPException: If pass not found, not a staff pass, show closed, or
                            not enough passes available for a guest hold
         """
+        from app.pass_giveaway.services.alternate_service import AlternateService
+
         try:
             pass_item = db.query(Pass).filter(Pass.id == pass_id).first()
             if not pass_item:
@@ -867,6 +869,13 @@ class PassService:
                 if alternative:
                     pass_item = alternative
                     is_guest_hold = False
+                else:
+                    # Every hold shows as just "Available", so which card was
+                    # clicked means nothing: earlier guests win, as they do
+                    # for alternates and when passes are cut.
+                    pass_item = AlternateService._guest_holds_newest_first(
+                        AlternateService._staff_passes(db, pass_item.show_id)
+                    )[0]
 
             now = datetime.now(timezone.utc)
 
@@ -904,8 +913,6 @@ class PassService:
             # A direct claim ends any place this staff member held in the
             # alternate queue, and a displaced only-with-guest claimer may
             # have freed a pass for the next alternate.
-            from app.pass_giveaway.services.alternate_service import AlternateService
-
             if staff_id is not None:
                 AlternateService.leave_if_waiting(db, show.id, staff_id, now)
             promotions = AlternateService.fill_open_passes(
@@ -1377,8 +1384,8 @@ class PassService:
 
         # --- staff passes ---
         # Cuts follow the claim-time "stack": the newest guest holds go first,
-        # then the newest claims. Cut claimers move to the top of the alternate
-        # queue (ordered by their original claim time).
+        # then the newest claims. Cut claimers rejoin the alternate queue by
+        # their original claim time, which for lottery winners is when they entered.
         from app.pass_giveaway.services.alternate_service import AlternateService
 
         def newest_first(p: Pass):
@@ -1487,6 +1494,27 @@ class PassService:
         AlternateService.notify_cut_claims(db, show, cut_staff_ids)
         db.refresh(show)
         return {"affected_djs": affected_djs, "affected_staff": affected_staff}
+
+    @staticmethod
+    def display_order(passes: list[Pass]) -> list[Pass]:
+        """
+        Sort a show's passes for display.
+
+        Pass rows are reused when a claim is released, so ID order says nothing
+        about who claimed first. Pairs come first in ID order, then staff claims
+        oldest first, guest holds oldest first, and available passes.
+        """
+
+        def key(p: Pass):
+            if p.pass_type != "staff":
+                rank = 0
+            elif p.status != "claimed":
+                rank = 3
+            else:
+                rank = 2 if p.guest_of_pass_id is not None else 1
+            return (rank, _as_utc(p.claimed_at), p.id)
+
+        return sorted(passes, key=key)
 
     @staticmethod
     def get_passes_for_show(

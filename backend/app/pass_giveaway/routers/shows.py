@@ -241,7 +241,7 @@ def _build_show_response(
     )
 
     passes = []
-    for pass_item in show.passes:
+    for pass_item in PassService.display_order(show.passes):
         pass_data = {
             "id": pass_item.id,
             "show_id": pass_item.show_id,

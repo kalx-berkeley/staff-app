@@ -468,6 +468,41 @@ def _run_ordered(db, show, order):
 
 
 class TestLottery:
+    def test_winners_claim_times_are_their_entry_times(self, db, venue, people):
+        show = _lottery_show(db, venue, 3)
+        ann = _enter(db, show, people["Ann"], 30, has_guest=True)
+        ben = _enter(db, show, people["Ben"], 20)
+
+        with patch(SEND_EMAIL):
+            _run_ordered(db, show, [ben, ann])
+
+        db.expire_all()
+        ann_pass = _primary(db, show, people["Ann"])
+        ben_pass = _primary(db, show, people["Ben"])
+        assert ann_pass.claimed_at == ann.entered_at
+        assert _guest_hold(db, ann_pass).claimed_at == ann.entered_at
+        assert ben_pass.claimed_at == ben.entered_at
+        claimed = [
+            p.staff_name
+            for p in PassService.display_order(show.passes)
+            if p.status == "claimed" and p.guest_of_pass_id is None
+        ]
+        assert claimed == ["Ann", "Ben"]
+
+    def test_cut_winner_rejoins_queue_by_entry_time(self, client, db, venue, people):
+        show = _lottery_show(db, venue, 2)
+        ann = _enter(db, show, people["Ann"], 30)
+        ben = _enter(db, show, people["Ben"], 20)
+        cat = _enter(db, show, people["Cat"], 15)
+        dan = _enter(db, show, people["Dan"], 5)
+
+        with patch(SEND_EMAIL):
+            _run_ordered(db, show, [ben, cat, ann, dan])
+            PassService.adjust_passes_for_show(db, show, 1)
+
+        assert _primary(db, show, people["Cat"]) is None
+        assert _queue_names(client, show, people["Ben"]) == ["Ann", "Cat", "Dan"]
+
     def test_losers_queued_in_entry_order(self, client, db, venue, people):
         show = _lottery_show(db, venue, 1)
         ann = _enter(db, show, people["Ann"], 30)

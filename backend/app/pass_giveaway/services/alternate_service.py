@@ -369,7 +369,9 @@ class AlternateService:
         """
         Queue a claimer whose pass was removed by a pass-count reduction (no commit).
 
-        Their original claim time puts them ahead of every existing alternate.
+        Their original claim time puts them ahead of every alternate who joined
+        later. A lottery winner's claim time is when they entered, so they go
+        behind any lottery loser who entered before them.
         """
         existing = AlternateService.get_waiting_entry(db, show.id, pass_item.staff_id)
         if existing:

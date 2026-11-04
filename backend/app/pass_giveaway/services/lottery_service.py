@@ -430,12 +430,14 @@ class LotteryService:
             staff_loop()
             converted = guest_loop()
 
-        # Persist outcomes
+        # Persist outcomes. Winners' claim times are when they entered, so they
+        # rank by entry order for display, guest bumps and pass cuts, just as
+        # losers do in the alternate queue.
         for entry in entries:
             if entry.id in staff_pass:
                 primary = staff_pass[entry.id]
                 primary.staff_id = entry.staff_id
-                primary.claimed_at = now
+                primary.claimed_at = entry.entered_at
                 primary.status = "claimed"
                 primary.has_guest = entry.id in guest_pass
                 primary.guest_name = entry.guest_name if entry.id in guest_pass else None
@@ -447,7 +449,7 @@ class LotteryService:
                 if entry.id in guest_pass:
                     gp = guest_pass[entry.id]
                     gp.staff_id = entry.staff_id
-                    gp.claimed_at = now
+                    gp.claimed_at = entry.entered_at
                     gp.status = "claimed"
                     gp.guest_of_pass_id = primary.id
                     gp.updated_at = now

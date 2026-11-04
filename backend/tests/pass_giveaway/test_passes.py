@@ -3,7 +3,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
 from app.models.venue import Venue
 from app.models.staff import Staff
@@ -1246,6 +1246,112 @@ def test_claim_bumps_guest_when_no_other_pass_available(
     primary_pass = db.query(Pass).filter(Pass.id == primary_id).first()
     assert primary_pass.has_guest is False
     assert primary_pass.guest_name is None
+
+
+def _staff_pass_ids(db, show):
+    return [
+        p.id
+        for p in (
+            db.query(Pass)
+            .filter(Pass.show_id == show.id, Pass.pass_type == "staff")
+            .order_by(Pass.id)
+        )
+    ]
+
+
+def _add_staff(db, name):
+    member = Staff(email=f"{name}@example.com", name=name, phone="555-0100")
+    db.add(member)
+    db.flush()
+    db.add(StaffStatus(staff_id=member.id, status="Active"))
+    db.commit()
+    return member
+
+
+def _claim(client, pass_id, member, **body):
+    response = client.post(
+        f"/api/passes/{pass_id}/claim",
+        json=body,
+        headers={"X-Forwarded-User": member.email},
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def _set_claimed_at(db, pass_id, claimed_at):
+    db.query(Pass).filter(Pass.id == pass_id).update({"claimed_at": claimed_at})
+    db.commit()
+
+
+def test_claim_bumps_newest_guest_whichever_hold_was_clicked(
+    client, show, staff_member, staff_member2, db
+):
+    """When only guest holds remain, the newest guest is bumped even if the
+    claimer clicked the card holding an earlier claimer's guest."""
+    db.add_all(
+        [Pass(show_id=show.id, pass_type="staff", status="available") for _ in range(2)]
+    )
+    db.commit()
+    third = _add_staff(db, "third")
+    ids = _staff_pass_ids(db, show)
+
+    first_primary = _claim(client, ids[0], staff_member, has_guest=True)["id"]
+    second_primary = _claim(client, ids[2], staff_member2, has_guest=True)["id"]
+    first_hold = db.query(Pass).filter(Pass.guest_of_pass_id == first_primary).one()
+    second_hold = db.query(Pass).filter(Pass.guest_of_pass_id == second_primary).one()
+    now = datetime.now(timezone.utc)
+    for pass_id in (first_primary, first_hold.id):
+        _set_claimed_at(db, pass_id, now - timedelta(hours=2))
+    for pass_id in (second_primary, second_hold.id):
+        _set_claimed_at(db, pass_id, now - timedelta(hours=1))
+    first_hold_id, second_hold_id = first_hold.id, second_hold.id
+
+    claimed = _claim(client, first_hold_id, third)
+
+    assert claimed["id"] == second_hold_id
+    db.expire_all()
+    assert db.get(Pass, first_primary).has_guest is True
+    assert db.get(Pass, first_hold_id).guest_of_pass_id == first_primary
+    assert db.get(Pass, second_primary).has_guest is False
+
+
+def test_show_lists_staff_passes_in_claim_order(
+    client, show, staff_member, staff_member2, db
+):
+    """A released pass's row gets reused, but the later claimer on it still
+    lists after the earlier one, ahead of guest holds and available passes."""
+    show.genre = ["Rock"]  # the fixture's plain string fails the show response
+    db.add_all(
+        [Pass(show_id=show.id, pass_type="staff", status="available") for _ in range(3)]
+    )
+    db.commit()
+    third = _add_staff(db, "third")
+    ids = _staff_pass_ids(db, show)
+    headers = {"X-Forwarded-User": staff_member.email}
+
+    _claim(client, ids[0], third)
+    # Claims two rows: the second staff member's pass plus their guest hold.
+    second_primary = _claim(client, ids[1], staff_member2, has_guest=True)["id"]
+    second_hold_id = db.query(Pass).filter(Pass.guest_of_pass_id == second_primary).one().id
+    assert (
+        client.delete(
+            f"/api/passes/{ids[0]}/claim",
+            headers={"X-Forwarded-User": third.email},
+        ).status_code
+        == 200
+    )
+    _claim(client, ids[0], staff_member)
+    now = datetime.now(timezone.utc)
+    _set_claimed_at(db, second_primary, now - timedelta(hours=2))
+    _set_claimed_at(db, second_hold_id, now - timedelta(hours=2))
+    _set_claimed_at(db, ids[0], now - timedelta(hours=1))
+
+    response = client.get(f"/api/shows/{show.id}", headers=headers)
+
+    assert response.status_code == 200
+    listed = [p["id"] for p in response.json()["passes"] if p["pass_type"] == "staff"]
+    available = [i for i in ids if i not in (ids[0], second_primary, second_hold_id)]
+    assert listed == [second_primary, ids[0], second_hold_id, *available]
 
 
 def test_staff_member_cannot_claim_multiple_staff_passes(client, show, staff_member, db):
