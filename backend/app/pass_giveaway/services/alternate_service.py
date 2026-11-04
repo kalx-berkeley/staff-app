@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from app.common.areas import PASS_GIVEAWAY_AREA
 from app.config import settings
+from app.models.guest_fallback import GuestFallback
 from app.models.notification_preferences import NotificationPreferences
 from app.models.pass_model import Pass
 from app.models.show import Show
@@ -206,7 +207,7 @@ class AlternateService:
         if not waiting or freed_passes <= 0 or show.status != "published":
             return None
         for entry in waiting:
-            if not entry.only_attend_with_guest:
+            if entry.guest_fallback != GuestFallback.RELEASE:
                 return entry
         passes = AlternateService._staff_passes(db, show.id)
         available = len(AlternateService._available(passes)) + freed_passes
@@ -235,7 +236,7 @@ class AlternateService:
         staff: Staff,
         has_guest: bool = False,
         guest_name: str | None = None,
-        only_attend_with_guest: bool = False,
+        guest_fallback: str = GuestFallback.ATTEND_ALONE,
     ) -> StaffPassAlternate:
         """Add a staff member to the bottom of a show's alternate queue."""
         from app.pass_giveaway.services.pass_service import PassService
@@ -280,7 +281,7 @@ class AlternateService:
             staff_id=staff.id,
             has_guest=has_guest,
             guest_name=guest_name if has_guest else None,
-            only_attend_with_guest=only_attend_with_guest if has_guest else False,
+            guest_fallback=guest_fallback if has_guest else GuestFallback.ATTEND_ALONE,
             priority_at=now,
             source="joined",
             status="waiting",
@@ -298,7 +299,7 @@ class AlternateService:
         entry: StaffPassAlternate,
         has_guest: bool,
         guest_name: str | None,
-        only_attend_with_guest: bool,
+        guest_fallback: str,
     ) -> StaffPassAlternate:
         """Change an entry's +1 details without changing its place in line."""
         guest_name = guest_name.strip() if guest_name else None
@@ -310,7 +311,7 @@ class AlternateService:
             )
         entry.has_guest = has_guest
         entry.guest_name = guest_name if has_guest else None
-        entry.only_attend_with_guest = only_attend_with_guest if has_guest else False
+        entry.guest_fallback = guest_fallback if has_guest else GuestFallback.ATTEND_ALONE
         entry.updated_at = datetime.now(timezone.utc)
 
         # Dropping the only-with-guest condition can make this entry promotable.
@@ -383,7 +384,7 @@ class AlternateService:
                     staff_id=lottery_entry.staff_id,
                     has_guest=lottery_entry.has_guest,
                     guest_name=lottery_entry.guest_name,
-                    only_attend_with_guest=lottery_entry.only_attend_with_guest,
+                    guest_fallback=lottery_entry.guest_fallback,
                     priority_at=lottery_entry.entered_at,
                     source="lottery",
                     status="waiting",
@@ -413,7 +414,7 @@ class AlternateService:
                 staff_id=pass_item.staff_id,
                 has_guest=pass_item.has_guest,
                 guest_name=pass_item.guest_name,
-                only_attend_with_guest=pass_item.only_attend_with_guest,
+                guest_fallback=pass_item.guest_fallback,
                 priority_at=pass_item.claimed_at or now,
                 source="capacity_cut",
                 status="waiting",
@@ -518,7 +519,7 @@ class AlternateService:
             PassService._assign_claim(seat, entry.staff_id, now)
             if guest_pass is not None:
                 PassService._assign_guest_hold(
-                    seat, guest_pass, now, entry.guest_name, entry.only_attend_with_guest
+                    seat, guest_pass, now, entry.guest_name, entry.guest_fallback
                 )
             AlternateService._resolve(entry, "promoted", now)
             entry.promoted_pass_id = seat.id
@@ -540,13 +541,13 @@ class AlternateService:
             changed = False
 
             # Step 1: seats for alternates who will attend without their guest.
-            for entry in [e for e in waiting if not e.only_attend_with_guest]:
+            for entry in [e for e in waiting if e.guest_fallback != GuestFallback.RELEASE]:
                 seat = take_seat()
                 if seat is None:
                     break
                 promote(entry, seat, None)
                 changed = True
-            if any(not e.only_attend_with_guest for e in waiting):
+            if any(e.guest_fallback != GuestFallback.RELEASE for e in waiting):
                 # Still people waiting for a seat: nothing left for pairs.
                 continue
 
@@ -573,7 +574,7 @@ class AlternateService:
                 available[0],
                 now,
                 entry.guest_name,
-                entry.only_attend_with_guest,
+                entry.guest_fallback,
             )
             promotion.guest_granted = True
 
@@ -841,7 +842,7 @@ class AlternateService:
             bumped_line = (
                 " Because you said you can only attend with your guest, your staff pass"
                 " would be released too."
-                if entry.only_attend_with_guest
+                if entry.guest_fallback == GuestFallback.RELEASE
                 else ""
             )
             lines.append(

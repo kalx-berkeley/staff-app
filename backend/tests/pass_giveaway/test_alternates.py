@@ -275,7 +275,7 @@ class TestPromotion:
     def test_only_with_guest_skipped_but_keeps_place(self, client, db, venue, people):
         show = _make_show(db, venue, 1)
         p = _claim(client, db, show, people["Ann"])
-        _join(client, show, people["Ben"], has_guest=True, only_attend_with_guest=True)
+        _join(client, show, people["Ben"], has_guest=True, guest_fallback="release")
         _join(client, show, people["Cat"])
 
         with patch(SEND_EMAIL):
@@ -295,7 +295,7 @@ class TestPromotion:
             people["Ben"],
             has_guest=True,
             guest_name="Ben+1",
-            only_attend_with_guest=True,
+            guest_fallback="release",
         )
 
         with patch(SEND_EMAIL):
@@ -351,7 +351,7 @@ class TestPromotion:
                 people["Ann"],
                 has_guest=True,
                 guest_name="Ann+1",
-                only_attend_with_guest=True,
+                guest_fallback="release",
             )
         pd = _claim(client, db, show, people["Dan"])
         # Guest holds normally close the queue; reach this state directly.
@@ -374,7 +374,7 @@ class TestPromotion:
         show = _make_show(db, venue, 2)
         pa = _claim(client, db, show, people["Ann"])
         _claim(client, db, show, people["Dan"])
-        _join(client, show, people["Ben"], has_guest=True, only_attend_with_guest=True)
+        _join(client, show, people["Ben"], has_guest=True, guest_fallback="release")
         with patch(SEND_EMAIL):
             _release(client, people["Ann"], pa)
 
@@ -526,9 +526,7 @@ class TestLottery:
 
     def test_loser_promoted_in_same_run_gets_one_email(self, client, db, venue, people):
         show = _lottery_show(db, venue, 2)
-        ann = _enter(
-            db, show, people["Ann"], 30, has_guest=True, only_attend_with_guest=True
-        )
+        ann = _enter(db, show, people["Ann"], 30, has_guest=True, guest_fallback="release")
         ben = _enter(db, show, people["Ben"], 20)
         cat = _enter(db, show, people["Cat"], 10)
 
@@ -759,3 +757,35 @@ class TestReleaseOwnership:
         with patch(SEND_EMAIL):
             _release(client, promo, p)
         assert _primary(db, show, people["Ann"]) is None
+
+
+class TestGuestFallbackChoices:
+    """Staff can choose only the fallbacks the pass logic supports so far."""
+
+    def test_claim_stores_the_chosen_fallback(self, client, db, venue, people):
+        show = _make_show(db, venue, 2)
+        _claim(client, db, show, people["Ann"], has_guest=True, guest_fallback="release")
+
+        primary = _primary(db, show, people["Ann"])
+        assert primary.guest_fallback == "release"
+        assert _guest_hold(db, primary) is not None
+
+    def test_claim_defaults_to_attending_alone(self, client, db, venue, people):
+        show = _make_show(db, venue, 2)
+        _claim(client, db, show, people["Ann"], has_guest=True)
+        assert _primary(db, show, people["Ann"]).guest_fallback == "attend_alone"
+
+    @pytest.mark.parametrize("fallback", ["wait", "wait_then_release", "other"])
+    def test_other_values_are_rejected(self, client, db, venue, people, fallback):
+        show = _make_show(db, venue, 2)
+        body = {"has_guest": True, "guest_fallback": fallback}
+        pass_id = _first_available(db, show).id
+        headers = _h(people["Ann"])
+
+        claim = client.post(f"/api/passes/{pass_id}/claim", json=body, headers=headers)
+        join = client.post(f"/api/shows/{show.id}/alternates", json=body, headers=headers)
+        enter = client.post(
+            f"/api/shows/{show.id}/lottery/enter/staff", json=body, headers=headers
+        )
+
+        assert [claim.status_code, join.status_code, enter.status_code] == [422] * 3

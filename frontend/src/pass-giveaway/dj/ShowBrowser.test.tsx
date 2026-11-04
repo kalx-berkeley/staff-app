@@ -455,7 +455,7 @@ describe('ShowBrowser', () => {
       claimed_at: null,
       has_guest: false,
       guest_name: null,
-      only_attend_with_guest: false,
+      guest_fallback: 'attend_alone' as const,
       guest_of_pass_id: null,
       preassigned_dj: 'DJ Wolfman',
       preassigned_date: localToday(),

@@ -4,6 +4,8 @@ from datetime import date
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.common.schemas.types import UtcDatetime
+from app.models.guest_fallback import GuestFallback
+from app.pass_giveaway.schemas.guest_fallback import GuestFallbackChoice
 
 
 class WinnerReleaseData(BaseModel):
@@ -105,9 +107,9 @@ class ClaimData(BaseModel):
     guest_name: str | None = Field(
         None, max_length=100, description="Guest's name (required by some venues)"
     )
-    only_attend_with_guest: bool = Field(
-        False,
-        description="Release this pass too if the guest cannot attend",
+    guest_fallback: GuestFallbackChoice = Field(
+        GuestFallback.ATTEND_ALONE,
+        description="What happens if the guest cannot attend",
     )
 
 
@@ -143,7 +145,7 @@ class PassResponse(BaseModel):
     # Staff +1 guest fields
     has_guest: bool = False
     guest_name: str | None = None
-    only_attend_with_guest: bool = False
+    guest_fallback: str = GuestFallback.ATTEND_ALONE
     guest_of_pass_id: int | None = None
 
     # For pre-assigned pairs

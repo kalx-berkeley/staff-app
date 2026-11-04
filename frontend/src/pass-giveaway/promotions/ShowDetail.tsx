@@ -1433,7 +1433,7 @@ const ShowDetail = () => {
                       {e.has_guest && (
                         <span style={{ color: '#666', fontSize: '0.9em' }}>
                           {' '}+ {e.guest_name ? e.guest_name : 'guest'}
-                          {e.only_attend_with_guest && ' (only with guest)'}
+                          {e.guest_fallback === 'release' && ' (only with guest)'}
                         </span>
                       )}
                     </li>
@@ -1519,7 +1519,7 @@ const ShowDetail = () => {
                       <p className="pass-guest-note">
                         +1 guest reserved
                         {pass.guest_name ? `: ${pass.guest_name}` : ''}
-                        {pass.only_attend_with_guest ? " (staff will release if guest can't attend)" : ''}
+                        {pass.guest_fallback === 'release' ? " (staff will release if guest can't attend)" : ''}
                         {' '}— <em>{show.close_notifications_pending ? "not confirmed yet, staff hasn't been emailed" : 'not confirmed until show closes'}</em>
                       </p>
                     )}

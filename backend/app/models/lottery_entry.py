@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
+from app.models.guest_fallback import GuestFallback
 from app.database import Base
 
 
@@ -21,8 +22,11 @@ class LotteryEntry(Base):
     assignment_date = Column(Date, nullable=True)
     has_guest = Column(Boolean, nullable=False, default=False, server_default="false")
     guest_name = Column(String, nullable=True)
-    only_attend_with_guest = Column(
-        Boolean, nullable=False, default=False, server_default="false"
+    guest_fallback = Column(
+        String,
+        nullable=False,
+        default=GuestFallback.ATTEND_ALONE,
+        server_default=GuestFallback.ATTEND_ALONE,
     )
     # 'pending', 'won', 'lost'
     status = Column(String, nullable=False, default="pending", server_default="pending")

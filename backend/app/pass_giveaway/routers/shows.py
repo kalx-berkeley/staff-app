@@ -280,7 +280,7 @@ def _build_show_response(
             "claimed_at": pass_item.claimed_at,
             "has_guest": pass_item.has_guest,
             "guest_name": pass_item.guest_name,
-            "only_attend_with_guest": pass_item.only_attend_with_guest,
+            "guest_fallback": pass_item.guest_fallback,
             "guest_of_pass_id": pass_item.guest_of_pass_id,
             "preassigned_dj": pass_item.preassigned_dj,
             "preassigned_date": pass_item.preassigned_date,

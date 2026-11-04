@@ -278,7 +278,7 @@ def claim_pass(
         staff_id,
         has_guest=claim_data.has_guest,
         guest_name=claim_data.guest_name,
-        only_attend_with_guest=claim_data.only_attend_with_guest,
+        guest_fallback=claim_data.guest_fallback,
     )
 
     audit_service.log_event(
@@ -293,7 +293,7 @@ def claim_pass(
             "staff_id": staff_id,
             "show_id": pass_item.show_id,
             "has_guest": claim_data.has_guest,
-            "only_attend_with_guest": claim_data.only_attend_with_guest,
+            "guest_fallback": claim_data.guest_fallback,
         },
     )
 

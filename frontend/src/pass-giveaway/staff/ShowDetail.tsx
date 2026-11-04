@@ -7,7 +7,7 @@ import { formatPhone, formatLeave, isOnLeave, leaveCoversShow, formatDateValue }
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { STAFF_PASSES_NOT_YET_ACTIVE, WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow, staffPassesNotYetActive } from '../utils';
-import type { ShowResponse, ClaimData, LotteryStatus, SpecialtyShowResponse, AlternateQueue, AlternateJoinRequest } from '../types';
+import type { ShowResponse, ClaimData, LotteryStatus, SpecialtyShowResponse, AlternateQueue, AlternateJoinRequest, GuestFallback } from '../types';
 import type { StaffProfile, APIError } from '../../common/types';
 
 const EmailIcon = () => (
@@ -53,7 +53,7 @@ const ShowDetail = () => {
   // +1 guest claim state
   const [guestClaimPassId, setGuestClaimPassId] = useState<number | null>(null);
   const [guestName, setGuestName] = useState('');
-  const [onlyWithGuest, setOnlyWithGuest] = useState(false);
+  const [guestFallback, setGuestFallback] = useState<GuestFallback>('attend_alone');
 
   // Alternate queue state
   const [alternateQueue, setAlternateQueue] = useState<AlternateQueue | null>(null);
@@ -71,7 +71,7 @@ const ShowDetail = () => {
   const [showStaffLotteryForm, setShowStaffLotteryForm] = useState(false);
   const [lotteryGuestName, setLotteryGuestName] = useState('');
   const [lotteryHasGuest, setLotteryHasGuest] = useState(false);
-  const [lotteryOnlyWithGuest, setLotteryOnlyWithGuest] = useState(false);
+  const [lotteryGuestFallback, setLotteryGuestFallback] = useState<GuestFallback>('attend_alone');
   // DJ lottery entry form state
   const [showDJLotteryForm, setShowDJLotteryForm] = useState(false);
   const [lotteryDJDate, setLotteryDJDate] = useState('');
@@ -247,7 +247,7 @@ const ShowDetail = () => {
       showEphemeralSuccess(msg);
       setGuestClaimPassId(null);
       setGuestName('');
-      setOnlyWithGuest(false);
+      setGuestFallback('attend_alone');
       await loadShow(true);
     } catch (err) {
       const apiError = err as APIError;
@@ -269,7 +269,7 @@ const ShowDetail = () => {
     await handleClaimPass(passId, {
       has_guest: true,
       guest_name: guestName.trim() || null,
-      only_attend_with_guest: onlyWithGuest,
+      guest_fallback: guestFallback,
     });
   };
 
@@ -428,12 +428,12 @@ const ShowDetail = () => {
       await lotteryAPI.enterStaff(show.id, {
         has_guest: lotteryHasGuest,
         guest_name: lotteryHasGuest ? (lotteryGuestName.trim() || null) : null,
-        only_attend_with_guest: lotteryHasGuest ? lotteryOnlyWithGuest : false,
+        guest_fallback: lotteryHasGuest ? lotteryGuestFallback : 'attend_alone',
       });
       setShowStaffLotteryForm(false);
       setLotteryHasGuest(false);
       setLotteryGuestName('');
-      setLotteryOnlyWithGuest(false);
+      setLotteryGuestFallback('attend_alone');
       showEphemeralSuccess("You've entered the lottery! You'll receive an email with the result after the lottery closes.");
       await loadShow(true);
     } catch (err) {
@@ -1184,7 +1184,7 @@ const ShowDetail = () => {
                 {myStaffEntry.has_guest && (
                   <p>
                     +1 guest requested{myStaffEntry.guest_name ? `: ${myStaffEntry.guest_name}` : ''}
-                    {myStaffEntry.only_attend_with_guest ? ' (release pass if guest cannot attend)' : ''}
+                    {myStaffEntry.guest_fallback === 'release' ? ' (release pass if guest cannot attend)' : ''}
                   </p>
                 )}
                 <button
@@ -1241,18 +1241,18 @@ const ShowDetail = () => {
                       <label className="radio-label">
                         <input
                           type="radio"
-                          name="lottery-only-with-guest"
-                          checked={!lotteryOnlyWithGuest}
-                          onChange={() => setLotteryOnlyWithGuest(false)}
+                          name="lottery-guest-fallback"
+                          checked={lotteryGuestFallback === 'attend_alone'}
+                          onChange={() => setLotteryGuestFallback('attend_alone')}
                         />
                         {' '}I'll still attend without them
                       </label>
                       <label className="radio-label">
                         <input
                           type="radio"
-                          name="lottery-only-with-guest"
-                          checked={lotteryOnlyWithGuest}
-                          onChange={() => setLotteryOnlyWithGuest(true)}
+                          name="lottery-guest-fallback"
+                          checked={lotteryGuestFallback === 'release'}
+                          onChange={() => setLotteryGuestFallback('release')}
                         />
                         {' '}Release my pass too (cancel both)
                       </label>
@@ -1268,7 +1268,7 @@ const ShowDetail = () => {
                     {lotteryActionLoading ? 'Entering…' : 'Enter Lottery'}
                   </button>
                   <button
-                    onClick={() => { setShowStaffLotteryForm(false); setLotteryHasGuest(false); setLotteryGuestName(''); setLotteryOnlyWithGuest(false); }}
+                    onClick={() => { setShowStaffLotteryForm(false); setLotteryHasGuest(false); setLotteryGuestName(''); setLotteryGuestFallback('attend_alone'); }}
                     className="btn-small btn-secondary"
                     disabled={lotteryActionLoading}
                   >
@@ -1304,7 +1304,7 @@ const ShowDetail = () => {
                         <p className="pass-guest-note">
                           +1 guest reserved
                           {pass.guest_name ? `: ${pass.guest_name}` : ''}
-                          {pass.only_attend_with_guest ? " (staff will release if guest can't attend)" : ''}
+                          {pass.guest_fallback === 'release' ? " (staff will release if guest can't attend)" : ''}
                           {' '}— <em>
                             {!show.close_notifications_pending
                               ? 'not confirmed until show closes'
@@ -1403,18 +1403,18 @@ const ShowDetail = () => {
                               <label className="radio-label">
                                 <input
                                   type="radio"
-                                  name="only-with-guest"
-                                  checked={!onlyWithGuest}
-                                  onChange={() => setOnlyWithGuest(false)}
+                                  name="guest-fallback"
+                                  checked={guestFallback === 'attend_alone'}
+                                  onChange={() => setGuestFallback('attend_alone')}
                                 />
                                 {' '}I'll still attend without them
                               </label>
                               <label className="radio-label">
                                 <input
                                   type="radio"
-                                  name="only-with-guest"
-                                  checked={onlyWithGuest}
-                                  onChange={() => setOnlyWithGuest(true)}
+                                  name="guest-fallback"
+                                  checked={guestFallback === 'release'}
+                                  onChange={() => setGuestFallback('release')}
                                 />
                                 {' '}Release my pass too (cancel both)
                               </label>
@@ -1428,7 +1428,7 @@ const ShowDetail = () => {
                                 {passActionId === pass.id ? 'Claiming...' : 'Claim with +1'}
                               </button>
                               <button
-                                onClick={() => { setGuestClaimPassId(null); setGuestName(''); setOnlyWithGuest(false); setPassActionError(null); }}
+                                onClick={() => { setGuestClaimPassId(null); setGuestName(''); setGuestFallback('attend_alone'); setPassActionError(null); }}
                                 className="btn-small btn-secondary"
                                 disabled={passActionId === pass.id}
                               >
@@ -1448,7 +1448,7 @@ const ShowDetail = () => {
                             </button>
                             {canClaimWithGuest && (
                               <button
-                                onClick={() => { setGuestClaimPassId(pass.id); setGuestName(''); setOnlyWithGuest(false); }}
+                                onClick={() => { setGuestClaimPassId(pass.id); setGuestName(''); setGuestFallback('attend_alone'); }}
                                 className="btn-small"
                                 disabled={passActionId === pass.id || alreadyHasStaffPass || notYetActive}
                                 title={claimBlockedTitle ?? 'Claim this pass and reserve a second pass for a +1 guest. Guest spot is tentative until show closes.'}
@@ -1510,7 +1510,7 @@ const ShowDetail = () => {
               {myAlternateEntry.position === 1
                 ? ' — you are next in line if a staff pass frees up.'
                 : ` — ${myAlternateEntry.position - 1} ${myAlternateEntry.position === 2 ? 'person is' : 'people are'} ahead of you.`}
-              {myAlternateEntry.only_attend_with_guest &&
+              {myAlternateEntry.guest_fallback === 'release' &&
                 ' Because you only want to attend with your guest, you will be skipped until two passes are free at once.'}
             </div>
           )}
@@ -1526,7 +1526,7 @@ const ShowDetail = () => {
                   initial={{
                     has_guest: entry.has_guest,
                     guest_name: entry.guest_name,
-                    only_attend_with_guest: entry.only_attend_with_guest,
+                    guest_fallback: entry.guest_fallback,
                   }}
                   submitLabel="Save"
                   busy={alternateActionLoading}

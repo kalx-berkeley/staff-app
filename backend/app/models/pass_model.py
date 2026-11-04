@@ -3,6 +3,7 @@
 from datetime import datetime, date, timezone
 from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, DateTime, Date
 from sqlalchemy.orm import relationship
+from app.models.guest_fallback import GuestFallback
 from app.database import Base
 
 
@@ -37,8 +38,11 @@ class Pass(Base):
     # For staff passes claimed with a +1 guest
     has_guest = Column(Boolean, nullable=False, default=False, server_default="false")
     guest_name = Column(String, nullable=True)
-    only_attend_with_guest = Column(
-        Boolean, nullable=False, default=False, server_default="false"
+    guest_fallback = Column(
+        String,
+        nullable=False,
+        default=GuestFallback.ATTEND_ALONE,
+        server_default=GuestFallback.ATTEND_ALONE,
     )
     # If this pass is a guest hold, points to the primary staff pass
     guest_of_pass_id = Column(Integer, ForeignKey("passes.id"), nullable=True)

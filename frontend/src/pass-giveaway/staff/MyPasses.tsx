@@ -381,7 +381,7 @@ const MyPasses = () => {
                         <span className="info-label">+1 Guest:</span>
                         <span className="info-value">
                           {entry.guest_name || 'Requested'}
-                          {entry.only_attend_with_guest ? ' (only attending with guest)' : ''}
+                          {entry.guest_fallback === 'release' ? ' (only attending with guest)' : ''}
                         </span>
                       </div>
                     )}

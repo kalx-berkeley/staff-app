@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AlternateEntry, AlternateJoinRequest } from '../types';
+import type { AlternateEntry, AlternateJoinRequest, GuestFallback } from '../types';
 
 interface AlternateQueueListProps {
   entries: AlternateEntry[];
@@ -53,7 +53,7 @@ export const AlternateQueueList = ({
                 {entry.has_guest && (
                   <p className="pass-guest-note">
                     +1 guest requested{entry.guest_name ? `: ${entry.guest_name}` : ''}
-                    {entry.only_attend_with_guest ? ' (only attending with guest)' : ''}
+                    {entry.guest_fallback === 'release' ? ' (only attending with guest)' : ''}
                   </p>
                 )}
                 {renderDetails?.(entry)}
@@ -101,7 +101,9 @@ export const AlternateGuestForm = ({
 }: AlternateGuestFormProps) => {
   const [hasGuest, setHasGuest] = useState(initial?.has_guest ?? false);
   const [guestName, setGuestName] = useState(initial?.guest_name ?? '');
-  const [onlyWithGuest, setOnlyWithGuest] = useState(initial?.only_attend_with_guest ?? false);
+  const [guestFallback, setGuestFallback] = useState<GuestFallback>(
+    initial?.guest_fallback ?? 'attend_alone'
+  );
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = () => {
@@ -113,7 +115,7 @@ export const AlternateGuestForm = ({
     onSubmit({
       has_guest: hasGuest,
       guest_name: hasGuest ? guestName.trim() || null : null,
-      only_attend_with_guest: hasGuest ? onlyWithGuest : false,
+      guest_fallback: hasGuest ? guestFallback : 'attend_alone',
     });
   };
 
@@ -167,9 +169,9 @@ export const AlternateGuestForm = ({
             <label className="radio-label">
               <input
                 type="radio"
-                name={`${idPrefix}-only-with-guest`}
-                checked={!onlyWithGuest}
-                onChange={() => setOnlyWithGuest(false)}
+                name={`${idPrefix}-guest-fallback`}
+                checked={guestFallback === 'attend_alone'}
+                onChange={() => setGuestFallback('attend_alone')}
                 disabled={busy}
               />
               {' '}I'll still attend without them
@@ -177,9 +179,9 @@ export const AlternateGuestForm = ({
             <label className="radio-label">
               <input
                 type="radio"
-                name={`${idPrefix}-only-with-guest`}
-                checked={onlyWithGuest}
-                onChange={() => setOnlyWithGuest(true)}
+                name={`${idPrefix}-guest-fallback`}
+                checked={guestFallback === 'release'}
+                onChange={() => setGuestFallback('release')}
                 disabled={busy}
               />
               {' '}Skip me until there's a pass for both of us

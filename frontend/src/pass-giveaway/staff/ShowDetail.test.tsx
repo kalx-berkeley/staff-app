@@ -59,7 +59,7 @@ describe('Staff ShowDetail', () => {
     claimed_at: null,
     has_guest: false,
     guest_name: null,
-    only_attend_with_guest: false,
+    guest_fallback: 'attend_alone' as const,
     guest_of_pass_id: null,
     preassigned_dj: null,
     preassigned_date: null,
@@ -87,7 +87,7 @@ describe('Staff ShowDetail', () => {
     claimed_at: '2024-01-10T10:00:00',
     has_guest: false,
     guest_name: null,
-    only_attend_with_guest: false,
+    guest_fallback: 'attend_alone' as const,
     guest_of_pass_id: null,
     preassigned_dj: null,
     preassigned_date: null,
@@ -320,6 +320,39 @@ describe('Staff ShowDetail', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Pass claimed successfully!')).toBeInTheDocument();
+      });
+    });
+
+    it('sends the chosen guest fallback when claiming with a +1', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue({
+        ...mockShow,
+        passes: [availablePass, { ...availablePass, id: 3 }],
+      });
+      vi.mocked(passesAPI.claim).mockResolvedValue({
+        ...availablePass,
+        status: 'claimed',
+      });
+
+      render(
+        <BrowserRouter>
+          <ShowDetail />
+        </BrowserRouter>
+      );
+
+      const [claimWithGuest] = await screen.findAllByRole('button', {
+        name: /claim with \+1 guest/i,
+      });
+      fireEvent.click(claimWithGuest);
+      fireEvent.click(screen.getByRole('radio', { name: /release my pass too/i }));
+      fireEvent.click(screen.getByRole('button', { name: /^claim with \+1$/i }));
+
+      expect(
+        await screen.findByText('Pass claimed with +1 guest reservation!')
+      ).toBeInTheDocument();
+      expect(passesAPI.claim).toHaveBeenCalledWith(availablePass.id, {
+        has_guest: true,
+        guest_name: null,
+        guest_fallback: 'release',
       });
     });
 
@@ -606,7 +639,7 @@ describe('Staff ShowDetail', () => {
       position: 1,
       has_guest: false,
       guest_name: null,
-      only_attend_with_guest: false,
+      guest_fallback: 'attend_alone' as const,
       source: 'joined',
       priority_at: '2024-01-11T10:00:00Z',
       ...overrides,
@@ -692,7 +725,7 @@ describe('Staff ShowDetail', () => {
         expect(alternatesAPI.join).toHaveBeenCalledWith(1, {
           has_guest: true,
           guest_name: null,
-          only_attend_with_guest: false,
+          guest_fallback: 'attend_alone' as const,
         });
       });
       expect(await screen.findByText(/you're alternate #2/i)).toBeInTheDocument();

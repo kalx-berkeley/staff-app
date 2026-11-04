@@ -196,7 +196,7 @@ def join_alternate_queue(
         staff,
         has_guest=body.has_guest,
         guest_name=body.guest_name,
-        only_attend_with_guest=body.only_attend_with_guest,
+        guest_fallback=body.guest_fallback,
     )
     audit_service.log_event(
         db,
@@ -210,7 +210,7 @@ def join_alternate_queue(
             "show_id": show.id,
             "has_guest": entry.has_guest,
             "guest_name": entry.guest_name,
-            "only_attend_with_guest": entry.only_attend_with_guest,
+            "guest_fallback": entry.guest_fallback,
         },
     )
     queue = AlternateService.waiting_entries(db, show.id)
@@ -233,7 +233,7 @@ def update_my_alternate_entry(
         entry,
         has_guest=body.has_guest,
         guest_name=body.guest_name,
-        only_attend_with_guest=body.only_attend_with_guest,
+        guest_fallback=body.guest_fallback,
     )
     audit_service.log_event(
         db,
@@ -248,7 +248,7 @@ def update_my_alternate_entry(
             "status": entry.status,
             "has_guest": entry.has_guest,
             "guest_name": entry.guest_name,
-            "only_attend_with_guest": entry.only_attend_with_guest,
+            "guest_fallback": entry.guest_fallback,
         },
     )
     queue = AlternateService.waiting_entries(db, show.id)

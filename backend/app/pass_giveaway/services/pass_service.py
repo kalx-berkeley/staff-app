@@ -9,6 +9,7 @@ import logging
 
 from app.common.areas import PASS_GIVEAWAY_AREA
 from app.config import settings
+from app.models.guest_fallback import GuestFallback
 from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.staff import Staff
@@ -629,7 +630,7 @@ class PassService:
         pass_item.status = "claimed"
         pass_item.has_guest = False
         pass_item.guest_name = None
-        pass_item.only_attend_with_guest = False
+        pass_item.guest_fallback = GuestFallback.ATTEND_ALONE
         pass_item.guest_of_pass_id = None
         pass_item.updated_at = now
 
@@ -639,12 +640,12 @@ class PassService:
         guest_pass: Pass,
         now: datetime,
         guest_name: str | None,
-        only_attend_with_guest: bool,
+        guest_fallback: str,
     ) -> None:
         """Attach ``guest_pass`` to ``primary`` as its +1 guest hold."""
         primary.has_guest = True
         primary.guest_name = guest_name
-        primary.only_attend_with_guest = only_attend_with_guest
+        primary.guest_fallback = guest_fallback
         guest_pass.staff_id = primary.staff_id
         guest_pass.claimed_at = now
         guest_pass.status = "claimed"
@@ -659,7 +660,7 @@ class PassService:
         pass_item.claimed_at = None
         pass_item.has_guest = False
         pass_item.guest_name = None
-        pass_item.only_attend_with_guest = False
+        pass_item.guest_fallback = GuestFallback.ATTEND_ALONE
         pass_item.guest_of_pass_id = None
         pass_item.updated_at = now
 
@@ -681,14 +682,14 @@ class PassService:
         """
         released = False
         if primary_pass:
-            released = primary_pass.only_attend_with_guest
+            released = primary_pass.guest_fallback == GuestFallback.RELEASE
             # Notify before clearing staff_id so the staff relationship
             # is still intact when the email address is looked up.
             PassService._notify_guest_bumped(db, primary_pass, show, released)
 
             primary_pass.has_guest = False
             primary_pass.guest_name = None
-            primary_pass.only_attend_with_guest = False
+            primary_pass.guest_fallback = GuestFallback.ATTEND_ALONE
             primary_pass.updated_at = now
 
             if released:
@@ -775,7 +776,7 @@ class PassService:
         staff_id: int | None,
         has_guest: bool = False,
         guest_name: str | None = None,
-        only_attend_with_guest: bool = False,
+        guest_fallback: str = GuestFallback.ATTEND_ALONE,
     ) -> Pass:
         """
         Claim a staff pass, optionally reserving a second pass for a +1 guest.
@@ -792,7 +793,7 @@ class PassService:
             staff_id: Staff member ID (may be None for promotions staff)
             has_guest: Whether to also reserve a guest hold pass
             guest_name: Optional guest name for the reservation
-            only_attend_with_guest: Release this pass too if the guest loses their slot
+            guest_fallback: What happens if the guest loses their slot (GuestFallback)
 
         Returns:
             Updated primary pass
@@ -907,7 +908,7 @@ class PassService:
                         detail="Not enough available staff passes to reserve a guest hold",
                     )
                 PassService._assign_guest_hold(
-                    pass_item, guest_pass, now, guest_name, only_attend_with_guest
+                    pass_item, guest_pass, now, guest_name, guest_fallback
                 )
 
             # A direct claim ends any place this staff member held in the
@@ -1427,7 +1428,7 @@ class PassService:
                     break
                 primary = next((p for p in primaries if p.id == gh.guest_of_pass_id), None)
                 if primary:
-                    if primary.only_attend_with_guest:
+                    if primary.guest_fallback == GuestFallback.RELEASE:
                         affected_staff.append({
                             "name": primary.staff.name if primary.staff else "Unknown",
                             "phone": primary.staff.phone if primary.staff else None,
@@ -1442,7 +1443,7 @@ class PassService:
                     else:
                         primary.has_guest = False
                         primary.guest_name = None
-                        primary.only_attend_with_guest = False
+                        primary.guest_fallback = GuestFallback.ATTEND_ALONE
                         primary.updated_at = now
 
                 gh.guest_of_pass_id = None
