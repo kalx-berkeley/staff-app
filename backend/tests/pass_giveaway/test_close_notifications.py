@@ -348,7 +348,9 @@ class TestReopen:
 
         with patch(SEND_EMAIL) as promoted:
             response = client.put(
-                f"/api/shows/{show.id}", headers=_h(promo), json={"staff_pass_adjustment": 1}
+                f"/api/shows/{show.id}",
+                headers=_h(promo),
+                json={"staff_pass_adjustment": 1},
             )
         assert response.status_code == 200
         assert any("alex" in c.kwargs["to_email"] for c in promoted.call_args_list)
