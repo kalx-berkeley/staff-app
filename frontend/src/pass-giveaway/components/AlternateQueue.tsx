@@ -11,6 +11,8 @@ interface AlternateQueueListProps {
   /** Promotions only: remove someone from the queue. */
   onRemove?: (entry: AlternateEntry) => void;
   removingId?: number | null;
+  /** Leave out the divider, when the surrounding panel has its own heading. */
+  hideDivider?: boolean;
 }
 
 /**
@@ -24,13 +26,16 @@ export const AlternateQueueList = ({
   renderDetails,
   onRemove,
   removingId = null,
+  hideDivider = false,
 }: AlternateQueueListProps) => {
   if (entries.length === 0) return null;
   return (
     <div className="alternate-queue">
-      <div className="alternate-divider" role="separator">
-        <span>Alternates ({entries.length})</span>
-      </div>
+      {!hideDivider && (
+        <div className="alternate-divider" role="separator">
+          <span>Alternates ({entries.length})</span>
+        </div>
+      )}
       <div className="passes-list">
         {entries.map((entry) => {
           const isMine = entry.id === myEntryId;

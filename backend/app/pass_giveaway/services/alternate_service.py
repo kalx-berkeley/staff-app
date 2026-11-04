@@ -83,6 +83,37 @@ class AlternateService:
         return sorted(entries, key=_queue_key)
 
     @staticmethod
+    def entries_expired_at_close(db: Session, show_id: int) -> list[StaffPassAlternate]:
+        """
+        Entries still waiting when a closed show last closed, in queue order.
+
+        ``expire_on_close`` gives every entry it expires the same ``resolved_at``.
+        Older expired entries were left behind by an earlier close, because
+        reopening doesn't restore anyone who held a pass at the time. Someone
+        who has since been given a pass is left out too.
+        """
+        expired = (
+            db.query(StaffPassAlternate)
+            .filter(
+                StaffPassAlternate.show_id == show_id,
+                StaffPassAlternate.status == "expired",
+            )
+            .all()
+        )
+        if not expired:
+            return []
+        last_close = max(entry.resolved_at for entry in expired)
+        return sorted(
+            (
+                entry
+                for entry in expired
+                if entry.resolved_at == last_close
+                and not AlternateService._has_claim(db, show_id, entry.staff_id)
+            ),
+            key=_queue_key,
+        )
+
+    @staticmethod
     def _eligible(
         show: Show, waiting: list[StaffPassAlternate]
     ) -> list[StaffPassAlternate]:

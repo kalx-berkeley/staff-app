@@ -594,4 +594,59 @@ describe('Promotions ShowDetail — alternates', () => {
     const label = await screen.findByText('Email:');
     expect(label.closest('.alternate-card')).toHaveTextContent('wanda@example.com');
   });
+
+  describe('on a closed show', () => {
+    const closedQueue = {
+      queue_open: false,
+      entries: [
+        {
+          id: 7,
+          show_id: 1,
+          staff_id: 30,
+          staff_name: 'Wanda Waiting',
+          staff_phone: '5551234567',
+          staff_email: 'wanda@example.com',
+          position: 1,
+          has_guest: false,
+          guest_name: null,
+          only_attend_with_guest: false,
+          source: 'joined',
+          priority_at: '2024-01-01T00:00:00Z',
+        },
+      ],
+      my_entry_id: null,
+      next_candidate_staff_id: null,
+      next_candidate_name: null,
+    };
+
+    it('lists them once, in their own panel right after the guest list, without Remove', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue({ ...makeShow([]), status: 'closed' });
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue(closedQueue);
+
+      await renderShowDetail();
+
+      const heading = await screen.findByRole('heading', { name: 'Alternates (1)' });
+      const panel = heading.closest('.guest-list-summary') as HTMLElement;
+      const guestList = screen
+        .getByRole('heading', { name: 'Guest List for Venue' })
+        .closest('.guest-list-summary') as HTMLElement;
+      expect(panel).not.toBe(guestList);
+      expect(guestList.nextElementSibling).toBe(panel);
+      expect(within(panel).getByText('Alternate #1')).toBeInTheDocument();
+      expect(screen.getAllByText('Alternate #1')).toHaveLength(1);
+      expect(within(guestList).queryByText(/Wanda Waiting/)).not.toBeInTheDocument();
+      expect(within(panel).queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
+    });
+
+    it('has no panel when there were no alternates', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue({ ...makeShow([]), status: 'closed' });
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue({ ...closedQueue, entries: [] });
+
+      await renderShowDetail();
+
+      await screen.findByRole('heading', { name: 'Guest List for Venue' });
+      await waitFor(() => expect(alternatesAPI.getQueue).toHaveBeenCalled());
+      expect(screen.queryByRole('heading', { name: /^Alternates/ })).not.toBeInTheDocument();
+    });
+  });
 });

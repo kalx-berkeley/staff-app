@@ -94,10 +94,15 @@ def get_alternate_queue(
     Get a show's alternate queue in order, plus the current user's place in it.
 
     Only promotions staff get the alternates' phone numbers and email addresses.
+    Once a show closes, promotions staff get whoever was still waiting at the
+    close, and everyone else gets an empty queue.
     """
     role, staff = user_info
     show = _get_show(db, show_id)
     queue = AlternateService.waiting_entries(db, show.id)
+    listed = queue
+    if show.status == "closed" and role == "promotions":
+        listed = AlternateService.entries_expired_at_close(db, show.id)
 
     my_entry_id = next((e.id for e in queue if e.staff_id == staff.id), None)
 
@@ -122,9 +127,9 @@ def get_alternate_queue(
             db, show, freed_passes=2 if has_guest_hold else 1
         )
 
-    entries = [_entry_response(e, i) for i, e in enumerate(queue, start=1)]
+    entries = [_entry_response(e, i) for i, e in enumerate(listed, start=1)]
     if role == "promotions":
-        for response, entry in zip(entries, queue):
+        for response, entry in zip(entries, listed):
             response.staff_phone = entry.staff.phone
             response.staff_email = entry.staff.email
 

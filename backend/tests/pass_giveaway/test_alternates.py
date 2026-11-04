@@ -568,6 +568,69 @@ class TestLifecycle:
         assert _queue_names(client, show, people["Ann"]) == ["Ben", "Cat"]
         assert "alternate #2" in _emails_to(mock_send, people["Cat"])[0]["body_text"]
 
+    def test_closed_show_lists_expired_alternates_to_promotions_only(
+        self, client, db, venue, people, promo
+    ):
+        show = _make_show(db, venue, 1)
+        _claim(client, db, show, people["Ann"])
+        _join(client, show, people["Ben"])
+        _join(client, show, people["Cat"])
+        with patch(SEND_EMAIL):
+            client.post(f"/api/shows/{show.id}/close", headers=_h(promo))
+
+        queue = client.get(f"/api/shows/{show.id}/alternates", headers=_h(promo)).json()
+        assert [(e["staff_name"], e["position"]) for e in queue["entries"]] == [
+            ("Ben", 1),
+            ("Cat", 2),
+        ]
+        assert queue["entries"][0]["staff_phone"] == "555-0000"
+        assert queue["queue_open"] is False
+
+        for viewer in (people["Ben"], people["Eve"]):
+            queue = client.get(
+                f"/api/shows/{show.id}/alternates", headers=_h(viewer)
+            ).json()
+            assert queue["entries"] == []
+            assert queue["my_entry_id"] is None
+
+    def test_closed_show_lists_only_entries_expired_by_the_last_close(
+        self, client, db, venue, people, promo
+    ):
+        show = _make_show(db, venue, 1)
+        ann_pass = _claim(client, db, show, people["Ann"])
+        _join(client, show, people["Ben"])
+        with patch(SEND_EMAIL):
+            client.post(f"/api/shows/{show.id}/close", headers=_h(promo))
+
+        # Ben holds a pass at reopen, so his old entry stays expired. He then
+        # goes back on the list with a new entry, so he has two when it closes.
+        ann_pass.staff_id = people["Ben"].id
+        db.commit()
+        with patch(SEND_EMAIL):
+            client.post(f"/api/shows/{show.id}/reopen", headers=_h(promo))
+        ann_pass.staff_id = people["Ann"].id
+        db.commit()
+        _join(client, show, people["Ben"])
+        with patch(SEND_EMAIL):
+            client.post(f"/api/shows/{show.id}/close", headers=_h(promo))
+
+        queue = client.get(f"/api/shows/{show.id}/alternates", headers=_h(promo)).json()
+        assert [e["staff_name"] for e in queue["entries"]] == ["Ben"]
+
+    def test_closed_show_omits_expired_alternate_who_now_has_a_pass(
+        self, client, db, venue, people, promo
+    ):
+        show = _make_show(db, venue, 1)
+        ann_pass = _claim(client, db, show, people["Ann"])
+        _join(client, show, people["Ben"])
+        with patch(SEND_EMAIL):
+            client.post(f"/api/shows/{show.id}/close", headers=_h(promo))
+        ann_pass.staff_id = people["Ben"].id
+        db.commit()
+
+        queue = client.get(f"/api/shows/{show.id}/alternates", headers=_h(promo)).json()
+        assert queue["entries"] == []
+
     def test_close_side_effects_shared_by_auto_close(self, db, venue, people):
         from app.pass_giveaway.routers.shows import run_close_side_effects
 

@@ -628,6 +628,22 @@ const ShowDetail = () => {
   const emailRequirement = show?.guest_list_requirements.email_address_requirement ?? 'none';
   const includeOnAirEmail = emailRequirement === 'all';
   const includeStaffEmail = emailRequirement !== 'none';
+
+  const renderAlternateDetails = (entry: AlternateEntry) => (
+    <>
+      <p>
+        <strong>Phone:</strong> {formatPhone(entry.staff_phone)}
+      </p>
+      {includeStaffEmail && (
+        <p>
+          <strong>Email:</strong> {entry.staff_email}
+        </p>
+      )}
+      <p>
+        <strong>Waiting since:</strong> {formatDateTime(entry.priority_at)}
+      </p>
+    </>
+  );
   const staffGuestRequiresName = show?.guest_list_requirements.staff_guest_requires_name ?? false;
 
   const buildExtras = (phone: string | null, email: string | null): string => {
@@ -811,6 +827,20 @@ const ShowDetail = () => {
             </div>
           )}
           <p className="guest-list-closing" style={{ whiteSpace: 'pre-line' }}>{emailClosing}</p>
+        </div>
+      )}
+
+      {show.status === 'closed' && alternates.length > 0 && (
+        <div className="guest-list-summary">
+          <div className="guest-list-summary-header">
+            <h3>Alternates ({alternates.length})</h3>
+          </div>
+          <p>These staff were still on the alternate list when the show closed. They are not on the guest list.</p>
+          <AlternateQueueList
+            entries={alternates}
+            renderDetails={renderAlternateDetails}
+            hideDivider
+          />
         </div>
       )}
 
@@ -1455,26 +1485,14 @@ const ShowDetail = () => {
             );
           })}
         </div>
-        <AlternateQueueList
-          entries={alternates}
-          renderDetails={(entry) => (
-            <>
-              <p>
-                <strong>Phone:</strong> {formatPhone(entry.staff_phone)}
-              </p>
-              {includeStaffEmail && (
-                <p>
-                  <strong>Email:</strong> {entry.staff_email}
-                </p>
-              )}
-              <p>
-                <strong>Waiting since:</strong> {formatDateTime(entry.priority_at)}
-              </p>
-            </>
-          )}
-          onRemove={show.status === 'published' ? setAlternateToRemove : undefined}
-          removingId={removingAlternateId}
-        />
+        {show.status !== 'closed' && (
+          <AlternateQueueList
+            entries={alternates}
+            renderDetails={renderAlternateDetails}
+            onRemove={show.status === 'published' ? setAlternateToRemove : undefined}
+            removingId={removingAlternateId}
+          />
+        )}
       </div>
 
       {alternateToRemove && (
