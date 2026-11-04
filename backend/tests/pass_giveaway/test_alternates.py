@@ -760,7 +760,7 @@ class TestReleaseOwnership:
 
 
 class TestGuestFallbackChoices:
-    """Staff can choose only the fallbacks the pass logic supports so far."""
+    """The API stores a valid guest fallback and rejects anything else."""
 
     def test_claim_stores_the_chosen_fallback(self, client, db, venue, people):
         show = _make_show(db, venue, 2)
@@ -775,8 +775,8 @@ class TestGuestFallbackChoices:
         _claim(client, db, show, people["Ann"], has_guest=True)
         assert _primary(db, show, people["Ann"]).guest_fallback == "attend_alone"
 
-    @pytest.mark.parametrize("fallback", ["wait", "wait_then_release", "other"])
-    def test_other_values_are_rejected(self, client, db, venue, people, fallback):
+    def test_other_values_are_rejected(self, client, db, venue, people):
+        fallback = "other"
         show = _make_show(db, venue, 2)
         body = {"has_guest": True, "guest_fallback": fallback}
         pass_id = _first_available(db, show).id

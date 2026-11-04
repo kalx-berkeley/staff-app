@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { renderAndSettle } from '../../test/render';
 import { BrowserRouter } from 'react-router-dom';
 import ShowDetail from './ShowDetail';
 import { showsAPI, passesAPI, alternatesAPI } from '../api';
@@ -15,6 +16,9 @@ vi.mock('../api', () => ({
     claim: vi.fn(),
     releaseClaim: vi.fn(),
     removePreassignment: vi.fn(),
+    addGuest: vi.fn(),
+    updateGuestName: vi.fn(),
+    removeGuest: vi.fn(),
   },
   alternatesAPI: {
     getQueue: vi.fn(),
@@ -754,6 +758,150 @@ describe('Staff ShowDetail', () => {
       vi.mocked(alternatesAPI.leave).mockResolvedValue(undefined);
       fireEvent.click(screen.getByRole('button', { name: /leave list/i }));
       await waitFor(() => expect(alternatesAPI.leave).toHaveBeenCalledWith(1));
+    });
+
+    describe('+1 guests on the alternate list', () => {
+      const myPass = { ...claimedPass, staff_email: 'me@example.com', staff_name: 'Me' };
+      const showPage = () => renderAndSettle(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      it('offers all four options with their tradeoffs when a spare pass is free', async () => {
+        vi.mocked(showsAPI.get).mockResolvedValue({
+          ...fullShow,
+          passes: [availablePass, { ...availablePass, id: 3 }],
+        });
+        vi.mocked(alternatesAPI.getQueue).mockResolvedValue(queue({ queue_open: false }));
+        await showPage();
+
+        fireEvent.click(screen.getAllByRole('button', { name: /claim with \+1 guest/i })[0]);
+
+        expect(screen.getAllByRole('radio')).toHaveLength(4);
+        expect(screen.getByRole('radio', { name: /still attend without them/i })).toBeChecked();
+        expect(screen.getByRole('radio', { name: /release my pass too/i })).toBeInTheDocument();
+        expect(screen.getByRole('radio', { name: /and i'll attend either way/i })).toBeInTheDocument();
+        expect(screen.getByRole('radio', { name: /but release my pass/i })).toBeInTheDocument();
+        expect(screen.getAllByText(/^Pro:/)).toHaveLength(4);
+        expect(screen.getAllByText(/^Con:/)).toHaveLength(4);
+      });
+
+      it('offers only the waiting options when no spare pass is free', async () => {
+        vi.mocked(showsAPI.get).mockResolvedValue({ ...fullShow, passes: [availablePass] });
+        vi.mocked(alternatesAPI.getQueue).mockResolvedValue(queue({ queue_open: false }));
+        vi.mocked(passesAPI.claim).mockResolvedValue({
+          ...availablePass,
+          status: 'claimed',
+          guest_waiting: true,
+        });
+        await showPage();
+
+        fireEvent.click(screen.getByRole('button', { name: /claim with \+1 guest/i }));
+
+        expect(screen.getAllByRole('radio')).toHaveLength(2);
+        expect(screen.getByText(/no pass free for your guest right now/i)).toBeInTheDocument();
+        expect(screen.getByRole('radio', { name: /and i'll attend either way/i })).toBeChecked();
+
+        fireEvent.click(screen.getByRole('radio', { name: /but release my pass/i }));
+        fireEvent.click(screen.getByRole('button', { name: /^claim with \+1$/i }));
+
+        expect(await screen.findByText(/your guest is on the alternate list/i)).toBeInTheDocument();
+        expect(passesAPI.claim).toHaveBeenCalledWith(availablePass.id, {
+          has_guest: true,
+          guest_name: null,
+          guest_fallback: 'wait_then_release',
+        });
+      });
+
+      it('lists waiting guests below the staff alternates', async () => {
+        vi.mocked(showsAPI.get).mockResolvedValue({ ...fullShow, passes: [claimedPass] });
+        vi.mocked(alternatesAPI.getQueue).mockResolvedValue(
+          queue({
+            entries: [entry({})],
+            waiting_guests: [
+              {
+                pass_id: 2,
+                position: 1,
+                guest_name: 'Sam',
+                host_staff_id: 5,
+                host_name: 'Alex',
+                is_mine: false,
+              },
+            ],
+          })
+        );
+        await showPage();
+
+        expect(await screen.findByText('Guests waiting for a pass')).toBeInTheDocument();
+        expect(screen.getByText('Guest #1')).toBeInTheDocument();
+        expect(screen.getByText('Sam (guest of Alex)')).toBeInTheDocument();
+        expect(screen.getByText('Alternate #1')).toBeInTheDocument();
+      });
+
+      it('shows the host their waiting guest and removes them', async () => {
+        const waiting = {
+          ...myPass,
+          guest_waiting: true,
+          guest_position: 2,
+          guest_name: 'Sam',
+          guest_fallback: 'wait' as const,
+        };
+        vi.mocked(showsAPI.get).mockResolvedValue({ ...fullShow, passes: [waiting] });
+        vi.mocked(alternatesAPI.getQueue).mockResolvedValue(queue({ queue_open: false }));
+        vi.mocked(passesAPI.removeGuest).mockResolvedValue(myPass);
+        await showPage();
+
+        expect(screen.getByText(/\+1 guest on the alternate list: Sam \(guest #2\)/)).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: /remove my guest/i }));
+        expect(screen.getByText(/you'll keep your own pass/i)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /remove my guest/i }));
+
+        expect(await screen.findByText('Your guest has been removed.')).toBeInTheDocument();
+        expect(passesAPI.removeGuest).toHaveBeenCalledWith(waiting.id);
+      });
+
+      it('adds a guest to a pass claimed without one', async () => {
+        vi.mocked(showsAPI.get).mockResolvedValue({ ...fullShow, passes: [myPass] });
+        vi.mocked(alternatesAPI.getQueue).mockResolvedValue(queue({ queue_open: false }));
+        vi.mocked(passesAPI.addGuest).mockResolvedValue({ ...myPass, guest_waiting: true });
+        await showPage();
+
+        fireEvent.click(screen.getByRole('button', { name: /add a guest/i }));
+        expect(screen.getAllByRole('radio')).toHaveLength(2);
+        fireEvent.click(screen.getByRole('button', { name: /^add guest$/i }));
+
+        expect(await screen.findByText('Your guest has been added.')).toBeInTheDocument();
+        expect(passesAPI.addGuest).toHaveBeenCalledWith(myPass.id, {
+          guest_name: null,
+          guest_fallback: 'wait',
+        });
+      });
+
+      it('corrects a guest name', async () => {
+        const seated = { ...myPass, has_guest: true, guest_name: 'Sma' };
+        vi.mocked(showsAPI.get).mockResolvedValue({ ...fullShow, passes: [seated] });
+        vi.mocked(alternatesAPI.getQueue).mockResolvedValue(queue({ queue_open: false }));
+        vi.mocked(passesAPI.updateGuestName).mockResolvedValue({ ...seated, guest_name: 'Sam' });
+        await showPage();
+
+        fireEvent.click(screen.getByRole('button', { name: /fix guest name/i }));
+        fireEvent.change(screen.getByLabelText(/guest name/i), { target: { value: 'Sam' } });
+        fireEvent.click(screen.getByRole('button', { name: /save name/i }));
+
+        expect(await screen.findByText("Your guest's name has been updated.")).toBeInTheDocument();
+        expect(passesAPI.updateGuestName).toHaveBeenCalledWith(seated.id, 'Sam');
+      });
+
+      it('hides the guest controls once the show closes', async () => {
+        vi.mocked(showsAPI.get).mockResolvedValue({
+          ...fullShow,
+          status: 'closed' as const,
+          passes: [{ ...myPass, has_guest: true, guest_name: 'Sam' }],
+        });
+        vi.mocked(alternatesAPI.getQueue).mockResolvedValue(queue({ queue_open: false }));
+        await showPage();
+
+        expect(screen.queryByRole('button', { name: /remove my guest/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /fix guest name/i })).not.toBeInTheDocument();
+      });
     });
 
     it('warns who will get the pass before releasing', async () => {

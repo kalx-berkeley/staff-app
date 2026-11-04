@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import type { AlternateEntry, AlternateJoinRequest, GuestFallback } from '../types';
+import type { AlternateEntry, AlternateJoinRequest, GuestFallback, WaitingGuest } from '../types';
+import { waitingFallbackNote } from '../utils';
+import GuestFallbackOptions from './GuestFallbackOptions';
 
 interface AlternateQueueListProps {
   entries: AlternateEntry[];
@@ -54,6 +56,7 @@ export const AlternateQueueList = ({
                   <p className="pass-guest-note">
                     +1 guest requested{entry.guest_name ? `: ${entry.guest_name}` : ''}
                     {entry.guest_fallback === 'release' ? ' (only attending with guest)' : ''}
+                    {waitingFallbackNote(entry.guest_fallback)}
                   </p>
                 )}
                 {renderDetails?.(entry)}
@@ -73,6 +76,60 @@ export const AlternateQueueList = ({
         })}
       </div>
     </div>
+  );
+};
+
+interface WaitingGuestsListProps {
+  guests: WaitingGuest[];
+  heading?: string;
+  /** Promotions only: remove a guest from the list. */
+  onRemove?: (guest: WaitingGuest) => void;
+  removingPassId?: number | null;
+}
+
+/** +1 guests waiting for a pass, shown below the staff alternates with their own numbers. */
+export const WaitingGuestsList = ({
+  guests,
+  heading = 'Guests waiting for a pass',
+  onRemove,
+  removingPassId = null,
+}: WaitingGuestsListProps) => {
+  if (guests.length === 0) return null;
+  return (
+    <>
+      <div className="alternate-divider">
+        <span>{heading}</span>
+      </div>
+      <div className="passes-list">
+        {guests.map((guest) => (
+          <div
+            key={guest.pass_id}
+            className={`pass-card alternate-card${guest.is_mine ? ' alternate-card--mine' : ''}`}
+          >
+            <div className="pass-details">
+              <p className="alternate-label">
+                Guest #{guest.position}
+                {guest.is_mine && <span className="alternate-you"> (your guest)</span>}
+              </p>
+              <p>
+                {guest.guest_name
+                  ? `${guest.guest_name} (guest of ${guest.host_name ?? 'staff'})`
+                  : `Guest of ${guest.host_name ?? 'staff'}`}
+              </p>
+              {onRemove && (
+                <button
+                  onClick={() => onRemove(guest)}
+                  className="btn-small btn-danger"
+                  disabled={removingPassId === guest.pass_id}
+                >
+                  {removingPassId === guest.pass_id ? 'Removing…' : 'Remove'}
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
   );
 };
 
@@ -164,29 +221,14 @@ export const AlternateGuestForm = ({
               />
             </div>
           )}
-          <fieldset className="form-group radio-group">
-            <legend>If there isn't a pass for my guest:</legend>
-            <label className="radio-label">
-              <input
-                type="radio"
-                name={`${idPrefix}-guest-fallback`}
-                checked={guestFallback === 'attend_alone'}
-                onChange={() => setGuestFallback('attend_alone')}
-                disabled={busy}
-              />
-              {' '}I'll still attend without them
-            </label>
-            <label className="radio-label">
-              <input
-                type="radio"
-                name={`${idPrefix}-guest-fallback`}
-                checked={guestFallback === 'release'}
-                onChange={() => setGuestFallback('release')}
-                disabled={busy}
-              />
-              {' '}Skip me until there's a pass for both of us
-            </label>
-          </fieldset>
+          <GuestFallbackOptions
+            name={`${idPrefix}-guest-fallback`}
+            legend="If there isn't a pass for my guest:"
+            value={guestFallback}
+            onChange={setGuestFallback}
+            disabled={busy}
+            forAlternate
+          />
         </>
       )}
       {error && <p className="field-error">{error}</p>}

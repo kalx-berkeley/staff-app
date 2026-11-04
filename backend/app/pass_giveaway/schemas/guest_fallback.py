@@ -2,4 +2,4 @@
 
 from typing import Literal
 
-GuestFallbackChoice = Literal["attend_alone", "release"]
+GuestFallbackChoice = Literal["attend_alone", "release", "wait", "wait_then_release"]

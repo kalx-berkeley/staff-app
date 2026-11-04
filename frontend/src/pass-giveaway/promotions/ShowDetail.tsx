@@ -1,18 +1,24 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { showsAPI, passesAPI, autocompleteAPI, specialtyShowsAPI, lotteryAPI, alternatesAPI } from '../api';
-import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList } from '../components';
+import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, WaitingGuestsList } from '../components';
 import MarkdownContent from '../../common/components/MarkdownContent';
 import { formatPhone, formatLeave, isOnLeave, formatDateValue } from '../../common/utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import type { ShowResponse, PreAssignmentData, LotteryStatus, PassResponse, DjSuggestion, DjLeave, AlternateEntry } from '../types';
+import type { ShowResponse, PreAssignmentData, LotteryStatus, PassResponse, DjSuggestion, DjLeave, AlternateEntry, WaitingGuest } from '../types';
 import type { APIError, PromotionsStaffProfile } from '../../common/types';
-import { WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow } from '../utils';
+import { WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow, waitingFallbackNote } from '../utils';
 
 type SuggestMode = 'choose' | 'date' | 'genre' | null;
 
 type ConfirmAction = 'close' | 'unpublish' | 'reopen' | 'notify' | null;
+
+interface GuestToRemove {
+  passId: number;
+  guestName: string | null;
+  hostName: string | null;
+}
 
 interface ConfirmModalProps {
   action: Exclude<ConfirmAction, null>;
@@ -223,12 +229,16 @@ const ShowDetail = () => {
   const [alternates, setAlternates] = useState<AlternateEntry[]>([]);
   const [alternateToRemove, setAlternateToRemove] = useState<AlternateEntry | null>(null);
   const [removingAlternateId, setRemovingAlternateId] = useState<number | null>(null);
+  const [waitingGuests, setWaitingGuests] = useState<WaitingGuest[]>([]);
+  const [guestToRemove, setGuestToRemove] = useState<GuestToRemove | null>(null);
+  const [removingGuestPassId, setRemovingGuestPassId] = useState<number | null>(null);
 
   const loadAlternates = useCallback(async () => {
     if (!id) return;
     try {
       const queue = await alternatesAPI.getQueue(parseInt(id));
       setAlternates(queue.entries);
+      setWaitingGuests(queue.waiting_guests ?? []);
     } catch {
       // non-fatal — section will not render
     }
@@ -255,6 +265,25 @@ const ShowDetail = () => {
       );
     } finally {
       setRemovingAlternateId(null);
+    }
+  };
+
+  const handleRemoveGuest = async () => {
+    if (!guestToRemove) return;
+    const { passId } = guestToRemove;
+    setGuestToRemove(null);
+    setRemovingGuestPassId(passId);
+    setActionError(null);
+    try {
+      await passesAPI.removeGuest(passId);
+      await loadShow(true);
+    } catch (err) {
+      const apiError = err as APIError;
+      setActionError(
+        typeof apiError.detail === 'string' ? apiError.detail : 'Failed to remove guest'
+      );
+    } finally {
+      setRemovingGuestPassId(null);
     }
   };
 
@@ -900,6 +929,16 @@ const ShowDetail = () => {
         </div>
       )}
 
+      {show.status === 'closed' && waitingGuests.length > 0 && (
+        <div className="guest-list-summary">
+          <div className="guest-list-summary-header">
+            <h3>Guests still waiting ({waitingGuests.length})</h3>
+          </div>
+          <p>These +1 guests were still on the alternate list when the show closed. They are not on the guest list.</p>
+          <WaitingGuestsList guests={waitingGuests} heading="Guests" />
+        </div>
+      )}
+
       {show.status === 'closed' && (show.venue.pass_call_instructions || show.venue.contacts.length > 0) && (
         <div className="show-info">
           {show.venue.pass_call_instructions && (
@@ -1434,6 +1473,7 @@ const ShowDetail = () => {
                         <span style={{ color: '#666', fontSize: '0.9em' }}>
                           {' '}+ {e.guest_name ? e.guest_name : 'guest'}
                           {e.guest_fallback === 'release' && ' (only with guest)'}
+                          {waitingFallbackNote(e.guest_fallback)}
                         </span>
                       )}
                     </li>
@@ -1520,7 +1560,33 @@ const ShowDetail = () => {
                         +1 guest reserved
                         {pass.guest_name ? `: ${pass.guest_name}` : ''}
                         {pass.guest_fallback === 'release' ? " (staff will release if guest can't attend)" : ''}
+                        {waitingFallbackNote(pass.guest_fallback)}
                         {' '}— <em>{show.close_notifications_pending ? "not confirmed yet, staff hasn't been emailed" : 'not confirmed until show closes'}</em>
+                      </p>
+                    )}
+                    {pass.has_guest && show.status === 'published' && (
+                      <button
+                        onClick={() =>
+                          setGuestToRemove({
+                            passId: pass.id,
+                            guestName: pass.guest_name,
+                            hostName: pass.staff_name ?? null,
+                          })
+                        }
+                        className="btn-small btn-danger"
+                        disabled={removingGuestPassId === pass.id}
+                      >
+                        {removingGuestPassId === pass.id ? 'Removing…' : 'Remove guest'}
+                      </button>
+                    )}
+                    {pass.guest_waiting && (
+                      <p className="pass-guest-note">
+                        +1 guest on the alternate list
+                        {pass.guest_name ? `: ${pass.guest_name}` : ''}
+                        {pass.guest_position ? ` (guest #${pass.guest_position})` : ''}
+                        {pass.guest_fallback === 'wait_then_release'
+                          ? " — staff's pass is released if they don't have one at close"
+                          : ''}
                       </p>
                     )}
                     <p>
@@ -1550,7 +1616,47 @@ const ShowDetail = () => {
             removingId={removingAlternateId}
           />
         )}
+        {show.status !== 'closed' && (
+          <WaitingGuestsList
+            guests={waitingGuests}
+            onRemove={
+              show.status === 'published'
+                ? (guest) =>
+                    setGuestToRemove({
+                      passId: guest.pass_id,
+                      guestName: guest.guest_name,
+                      hostName: guest.host_name,
+                    })
+                : undefined
+            }
+            removingPassId={removingGuestPassId}
+          />
+        )}
       </div>
+
+      {guestToRemove && (
+        <div className="modal-overlay" onClick={() => setGuestToRemove(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Remove Guest</h3>
+              <button className="btn-close" onClick={() => setGuestToRemove(null)}>×</button>
+            </div>
+            <p>
+              Remove <strong>{guestToRemove.guestName || 'the +1 guest'}</strong> from{' '}
+              {guestToRemove.hostName ?? 'this staff member'}'s pass? They will keep their own
+              pass and will be emailed that you removed their guest.
+            </p>
+            <div className="form-actions" style={{ marginTop: '1rem' }}>
+              <button onClick={() => setGuestToRemove(null)} className="btn-secondary">
+                Cancel
+              </button>
+              <button onClick={handleRemoveGuest} className="btn-danger">
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {alternateToRemove && (
         <div className="modal-overlay" onClick={() => setAlternateToRemove(null)}>

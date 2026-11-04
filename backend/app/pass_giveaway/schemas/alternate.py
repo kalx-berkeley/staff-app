@@ -39,11 +39,23 @@ class AlternateEntryResponse(BaseModel):
     priority_at: UtcDatetime
 
 
+class WaitingGuestResponse(BaseModel):
+    """A staff member's +1 guest waiting on the alternate list."""
+
+    pass_id: int
+    position: int
+    guest_name: str | None = None
+    host_staff_id: int | None = None
+    host_name: str | None = None
+    is_mine: bool = False
+
+
 class AlternateQueueResponse(BaseModel):
     """A show's alternate queue as seen by the current user."""
 
     queue_open: bool
     entries: list[AlternateEntryResponse]
+    waiting_guests: list[WaitingGuestResponse] = []
     my_entry_id: int | None = None
     # Who would get the current user's pass if they released it now.
     next_candidate_staff_id: int | None = None

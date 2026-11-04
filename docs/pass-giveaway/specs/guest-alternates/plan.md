@@ -120,8 +120,8 @@ case the show reopens.
 1. **Guest moved to the list:** their position and what happens at close under the
    chosen option.
 2. **Guest got a pass:** not confirmed until close, and could still be bumped.
-3. **Guest started on the list:** a change to the claim, lottery and alternate
-   messages.
+3. **Guest started on the list:** a change to the lottery and promotion emails, and
+   to the on-screen message after a direct claim, which sends no email.
 4. **Guest still waiting at close, option 3:** "You're on the guest list; your
    guest isn't."
 5. **Released at close, option 4:** neither is on the guest list.
@@ -230,7 +230,9 @@ stage 3, and the branch isn't merged before then.
   ignored when the claim lands on a hold.
 - `AlternateService.fill_open_passes`: remove the early return when no staff are
   waiting, seat guests in step 3, and skip guests whose host is on leave.
-- `AlternateService._guest_holds_newest_first`: order by `guest_priority_at`.
+- `PassService._assign_guest_hold`: set a hold's `claimed_at` to the guest's
+  `guest_priority_at`, so `_guest_holds_newest_first`, `display_order` and pass cuts
+  all follow the guest order.
 - `AlternateService.next_candidate` and the alternates `GET` response: name the
   waiting guest in the release warning, and add the guests section.
 - `AlternateService.restore_on_reopen`: stop returning early when nothing is

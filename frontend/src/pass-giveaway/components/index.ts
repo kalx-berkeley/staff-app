@@ -17,7 +17,9 @@ export { default as EmailAddressRequirementField } from './EmailAddressRequireme
 export { default as PersonAutocomplete } from '../../common/components/PersonAutocomplete';
 export type { PersonOption } from '../../common/components/PersonAutocomplete';
 export { extractPersonEmail } from '../../common/components/personUtils';
-export { AlternateQueueList, AlternateGuestForm } from './AlternateQueue';
+export { AlternateQueueList, AlternateGuestForm, WaitingGuestsList } from './AlternateQueue';
+export { default as GuestFallbackOptions } from './GuestFallbackOptions';
+export { default as ClaimGuestActions } from './ClaimGuestActions';
 export { default as DescriptionCheckFeedback } from './DescriptionCheckFeedback';
 export { useDescriptionCheck } from './useDescriptionCheck';
 export type { DescriptionCheck } from './useDescriptionCheck';

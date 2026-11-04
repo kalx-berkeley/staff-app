@@ -14,3 +14,8 @@ class GuestFallback:
     # The guest waits on the alternate list. If they're still waiting when the show
     # closes, the staff member's pass is released.
     WAIT_THEN_RELEASE = "wait_then_release"
+
+    @staticmethod
+    def waits(value: str) -> bool:
+        """Whether a guest with this fallback goes on the alternate list without a pass."""
+        return value in (GuestFallback.WAIT, GuestFallback.WAIT_THEN_RELEASE)

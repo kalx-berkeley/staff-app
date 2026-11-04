@@ -75,6 +75,10 @@ class LotteryService:
         staff = db.query(Staff).filter(Staff.id == staff_id).first()
         if staff:
             ensure_not_on_leave_for_show(staff, show)
+        if has_guest:
+            from app.pass_giveaway.services.pass_service import PassService
+
+            PassService._validate_guest_name(show, guest_name)
 
         existing = (
             db.query(LotteryEntry)
@@ -440,13 +444,21 @@ class LotteryService:
                 primary.staff_id = entry.staff_id
                 primary.claimed_at = entry.entered_at
                 primary.status = "claimed"
-                primary.has_guest = entry.id in guest_pass
-                primary.guest_name = entry.guest_name if entry.id in guest_pass else None
-                primary.guest_fallback = (
-                    entry.guest_fallback
-                    if entry.id in guest_pass
-                    else GuestFallback.ATTEND_ALONE
+                # A guest with no pass who can wait goes on the alternate list.
+                guest_seated = entry.id in guest_pass
+                guest_waiting = (
+                    entry.has_guest
+                    and not guest_seated
+                    and GuestFallback.waits(entry.guest_fallback)
                 )
+                keeps_guest = guest_seated or guest_waiting
+                primary.has_guest = guest_seated
+                primary.guest_waiting = guest_waiting
+                primary.guest_name = entry.guest_name if keeps_guest else None
+                primary.guest_fallback = (
+                    entry.guest_fallback if keeps_guest else GuestFallback.ATTEND_ALONE
+                )
+                primary.guest_priority_at = entry.entered_at if keeps_guest else None
                 primary.updated_at = now
 
                 if entry.id in guest_pass:
@@ -476,9 +488,14 @@ class LotteryService:
             AlternateService._audit_bulk(
                 db, "alternates_enqueued_from_lottery", show, queued
             )
+        # A winner's guest given a leftover pass hears about it in the result email.
+        winner_pass_ids = {p.id for p in staff_pass.values()}
+        promotions.guests_seated = [
+            host for host in promotions.guests_seated if host.id not in winner_pass_ids
+        ]
         AlternateService.finalize_promotions(db, promotions)
 
-        promoted_staff_ids = {p.entry.staff_id for p in promotions}
+        promoted_staff_ids = {p.entry.staff_id for p in promotions.promotions}
         alternate_positions = {
             alt.staff_id: position
             for position, alt in enumerate(
@@ -506,7 +523,7 @@ class LotteryService:
             show_desc = f'"{show.event_name}" at {show.venue.name} on {show.show_date}'
 
             if entry.id in staff_pass:
-                if entry.id in guest_pass:
+                if staff_pass[entry.id].has_guest:
                     # Cases 3 & 6: staff won, guest won. The guest pass is a
                     # hold that another staff member can still take until the
                     # show closes.
@@ -542,6 +559,24 @@ class LotteryService:
                         ),
                     ])
                     subject = f"You won passes to {show.event_name}!"
+                elif staff_pass[entry.id].guest_waiting:
+                    # Staff won, and their guest is waiting on the alternate list.
+                    body = "\n".join([
+                        (
+                            "Congratulations! You have been selected in the"
+                            f" lottery for {show_desc}."
+                        ),
+                        "",
+                        "Your staff pass has been reserved.",
+                        "",
+                        *AlternateService._guest_waiting_lines(staff_pass[entry.id]),
+                        "",
+                        (
+                            "No further action is needed. Your name will be on the guest"
+                            " list sent to the venue when the show closes."
+                        ),
+                    ])
+                    subject = f"You won a pass to {show.event_name}!"
                 elif entry.has_guest:
                     # Case 4: staff won, guest lost (the fallback isn't release here)
                     body = "\n".join([

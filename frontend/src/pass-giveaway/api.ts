@@ -30,6 +30,7 @@ import type {
   MySpecialtyShowResponse,
   NotificationPreferences,
   OnAirInfo,
+  GuestFallback,
   PassResponse,
   PreAssignmentData,
   PromoterCreate,
@@ -565,6 +566,41 @@ export const passesAPI = {
   claim: async (passId: number, data?: ClaimData): Promise<PassResponse> => {
     try {
       const response = await apiClient.post<PassResponse>(`/passes/${passId}/claim`, data ?? {});
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /** Add a +1 guest to your own claimed staff pass. */
+  addGuest: async (
+    passId: number,
+    data: { guest_name: string | null; guest_fallback: GuestFallback }
+  ): Promise<PassResponse> => {
+    try {
+      const response = await apiClient.post<PassResponse>(`/passes/${passId}/guest`, data);
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /** Correct the name of the +1 guest on your own claimed staff pass. */
+  updateGuestName: async (passId: number, guestName: string | null): Promise<PassResponse> => {
+    try {
+      const response = await apiClient.patch<PassResponse>(`/passes/${passId}/guest`, {
+        guest_name: guestName,
+      });
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /** Remove a +1 guest from a claimed staff pass, whether seated or waiting. */
+  removeGuest: async (passId: number): Promise<PassResponse> => {
+    try {
+      const response = await apiClient.delete<PassResponse>(`/passes/${passId}/guest`);
       return response.data;
     } catch (error) {
       return handleAPIError(error);

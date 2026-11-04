@@ -44,6 +44,12 @@ class Pass(Base):
         default=GuestFallback.ATTEND_ALONE,
         server_default=GuestFallback.ATTEND_ALONE,
     )
+    # The guest has no pass and is on the alternate list. has_guest stays false
+    # until they get a seat, because the guest list depends on it.
+    guest_waiting = Column(Boolean, nullable=False, default=False, server_default="false")
+    # Decides which guest gets a free pass first and which is bumped last: the claim
+    # time, or when the guest was added if that was after claiming.
+    guest_priority_at = Column(DateTime, nullable=True)
     # If this pass is a guest hold, points to the primary staff pass
     guest_of_pass_id = Column(Integer, ForeignKey("passes.id"), nullable=True)
 
@@ -98,6 +104,28 @@ class Pass(Base):
     @property
     def staff_email(self):
         return self.staff.email if self.staff else None
+
+    @property
+    def guest_queue_key(self) -> tuple:
+        """Sort key for this pass's guest among a show's waiting guests."""
+        priority = self.guest_priority_at or self.claimed_at or datetime.min
+        if priority.tzinfo is None:
+            priority = priority.replace(tzinfo=timezone.utc)
+        return (priority, self.id or 0)
+
+    @property
+    def guest_position(self) -> int | None:
+        """This pass's guest's place among the show's waiting guests, from 1."""
+        if not self.guest_waiting or self.show is None:
+            return None
+        ahead = [
+            p
+            for p in self.show.passes
+            if p.guest_waiting
+            and p.status == "claimed"
+            and p.guest_queue_key < self.guest_queue_key
+        ]
+        return len(ahead) + 1
 
     def _claimant_leave_covering_show(self):
         """The claimant, if this is their own staff pass and they're on leave for the show."""

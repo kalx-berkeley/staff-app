@@ -168,6 +168,11 @@ def _notify_claimers_of_cancellation(db, show) -> None:
         if pass_item.has_guest:
             guest_label = pass_item.guest_name or "your guest"
             lines.append(f"The guest pass reserved for {guest_label} is cancelled as well.")
+        elif pass_item.guest_waiting:
+            guest_label = pass_item.guest_name or "your guest"
+            lines.append(
+                f"The place on the alternate list for {guest_label} is cancelled as well."
+            )
         AlternateService._email(
             db,
             pass_item.staff,
@@ -282,6 +287,8 @@ def _build_show_response(
             "guest_name": pass_item.guest_name,
             "guest_fallback": pass_item.guest_fallback,
             "guest_of_pass_id": pass_item.guest_of_pass_id,
+            "guest_waiting": pass_item.guest_waiting,
+            "guest_position": pass_item.guest_position,
             "preassigned_dj": pass_item.preassigned_dj,
             "preassigned_date": pass_item.preassigned_date,
             "preassigned_specialty_show_id": pass_item.preassigned_specialty_show_id,

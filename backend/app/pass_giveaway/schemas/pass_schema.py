@@ -113,6 +113,24 @@ class ClaimData(BaseModel):
     )
 
 
+class GuestAddData(BaseModel):
+    """Schema for adding a +1 guest to a claimed staff pass."""
+
+    guest_name: str | None = Field(
+        None, max_length=100, description="Guest's name (required by some venues)"
+    )
+    guest_fallback: GuestFallbackChoice = Field(
+        GuestFallback.ATTEND_ALONE,
+        description="What happens if the guest cannot attend",
+    )
+
+
+class GuestNameData(BaseModel):
+    """Schema for correcting a +1 guest's name."""
+
+    guest_name: str | None = Field(None, max_length=100)
+
+
 class PassResponse(BaseModel):
     """Schema for pass_item response."""
 
@@ -147,6 +165,9 @@ class PassResponse(BaseModel):
     guest_name: str | None = None
     guest_fallback: str = GuestFallback.ATTEND_ALONE
     guest_of_pass_id: int | None = None
+    # The guest has no pass and is on the alternate list, at this position.
+    guest_waiting: bool = False
+    guest_position: int | None = None
 
     # For pre-assigned pairs
     preassigned_dj: str | None = None

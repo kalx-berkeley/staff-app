@@ -416,9 +416,20 @@ export interface AlternateEntry {
 }
 
 /** A show's alternate queue as seen by the current user. */
+/** A staff member's +1 guest waiting on the alternate list. */
+export interface WaitingGuest {
+  pass_id: number;
+  position: number;
+  guest_name: string | null;
+  host_staff_id: number | null;
+  host_name: string | null;
+  is_mine: boolean;
+}
+
 export interface AlternateQueue {
   queue_open: boolean;
   entries: AlternateEntry[];
+  waiting_guests?: WaitingGuest[];
   my_entry_id: number | null;
   /** Who would get the current user's pass if they released it now. */
   next_candidate_staff_id: number | null;
@@ -599,6 +610,9 @@ export interface PassResponse {
   guest_name: string | null;
   guest_fallback: GuestFallback;
   guest_of_pass_id: number | null;
+  /** The guest has no pass and is on the alternate list, at this position. */
+  guest_waiting?: boolean;
+  guest_position?: number | null;
 
   // For pre-assigned pairs
   preassigned_dj: string | null;

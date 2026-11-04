@@ -14,6 +14,7 @@ vi.mock('../api', () => ({
   passesAPI: {
     setPreassignment: vi.fn(),
     removePreassignment: vi.fn(),
+    removeGuest: vi.fn(),
     getPreassignSchedule: vi.fn().mockResolvedValue([]),
     getPreassignLeave: vi.fn().mockResolvedValue(null),
     getSuggestionsByDate: vi.fn(),
@@ -601,6 +602,55 @@ describe('Promotions ShowDetail — alternates', () => {
 
     const label = await screen.findByText('Email:');
     expect(label.closest('.alternate-card')).toHaveTextContent('wanda@example.com');
+  });
+
+  describe('waiting guests', () => {
+    const waitingQueue = {
+      queue_open: false,
+      entries: [],
+      waiting_guests: [
+        {
+          pass_id: 12,
+          position: 1,
+          guest_name: 'Sam',
+          host_staff_id: 30,
+          host_name: 'Alex',
+          is_mine: false,
+        },
+      ],
+      my_entry_id: null,
+      next_candidate_staff_id: null,
+      next_candidate_name: null,
+      my_outcome_pending: false,
+    };
+
+    it('lets promotions staff remove a waiting guest', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue({ ...makeShow([]), status: 'published' });
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue(waitingQueue);
+      vi.mocked(passesAPI.removeGuest).mockResolvedValue({} as PassResponse);
+
+      await renderShowDetail();
+
+      expect(await screen.findByText('Sam (guest of Alex)')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /^remove$/i }));
+      expect(screen.getByText(/emailed that you removed their guest/i)).toBeInTheDocument();
+      const [, confirm] = screen.getAllByRole('button', { name: /^remove$/i });
+      fireEvent.click(confirm);
+
+      await waitFor(() => expect(passesAPI.removeGuest).toHaveBeenCalledWith(12));
+      await waitFor(() => expect(showsAPI.get).toHaveBeenCalledTimes(2));
+    });
+
+    it('lists guests still waiting below the guest list once closed', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue({ ...makeShow([]), status: 'closed' });
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue(waitingQueue);
+
+      await renderShowDetail();
+
+      expect(await screen.findByText('Guests still waiting (1)')).toBeInTheDocument();
+      expect(screen.getByText('Sam (guest of Alex)')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^remove$/i })).not.toBeInTheDocument();
+    });
   });
 
   describe('on a closed show', () => {
