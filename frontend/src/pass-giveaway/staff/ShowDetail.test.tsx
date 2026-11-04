@@ -890,6 +890,48 @@ describe('Staff ShowDetail', () => {
         expect(passesAPI.updateGuestName).toHaveBeenCalledWith(seated.id, 'Sam');
       });
 
+      it('hides a waiting guest\'s outcome while the close emails are held', async () => {
+        vi.mocked(showsAPI.get).mockResolvedValue({
+          ...fullShow,
+          status: 'closed' as const,
+          close_notifications_pending: true,
+          passes: [{ ...myPass, guest_waiting: true, guest_position: 1, guest_name: 'Sam' }],
+        });
+        vi.mocked(alternatesAPI.getQueue).mockResolvedValue(queue({ queue_open: false }));
+        await showPage();
+
+        expect(screen.getByText(/not confirmed yet, you'll get an email/i)).toBeInTheDocument();
+        expect(screen.queryByText(/didn't get a pass/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/guest #1/i)).not.toBeInTheDocument();
+      });
+
+      it('says a waiting guest missed out once the show has closed', async () => {
+        vi.mocked(showsAPI.get).mockResolvedValue({
+          ...fullShow,
+          status: 'closed' as const,
+          close_notifications_pending: false,
+          passes: [{ ...myPass, guest_waiting: true, guest_position: 1, guest_name: 'Sam' }],
+        });
+        vi.mocked(alternatesAPI.getQueue).mockResolvedValue(queue({ queue_open: false }));
+        await showPage();
+
+        expect(screen.getByText(/\+1 guest didn't get a pass: Sam/)).toBeInTheDocument();
+      });
+
+      it('says a seated guest is confirmed once the show has closed', async () => {
+        vi.mocked(showsAPI.get).mockResolvedValue({
+          ...fullShow,
+          status: 'closed' as const,
+          close_notifications_pending: false,
+          passes: [{ ...myPass, has_guest: true, guest_name: 'Sam' }],
+        });
+        vi.mocked(alternatesAPI.getQueue).mockResolvedValue(queue({ queue_open: false }));
+        await showPage();
+
+        expect(screen.getByText('confirmed')).toBeInTheDocument();
+        expect(screen.queryByText(/until show closes/i)).not.toBeInTheDocument();
+      });
+
       it('hides the guest controls once the show closes', async () => {
         vi.mocked(showsAPI.get).mockResolvedValue({
           ...fullShow,

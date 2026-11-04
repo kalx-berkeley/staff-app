@@ -234,8 +234,14 @@ const MyPasses = () => {
                       <div className="info-row">
                         <span className="info-label">+1 Guest:</span>
                         <span className="info-value">
-                          {pass.guest_name || 'Your guest'} is on the alternate list
-                          {pass.guest_position ? ` (guest #${pass.guest_position})` : ''}
+                          {pass.show_status === 'closed' ? (
+                            `${pass.guest_name || 'Your guest'}: see your email for the outcome`
+                          ) : (
+                            <>
+                              {pass.guest_name || 'Your guest'} is on the alternate list
+                              {pass.guest_position ? ` (guest #${pass.guest_position})` : ''}
+                            </>
+                          )}
                         </span>
                       </div>
                     )}

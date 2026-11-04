@@ -57,6 +57,7 @@ from app.scheduler import (
     schedule_lottery_job,
     unschedule_lottery_job,
 )
+from app.pass_giveaway.services.close_digest import CloseDigest
 from app.pass_giveaway.guest_redaction import GuestRedactingRoute
 
 logger = logging.getLogger(__name__)
@@ -84,62 +85,88 @@ def _passes_with_pending_guests(db, show) -> list:
     )
 
 
-def _notify_staff_guests_confirmed(db, show) -> int:
+def _add_close_outcomes(db, show, digest: CloseDigest) -> dict[str, int]:
     """
-    Notify staff members with pending +1 guests that their guest is confirmed.
+    Add the email saying who is on the guest list to each +1 host and alternate.
 
-    :returns: Number of passes with a pending guest.
-    """
-    from app.common.services import notification_service
-
-    guest_passes = _passes_with_pending_guests(db, show)
-    for pass_item in guest_passes:
-        if not pass_item.staff or not pass_item.staff.email:
-            continue
-        guest_label = (
-            f" and {pass_item.guest_name}" if pass_item.guest_name else " and your guest"
-        )
-        body = "\n".join([
-            (
-                f'Good news! Your staff pass for "{show.event_name}" at {show.venue.name}'
-                f" on {show.show_date} has been confirmed."
-            ),
-            "",
-            f"You{guest_label} are both on the guest list.",
-            "",
-            "The show has now been closed — please check with the venue for entry details.",
-        ])
-        notification_service.send_email(
-            to_email=pass_item.staff.email,
-            subject=f"Your guest is confirmed: {show.event_name}",
-            body_text=body,
-            db=db,
-            area=PASS_GIVEAWAY_AREA,
-        )
-    return len(guest_passes)
-
-
-def run_close_side_effects(db, show) -> None:
-    """
-    What follows closing a show, whether manual or automatic.
-
-    Confirms +1 guests to their staff hosts and tells anyone still on the
-    alternate list that they did not get a pass. When the show's promoter or
-    venue holds those emails, and there's anyone to send them to, they wait for
-    the send-close-notifications endpoint instead.
+    :returns: How many of each kind of person there were, for the audit log.
     """
     from app.pass_giveaway.services.alternate_service import AlternateService
 
+    guest_passes = _passes_with_pending_guests(db, show)
+    for pass_item in guest_passes:
+        guest_label = (
+            f" and {pass_item.guest_name}" if pass_item.guest_name else " and your guest"
+        )
+        digest.add_outcome(
+            pass_item.staff,
+            f"Your guest is confirmed: {show.event_name}",
+            [
+                (
+                    f'Good news! Your staff pass for "{show.event_name}" at'
+                    f" {show.venue.name} on {show.show_date} has been confirmed."
+                ),
+                "",
+                f"You{guest_label} are both on the guest list.",
+                "",
+                (
+                    "The show has now been closed — please check with the venue for"
+                    " entry details."
+                ),
+            ],
+        )
+
+    waiting_hosts = AlternateService.waiting_guests(db, show.id)
+    for host in waiting_hosts:
+        digest.add_outcome(
+            host.staff,
+            f"Your guest didn't get a pass: {show.event_name}",
+            [
+                f"The guest list for {AlternateService._show_desc(show)} has been closed.",
+                "",
+                (
+                    f"You're on the guest list, but {host.guest_name or 'your guest'}"
+                    " didn't get a pass, so they aren't."
+                ),
+                "",
+                "Please check with the venue for entry details.",
+            ],
+        )
+
+    alternates = AlternateService.add_expired_outcomes(db, show, digest)
+    return {
+        "guest_hosts": len(guest_passes),
+        "waiting_guest_hosts": len(waiting_hosts),
+        "alternates": alternates,
+    }
+
+
+def run_close_side_effects(db, show, digest: CloseDigest | None = None) -> None:
+    """
+    What follows closing a show, whether manual or automatic.
+
+    Tells +1 hosts whether their guest is on the guest list, and tells anyone still on
+    the alternate list that they did not get a pass. When the show's promoter or venue
+    holds those emails, and there's anyone to send them to, they wait for the
+    send-close-notifications endpoint instead.
+
+    :param digest: What the close itself had to tell people, from ``close_show``.
+    """
+    from app.pass_giveaway.services.alternate_service import AlternateService
+
+    digest = digest or CloseDigest()
     hold = show.promoted_by.hold_close_notifications and bool(
         _passes_with_pending_guests(db, show)
         or AlternateService.waiting_entries(db, show.id)
+        or AlternateService.waiting_guests(db, show.id)
     )
     if hold:
         show.close_notifications_held = True
         db.commit()
-    else:
-        _notify_staff_guests_confirmed(db, show)
-    AlternateService.expire_on_close(db, show, notify=not hold)
+    AlternateService.expire_on_close(db, show)
+    if not hold:
+        _add_close_outcomes(db, show, digest)
+    digest.send(db)
 
 
 def _notify_claimers_of_cancellation(db, show) -> None:
@@ -1089,10 +1116,11 @@ def close_show(
     db: Session = Depends(get_db),
 ):
     """Close a show (promotions staff only)."""
-    show = ShowService.close_show(db, show_id)
+    digest = CloseDigest()
+    show = ShowService.close_show(db, show_id, digest)
     unschedule_auto_close_job(show_id)
     unschedule_lottery_job(show_id)
-    run_close_side_effects(db, show)
+    run_close_side_effects(db, show, digest)
     audit_service.log_event(
         db,
         event_type="show_closed",
@@ -1114,8 +1142,6 @@ def send_close_notifications(
 ):
     """Send the close emails held for a closed show (promotions staff only)."""
     from datetime import datetime, timezone
-
-    from app.pass_giveaway.services.alternate_service import AlternateService
 
     show = ShowService.get_show(db, show_id)
     not_pending = HTTPException(
@@ -1142,8 +1168,9 @@ def send_close_notifications(
         raise not_pending
     db.refresh(show)
 
-    guest_hosts = _notify_staff_guests_confirmed(db, show)
-    alternates = AlternateService.notify_expired_at_close(db, show)
+    digest = CloseDigest()
+    counts = _add_close_outcomes(db, show, digest)
+    digest.send(db)
     audit_service.log_event(
         db,
         event_type="close_notifications_sent",
@@ -1154,8 +1181,7 @@ def send_close_notifications(
         entity_id=show.id,
         details={
             "event_name": show.event_name,
-            "guest_hosts": guest_hosts,
-            "alternates": alternates,
+            **counts,
         },
     )
     return _build_show_response(show)

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { promotersAPI, venuesAPI } from '../api';
-import { Tooltip, PersonAutocomplete, extractPersonEmail, EmailAddressRequirementField } from '../components';
+import { Tooltip, PersonAutocomplete, extractPersonEmail, EmailAddressRequirementField, HoldCloseNotificationsHint } from '../components';
 import type { EmailAddressRequirement, PromoterResponse, PromoterCreate, PromoterUpdate, PromoterContactCreate, PromotionsStaffOption } from '../types';
 import type { APIError, ValidationError } from '../../common/types';
 
@@ -308,11 +308,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
             />
             {' '}Wait for me to send close notifications
           </label>
-          <span className="field-hint">
-            When checked, closing a show doesn't tell staff with a +1 or alternates the outcome. A
-            promotions rep sends those emails with a button on the closed show's page. If nobody
-            clicks it before the show date has passed, they're never sent.
-          </span>
+          <HoldCloseNotificationsHint />
         </div>
       </div>
 

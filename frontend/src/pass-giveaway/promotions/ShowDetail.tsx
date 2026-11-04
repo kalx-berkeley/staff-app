@@ -8,7 +8,7 @@ import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import type { ShowResponse, PreAssignmentData, LotteryStatus, PassResponse, DjSuggestion, DjLeave, AlternateEntry, WaitingGuest } from '../types';
 import type { APIError, PromotionsStaffProfile } from '../../common/types';
-import { WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow, waitingFallbackNote } from '../utils';
+import { WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow, seatedFallbackNote, waitingFallbackNote } from '../utils';
 
 type SuggestMode = 'choose' | 'date' | 'genre' | null;
 
@@ -25,11 +25,12 @@ interface ConfirmModalProps {
   show: ShowResponse;
   userEmail: string | null;
   alternateCount: number;
+  waitingGuestCount: number;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-const ConfirmModal = ({ action, show, userEmail, alternateCount, onConfirm, onCancel }: ConfirmModalProps) => {
+const ConfirmModal = ({ action, show, userEmail, alternateCount, waitingGuestCount, onConfirm, onCancel }: ConfirmModalProps) => {
   // promotions_contacts are the reps of the show's promoter or, with none, its venue
   const isShowRep = userEmail
     ? show.promotions_contacts.some((c) => c.email === userEmail)
@@ -70,6 +71,8 @@ const ConfirmModal = ({ action, show, userEmail, alternateCount, onConfirm, onCa
     const recipients = [
       guestHostCount > 0 &&
         `${guestHostCount} +1 ${guestHostCount === 1 ? 'host' : 'hosts'} that their guest is confirmed`,
+      waitingGuestCount > 0 &&
+        `${waitingGuestCount} +1 ${waitingGuestCount === 1 ? 'host' : 'hosts'} that their guest didn't get a pass`,
       alternateCount > 0 &&
         `${alternateCount} ${alternateCount === 1 ? 'alternate' : 'alternates'} that they didn't get a pass`,
     ].filter(Boolean);
@@ -1414,6 +1417,7 @@ const ShowDetail = () => {
           show={show}
           userEmail={user?.email ?? null}
           alternateCount={alternates.length}
+          waitingGuestCount={waitingGuests.length}
           onConfirm={handleConfirmedAction}
           onCancel={() => setConfirmAction(null)}
         />
@@ -1533,7 +1537,7 @@ const ShowDetail = () => {
                       {guestOf?.guest_name ? ` (${guestOf.guest_name})` : ''}
                     </p>
                     <p className="pass-guest-note">
-                      <em>Not confirmed until the show closes</em>
+                      <em>{show.status === 'closed' ? 'Confirmed' : 'Not confirmed until the show closes'}</em>
                     </p>
                   </div>
                 )}
@@ -1559,9 +1563,13 @@ const ShowDetail = () => {
                       <p className="pass-guest-note">
                         +1 guest reserved
                         {pass.guest_name ? `: ${pass.guest_name}` : ''}
-                        {pass.guest_fallback === 'release' ? " (staff will release if guest can't attend)" : ''}
-                        {waitingFallbackNote(pass.guest_fallback)}
-                        {' '}— <em>{show.close_notifications_pending ? "not confirmed yet, staff hasn't been emailed" : 'not confirmed until show closes'}</em>
+                        {show.status !== 'closed' && pass.guest_fallback === 'release' ? " (staff will release if guest can't attend)" : ''}
+                        {show.status !== 'closed' && seatedFallbackNote(pass.guest_fallback)}
+                        {' '}— <em>{show.close_notifications_pending
+                            ? "not confirmed yet, staff hasn't been emailed"
+                            : show.status === 'closed'
+                              ? 'confirmed'
+                              : 'not confirmed until show closes'}</em>
                       </p>
                     )}
                     {pass.has_guest && show.status === 'published' && (
@@ -1581,12 +1589,22 @@ const ShowDetail = () => {
                     )}
                     {pass.guest_waiting && (
                       <p className="pass-guest-note">
-                        +1 guest on the alternate list
-                        {pass.guest_name ? `: ${pass.guest_name}` : ''}
-                        {pass.guest_position ? ` (guest #${pass.guest_position})` : ''}
-                        {pass.guest_fallback === 'wait_then_release'
-                          ? " — staff's pass is released if they don't have one at close"
-                          : ''}
+                        {show.status === 'closed' ? (
+                          <>
+                            +1 guest didn't get a pass
+                            {pass.guest_name ? `: ${pass.guest_name}` : ''}
+                            {show.close_notifications_pending ? " — staff hasn't been emailed" : ''}
+                          </>
+                        ) : (
+                          <>
+                            +1 guest on the alternate list
+                            {pass.guest_name ? `: ${pass.guest_name}` : ''}
+                            {pass.guest_position ? ` (guest #${pass.guest_position})` : ''}
+                            {pass.guest_fallback === 'wait_then_release'
+                              ? " — staff's pass is released if they don't have one at close"
+                              : ''}
+                          </>
+                        )}
                       </p>
                     )}
                     <p>

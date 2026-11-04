@@ -173,6 +173,16 @@ These apply to guests under options 3 and 4.
 - Guests moving to the list, getting a pass and being removed are audit logged, as
   are releases at close.
 
+## Decisions after the build (2026-11-04)
+
+| Topic | Decision |
+|---|---|
+| Held emails and released staff | Release emails stay held, even though someone could turn up not knowing they lost their pass if no rep sends them. The venue and promoter forms warn about this next to the "Wait for me to send close notifications" option. |
+| Warning when closing a show | None. The close pop-up doesn't mention releases. |
+| Staff with email turned off | They get none of these emails, including release notices. The profile page says so. |
+| Lottery email on a held show | An option 4 winner can be told their pass is reserved even though it was released moments later, and only learns otherwise when the rep sends the emails. Left as is. |
+| Email setting | All pass giveaway emails to staff respect it, including the older guest-bumped and guest-confirmed emails. |
+
 ## Data model
 
 ### `passes`
@@ -266,14 +276,17 @@ stage 3, and the branch isn't merged before then.
 - `fill_open_passes`: a close mode that treats option 4 alternates as needing a
   pair.
 - Released hosts become `staff_pass_alternates` rows with
-  `source="released_at_close"`, `status="expired"` and `priority_at` set to their
-  claim time. They need the same `resolved_at` as the entries `expire_on_close`
-  expires, or `entries_expired_at_close` leaves them out, so pass one timestamp
-  through.
-- Check `restore_on_reopen` and `entries_expired_at_close` with these rows.
-- Collect emails during the close and send one per person from the final result.
-  This covers `_notify_guest_bumped`, promotion emails, `_notify_staff_guests_confirmed`,
-  `AlternateService._email_no_pass` and, when a close triggers the draw, the
+  `source="released_at_close"` and `priority_at` set to their claim time. They're
+  added as `waiting` after the last release, so this close can't promote them back,
+  and `expire_on_close` then expires them with the rest of the queue. That gives them
+  the same `resolved_at`, which `entries_expired_at_close` depends on.
+- `restore_on_reopen` changes these rows' `source` to `joined`, so a later close
+  treats them as ordinary alternates. It always tells them they're back on the list,
+  even if the close's emails were held, because they may not know they lost their
+  pass.
+- A new `CloseDigest` (`services/close_digest.py`) collects emails during the close
+  and sends one per person from the final result. It covers bumps, promotion emails,
+  the guest confirmation, the "no pass" email and, when a close triggers the draw, the
   `run_lottery` result emails. Called on its own, `run_lottery` keeps emailing as it
   does now.
 - `run_close_side_effects` and `send_close_notifications`: hold and send emails 4

@@ -354,13 +354,23 @@ async def bootstrap_spinitron_schedule():
     await sync_spinitron_schedule()
 
 
-def _finish_auto_close(db, show) -> None:
+def _close_automatically(db, show_id: int) -> None:
+    """Close a show and do what follows."""
+    from app.pass_giveaway.services.close_digest import CloseDigest
+    from app.pass_giveaway.services.show_service import ShowService
+
+    digest = CloseDigest()
+    show = ShowService.close_show(db, show_id, digest)
+    _finish_auto_close(db, show, digest)
+
+
+def _finish_auto_close(db, show, digest) -> None:
     """Run the close side effects, then email the reps, who hear if emails are held."""
     from app.pass_giveaway.routers.shows import run_close_side_effects
     from app.pass_giveaway.services.show_service import ShowService
 
     db.refresh(show)
-    run_close_side_effects(db, show)
+    run_close_side_effects(db, show, digest)
     ShowService._notify_venue_owners_of_auto_close(db, show)
 
 
@@ -368,6 +378,7 @@ async def auto_close_show(show_id: int):
     """DateTrigger job that closes a show and emails venue owners the guest list."""
     from app.database import SessionLocal
     from app.models.show import Show
+    from app.pass_giveaway.services.close_digest import CloseDigest
     from app.pass_giveaway.services.show_service import ShowService
 
     logger.info(f"Auto-closing show {show_id}")
@@ -383,9 +394,10 @@ async def auto_close_show(show_id: int):
                 f"Auto-close job: show {show_id} status is '{show.status}', skipping"
             )
             return
-        ShowService.close_show(db, show_id)
+        digest = CloseDigest()
+        ShowService.close_show(db, show_id, digest)
         unschedule_lottery_job(show_id)
-        _finish_auto_close(db, show)
+        _finish_auto_close(db, show, digest)
         logger.info(f"Auto-close complete for show {show_id} ({show.event_name})")
     except Exception as e:
         logger.error(f"Auto-close job failed for show {show_id}: {str(e)}", exc_info=True)
@@ -434,7 +446,6 @@ def _reschedule_pending_auto_close_jobs() -> None:
 
     from app.database import SessionLocal
     from app.models.show import Show
-    from app.pass_giveaway.services.show_service import ShowService
     from datetime import datetime
     from zoneinfo import ZoneInfo
 
@@ -470,8 +481,7 @@ def _reschedule_pending_auto_close_jobs() -> None:
                     f"({close_dt}); closing now"
                 )
                 try:
-                    ShowService.close_show(db, show.id)
-                    _finish_auto_close(db, show)
+                    _close_automatically(db, show.id)
                 except Exception as e:
                     logger.error(f"Failed to close missed auto-close show {show.id}: {e}")
     finally:

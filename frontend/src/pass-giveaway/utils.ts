@@ -49,6 +49,15 @@ export const waitingFallbackNote = (fallback: GuestFallback): string => {
   return '';
 };
 
+/** The same note for a guest who has a pass, and only waits if they lose it. */
+export const seatedFallbackNote = (fallback: GuestFallback): string => {
+  if (fallback === 'wait') return ' (goes on the alternate list if bumped)';
+  if (fallback === 'wait_then_release') {
+    return " (goes on the alternate list if bumped; staff's pass is released if they don't have one at close)";
+  }
+  return '';
+};
+
 export const STAFF_PASSES_NOT_YET_ACTIVE = 'Staff passes open to you once your status is Active.';
 
 /**

@@ -641,6 +641,59 @@ describe('Promotions ShowDetail — alternates', () => {
       await waitFor(() => expect(showsAPI.get).toHaveBeenCalledTimes(2));
     });
 
+    it('says a seated guest is confirmed once the show has closed', async () => {
+      const host = {
+        ...makeShow([]).passes[0],
+        id: 20,
+        pass_type: 'staff' as const,
+        status: 'claimed' as const,
+        staff_id: 30,
+        staff_name: 'Alex',
+        staff_phone: '5551234567',
+        has_guest: true,
+        guest_name: 'Sam',
+      };
+      vi.mocked(showsAPI.get).mockResolvedValue({
+        ...makeShow([host]),
+        status: 'closed',
+        close_notifications_pending: false,
+      });
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue({ ...waitingQueue, waiting_guests: [] });
+
+      await renderShowDetail();
+
+      expect(await screen.findByText('confirmed')).toBeInTheDocument();
+      expect(screen.queryByText(/until show closes/i)).not.toBeInTheDocument();
+    });
+
+    it('marks staff released at close in the closed alternates list', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue({ ...makeShow([]), status: 'closed' });
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue({
+        ...waitingQueue,
+        waiting_guests: [],
+        entries: [
+          {
+            id: 7,
+            show_id: 1,
+            staff_id: 30,
+            staff_name: 'Alex',
+            staff_phone: null,
+            staff_email: null,
+            position: 1,
+            has_guest: true,
+            guest_name: 'Sam',
+            guest_fallback: 'wait_then_release' as const,
+            source: 'released_at_close',
+            priority_at: '2024-01-01T00:00:00Z',
+          },
+        ],
+      });
+
+      await renderShowDetail();
+
+      expect(await screen.findByText(/pass released at close/i)).toBeInTheDocument();
+    });
+
     it('lists guests still waiting below the guest list once closed', async () => {
       vi.mocked(showsAPI.get).mockResolvedValue({ ...makeShow([]), status: 'closed' });
       vi.mocked(alternatesAPI.getQueue).mockResolvedValue(waitingQueue);

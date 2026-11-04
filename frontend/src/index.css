@@ -5407,6 +5407,11 @@ body.staging-active .workforms-review-detail {
   font-weight: 600;
 }
 
+.hold-close-warning {
+  display: block;
+  margin-top: 0.35rem;
+}
+
 /* The choice of what happens if a +1 guest has no pass */
 .guest-fallback-option {
   margin-bottom: 0.6rem;

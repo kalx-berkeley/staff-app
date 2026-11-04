@@ -1,6 +1,6 @@
 """Tests for +1 guests waiting on the staff pass alternate list."""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
@@ -19,6 +19,7 @@ from app.models.staff_status import StaffStatus
 from app.models.venue import Venue
 from tests.pass_giveaway.test_alternates import (
     SEND_EMAIL,
+    _add_waiting,
     _emails_to,
     _enter,
     _first_available,
@@ -817,3 +818,446 @@ class TestQueueResponse:
         assert passes.status_code == 200, passes.text
         assert passes.json()[0]["guest_waiting"] is True
         assert passes.json()[0]["guest_position"] == 2
+
+
+def _close(client, show, promo):
+    resp = client.post(f"/api/shows/{show.id}/close", headers=_h(promo))
+    assert resp.status_code == 200, resp.text
+
+
+def _reopen(client, show, promo):
+    resp = client.post(f"/api/shows/{show.id}/reopen", headers=_h(promo))
+    assert resp.status_code == 200, resp.text
+
+
+def _two_hosts_waiting(client, db, show, people, fallback="wait_then_release"):
+    """On a two-pass show, Ann then Ben claim, and neither guest has a pass."""
+    _claim_with_guest(client, db, show, people["Ann"], fallback)
+    _claim_with_guest(client, db, show, people["Ben"], fallback)
+    assert _waiting_names(db, show) == ["Ann+1", "Ben+1"]
+
+
+class TestReleaseAtClose:
+    def test_wait_host_stays_on_the_list_alone(self, client, db, venue, people, promo):
+        show = _make_show(db, venue, 1)
+        _claim_with_guest(client, db, show, people["Ann"], "wait")
+
+        with patch(SEND_EMAIL) as mock_send:
+            _close(client, show, promo)
+
+        db.refresh(show)
+        text = ShowService._build_guest_list_text(show)
+        assert "1 pass for Ann" in text and "Ann+1" not in text
+        (email,) = _emails_to(mock_send, people["Ann"])
+        assert "didn't get a pass" in email["subject"]
+        assert "You're on the guest list, but Ann+1" in email["body_text"]
+
+    def test_latest_host_goes_first_and_can_save_the_other(
+        self, client, db, venue, people, promo
+    ):
+        show = _make_show(db, venue, 2)
+        _two_hosts_waiting(client, db, show, people)
+
+        with patch(SEND_EMAIL) as mock_send:
+            _close(client, show, promo)
+
+        ann = _primary(db, show, people["Ann"])
+        assert ann.has_guest and not ann.guest_waiting
+        assert _primary(db, show, people["Ben"]) is None
+        db.refresh(show)
+        text = ShowService._build_guest_list_text(show)
+        assert "Ann and a guest" in text and "Ben" not in text
+
+        (ann_email,) = _emails_to(mock_send, people["Ann"])
+        assert "confirmed" in ann_email["subject"]
+        (ben_email,) = _emails_to(mock_send, people["Ben"])
+        assert "has been released" in ben_email["subject"]
+        assert "neither of you" in ben_email["body_text"]
+
+    def test_staff_alternate_gets_the_pass_ahead_of_the_guest(
+        self, client, db, venue, people, promo
+    ):
+        show = _make_show(db, venue, 2)
+        _two_hosts_waiting(client, db, show, people)
+        assert _join(client, show, people["Cat"]).status_code == 201
+
+        with patch(SEND_EMAIL) as mock_send:
+            _close(client, show, promo)
+
+        assert _primary(db, show, people["Cat"]) is not None
+        assert _primary(db, show, people["Ann"]) is None
+        assert _primary(db, show, people["Ben"]) is None
+        (cat_email,) = _emails_to(mock_send, people["Cat"])
+        assert "You got a staff pass" in cat_email["subject"]
+        assert "has been released" in _emails_to(mock_send, people["Ann"])[0]["subject"]
+
+    def test_released_even_if_nobody_can_use_the_pass(
+        self, client, db, venue, people, promo
+    ):
+        show = _make_show(db, venue, 1)
+        ann = _claim_with_guest(client, db, show, people["Ann"], "wait_then_release")
+
+        with patch(SEND_EMAIL):
+            _close(client, show, promo)
+
+        db.refresh(ann)
+        assert ann.status == "available"
+        assert _primary(db, show, people["Ann"]) is None
+
+    def test_seated_guest_means_no_release(self, client, db, venue, people, promo):
+        show = _make_show(db, venue, 2)
+        _claim_with_guest(client, db, show, people["Ann"], "wait_then_release")
+
+        with patch(SEND_EMAIL) as mock_send:
+            _close(client, show, promo)
+
+        assert _primary(db, show, people["Ann"]).has_guest
+        assert "confirmed" in _emails_to(mock_send, people["Ann"])[0]["subject"]
+
+    def test_removed_guest_means_no_release(self, client, db, venue, people, promo):
+        show = _make_show(db, venue, 1)
+        ann = _claim_with_guest(client, db, show, people["Ann"], "wait_then_release")
+        client.delete(f"/api/passes/{ann.id}/guest", headers=_h(people["Ann"]))
+
+        with patch(SEND_EMAIL):
+            _close(client, show, promo)
+
+        assert _primary(db, show, people["Ann"]) is not None
+
+    def test_option_4_alternate_needs_two_passes_at_close(
+        self, client, db, venue, people, promo
+    ):
+        show = _make_show(db, venue, 1)
+        _claim_with_guest(client, db, show, people["Ann"], "wait_then_release")
+        _join(
+            client,
+            show,
+            people["Cat"],
+            has_guest=True,
+            guest_name="Cat+1",
+            guest_fallback="wait_then_release",
+        )
+
+        with patch(SEND_EMAIL) as mock_send:
+            _close(client, show, promo)
+
+        assert _primary(db, show, people["Cat"]) is None
+        (cat_email,) = _emails_to(mock_send, people["Cat"])
+        assert "No staff pass" in cat_email["subject"]
+
+    def test_option_4_alternate_gets_a_pair_at_close(
+        self, client, db, venue, people, promo
+    ):
+        # A host on leave's guest is skipped, leaving a pass free until the close.
+        show = _make_show(db, venue, 2)
+        ann = _claim(client, db, show, people["Ann"])
+        PassService._start_guest_waiting(
+            ann, datetime.now(timezone.utc), "Ann+1", "wait_then_release"
+        )
+        db.commit()
+        _add_waiting(
+            db,
+            show,
+            people["Cat"],
+            has_guest=True,
+            guest_name="Cat+1",
+            guest_fallback="wait_then_release",
+        )
+
+        with patch(SEND_EMAIL) as mock_send:
+            _close(client, show, promo)
+
+        assert _primary(db, show, people["Cat"]).has_guest
+        (cat_email,) = _emails_to(mock_send, people["Cat"])
+        assert "You got a staff pass" in cat_email["subject"]
+        assert "both on the guest list" in cat_email["body_text"]
+
+    def test_released_host_listed_for_promotions(self, client, db, venue, people, promo):
+        show = _make_show(db, venue, 1)
+        _claim_with_guest(client, db, show, people["Ann"], "wait_then_release")
+
+        with patch(SEND_EMAIL):
+            _close(client, show, promo)
+
+        entries = _queue(client, show, promo)["entries"]
+        assert [e["staff_name"] for e in entries] == ["Ann"]
+        assert entries[0]["source"] == "released_at_close"
+        assert entries[0]["guest_name"] == "Ann+1"
+
+    def test_release_is_audited(self, client, db, venue, people, promo):
+        show = _make_show(db, venue, 1)
+        _claim_with_guest(client, db, show, people["Ann"], "wait_then_release")
+
+        with patch(SEND_EMAIL):
+            _close(client, show, promo)
+
+        events = [e.event_type for e in db.query(AuditLog).all()]
+        assert "pass_released_at_close" in events
+
+    def test_reopen_gives_an_unused_pass_back(self, client, db, venue, people, promo):
+        show = _make_show(db, venue, 1)
+        _claim_with_guest(client, db, show, people["Ann"], "wait_then_release")
+        with patch(SEND_EMAIL):
+            _close(client, show, promo)
+        assert _primary(db, show, people["Ann"]) is None
+
+        with patch(SEND_EMAIL) as mock_send:
+            _reopen(client, show, promo)
+
+        # The freed pass went unused, so Ann gets it back with her guest waiting.
+        ann = _primary(db, show, people["Ann"])
+        assert ann is not None and ann.guest_waiting
+        assert "You got a staff pass" in _emails_to(mock_send, people["Ann"])[0]["subject"]
+
+    def test_second_close_doesnt_say_released_again(self, client, db, venue, people, promo):
+        show = _make_show(db, venue, 1)
+        _claim_with_guest(client, db, show, people["Ann"], "wait_then_release")
+        _join(client, show, people["Cat"])
+        with patch(SEND_EMAIL):
+            _close(client, show, promo)
+            assert _primary(db, show, people["Cat"]) is not None
+            _reopen(client, show, promo)
+        entry = AlternateService.get_waiting_entry(db, show.id, people["Ann"].id)
+        assert entry is not None and entry.source == "joined"
+
+        with patch(SEND_EMAIL) as mock_send:
+            _close(client, show, promo)
+
+        assert "No staff pass" in _emails_to(mock_send, people["Ann"])[0]["subject"]
+
+    def test_auto_close_releases_too(self, db, venue, people, client):
+        from app.scheduler import _close_automatically
+
+        show = _make_show(db, venue, 1)
+        _claim_with_guest(client, db, show, people["Ann"], "wait_then_release")
+
+        with patch(SEND_EMAIL) as mock_send:
+            _close_automatically(db, show.id)
+
+        assert _primary(db, show, people["Ann"]) is None
+        (email,) = _emails_to(mock_send, people["Ann"])
+        assert "has been released" in email["subject"]
+
+
+class TestOneEmailAtClose:
+    def test_lottery_winner_and_guest(self, client, db, venue, people, promo):
+        show = _lottery_show(db, venue, 2)
+        _enter(db, show, people["Ann"], 5, has_guest=True, guest_name="Ann+1")
+
+        with patch(SEND_EMAIL) as mock_send:
+            _close(client, show, promo)
+
+        (email,) = _emails_to(mock_send, people["Ann"])
+        assert "You won" in email["subject"]
+        assert "selected in the lottery" in email["body_text"]
+        assert "both on the guest list" in email["body_text"]
+        assert "may go to another staff member" not in email["body_text"]
+
+    def test_lottery_winner_alone_gets_the_result(self, client, db, venue, people, promo):
+        show = _lottery_show(db, venue, 1)
+        _enter(db, show, people["Ann"], 5)
+
+        with patch(SEND_EMAIL) as mock_send:
+            _close(client, show, promo)
+
+        (email,) = _emails_to(mock_send, people["Ann"])
+        assert "Your staff pass has been reserved" in email["body_text"]
+
+    def test_lottery_loser(self, client, db, venue, people, promo):
+        show = _lottery_show(db, venue, 1)
+        ann = _enter(db, show, people["Ann"], 10)
+        ben = _enter(db, show, people["Ben"], 5)
+
+        def fake_shuffle(entries):
+            entries.sort(key=lambda e: [ann.id, ben.id].index(e.id))
+
+        with (
+            patch(SEND_EMAIL) as mock_send,
+            patch("random.shuffle", side_effect=fake_shuffle),
+        ):
+            _close(client, show, promo)
+
+        (email,) = _emails_to(mock_send, people["Ben"])
+        assert "not selected" in email["body_text"]
+        assert "no staff pass became available" in email["body_text"]
+        assert "alternate #" not in email["body_text"]
+        assert "Thank you for entering" not in email["body_text"]
+
+    def test_lottery_winner_released_hears_only_once(
+        self, client, db, venue, people, promo
+    ):
+        show = _lottery_show(db, venue, 1)
+        _enter(
+            db,
+            show,
+            people["Ann"],
+            5,
+            has_guest=True,
+            guest_name="Ann+1",
+            guest_fallback="wait_then_release",
+        )
+
+        with patch(SEND_EMAIL) as mock_send:
+            _close(client, show, promo)
+
+        (email,) = _emails_to(mock_send, people["Ann"])
+        assert "has been released" in email["subject"]
+        assert "selected in the lottery" in email["body_text"]
+
+    def test_promoted_alternate_with_a_waiting_guest(
+        self, client, db, venue, people, promo
+    ):
+        show = _make_show(db, venue, 1)
+        _claim_with_guest(client, db, show, people["Ann"], "wait_then_release")
+        _join(
+            client,
+            show,
+            people["Cat"],
+            has_guest=True,
+            guest_name="Cat+1",
+            guest_fallback="wait",
+        )
+
+        with patch(SEND_EMAIL) as mock_send:
+            _close(client, show, promo)
+
+        (email,) = _emails_to(mock_send, people["Cat"])
+        assert "You got a staff pass" in email["subject"]
+        assert "You're on the guest list, but Cat+1" in email["body_text"]
+        assert "guest #" not in email["body_text"]
+
+    def test_guest_seated_during_close_gets_no_separate_email(
+        self, client, db, venue, people, promo
+    ):
+        show = _make_show(db, venue, 2)
+        _two_hosts_waiting(client, db, show, people)
+
+        with patch(SEND_EMAIL) as mock_send:
+            _close(client, show, promo)
+
+        assert len(_emails_to(mock_send, people["Ann"])) == 1
+        assert "guest_given_pass" in [e.event_type for e in db.query(AuditLog).all()]
+
+
+class TestHeldEmails:
+    @pytest.fixture
+    def held_venue(self, db, venue):
+        venue.hold_close_notifications = True
+        db.commit()
+        return venue
+
+    def _send(self, client, show, promo):
+        return client.post(
+            f"/api/shows/{show.id}/send-close-notifications", headers=_h(promo)
+        )
+
+    def test_only_waiting_guests_still_holds(self, client, db, held_venue, people, promo):
+        show = _make_show(db, held_venue, 1)
+        _claim_with_guest(client, db, show, people["Ann"], "wait")
+
+        with patch(SEND_EMAIL) as mock_send:
+            _close(client, show, promo)
+            assert _emails_to(mock_send, people["Ann"]) == []
+            db.refresh(show)
+            assert show.close_notifications_held
+
+            resp = self._send(client, show, promo)
+
+        assert resp.status_code == 200, resp.text
+        (email,) = _emails_to(mock_send, people["Ann"])
+        assert "didn't get a pass" in email["subject"]
+
+    def test_released_host_waits_for_the_rep(self, client, db, held_venue, people, promo):
+        show = _make_show(db, held_venue, 1)
+        _claim_with_guest(client, db, show, people["Ann"], "wait_then_release")
+
+        with patch(SEND_EMAIL) as mock_send:
+            _close(client, show, promo)
+            assert _emails_to(mock_send, people["Ann"]) == []
+            assert _queue(client, show, people["Ann"])["my_outcome_pending"] is True
+            self._send(client, show, promo)
+
+        (email,) = _emails_to(mock_send, people["Ann"])
+        assert "has been released" in email["subject"]
+
+    def test_promoted_alternate_hears_now_and_confirmed_later(
+        self, client, db, held_venue, people, promo
+    ):
+        show = _make_show(db, held_venue, 2)
+        ann = _claim(client, db, show, people["Ann"])
+        PassService._start_guest_waiting(
+            ann, datetime.now(timezone.utc), "Ann+1", "wait_then_release"
+        )
+        db.commit()
+        _add_waiting(
+            db,
+            show,
+            people["Cat"],
+            has_guest=True,
+            guest_name="Cat+1",
+            guest_fallback="wait_then_release",
+        )
+
+        with patch(SEND_EMAIL) as mock_send:
+            _close(client, show, promo)
+            (now_email,) = _emails_to(mock_send, people["Cat"])
+            assert "You got a staff pass" in now_email["subject"]
+            assert "both on the guest list" not in now_email["body_text"]
+
+            self._send(client, show, promo)
+
+        later = _emails_to(mock_send, people["Cat"])[1]
+        assert "confirmed" in later["subject"]
+
+    def test_lottery_result_goes_now_and_outcome_later(
+        self, client, db, held_venue, people, promo
+    ):
+        show = _lottery_show(db, held_venue, 1)
+        ann = _enter(db, show, people["Ann"], 10)
+        ben = _enter(db, show, people["Ben"], 5)
+
+        def fake_shuffle(entries):
+            entries.sort(key=lambda e: [ann.id, ben.id].index(e.id))
+
+        with (
+            patch(SEND_EMAIL) as mock_send,
+            patch("random.shuffle", side_effect=fake_shuffle),
+        ):
+            _close(client, show, promo)
+            (now_email,) = _emails_to(mock_send, people["Ben"])
+            assert "not selected" in now_email["body_text"]
+            assert "alternate #" not in now_email["body_text"]
+
+            self._send(client, show, promo)
+
+        assert "No staff pass" in _emails_to(mock_send, people["Ben"])[1]["subject"]
+
+    def test_reopen_tells_a_released_host_who_never_heard(
+        self, client, db, held_venue, people, promo
+    ):
+        show = _make_show(db, held_venue, 1)
+        _claim_with_guest(client, db, show, people["Ann"], "wait_then_release")
+        _join(client, show, people["Cat"])
+        with patch(SEND_EMAIL):
+            _close(client, show, promo)
+
+        with patch(SEND_EMAIL) as mock_send:
+            _reopen(client, show, promo)
+
+        (email,) = _emails_to(mock_send, people["Ann"])
+        assert "back on the alternate list" in email["subject"]
+        assert "was released when the show closed" in email["body_text"]
+
+    def test_send_counts_are_audited(self, client, db, held_venue, people, promo):
+        show = _make_show(db, held_venue, 1)
+        _claim_with_guest(client, db, show, people["Ann"], "wait")
+        with patch(SEND_EMAIL):
+            _close(client, show, promo)
+            self._send(client, show, promo)
+
+        entry = (
+            db.query(AuditLog)
+            .filter(AuditLog.event_type == "close_notifications_sent")
+            .one()
+        )
+        assert entry.details["waiting_guest_hosts"] == 1

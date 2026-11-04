@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.common.areas import PASS_GIVEAWAY_AREA
 from app.models.guest_fallback import GuestFallback
+from app.pass_giveaway.services.close_digest import CloseDigest
 from app.models.lottery_entry import LotteryEntry
 from app.models.notification_preferences import NotificationPreferences
 from app.models.pass_model import Pass
@@ -295,13 +296,15 @@ class LotteryService:
             )
 
     @staticmethod
-    def run_lottery(db: Session, show_id: int) -> dict:
+    def run_lottery(db: Session, show_id: int, digest: CloseDigest | None = None) -> dict:
         """
         Execute the lottery for a show.
 
         Randomly assigns available passes to lottery entrants, then sends
         notification emails to all entrants (winners and losers).
         Returns a summary dict.
+
+        :param digest: The show is closing, so staff results go in the close's email.
         """
         show = db.query(Show).filter(Show.id == show_id).first()
         if not show:
@@ -333,7 +336,9 @@ class LotteryService:
 
         now = datetime.now(timezone.utc)
 
-        staff_summary = LotteryService._run_staff_lottery(db, show, staff_entries, now)
+        staff_summary = LotteryService._run_staff_lottery(
+            db, show, staff_entries, now, digest
+        )
         dj_summary = LotteryService._run_dj_lottery(db, show, dj_entries, now)
 
         logger.info(
@@ -345,7 +350,11 @@ class LotteryService:
 
     @staticmethod
     def _run_staff_lottery(
-        db: Session, show: Show, entries: list[LotteryEntry], now: datetime
+        db: Session,
+        show: Show,
+        entries: list[LotteryEntry],
+        now: datetime,
+        digest: CloseDigest | None = None,
     ) -> dict:
         """Run the staff pass lottery and claim passes for winners.
 
@@ -493,7 +502,7 @@ class LotteryService:
         promotions.guests_seated = [
             host for host in promotions.guests_seated if host.id not in winner_pass_ids
         ]
-        AlternateService.finalize_promotions(db, promotions)
+        AlternateService.finalize_promotions(db, promotions, digest)
 
         promoted_staff_ids = {p.entry.staff_id for p in promotions.promotions}
         alternate_positions = {
@@ -677,7 +686,8 @@ class LotteryService:
                     subject = f"Lottery result for {show.event_name}"
 
             position = alternate_positions.get(entry.staff_id)
-            if entry.id not in staff_pass and position is not None:
+            # A close ends the alternate list right after the draw.
+            if digest is None and entry.id not in staff_pass and position is not None:
                 body = body.replace(
                     "Thank you for entering!",
                     "\n".join([
@@ -693,6 +703,21 @@ class LotteryService:
                         "Thank you for entering!",
                     ]),
                 )
+
+            if digest is not None:
+                won = entry.id in staff_pass
+                digest.add_intro(
+                    staff_member,
+                    subject,
+                    [body],
+                    short_lines=[
+                        "Congratulations! You have been selected in the lottery for"
+                        f" {show_desc}."
+                        if won
+                        else body.replace("\n\nThank you for entering!", "")
+                    ],
+                )
+                continue
 
             notification_service.send_email(
                 to_email=staff_member.email,

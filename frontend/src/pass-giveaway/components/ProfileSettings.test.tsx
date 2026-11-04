@@ -86,6 +86,15 @@ describe('ProfileSettings', () => {
     expect(screen.getByText('555-987-6543')).toBeInTheDocument();
   });
 
+  it('warns that turning off email hides a released pass', async () => {
+    vi.mocked(usersAPI.getProfile).mockResolvedValue(mockPromotionsProfile);
+
+    render(<ProfileSettings section="Promotions" />);
+
+    expect(await screen.findByText(/won't be told if your staff pass is released/i)).toBeInTheDocument();
+    expect(screen.getByText(/your staff pass and \+1 guest/i)).toBeInTheDocument();
+  });
+
   it('should display the Airtable notice', async () => {
     vi.mocked(usersAPI.getProfile).mockResolvedValue(mockPromotionsProfile);
 

@@ -6,7 +6,7 @@ import MarkdownContent from '../../common/components/MarkdownContent';
 import { formatPhone, formatLeave, isOnLeave, leaveCoversShow, formatDateValue } from '../../common/utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { STAFF_PASSES_NOT_YET_ACTIVE, WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow, staffPassesNotYetActive, waitingFallbackNote } from '../utils';
+import { STAFF_PASSES_NOT_YET_ACTIVE, WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow, seatedFallbackNote, staffPassesNotYetActive, waitingFallbackNote } from '../utils';
 import type { ShowResponse, ClaimData, LotteryStatus, SpecialtyShowResponse, AlternateQueue, AlternateJoinRequest, GuestFallback } from '../types';
 import type { StaffProfile, APIError } from '../../common/types';
 
@@ -1356,25 +1356,39 @@ const ShowDetail = () => {
                         <p className="pass-guest-note">
                           +1 guest reserved
                           {pass.guest_name ? `: ${pass.guest_name}` : ''}
-                          {pass.guest_fallback === 'release' ? " (staff will release if guest can't attend)" : ''}
-                          {waitingFallbackNote(pass.guest_fallback)}
+                          {show.status !== 'closed' && pass.guest_fallback === 'release' ? " (staff will release if guest can't attend)" : ''}
+                          {show.status !== 'closed' && seatedFallbackNote(pass.guest_fallback)}
                           {' '}— <em>
-                            {!show.close_notifications_pending
-                              ? 'not confirmed until show closes'
-                              : isMine
+                            {show.close_notifications_pending
+                              ? isMine
                                 ? "not confirmed yet, you'll get an email"
-                                : 'not confirmed yet'}
+                                : 'not confirmed yet'
+                              : show.status === 'closed'
+                                ? 'confirmed'
+                                : 'not confirmed until show closes'}
                           </em>
                         </p>
                       )}
                       {pass.guest_waiting && (
                         <p className="pass-guest-note">
-                          +1 guest on the alternate list
-                          {pass.guest_name ? `: ${pass.guest_name}` : ''}
-                          {pass.guest_position ? ` (guest #${pass.guest_position})` : ''}
-                          {pass.guest_fallback === 'wait_then_release'
-                            ? " — staff's pass is released if they don't have one at close"
-                            : ''}
+                          {show.status !== 'closed' ? (
+                            <>
+                              +1 guest on the alternate list
+                              {pass.guest_name ? `: ${pass.guest_name}` : ''}
+                              {pass.guest_position ? ` (guest #${pass.guest_position})` : ''}
+                              {pass.guest_fallback === 'wait_then_release'
+                                ? " — staff's pass is released if they don't have one at close"
+                                : ''}
+                            </>
+                          ) : show.close_notifications_pending ? (
+                            <>
+                              +1 guest{pass.guest_name ? `: ${pass.guest_name}` : ''} — <em>
+                                {isMine ? "not confirmed yet, you'll get an email" : 'not confirmed yet'}
+                              </em>
+                            </>
+                          ) : (
+                            <>+1 guest didn't get a pass{pass.guest_name ? `: ${pass.guest_name}` : ''}</>
+                          )}
                         </p>
                       )}
                       {pass.staff_phone && <p><strong>Phone:</strong> {formatPhone(pass.staff_phone)}</p>}

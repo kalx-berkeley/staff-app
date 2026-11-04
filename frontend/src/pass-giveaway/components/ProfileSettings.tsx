@@ -212,6 +212,11 @@ const ProfileSettings = ({ section }: { section: 'Promotions' | 'Staff' }) => {
             When enabled, you'll receive emails for:
           </p>
           <ul className="field-hint">
+            <li>
+              Your staff pass and +1 guest — getting a pass from the alternate list, your pass being
+              removed or released, including when a show closes, your guest losing or getting a
+              pass, and whether your guest is on the guest list
+            </li>
             <li>Lottery results — whether you won or lost a pass (or on-air pass pair) lottery you entered</li>
             <li>Lottery entry cancellations — if a show you entered a lottery for is cancelled before the drawing</li>
             <li>
@@ -223,6 +228,8 @@ const ProfileSettings = ({ section }: { section: 'Promotions' | 'Staff' }) => {
           </ul>
           <p className="field-hint">
             Disabling this stops all of the above; you'll need to check the app directly instead.
+            You won't be told if your staff pass is released, so you could turn up expecting to be
+            on the guest list.
           </p>
         </div>
       ) : (

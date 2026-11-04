@@ -23,6 +23,9 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
+    // Longer than the wait for findBy* and waitFor in src/test/setup.ts, so a failed
+    // wait reports what it couldn't find instead of a plain timeout.
+    testTimeout: 15000,
     experimental: {
       diagnostics: {
         // Vitest suggests `pool: 'vmThreads'` or `isolate: false` to avoid

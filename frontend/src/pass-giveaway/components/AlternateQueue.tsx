@@ -52,11 +52,16 @@ export const AlternateQueueList = ({
                   {isMine && <span className="alternate-you"> (you)</span>}
                 </p>
                 <p><strong>Name:</strong> {entry.staff_name ?? '(name not recorded)'}</p>
+                {entry.source === 'released_at_close' && (
+                  <p className="pass-guest-note">
+                    Pass released at close, because their guest didn't have one
+                  </p>
+                )}
                 {entry.has_guest && (
                   <p className="pass-guest-note">
                     +1 guest requested{entry.guest_name ? `: ${entry.guest_name}` : ''}
                     {entry.guest_fallback === 'release' ? ' (only attending with guest)' : ''}
-                    {waitingFallbackNote(entry.guest_fallback)}
+                    {entry.source !== 'released_at_close' && waitingFallbackNote(entry.guest_fallback)}
                   </p>
                 )}
                 {renderDetails?.(entry)}

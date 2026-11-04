@@ -10,6 +10,7 @@ import logging
 from app.common.areas import PASS_GIVEAWAY_AREA
 from app.config import settings
 from app.models.guest_fallback import GuestFallback
+from app.pass_giveaway.services.close_digest import CloseDigest
 from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.staff import Staff
@@ -711,6 +712,7 @@ class PassService:
         primary_pass: Pass | None,
         show: Show,
         now: datetime,
+        digest: CloseDigest | None = None,
     ) -> bool:
         """
         Detach a guest hold from its primary pass so it can be claimed by someone else.
@@ -731,7 +733,7 @@ class PassService:
             released = primary_pass.guest_fallback == GuestFallback.RELEASE
             # Notify before clearing staff_id so the staff relationship
             # is still intact when the email address is looked up.
-            PassService._notify_guest_bumped(db, primary_pass, show, released)
+            PassService._notify_guest_bumped(db, primary_pass, show, released, digest)
 
             PassService._clear_guest(primary_pass, now)
 
@@ -747,6 +749,7 @@ class PassService:
         primary_pass: Pass,
         show: Show,
         released: bool,
+        digest: CloseDigest | None = None,
     ) -> None:
         """Email a staff member whose guest was bumped, if they have email enabled."""
         from app.pass_giveaway.services.alternate_service import AlternateService
@@ -801,7 +804,10 @@ class PassService:
             ]
             subject = f"Your guest pass is no longer available: {show.event_name}"
 
-        AlternateService._email(db, primary_pass.staff, subject=subject, lines=lines)
+        if digest is not None:
+            digest.add_intro(primary_pass.staff, subject, lines)
+        else:
+            AlternateService._email(db, primary_pass.staff, subject=subject, lines=lines)
 
     @staticmethod
     def claim_staff_pass(

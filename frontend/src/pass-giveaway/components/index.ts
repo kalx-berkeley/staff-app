@@ -19,6 +19,7 @@ export type { PersonOption } from '../../common/components/PersonAutocomplete';
 export { extractPersonEmail } from '../../common/components/personUtils';
 export { AlternateQueueList, AlternateGuestForm, WaitingGuestsList } from './AlternateQueue';
 export { default as GuestFallbackOptions } from './GuestFallbackOptions';
+export { default as HoldCloseNotificationsHint } from './HoldCloseNotificationsHint';
 export { default as ClaimGuestActions } from './ClaimGuestActions';
 export { default as DescriptionCheckFeedback } from './DescriptionCheckFeedback';
 export { useDescriptionCheck } from './useDescriptionCheck';
