@@ -43,6 +43,7 @@ vi.mock('../../common/contexts/authHooks', () => ({
 }));
 
 const entry: MyAlternateEntry = {
+  outcome_pending: false,
   id: 4,
   show_id: 9,
   staff_id: 1,
@@ -71,6 +72,18 @@ describe('Staff MyPasses — alternate lists', () => {
     render(<BrowserRouter><MyPasses /></BrowserRouter>);
     await waitFor(() => expect(alternatesAPI.getMyEntries).toHaveBeenCalled());
     expect(screen.queryByText('Alternate Lists')).not.toBeInTheDocument();
+  });
+
+  it('shows a held outcome instead of the queue position and Leave button', async () => {
+    vi.mocked(alternatesAPI.getMyEntries).mockResolvedValue([{ ...entry, outcome_pending: true }]);
+
+    render(<BrowserRouter><MyPasses /></BrowserRouter>);
+
+    expect(
+      await screen.findByText("The show has closed. You'll get an email with the outcome.")
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Ahead of you:')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /leave list/i })).not.toBeInTheDocument();
   });
 
   it('lists entries with position and lets the user leave', async () => {

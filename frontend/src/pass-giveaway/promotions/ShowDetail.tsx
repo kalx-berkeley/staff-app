@@ -12,17 +12,18 @@ import { WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow } from '../
 
 type SuggestMode = 'choose' | 'date' | 'genre' | null;
 
-type ConfirmAction = 'close' | 'unpublish' | 'reopen' | null;
+type ConfirmAction = 'close' | 'unpublish' | 'reopen' | 'notify' | null;
 
 interface ConfirmModalProps {
   action: Exclude<ConfirmAction, null>;
   show: ShowResponse;
   userEmail: string | null;
+  alternateCount: number;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-const ConfirmModal = ({ action, show, userEmail, onConfirm, onCancel }: ConfirmModalProps) => {
+const ConfirmModal = ({ action, show, userEmail, alternateCount, onConfirm, onCancel }: ConfirmModalProps) => {
   // promotions_contacts are the reps of the show's promoter or, with none, its venue
   const isShowRep = userEmail
     ? show.promotions_contacts.some((c) => c.email === userEmail)
@@ -50,6 +51,35 @@ const ConfirmModal = ({ action, show, userEmail, onConfirm, onCancel }: ConfirmM
           <div className="form-actions" style={{ marginTop: '1rem' }}>
             <button onClick={onCancel} className="btn-secondary">Cancel</button>
             <button onClick={onConfirm} className="btn-primary">Close Show</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (action === 'notify') {
+    const guestHostCount = show.passes.filter(
+      (p) => p.pass_type === 'staff' && p.status === 'claimed' && p.has_guest
+    ).length;
+    const recipients = [
+      guestHostCount > 0 &&
+        `${guestHostCount} +1 ${guestHostCount === 1 ? 'host' : 'hosts'} that their guest is confirmed`,
+      alternateCount > 0 &&
+        `${alternateCount} ${alternateCount === 1 ? 'alternate' : 'alternates'} that they didn't get a pass`,
+    ].filter(Boolean);
+    return (
+      <div className="modal-overlay" onClick={onCancel}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h3>Notify Staff and Alternates</h3>
+            <button className="btn-close" onClick={onCancel}>×</button>
+          </div>
+          <p>
+            This will email {recipients.join(' and ')} for <strong>{show.event_name}</strong>.
+          </p>
+          <div className="form-actions" style={{ marginTop: '1rem' }}>
+            <button onClick={onCancel} className="btn-secondary">Cancel</button>
+            <button onClick={onConfirm} className="btn-primary">Send Notifications</button>
           </div>
         </div>
       </div>
@@ -336,6 +366,8 @@ const ShowDetail = () => {
         await showsAPI.unpublish(parseInt(id));
       } else if (confirmAction === 'reopen') {
         await showsAPI.reopen(parseInt(id));
+      } else if (confirmAction === 'notify') {
+        await showsAPI.sendCloseNotifications(parseInt(id));
       }
       await Promise.all([loadShow(), loadLotteryStatus()]);
     } catch (err) {
@@ -343,7 +375,9 @@ const ShowDetail = () => {
       setActionError(
         typeof apiError.detail === 'string'
           ? apiError.detail
-          : `Failed to ${confirmAction} show`
+          : confirmAction === 'notify'
+            ? 'Failed to send notifications'
+            : `Failed to ${confirmAction} show`
       );
     } finally {
       setActionLoading(false);
@@ -799,12 +833,34 @@ const ShowDetail = () => {
         <div className="guest-list-summary">
           <div className="guest-list-summary-header">
             <h3>Guest List for Venue</h3>
-            {(guestListLines.length > 0 || failedAttempts.length > 0) && (
-              <button onClick={handleCopyGuestList} className="btn-secondary btn-small">
-                {copySuccess ? 'Copied!' : 'Copy'}
-              </button>
-            )}
+            <div className="guest-list-summary-actions">
+              {show.close_notifications_pending && (
+                <button
+                  onClick={() => setConfirmAction('notify')}
+                  className="btn-primary btn-small"
+                  disabled={actionLoading}
+                >
+                  Notify Staff and Alternates
+                </button>
+              )}
+              {(guestListLines.length > 0 || failedAttempts.length > 0) && (
+                <button onClick={handleCopyGuestList} className="btn-secondary btn-small">
+                  {copySuccess ? 'Copied!' : 'Copy'}
+                </button>
+              )}
+            </div>
           </div>
+          {show.close_notifications_pending && (
+            <p className="field-hint">
+              Staff with a +1 and alternates haven't been told the outcome yet.
+            </p>
+          )}
+          {show.close_notifications_sent_at && (
+            <p className="field-hint">
+              Notifications sent {formatAttemptDateTime(show.close_notifications_sent_at)}
+              {show.close_notifications_sent_by ? ` by ${show.close_notifications_sent_by}` : ''}
+            </p>
+          )}
           <p className="guest-list-greeting">{emailGreeting}</p>
           {guestListLines.length > 0 ? (
             <>
@@ -1318,6 +1374,7 @@ const ShowDetail = () => {
           action={confirmAction}
           show={show}
           userEmail={user?.email ?? null}
+          alternateCount={alternates.length}
           onConfirm={handleConfirmedAction}
           onCancel={() => setConfirmAction(null)}
         />
@@ -1463,7 +1520,7 @@ const ShowDetail = () => {
                         +1 guest reserved
                         {pass.guest_name ? `: ${pass.guest_name}` : ''}
                         {pass.only_attend_with_guest ? " (staff will release if guest can't attend)" : ''}
-                        {' '}— <em>not confirmed until show closes</em>
+                        {' '}— <em>{show.close_notifications_pending ? "not confirmed yet, staff hasn't been emailed" : 'not confirmed until show closes'}</em>
                       </p>
                     )}
                     <p>

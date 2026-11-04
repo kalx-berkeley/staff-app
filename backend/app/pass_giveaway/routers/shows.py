@@ -68,12 +68,11 @@ class AttemptRequest(BaseModel):
     dj_name: str
 
 
-def _notify_staff_guests_confirmed(db, show) -> None:
-    """Notify staff members with pending +1 guests that their guest is confirmed."""
-    from app.common.services import notification_service
+def _passes_with_pending_guests(db, show) -> list:
+    """Claimed staff passes whose +1 guest isn't confirmed until the show closes."""
     from app.models.pass_model import Pass
 
-    guest_passes = (
+    return (
         db.query(Pass)
         .filter(
             Pass.show_id == show.id,
@@ -83,6 +82,17 @@ def _notify_staff_guests_confirmed(db, show) -> None:
         )
         .all()
     )
+
+
+def _notify_staff_guests_confirmed(db, show) -> int:
+    """
+    Notify staff members with pending +1 guests that their guest is confirmed.
+
+    :returns: Number of passes with a pending guest.
+    """
+    from app.common.services import notification_service
+
+    guest_passes = _passes_with_pending_guests(db, show)
     for pass_item in guest_passes:
         if not pass_item.staff or not pass_item.staff.email:
             continue
@@ -106,19 +116,30 @@ def _notify_staff_guests_confirmed(db, show) -> None:
             db=db,
             area=PASS_GIVEAWAY_AREA,
         )
+    return len(guest_passes)
 
 
 def run_close_side_effects(db, show) -> None:
     """
-    Notifications that follow closing a show, whether manual or automatic.
+    What follows closing a show, whether manual or automatic.
 
     Confirms +1 guests to their staff hosts and tells anyone still on the
-    alternate list that they did not get a pass.
+    alternate list that they did not get a pass. When the show's promoter or
+    venue holds those emails, and there's anyone to send them to, they wait for
+    the send-close-notifications endpoint instead.
     """
     from app.pass_giveaway.services.alternate_service import AlternateService
 
-    _notify_staff_guests_confirmed(db, show)
-    AlternateService.expire_on_close(db, show)
+    hold = show.promoted_by.hold_close_notifications and bool(
+        _passes_with_pending_guests(db, show)
+        or AlternateService.waiting_entries(db, show.id)
+    )
+    if hold:
+        show.close_notifications_held = True
+        db.commit()
+    else:
+        _notify_staff_guests_confirmed(db, show)
+    AlternateService.expire_on_close(db, show, notify=not hold)
 
 
 def _notify_claimers_of_cancellation(db, show) -> None:
@@ -337,6 +358,9 @@ def _build_show_response(
         "planned_close_date": show.planned_close_date,
         "planned_close_time": show.planned_close_time,
         "auto_close": show.auto_close,
+        "close_notifications_pending": show.close_notifications_pending,
+        "close_notifications_sent_at": show.close_notifications_sent_at,
+        "close_notifications_sent_by": show.close_notifications_sent_by,
         "co_announce": show.co_announce,
         "lottery_enabled": show.lottery_enabled,
         "lottery_window_hours": show.lottery_window_hours,
@@ -1075,6 +1099,61 @@ def close_show(
     return _build_show_response(show)
 
 
+@router.post("/{show_id}/send-close-notifications", response_model=ShowResponse)
+def send_close_notifications(
+    show_id: int,
+    promotions: Staff = Depends(get_promotions_staff),
+    db: Session = Depends(get_db),
+):
+    """Send the close emails held for a closed show (promotions staff only)."""
+    from datetime import datetime, timezone
+
+    from app.pass_giveaway.services.alternate_service import AlternateService
+
+    show = ShowService.get_show(db, show_id)
+    not_pending = HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="This show has no close notifications waiting to be sent.",
+    )
+    if not show.close_notifications_pending:
+        raise not_pending
+    # Claim the send in one statement so a double click can't email everyone twice.
+    claimed = (
+        db.query(Show)
+        .filter(Show.id == show_id, Show.close_notifications_held.is_(True))
+        .update(
+            {
+                Show.close_notifications_held: False,
+                Show.close_notifications_sent_at: datetime.now(timezone.utc),
+                Show.close_notifications_sent_by: promotions.name or promotions.email,
+            },
+            synchronize_session=False,
+        )
+    )
+    db.commit()
+    if not claimed:
+        raise not_pending
+    db.refresh(show)
+
+    guest_hosts = _notify_staff_guests_confirmed(db, show)
+    alternates = AlternateService.notify_expired_at_close(db, show)
+    audit_service.log_event(
+        db,
+        event_type="close_notifications_sent",
+        area=PASS_GIVEAWAY_AREA,
+        actor_email=promotions.email,
+        actor_role="promotions",
+        entity_type="show",
+        entity_id=show.id,
+        details={
+            "event_name": show.event_name,
+            "guest_hosts": guest_hosts,
+            "alternates": alternates,
+        },
+    )
+    return _build_show_response(show)
+
+
 @router.post("/{show_id}/unpublish", response_model=ShowResponse)
 def unpublish_show(
     show_id: int,
@@ -1114,8 +1193,9 @@ def reopen_show(
 
     from app.pass_giveaway.services.alternate_service import AlternateService
 
+    was_held = ShowService.get_show(db, show_id).close_notifications_held
     show = ShowService.reopen_show(db, show_id)
-    AlternateService.restore_on_reopen(db, show)
+    AlternateService.restore_on_reopen(db, show, notify_restored=not was_held)
     _LA = ZoneInfo("America/Los_Angeles")
     if show.auto_close and show.planned_close_date and show.planned_close_time:
         close_dt = datetime.combine(
@@ -1153,10 +1233,13 @@ def delete_show(
 
     show = ShowService.get_show(db, show_id)
     event_name = show.event_name
+    held_alternates_untold = show.close_notifications_pending
     ShowService.delete_show(db, show_id, actor_email=promotions.email)
     _notify_claimers_of_cancellation(db, show)
     _cancel_pending_lottery_entries(db, show, reason="deleted")
-    AlternateService.cancel_on_delete(db, show)
+    AlternateService.cancel_on_delete(db, show, notify_expired=held_alternates_untold)
+    show.close_notifications_held = False
+    db.commit()
     unschedule_auto_close_job(show_id)
     unschedule_lottery_job(show_id)
     audit_service.log_event(

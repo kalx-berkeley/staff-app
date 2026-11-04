@@ -46,11 +46,15 @@ class AlternateQueueResponse(BaseModel):
     # Who would get the current user's pass if they released it now.
     next_candidate_staff_id: int | None = None
     next_candidate_name: str | None = None
+    # The current user was on the list when the show closed, and the email telling
+    # them the outcome is being held.
+    my_outcome_pending: bool = False
 
 
 class MyAlternateEntryResponse(AlternateEntryResponse):
-    """One of the current user's waiting entries, with show details."""
+    """One of the current user's waiting or outcome-pending entries, with show details."""
 
+    outcome_pending: bool = False
     show_event_name: str | None = None
     show_date: date | None = None
     show_venue_name: str | None = None

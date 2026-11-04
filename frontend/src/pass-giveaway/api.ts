@@ -197,6 +197,22 @@ export const showsAPI = {
   },
 
   /**
+   * Send a closed show's held emails to staff with a +1 and alternates
+   * (promotions staff only).
+   *
+   * @param id - Show ID
+   * @returns Promise resolving to the updated show
+   */
+  sendCloseNotifications: async (id: number): Promise<ShowResponse> => {
+    try {
+      const response = await apiClient.post<ShowResponse>(`/shows/${id}/send-close-notifications`);
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
    * Reopen a closed show (promotions staff only).
    * Transitions show from closed back to published status.
    * Only allowed if the show date has not yet passed.

@@ -379,6 +379,9 @@ class ShowResponse(BaseModel):
     planned_close_date: date | None
     planned_close_time: time | None
     auto_close: bool
+    close_notifications_pending: bool = False
+    close_notifications_sent_at: UtcDatetime | None = None
+    close_notifications_sent_by: str | None = None
     co_announce: bool
     lottery_enabled: bool = False
     lottery_window_hours: int = 24

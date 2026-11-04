@@ -1305,7 +1305,13 @@ const ShowDetail = () => {
                           +1 guest reserved
                           {pass.guest_name ? `: ${pass.guest_name}` : ''}
                           {pass.only_attend_with_guest ? " (staff will release if guest can't attend)" : ''}
-                          {' '}— <em>not confirmed until show closes</em>
+                          {' '}— <em>
+                            {!show.close_notifications_pending
+                              ? 'not confirmed until show closes'
+                              : isMine
+                                ? "not confirmed yet, you'll get an email"
+                                : 'not confirmed yet'}
+                          </em>
                         </p>
                       )}
                       {pass.staff_phone && <p><strong>Phone:</strong> {formatPhone(pass.staff_phone)}</p>}
@@ -1461,6 +1467,12 @@ const ShowDetail = () => {
           </div>
 
           {alternateActionError && <p className="field-error">{alternateActionError}</p>}
+
+          {alternateQueue?.my_outcome_pending && (
+            <div className="alternate-summary">
+              <p style={{ margin: 0 }}>The show has closed. You'll get an email with the outcome.</p>
+            </div>
+          )}
 
           {canJoinAlternates && (
             <div className="alternate-summary">

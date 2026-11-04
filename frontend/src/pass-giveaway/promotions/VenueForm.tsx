@@ -37,6 +37,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   const [emailAddressRequirement, setEmailAddressRequirement] =
     useState<EmailAddressRequirement>('none');
   const [staffGuestRequiresName, setStaffGuestRequiresName] = useState(false);
+  const [holdCloseNotifications, setHoldCloseNotifications] = useState(false);
   const [defaultLotteryEnabled, setDefaultLotteryEnabled] = useState(false);
   const [defaultLotteryWindowHours, setDefaultLotteryWindowHours] = useState('24');
   const [defaultDjPreassignProhibitionDays, setDefaultDjPreassignProhibitionDays] = useState('');
@@ -82,6 +83,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
       setRequiresPhoneNumber(venue.requires_phone_number ?? false);
       setEmailAddressRequirement(venue.email_address_requirement ?? 'none');
       setStaffGuestRequiresName(venue.staff_guest_requires_name ?? false);
+      setHoldCloseNotifications(venue.hold_close_notifications ?? false);
       setDefaultLotteryEnabled(venue.default_lottery_enabled ?? false);
       setDefaultLotteryWindowHours(String(venue.default_lottery_window_hours ?? 24));
       setDefaultDjPreassignProhibitionDays(
@@ -237,6 +239,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           requires_phone_number: requiresPhoneNumber,
           email_address_requirement: emailAddressRequirement,
           staff_guest_requires_name: staffGuestRequiresName,
+          hold_close_notifications: holdCloseNotifications,
           default_lottery_enabled: defaultLotteryEnabled,
           default_lottery_window_hours: defaultLotteryEnabled ? (parseInt(defaultLotteryWindowHours) || 24) : 24,
           default_dj_preassign_prohibition_days: defaultDjPreassignProhibitionDaysValue,
@@ -265,6 +268,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           requires_phone_number: requiresPhoneNumber,
           email_address_requirement: emailAddressRequirement,
           staff_guest_requires_name: staffGuestRequiresName,
+          hold_close_notifications: holdCloseNotifications,
           default_lottery_enabled: defaultLotteryEnabled,
           default_lottery_window_hours: defaultLotteryEnabled ? (parseInt(defaultLotteryWindowHours) || 24) : 24,
           default_dj_preassign_prohibition_days: defaultDjPreassignProhibitionDaysValue,
@@ -636,6 +640,22 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
                 When checked, staff members bringing a +1 guest must provide the guest's name,
                 and the guest list will show the guest's name as a separate entry. When unchecked,
                 the list shows "John Doe and a guest" without requiring the guest's name.
+              </span>
+            </div>
+            <div className="form-group form-group-checkbox">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={holdCloseNotifications}
+                  onChange={(e) => setHoldCloseNotifications(e.target.checked)}
+                  disabled={submitting}
+                />
+                {' '}Wait for me to send close notifications
+              </label>
+              <span className="field-hint">
+                When checked, closing a show doesn't tell staff with a +1 or alternates the outcome. A
+                promotions rep sends those emails with a button on the closed show's page. If nobody
+                clicks it before the show date has passed, they're never sent.
               </span>
             </div>
           </div>

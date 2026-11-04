@@ -27,6 +27,11 @@ class Promoter(Base):
     staff_guest_requires_name = Column(
         Boolean, nullable=False, default=False, server_default="false"
     )
+    # Hold the emails telling staff and alternates the outcome when a show closes
+    # until a promotions rep clicks the button on the show page
+    hold_close_notifications = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     deleted = Column(Boolean, nullable=False, default=False)
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False

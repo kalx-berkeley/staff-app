@@ -25,6 +25,9 @@ logger = logging.getLogger(__name__)
 
 _LA = ZoneInfo("America/Los_Angeles")
 
+# Must match the button on the promotions show page.
+NOTIFY_BUTTON_LABEL = "Notify Staff and Alternates"
+
 
 def apply_venue_rating(show: Show, venue: Venue) -> None:
     """
@@ -466,8 +469,14 @@ class ShowService:
                     detail="Cannot reopen a show whose date has already passed.",
                 )
 
+            now = datetime.now(timezone.utc)
             show.status = "published"
-            show.updated_at = datetime.now(timezone.utc)
+            show.updated_at = now
+            show.reopened_at = now
+            # The next close starts over, whether or not these were sent.
+            show.close_notifications_held = False
+            show.close_notifications_sent_at = None
+            show.close_notifications_sent_by = None
 
             db.commit()
             db.refresh(show)
@@ -899,7 +908,15 @@ class ShowService:
         """Send guest list email to responsible owners when the show is auto-closed."""
         subject = f"Show auto-closed: {show.event_name} — guest list"
         show_url = f"{settings.frontend_base_url}/pass-giveaway/promotions/shows/{show.id}"
-        body = ShowService._build_guest_list_text(show) + f"\n\nView this show: {show_url}"
+        body = ShowService._build_guest_list_text(show)
+        if show.close_notifications_pending:
+            body += (
+                "\n\nNo notifications have been sent to staff or alternates about this"
+                " show. Go to the show page and click"
+                f' "{NOTIFY_BUTTON_LABEL}" to tell them the outcome: {show_url}'
+            )
+        else:
+            body += f"\n\nView this show: {show_url}"
 
         owners = show.promoted_by.owners
         for owner in owners:

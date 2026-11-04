@@ -37,6 +37,7 @@ class PromoterCreate(BaseModel):
     requires_phone_number: bool = False
     email_address_requirement: EmailAddressRequirement = "none"
     staff_guest_requires_name: bool = False
+    hold_close_notifications: bool = False
     owner_emails: list[str] = Field(default_factory=list)
     contacts: list[PromoterContactCreate] = Field(default_factory=list)
 
@@ -50,6 +51,7 @@ class PromoterUpdate(BaseModel):
     requires_phone_number: bool | None = None
     email_address_requirement: EmailAddressRequirement | None = None
     staff_guest_requires_name: bool | None = None
+    hold_close_notifications: bool | None = None
     owner_emails: list[str] | None = None
     contacts: list[PromoterContactCreate] | None = None
 
@@ -68,6 +70,7 @@ class PromoterResponse(BaseModel):
     # Derived from email_address_requirement: DJs must collect on-air winners' emails
     requires_email_address: bool = False
     staff_guest_requires_name: bool = False
+    hold_close_notifications: bool = False
     deleted: bool = False
     owner_emails: list[str] = Field(default_factory=list)
     contacts: list[PromoterContactResponse] = Field(default_factory=list)
@@ -83,6 +86,7 @@ class PromoterResponse(BaseModel):
             email_address_requirement=promoter.email_address_requirement,
             requires_email_address=promoter.requires_email_address,
             staff_guest_requires_name=promoter.staff_guest_requires_name,
+            hold_close_notifications=promoter.hold_close_notifications,
             deleted=promoter.deleted,
             owner_emails=[o.promotions_staff_email for o in promoter.owners],
             contacts=[PromoterContactResponse.model_validate(c) for c in promoter.contacts],

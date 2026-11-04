@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
 from sqlalchemy import (
     Column,
     Integer,
@@ -55,6 +56,14 @@ class Show(Base):
     planned_close_date = Column(Date, nullable=True)
     planned_close_time = Column(Time, nullable=True)
     auto_close = Column(Boolean, nullable=False, default=False, server_default=false())
+    # True from a close whose outcome emails were held until they're sent, the
+    # show is reopened or it's deleted. See promoted_by.hold_close_notifications.
+    close_notifications_held = Column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    close_notifications_sent_at = Column(DateTime(timezone=True), nullable=True)
+    close_notifications_sent_by = Column(String, nullable=True)
+    reopened_at = Column(DateTime(timezone=True), nullable=True)
     co_announce = Column(Boolean, nullable=False, default=False, server_default=false())
     lottery_enabled = Column(Boolean, nullable=False, default=False, server_default=false())
     lottery_window_hours = Column(
@@ -107,3 +116,16 @@ class Show(Base):
         promoter, so it plays no part here.
         """
         return self.promoter or self.venue
+
+    @property
+    def close_notifications_pending(self) -> bool:
+        """Whether held close emails can still be sent.
+
+        They stop being useful once the show date has passed, so they're dropped.
+        """
+        today = datetime.now(ZoneInfo("America/Los_Angeles")).date()
+        return (
+            self.status == "closed"
+            and self.close_notifications_held
+            and self.show_date >= today
+        )

@@ -65,7 +65,12 @@ def get_my_alternate_entries(
     user_info: tuple = Depends(require_promotions_or_staff),
     db: Session = Depends(get_db),
 ):
-    """Get the current staff member's waiting alternate entries, across all shows."""
+    """
+    Get the current staff member's alternate entries, across all shows.
+
+    Includes entries expired by a close whose emails are being held, since they
+    haven't been told the outcome yet.
+    """
     _, staff = user_info
     entries = (
         db.query(StaffPassAlternate)
@@ -80,6 +85,28 @@ def get_my_alternate_entries(
         queue = AlternateService.waiting_entries(db, entry.show_id)
         position = next(i for i, e in enumerate(queue, start=1) if e.id == entry.id)
         results.append(_entry_response(entry, position, MyAlternateEntryResponse))
+
+    held_shows = (
+        db.query(Show)
+        .join(StaffPassAlternate, StaffPassAlternate.show_id == Show.id)
+        .filter(
+            StaffPassAlternate.staff_id == staff.id,
+            StaffPassAlternate.status == "expired",
+            Show.status == "closed",
+            Show.close_notifications_held.is_(True),
+        )
+        .distinct()
+        .all()
+    )
+    for show in held_shows:
+        if not show.close_notifications_pending:
+            continue
+        expired = AlternateService.entries_expired_at_close(db, show.id)
+        for position, entry in enumerate(expired, start=1):
+            if entry.staff_id == staff.id:
+                response = _entry_response(entry, position, MyAlternateEntryResponse)
+                response.outcome_pending = True
+                results.append(response)
     results.sort(key=lambda r: (r.show_date is None, r.show_date))
     return results
 
@@ -101,8 +128,13 @@ def get_alternate_queue(
     show = _get_show(db, show_id)
     queue = AlternateService.waiting_entries(db, show.id)
     listed = queue
+    expired = (
+        AlternateService.entries_expired_at_close(db, show.id)
+        if show.status == "closed"
+        else []
+    )
     if show.status == "closed" and role == "promotions":
-        listed = AlternateService.entries_expired_at_close(db, show.id)
+        listed = expired
 
     my_entry_id = next((e.id for e in queue if e.staff_id == staff.id), None)
 
@@ -139,6 +171,8 @@ def get_alternate_queue(
         my_entry_id=my_entry_id,
         next_candidate_staff_id=next_candidate.staff_id if next_candidate else None,
         next_candidate_name=next_candidate.staff_name if next_candidate else None,
+        my_outcome_pending=show.close_notifications_pending
+        and any(e.staff_id == staff.id for e in expired),
     )
 
 

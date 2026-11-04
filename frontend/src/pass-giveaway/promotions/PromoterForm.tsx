@@ -27,6 +27,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
   const [emailAddressRequirement, setEmailAddressRequirement] =
     useState<EmailAddressRequirement>('none');
   const [staffGuestRequiresName, setStaffGuestRequiresName] = useState(false);
+  const [holdCloseNotifications, setHoldCloseNotifications] = useState(false);
   const [ownerEmails, setOwnerEmails] = useState<string[]>([]);
   const [newOwnerInput, setNewOwnerInput] = useState('');
   const [promotionsStaff, setPromotionsStaff] = useState<PromotionsStaffOption[]>([]);
@@ -46,6 +47,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
       setRequiresPhoneNumber(promoter.requires_phone_number ?? false);
       setEmailAddressRequirement(promoter.email_address_requirement ?? 'none');
       setStaffGuestRequiresName(promoter.staff_guest_requires_name ?? false);
+      setHoldCloseNotifications(promoter.hold_close_notifications ?? false);
       setOwnerEmails(promoter.owner_emails || []);
       setContacts(
         promoter.contacts.length > 0
@@ -133,6 +135,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
           requires_phone_number: requiresPhoneNumber,
           email_address_requirement: emailAddressRequirement,
           staff_guest_requires_name: staffGuestRequiresName,
+          hold_close_notifications: holdCloseNotifications,
           owner_emails: ownerEmails,
           contacts,
         };
@@ -145,6 +148,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
           requires_phone_number: requiresPhoneNumber,
           email_address_requirement: emailAddressRequirement,
           staff_guest_requires_name: staffGuestRequiresName,
+          hold_close_notifications: holdCloseNotifications,
           owner_emails: ownerEmails,
           contacts,
         };
@@ -292,6 +296,22 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
           <span className="field-hint">
             When checked, staff members bringing a +1 guest must provide the guest's name,
             and the guest list will show the guest's name as a separate entry.
+          </span>
+        </div>
+        <div className="form-group form-group-checkbox">
+          <label>
+            <input
+              type="checkbox"
+              checked={holdCloseNotifications}
+              onChange={(e) => setHoldCloseNotifications(e.target.checked)}
+              disabled={submitting}
+            />
+            {' '}Wait for me to send close notifications
+          </label>
+          <span className="field-hint">
+            When checked, closing a show doesn't tell staff with a +1 or alternates the outcome. A
+            promotions rep sends those emails with a button on the closed show's page. If nobody
+            clicks it before the show date has passed, they're never sent.
           </span>
         </div>
       </div>

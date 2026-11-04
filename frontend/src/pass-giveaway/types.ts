@@ -78,6 +78,7 @@ export interface PromoterCreate {
   requires_phone_number?: boolean;
   email_address_requirement?: EmailAddressRequirement;
   staff_guest_requires_name?: boolean;
+  hold_close_notifications?: boolean;
   owner_emails?: string[];
   contacts?: PromoterContactCreate[];
 }
@@ -89,6 +90,7 @@ export interface PromoterUpdate {
   requires_phone_number?: boolean;
   email_address_requirement?: EmailAddressRequirement;
   staff_guest_requires_name?: boolean;
+  hold_close_notifications?: boolean;
   owner_emails?: string[];
   contacts?: PromoterContactCreate[];
 }
@@ -103,6 +105,7 @@ export interface PromoterResponse {
   // Derived: DJs must collect an email address from on-air winners
   requires_email_address: boolean;
   staff_guest_requires_name: boolean;
+  hold_close_notifications: boolean;
   deleted: boolean;
   owner_emails: string[];
   contacts: PromoterContactResponse[];
@@ -134,6 +137,7 @@ export interface VenueCreate {
   requires_phone_number?: boolean;
   email_address_requirement?: EmailAddressRequirement;
   staff_guest_requires_name?: boolean;
+  hold_close_notifications?: boolean;
   default_lottery_enabled?: boolean;
   default_lottery_window_hours?: number;
   default_dj_preassign_prohibition_days?: number | null;
@@ -161,6 +165,7 @@ export interface VenueUpdate {
   requires_phone_number?: boolean;
   email_address_requirement?: EmailAddressRequirement;
   staff_guest_requires_name?: boolean;
+  hold_close_notifications?: boolean;
   default_lottery_enabled?: boolean;
   default_lottery_window_hours?: number;
   default_dj_preassign_prohibition_days?: number | null;
@@ -191,6 +196,7 @@ export interface VenueResponse {
   // Derived: DJs must collect an email address from on-air winners
   requires_email_address: boolean;
   staff_guest_requires_name: boolean;
+  hold_close_notifications: boolean;
   default_lottery_enabled: boolean;
   default_lottery_window_hours: number;
   default_dj_preassign_prohibition_days: number | null;
@@ -414,9 +420,13 @@ export interface AlternateQueue {
   /** Who would get the current user's pass if they released it now. */
   next_candidate_staff_id: number | null;
   next_candidate_name: string | null;
+  /** The current user was on the list at close and hasn't been told the outcome. */
+  my_outcome_pending: boolean;
 }
 
 export interface MyAlternateEntry extends AlternateEntry {
+  /** The show closed, and the email with the outcome is being held. */
+  outcome_pending: boolean;
   show_event_name: string | null;
   show_date: string | null; // ISO date string
   show_venue_name: string | null;
@@ -489,6 +499,10 @@ export interface ShowResponse {
   planned_close_date: string | null;
   planned_close_time: string | null;
   auto_close: boolean;
+  /** The close emails to staff and alternates are held, waiting for the button. */
+  close_notifications_pending: boolean;
+  close_notifications_sent_at: string | null;
+  close_notifications_sent_by: string | null;
   co_announce: boolean;
   lottery_enabled: boolean;
   lottery_window_hours: number;

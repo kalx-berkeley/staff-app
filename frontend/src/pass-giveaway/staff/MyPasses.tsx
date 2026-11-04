@@ -364,12 +364,18 @@ const MyPasses = () => {
                         <span className="info-value">{formatDate(entry.show_date)}</span>
                       </div>
                     )}
-                    <div className="info-row">
-                      <span className="info-label">Ahead of you:</span>
-                      <span className="info-value">
-                        {entry.position === 1 ? 'Nobody — you are next' : entry.position - 1}
-                      </span>
-                    </div>
+                    {entry.outcome_pending ? (
+                      <p style={{ margin: '0.5rem 0 0' }}>
+                        The show has closed. You'll get an email with the outcome.
+                      </p>
+                    ) : (
+                      <div className="info-row">
+                        <span className="info-label">Ahead of you:</span>
+                        <span className="info-value">
+                          {entry.position === 1 ? 'Nobody — you are next' : entry.position - 1}
+                        </span>
+                      </div>
+                    )}
                     {entry.has_guest && (
                       <div className="info-row">
                         <span className="info-label">+1 Guest:</span>
@@ -386,13 +392,15 @@ const MyPasses = () => {
                   <Link to={`/staff/shows/${entry.show_id}`} className="btn-primary">
                     View Show
                   </Link>
-                  <button
-                    onClick={() => handleLeaveAlternates(entry.show_id)}
-                    className="btn-small btn-danger"
-                    disabled={leavingShowId === entry.show_id}
-                  >
-                    {leavingShowId === entry.show_id ? 'Leaving…' : 'Leave list'}
-                  </button>
+                  {!entry.outcome_pending && (
+                    <button
+                      onClick={() => handleLeaveAlternates(entry.show_id)}
+                      className="btn-small btn-danger"
+                      disabled={leavingShowId === entry.show_id}
+                    >
+                      {leavingShowId === entry.show_id ? 'Leaving…' : 'Leave list'}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

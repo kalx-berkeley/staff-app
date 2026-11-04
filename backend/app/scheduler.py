@@ -2,7 +2,7 @@
 
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
@@ -354,6 +354,16 @@ async def bootstrap_spinitron_schedule():
     await sync_spinitron_schedule()
 
 
+def _finish_auto_close(db, show) -> None:
+    """Run the close side effects, then email the reps, who hear if emails are held."""
+    from app.pass_giveaway.routers.shows import run_close_side_effects
+    from app.pass_giveaway.services.show_service import ShowService
+
+    db.refresh(show)
+    run_close_side_effects(db, show)
+    ShowService._notify_venue_owners_of_auto_close(db, show)
+
+
 async def auto_close_show(show_id: int):
     """DateTrigger job that closes a show and emails venue owners the guest list."""
     from app.database import SessionLocal
@@ -375,11 +385,7 @@ async def auto_close_show(show_id: int):
             return
         ShowService.close_show(db, show_id)
         unschedule_lottery_job(show_id)
-        db.refresh(show)
-        ShowService._notify_venue_owners_of_auto_close(db, show)
-        from app.pass_giveaway.routers.shows import run_close_side_effects
-
-        run_close_side_effects(db, show)
+        _finish_auto_close(db, show)
         logger.info(f"Auto-close complete for show {show_id} ({show.event_name})")
     except Exception as e:
         logger.error(f"Auto-close job failed for show {show_id}: {str(e)}", exc_info=True)
@@ -411,11 +417,17 @@ def unschedule_auto_close_job(show_id: int) -> None:
         pass
 
 
+def _as_utc(dt):
+    """Treat a naive datetime as UTC, since SQLite drops the timezone."""
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+
 def _reschedule_pending_auto_close_jobs() -> None:
     """
     On startup, re-register DateTrigger auto-close jobs for shows that have
     auto_close=True, status='published', and a future planned close datetime.
-    Shows whose window already passed are closed immediately.
+    Shows whose window already passed are closed immediately, unless a rep
+    reopened them after it passed.
     """
     if os.getenv("TESTING") == "1":
         return
@@ -447,6 +459,11 @@ def _reschedule_pending_auto_close_jobs() -> None:
             )
             if close_dt > now:
                 schedule_auto_close_job(show.id, close_dt)
+            elif show.reopened_at and _as_utc(show.reopened_at) >= close_dt:
+                logger.info(
+                    f"Show {show.id} was reopened after its auto-close time; leaving it"
+                    " open"
+                )
             else:
                 logger.warning(
                     f"Auto-close datetime for show {show.id} already passed "
@@ -454,11 +471,7 @@ def _reschedule_pending_auto_close_jobs() -> None:
                 )
                 try:
                     ShowService.close_show(db, show.id)
-                    db.refresh(show)
-                    ShowService._notify_venue_owners_of_auto_close(db, show)
-                    from app.pass_giveaway.routers.shows import run_close_side_effects
-
-                    run_close_side_effects(db, show)
+                    _finish_auto_close(db, show)
                 except Exception as e:
                     logger.error(f"Failed to close missed auto-close show {show.id}: {e}")
     finally:

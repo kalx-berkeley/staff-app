@@ -53,6 +53,7 @@ class VenueCreate(BaseModel):
     requires_phone_number: bool = False
     email_address_requirement: EmailAddressRequirement = "none"
     staff_guest_requires_name: bool = False
+    hold_close_notifications: bool = False
     default_lottery_enabled: bool = False
     default_lottery_window_hours: int = 24
     default_dj_preassign_prohibition_days: int | None = None
@@ -84,6 +85,7 @@ class VenueUpdate(BaseModel):
     requires_phone_number: bool | None = None
     email_address_requirement: EmailAddressRequirement | None = None
     staff_guest_requires_name: bool | None = None
+    hold_close_notifications: bool | None = None
     default_lottery_enabled: bool | None = None
     default_lottery_window_hours: int | None = None
     default_dj_preassign_prohibition_days: int | None = None
@@ -118,6 +120,7 @@ class VenueResponse(BaseModel):
     # Derived from email_address_requirement: DJs must collect on-air winners' emails
     requires_email_address: bool = False
     staff_guest_requires_name: bool = False
+    hold_close_notifications: bool = False
     default_lottery_enabled: bool = False
     default_lottery_window_hours: int = 24
     default_dj_preassign_prohibition_days: int | None = None
@@ -151,6 +154,7 @@ class VenueResponse(BaseModel):
             email_address_requirement=venue.email_address_requirement,
             requires_email_address=venue.requires_email_address,
             staff_guest_requires_name=venue.staff_guest_requires_name,
+            hold_close_notifications=venue.hold_close_notifications,
             default_lottery_enabled=venue.default_lottery_enabled,
             default_lottery_window_hours=venue.default_lottery_window_hours,
             default_dj_preassign_prohibition_days=venue.default_dj_preassign_prohibition_days,

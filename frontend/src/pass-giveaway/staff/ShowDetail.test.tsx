@@ -102,7 +102,7 @@ describe('Staff ShowDetail', () => {
     id: 1,
     event_name: 'Test Concert',
     genre: ['Rock'],
-    venue: { id: 1, name: 'Test Venue', address: '123 Main St', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, venue_type: 'music', default_age_restriction: null, default_movie_rating: null, default_num_pass_pairs: null, requires_phone_number: false, email_address_requirement: 'none', requires_email_address: false, staff_guest_requires_name: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, default_on_air_description: null, default_caller_special_instructions: null, has_logo: false, show_name_with_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], contacts: [] },
+    venue: { id: 1, name: 'Test Venue', address: '123 Main St', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, venue_type: 'music', default_age_restriction: null, default_movie_rating: null, default_num_pass_pairs: null, requires_phone_number: false, email_address_requirement: 'none', requires_email_address: false, staff_guest_requires_name: false, hold_close_notifications: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, default_on_air_description: null, default_caller_special_instructions: null, has_logo: false, show_name_with_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], contacts: [] },
     show_date: '2024-12-31',
     show_time: '20:00',
     show_start_date: null,
@@ -124,6 +124,9 @@ describe('Staff ShowDetail', () => {
     planned_close_date: null,
     planned_close_time: null,
     auto_close: false,
+    close_notifications_pending: false,
+    close_notifications_sent_at: null,
+    close_notifications_sent_by: null,
     co_announce: false,
     lottery_enabled: false,
     lottery_window_hours: 24,
@@ -518,6 +521,7 @@ describe('Staff ShowDetail', () => {
         my_entry_id: null,
         next_candidate_staff_id: null,
         next_candidate_name: null,
+        my_outcome_pending: false,
       });
 
       render(<BrowserRouter><ShowDetail /></BrowserRouter>);
@@ -613,11 +617,49 @@ describe('Staff ShowDetail', () => {
       my_entry_id: null,
       next_candidate_staff_id: null,
       next_candidate_name: null,
+      my_outcome_pending: false,
       ...overrides,
     });
 
     beforeEach(() => {
       mockUseAuth.mockReturnValue({ user: meUser, loading: false, error: null, refetchUser: vi.fn() });
+    });
+
+    it('tells an alternate an outcome email is coming while it is held', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue({
+        ...fullShow,
+        status: 'closed',
+        close_notifications_pending: true,
+      });
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue(
+        queue({ queue_open: false, my_outcome_pending: true })
+      );
+
+      render(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      expect(
+        await screen.findByText("The show has closed. You'll get an email with the outcome.")
+      ).toBeInTheDocument();
+    });
+
+    it('tells only the +1 host that an email is coming while it is held', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue({
+        ...mockShow,
+        status: 'closed',
+        close_notifications_pending: true,
+        passes: [
+          { ...claimedPass, has_guest: true, staff_email: 'me@example.com' },
+          { ...claimedPass, id: 3, has_guest: true, staff_name: 'Ken', staff_email: 'ken@example.com' },
+        ],
+      });
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue(queue({ queue_open: false }));
+
+      render(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      expect(await screen.findByText("not confirmed yet, you'll get an email")).toBeInTheDocument();
+      expect(screen.getByText('not confirmed yet')).toBeInTheDocument();
+      expect(screen.queryByText('not confirmed until show closes')).not.toBeInTheDocument();
+      await waitFor(() => expect(alternatesAPI.getQueue).toHaveBeenCalled());
     });
 
     it('hides the join control while passes are still available', async () => {

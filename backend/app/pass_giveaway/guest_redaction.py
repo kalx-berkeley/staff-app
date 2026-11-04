@@ -27,6 +27,7 @@ from app.config import settings
 
 # Keys whose value is removed (set to None) in every guest response.
 _HIDDEN_VALUES = {
+    "close_notifications_sent_by",
     "email",
     "phone",
     "recipient_email",

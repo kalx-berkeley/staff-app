@@ -616,8 +616,13 @@ class AlternateService:
     # ── Show lifecycle ──────────────────────────────────────────────────────
 
     @staticmethod
-    def expire_on_close(db: Session, show: Show) -> int:
-        """Close out the queue when the show closes and tell each alternate."""
+    def expire_on_close(db: Session, show: Show, notify: bool = True) -> int:
+        """
+        Close out the queue when the show closes and tell each alternate.
+
+        :param notify: False when the show's close emails are being held; send
+            them later with ``notify_expired_at_close``.
+        """
         waiting = AlternateService.waiting_entries(db, show.id)
         if not waiting:
             return 0
@@ -626,7 +631,20 @@ class AlternateService:
             AlternateService._resolve(entry, "expired", now)
         db.commit()
         AlternateService._audit_bulk(db, "alternates_expired", show, waiting)
-        for entry in waiting:
+        if notify:
+            AlternateService._email_no_pass(db, show, waiting)
+        return len(waiting)
+
+    @staticmethod
+    def notify_expired_at_close(db: Session, show: Show) -> int:
+        """Send the held "no pass" email to everyone expired by the last close."""
+        entries = AlternateService.entries_expired_at_close(db, show.id)
+        AlternateService._email_no_pass(db, show, entries)
+        return len(entries)
+
+    @staticmethod
+    def _email_no_pass(db: Session, show: Show, entries: list[StaffPassAlternate]) -> None:
+        for entry in entries:
             AlternateService._email(
                 db,
                 entry.staff,
@@ -645,11 +663,16 @@ class AlternateService:
                     "Thank you for your interest!",
                 ],
             )
-        return len(waiting)
 
     @staticmethod
-    def restore_on_reopen(db: Session, show: Show) -> int:
-        """Put entries expired by a close back in line when the show is reopened."""
+    def restore_on_reopen(db: Session, show: Show, notify_restored: bool = True) -> int:
+        """
+        Put entries expired by a close back in line when the show is reopened.
+
+        :param notify_restored: False when the close's emails were being held, so
+            restored alternates never heard they were off the list. Anyone promoted
+            is still told.
+        """
         expired = (
             db.query(StaffPassAlternate)
             .filter(
@@ -678,6 +701,8 @@ class AlternateService:
         db.commit()
         AlternateService._audit_bulk(db, "alternates_restored", show, restored)
         AlternateService.finalize_promotions(db, promotions)
+        if not notify_restored:
+            return len(restored)
 
         promoted_ids = {p.entry.id for p in promotions}
         positions = {
@@ -708,8 +733,13 @@ class AlternateService:
         return len(restored)
 
     @staticmethod
-    def cancel_on_delete(db: Session, show: Show) -> int:
-        """Cancel the queue when the show is deleted and tell waiting alternates."""
+    def cancel_on_delete(db: Session, show: Show, notify_expired: bool = False) -> int:
+        """
+        Cancel the queue when the show is deleted and tell waiting alternates.
+
+        :param notify_expired: Also tell those expired by the last close, because
+            the email telling them the outcome was still being held.
+        """
         entries = (
             db.query(StaffPassAlternate)
             .filter(
@@ -722,6 +752,8 @@ class AlternateService:
             return 0
         now = datetime.now(timezone.utc)
         notify = [e for e in entries if e.status == "waiting"]
+        if notify_expired:
+            notify += AlternateService.entries_expired_at_close(db, show.id)
         for entry in entries:
             AlternateService._resolve(entry, "cancelled", now)
         db.commit()

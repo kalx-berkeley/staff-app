@@ -2526,6 +2526,13 @@ fieldset.radio-group legend {
   margin-bottom: 0.75rem;
 }
 
+.guest-list-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 .guest-list-summary-header h3 {
   margin: 0;
   font-size: 1rem;

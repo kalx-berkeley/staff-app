@@ -9,6 +9,7 @@ import type { ShowResponse, PassResponse, DjSuggestion } from '../types';
 vi.mock('../api', () => ({
   showsAPI: {
     get: vi.fn(),
+    sendCloseNotifications: vi.fn(),
   },
   passesAPI: {
     setPreassignment: vi.fn(),
@@ -41,6 +42,7 @@ vi.mock('../api', () => ({
       my_entry_id: null,
       next_candidate_staff_id: null,
       next_candidate_name: null,
+      my_outcome_pending: false,
     }),
     remove: vi.fn(),
   },
@@ -104,7 +106,7 @@ const makeShow = (passes: PassResponse[]): ShowResponse => ({
     requires_phone_number: false,
     email_address_requirement: 'none',
     requires_email_address: false,
-    staff_guest_requires_name: false,
+    staff_guest_requires_name: false, hold_close_notifications: false,
     default_lottery_enabled: false,
     default_lottery_window_hours: 24,
     default_dj_preassign_prohibition_days: null,
@@ -139,6 +141,9 @@ const makeShow = (passes: PassResponse[]): ShowResponse => ({
   planned_close_date: null,
   planned_close_time: null,
   auto_close: false,
+  close_notifications_pending: false,
+  close_notifications_sent_at: null,
+  close_notifications_sent_by: null,
   co_announce: false,
   lottery_enabled: false,
   lottery_window_hours: 24,
@@ -528,6 +533,7 @@ describe('Promotions ShowDetail — alternates', () => {
         my_entry_id: null,
         next_candidate_staff_id: null,
         next_candidate_name: null,
+        my_outcome_pending: false,
       })
       .mockResolvedValue({
         queue_open: true,
@@ -535,6 +541,7 @@ describe('Promotions ShowDetail — alternates', () => {
         my_entry_id: null,
         next_candidate_staff_id: null,
         next_candidate_name: null,
+        my_outcome_pending: false,
       });
     vi.mocked(alternatesAPI.remove).mockResolvedValue(undefined);
 
@@ -587,6 +594,7 @@ describe('Promotions ShowDetail — alternates', () => {
       my_entry_id: null,
       next_candidate_staff_id: null,
       next_candidate_name: null,
+      my_outcome_pending: false,
     });
 
     await renderShowDetail();
@@ -617,6 +625,7 @@ describe('Promotions ShowDetail — alternates', () => {
       my_entry_id: null,
       next_candidate_staff_id: null,
       next_candidate_name: null,
+      my_outcome_pending: false,
     };
 
     it('lists them once, in their own panel right after the guest list, without Remove', async () => {
@@ -647,6 +656,104 @@ describe('Promotions ShowDetail — alternates', () => {
       await screen.findByRole('heading', { name: 'Guest List for Venue' });
       await waitFor(() => expect(alternatesAPI.getQueue).toHaveBeenCalled());
       expect(screen.queryByRole('heading', { name: /^Alternates/ })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Close notifications button', () => {
+    const hostPass = {
+      id: 7,
+      pass_type: 'staff',
+      status: 'claimed',
+      has_guest: true,
+      staff_name: 'Hana Host',
+    } as PassResponse;
+    const waiting = {
+      queue_open: false,
+      entries: [
+        {
+          id: 40,
+          show_id: 1,
+          staff_id: 30,
+          staff_name: 'Wanda Waiting',
+          staff_phone: null,
+          staff_email: null,
+          position: 1,
+          has_guest: false,
+          guest_name: null,
+          only_attend_with_guest: false,
+          source: 'joined',
+          priority_at: '2024-01-01T00:00:00Z',
+        },
+      ],
+      my_entry_id: null,
+      next_candidate_staff_id: null,
+      next_candidate_name: null,
+      my_outcome_pending: false,
+    };
+    const guestListPanel = () =>
+      screen
+        .getByRole('heading', { name: 'Guest List for Venue' })
+        .closest('.guest-list-summary') as HTMLElement;
+
+    it('hides the button when nothing is pending', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue({ ...makeShow([]), status: 'closed' });
+
+      await renderShowDetail();
+
+      await screen.findByRole('heading', { name: 'Guest List for Venue' });
+      expect(
+        screen.queryByRole('button', { name: 'Notify Staff and Alternates' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('leaves an empty group out of the confirmation', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue({
+        ...makeShow([]),
+        status: 'closed',
+        close_notifications_pending: true,
+      });
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue(waiting);
+
+      await renderShowDetail();
+
+      await screen.findByRole('heading', { name: 'Alternates (1)' });
+      fireEvent.click(screen.getByRole('button', { name: 'Notify Staff and Alternates' }));
+
+      const message = screen.getByText(/This will email/);
+      expect(message).toHaveTextContent("This will email 1 alternate that they didn't get a pass for");
+      expect(message).not.toHaveTextContent('host');
+    });
+
+    it('confirms who will be emailed, then sends and shows who sent them', async () => {
+      const pending = {
+        ...makeShow([hostPass]),
+        status: 'closed',
+        close_notifications_pending: true,
+      } as ShowResponse;
+      vi.mocked(showsAPI.get).mockResolvedValueOnce(pending).mockResolvedValue({
+        ...pending,
+        close_notifications_pending: false,
+        close_notifications_sent_at: '2024-01-01T20:00:00Z',
+        close_notifications_sent_by: 'Pat Promo',
+      });
+      vi.mocked(showsAPI.sendCloseNotifications).mockResolvedValue(pending);
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue(waiting);
+
+      await renderShowDetail();
+
+      await screen.findByRole('heading', { name: 'Alternates (1)' });
+      fireEvent.click(
+        within(guestListPanel()).getByRole('button', { name: 'Notify Staff and Alternates' })
+      );
+      expect(screen.getByText(/email 1 \+1 host that/)).toHaveTextContent('1 alternate that');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Send Notifications' }));
+
+      expect(await within(guestListPanel()).findByText(/by Pat Promo/)).toBeInTheDocument();
+      expect(showsAPI.sendCloseNotifications).toHaveBeenCalledWith(1);
+      expect(
+        screen.queryByRole('button', { name: 'Notify Staff and Alternates' })
+      ).not.toBeInTheDocument();
     });
   });
 });

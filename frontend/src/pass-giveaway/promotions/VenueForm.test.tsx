@@ -32,7 +32,7 @@ const makeVenue = (overrides: Partial<VenueResponse> = {}): VenueResponse => ({
   requires_phone_number: false,
   email_address_requirement: 'none',
   requires_email_address: false,
-  staff_guest_requires_name: false,
+  staff_guest_requires_name: false, hold_close_notifications: false,
   default_lottery_enabled: false,
   default_lottery_window_hours: 24,
   default_dj_preassign_prohibition_days: null,
@@ -222,6 +222,33 @@ describe('VenueForm', () => {
           address: '456 Old St',
         }));
       });
+    });
+  });
+
+  describe('Close notifications setting', () => {
+    it('loads and saves the setting', async () => {
+      vi.mocked(venuesAPI.update).mockResolvedValue(makeVenue());
+
+      render(
+        <VenueForm
+          venue={makeVenue({ hold_close_notifications: true })}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+
+      const checkbox = screen.getByLabelText(/wait for me to send close notifications/i);
+      expect(checkbox).toBeChecked();
+      fireEvent.click(checkbox);
+      fireEvent.click(screen.getByRole('button', { name: /update/i }));
+
+      await waitFor(() => {
+        expect(venuesAPI.update).toHaveBeenCalledWith(1, expect.objectContaining({
+          hold_close_notifications: false,
+        }));
+      });
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalled());
     });
   });
 

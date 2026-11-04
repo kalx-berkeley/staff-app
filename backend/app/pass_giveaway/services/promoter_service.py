@@ -59,6 +59,7 @@ class PromoterService:
                 requires_phone_number=promoter_data.requires_phone_number,
                 email_address_requirement=promoter_data.email_address_requirement,
                 staff_guest_requires_name=promoter_data.staff_guest_requires_name,
+                hold_close_notifications=promoter_data.hold_close_notifications,
             )
             db.add(promoter)
             db.flush()
@@ -151,6 +152,8 @@ class PromoterService:
                 promoter.email_address_requirement = promoter_data.email_address_requirement
             if promoter_data.staff_guest_requires_name is not None:
                 promoter.staff_guest_requires_name = promoter_data.staff_guest_requires_name
+            if promoter_data.hold_close_notifications is not None:
+                promoter.hold_close_notifications = promoter_data.hold_close_notifications
 
             if promoter_data.owner_emails is not None:
                 for owner in promoter.owners:
