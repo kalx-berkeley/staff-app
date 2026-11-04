@@ -764,7 +764,7 @@ describe('Staff ShowDetail', () => {
       const myPass = { ...claimedPass, staff_email: 'me@example.com', staff_name: 'Me' };
       const showPage = () => renderAndSettle(<BrowserRouter><ShowDetail /></BrowserRouter>);
 
-      it('offers all four options with their tradeoffs when a spare pass is free', async () => {
+      it('offers all four options in two groups with shared tradeoffs when a spare pass is free', async () => {
         vi.mocked(showsAPI.get).mockResolvedValue({
           ...fullShow,
           passes: [availablePass, { ...availablePass, id: 3 }],
@@ -779,8 +779,14 @@ describe('Staff ShowDetail', () => {
         expect(screen.getByRole('radio', { name: /release my pass too/i })).toBeInTheDocument();
         expect(screen.getByRole('radio', { name: /and i'll attend either way/i })).toBeInTheDocument();
         expect(screen.getByRole('radio', { name: /but release my pass/i })).toBeInTheDocument();
-        expect(screen.getAllByText(/^Pro:/)).toHaveLength(4);
-        expect(screen.getAllByText(/^Con:/)).toHaveLength(4);
+        expect(screen.getAllByText(/^Pro:/)).toHaveLength(2);
+        expect(screen.getAllByText(/^Con:/)).toHaveLength(2);
+        for (const name of [/still attend without them/i, /release my pass too/i]) {
+          expect(screen.getByRole('radio', { name })).toHaveAccessibleDescription(/know immediately/i);
+        }
+        for (const name of [/and i'll attend either way/i, /but release my pass/i]) {
+          expect(screen.getByRole('radio', { name })).toHaveAccessibleDescription(/until the show closes/i);
+        }
       });
 
       it('offers only the waiting options when no spare pass is free', async () => {
@@ -796,6 +802,7 @@ describe('Staff ShowDetail', () => {
         fireEvent.click(screen.getByRole('button', { name: /claim with \+1 guest/i }));
 
         expect(screen.getAllByRole('radio')).toHaveLength(2);
+        expect(screen.getAllByText(/^Pro:/)).toHaveLength(1);
         expect(screen.getByText(/no pass free for your guest right now/i)).toBeInTheDocument();
         expect(screen.getByRole('radio', { name: /and i'll attend either way/i })).toBeChecked();
 

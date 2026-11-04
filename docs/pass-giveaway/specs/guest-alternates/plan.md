@@ -31,15 +31,15 @@ The form question stays "If my guest can't attend". The answer is stored as
 
 If the guest has a pass at close, both attend under every option.
 
-### Pros and cons (always shown under every option)
+### Pros and cons (always shown with their group of options)
 
-| Option | Pro | Con |
+| Options | Pro | Con |
 |---|---|---|
-| 1 | You keep your pass. | If your guest loses their pass, they won't automatically get another chance. |
-| 2 | If your guest loses their pass, you find out right away and can make other plans. | You lose your pass at that moment, even if another pass frees up later. |
-| 3 | You keep your pass, and your guest can still get one until the show closes. | You may not know if your guest can come until the show closes, and staff get freed passes first. |
-| 4 | You only go if you can go together, and your guest can still get a pass until the show closes. | You may not find out until the show closes, and you could lose your pass at that point, with no time to make other plans. |
-| 2, alternate form ("Skip me until there's a pass for both of us") | You only get a pass if there's one for your guest too. | You're skipped until two passes are free at once, so you may never get one. |
+| 1 and 2 | You'll know immediately if your guest can't attend. | You won't be able to take advantage of a potential additional pass becoming available for them later. |
+| 3 and 4 | Your guest might still get to go if another pass becomes available. | You won't know if your guest can go until the show closes. |
+
+The alternate form's version of option 2 ("Skip me until there's a pass for both
+of us") shares the pros and cons of options 1 and 2.
 
 ## Agreed decisions (from grilling session, 2026-11-04)
 
