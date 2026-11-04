@@ -61,19 +61,19 @@ class PassService:
 
     @staticmethod
     def create_passes_for_show(
-        db: Session, show_id: int, num_pairs: int, extra_staff: int = 0
+        db: Session, show_id: int, num_pairs: int, staff_adjustment: int = 0
     ) -> list[Pass]:
         """
         Create passes for a show.
 
-        Creates N pass pairs and N + extra_staff staff passes.
+        Creates N pass pairs and N + staff_adjustment staff passes.
         This should be called automatically when a show is created.
 
         Args:
             db: Database session
             show_id: Show ID
             num_pairs: Number of pass pairs to create
-            extra_staff: Staff passes to create beyond one per pair
+            staff_adjustment: Staff passes to create above or below one per pair
 
         Returns:
             List of created passes (pairs + staff passes)
@@ -98,8 +98,8 @@ class PassService:
                 passes.append(pass_item)
                 db.add(pass_item)
 
-            # Create staff passes (one per pair, plus any extras)
-            for _ in range(num_pairs + extra_staff):
+            # Create staff passes (one per pair, plus the adjustment)
+            for _ in range(num_pairs + staff_adjustment):
                 pass_item = Pass(show_id=show_id, pass_type="staff", status="available")
                 passes.append(pass_item)
                 db.add(pass_item)
@@ -1540,8 +1540,8 @@ class PassService:
         """
         Adjust the physical pass records to match a new num_pass_pairs value.
 
-        The staff pass target is new_num_pairs + show.extra_staff_passes, so
-        this also applies a change to extra_staff_passes.
+        The staff pass target is new_num_pairs + show.staff_pass_adjustment, so
+        this also applies a change to staff_pass_adjustment.
 
         Returns a dict with:
           - affected_djs: list of DJ names whose preassignment was removed
@@ -1603,7 +1603,7 @@ class PassService:
             return (_as_utc(p.claimed_at), p.id)
 
         cut_staff_ids: list[int] = []
-        staff_delta = new_num_pairs + (show.extra_staff_passes or 0) - len(staff_passes)
+        staff_delta = new_num_pairs + (show.staff_pass_adjustment or 0) - len(staff_passes)
         to_delete_ids: set[int] = set()
         moved_guests: list[Pass] = []
         if staff_delta > 0:

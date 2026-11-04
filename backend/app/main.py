@@ -1,6 +1,7 @@
 from fastapi import Depends, FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
@@ -234,7 +235,12 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     logger.warning(f"Validation error on {request.url}: {exc.errors()}")
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-        content={"detail": "Validation error", "errors": exc.errors()},
+        content={
+            "detail": "Validation error",
+            # A validator's ValueError sits in the errors' ctx, which plain JSON
+            # can't serialize
+            "errors": jsonable_encoder(exc.errors()),
+        },
     )
 
 

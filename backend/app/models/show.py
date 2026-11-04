@@ -46,8 +46,8 @@ class Show(Base):
     movie_rating = Column(String, nullable=True)
     wheelchair_accessible = Column(String, nullable=False)  # "yes", "no", "unknown"
     num_pass_pairs = Column(Integer, nullable=False)
-    # Staff passes the venue or promoter gives us beyond the usual one per pair
-    extra_staff_passes = Column(
+    # Staff passes above (positive) or below (negative) the usual one per pair
+    staff_pass_adjustment = Column(
         Integer, nullable=False, default=0, server_default=text("0")
     )
     status = Column(
@@ -104,8 +104,8 @@ class Show(Base):
 
     @property
     def num_staff_passes(self) -> int:
-        """Total staff passes for this show: one per pair plus any extras."""
-        return self.num_pass_pairs + (self.extra_staff_passes or 0)
+        """Total staff passes for this show: one per pair plus the adjustment."""
+        return self.num_pass_pairs + (self.staff_pass_adjustment or 0)
 
     @property
     def promoted_by(self) -> "Promoter | Venue":

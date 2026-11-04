@@ -627,6 +627,9 @@ const ShowDetail = () => {
     ? lotteryStatus.is_active
     : show.lottery_enabled && lotteryDeadline !== null && new Date() < lotteryDeadline;
   const myStaffEntry = lotteryStatus?.my_staff_entry ?? null;
+  // A show can have no staff passes, but someone who entered before they were
+  // removed can still withdraw.
+  const staffLotteryActive = lotteryActive && (staffPasses.length > 0 || myStaffEntry !== null);
 
   const alternateEntries = alternateQueue?.entries ?? [];
   const myAlternateEntry =
@@ -1230,7 +1233,11 @@ const ShowDetail = () => {
 
           {notYetActive && <p className="field-hint">{STAFF_PASSES_NOT_YET_ACTIVE}</p>}
 
-          {lotteryActive && lotteryDeadline && (
+          {staffPasses.length === 0 && (
+            <p className="field-hint">This show has no staff passes.</p>
+          )}
+
+          {staffLotteryActive && lotteryDeadline && (
             <div className="lottery-banner">
               <strong>Lottery mode is active.</strong> Claiming a pass during this window enters
               you into a lottery instead of claiming immediately. The lottery closes on{' '}
@@ -1243,7 +1250,7 @@ const ShowDetail = () => {
             <p className="field-error">{lotteryActionError}</p>
           )}
 
-          {lotteryActive && (
+          {staffLotteryActive && (
             myStaffEntry ? (
               <div className="lottery-entry-confirmation">
                 <p>You have entered the lottery for a staff pass.</p>

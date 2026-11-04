@@ -116,7 +116,7 @@ describe('Staff ShowDetail', () => {
     movie_rating: null,
     wheelchair_accessible: 'yes',
     num_pass_pairs: 2,
-    extra_staff_passes: 0,
+    staff_pass_adjustment: 0,
     num_staff_passes: 2,
     promotions_contacts: [],
     guest_list_requirements: { requires_phone_number: false, email_address_requirement: 'none', requires_email_address: false, staff_guest_requires_name: false },
@@ -194,6 +194,26 @@ describe('Staff ShowDetail', () => {
   });
 
   describe('Individual Pass Cards', () => {
+    it('should say so and offer no lottery when a show has no staff passes', async () => {
+      loginAsClaimer();
+      vi.mocked(showsAPI.get).mockResolvedValue({
+        ...mockShow,
+        lottery_enabled: true,
+        published_at: new Date().toISOString(),
+        passes: mockShow.passes.filter((p) => p.pass_type !== 'staff'),
+      });
+
+      await renderAndSettle(
+        <BrowserRouter>
+          <ShowDetail />
+        </BrowserRouter>
+      );
+
+      expect(await screen.findByText('This show has no staff passes.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /enter lottery/i })).not.toBeInTheDocument();
+      expect(screen.queryByText(/lottery mode is active/i)).not.toBeInTheDocument();
+    });
+
     it('should show Claim button for available passes', async () => {
       vi.mocked(showsAPI.get).mockResolvedValue(mockShow);
 

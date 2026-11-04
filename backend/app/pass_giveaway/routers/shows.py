@@ -379,7 +379,7 @@ def _build_show_response(
         "movie_rating": show.movie_rating,
         "wheelchair_accessible": show.wheelchair_accessible,
         "num_pass_pairs": show.num_pass_pairs,
-        "extra_staff_passes": show.extra_staff_passes,
+        "staff_pass_adjustment": show.staff_pass_adjustment,
         "num_staff_passes": show.num_staff_passes,
         "promotions_contacts": _build_promotions_contacts(show),
         "guest_list_requirements": {
@@ -518,7 +518,7 @@ def _build_show_summary(
         "wheelchair_accessible": show.wheelchair_accessible,
         "status": show.status,
         "num_pass_pairs": show.num_pass_pairs,
-        "extra_staff_passes": show.extra_staff_passes,
+        "staff_pass_adjustment": show.staff_pass_adjustment,
         "num_staff_passes": show.num_staff_passes,
         "available_pair_count": pair_count,
         "available_staff_count": staff_count,
@@ -958,8 +958,24 @@ def update_show(
                 detail="planned close date/time must be before the show date/time",
             )
 
+    merged_pairs = (
+        existing.num_pass_pairs
+        if show_data.num_pass_pairs is None
+        else show_data.num_pass_pairs
+    )
+    merged_adjustment = (
+        existing.staff_pass_adjustment
+        if show_data.staff_pass_adjustment is None
+        else show_data.staff_pass_adjustment
+    )
+    if merged_pairs + merged_adjustment < 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="A show can't have fewer than 0 staff passes",
+        )
+
     old_num_pass_pairs = existing.num_pass_pairs
-    old_extra_staff_passes = existing.extra_staff_passes
+    old_staff_pass_adjustment = existing.staff_pass_adjustment
 
     def _auto_close_settings(s: Show) -> tuple:
         return (s.status, s.auto_close, s.planned_close_date, s.planned_close_time)
@@ -978,7 +994,7 @@ def update_show(
         "movie_rating",
         "wheelchair_accessible",
         "num_pass_pairs",
-        "extra_staff_passes",
+        "staff_pass_adjustment",
         "planned_close_date",
         "planned_close_time",
         "auto_close",
@@ -998,7 +1014,7 @@ def update_show(
     pass_adjustment = None
     if (
         show.num_pass_pairs != old_num_pass_pairs
-        or show.extra_staff_passes != old_extra_staff_passes
+        or show.staff_pass_adjustment != old_staff_pass_adjustment
     ):
         result = PassService.adjust_passes_for_show(db, show, show.num_pass_pairs)
         if result["affected_djs"] or result["affected_staff"]:

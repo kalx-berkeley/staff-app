@@ -130,7 +130,7 @@ const makeShow = (passes: PassResponse[]): ShowResponse => ({
   movie_rating: null,
   wheelchair_accessible: 'yes',
   num_pass_pairs: passes.length,
-  extra_staff_passes: 0,
+  staff_pass_adjustment: 0,
   num_staff_passes: passes.length,
   promotions_contacts: [],
   guest_list_requirements: { requires_phone_number: false, email_address_requirement: 'none', requires_email_address: false, staff_guest_requires_name: false },

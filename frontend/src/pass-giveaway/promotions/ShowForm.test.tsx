@@ -251,7 +251,7 @@ describe('ShowForm', () => {
         movie_rating: null,
         wheelchair_accessible: 'yes',
         num_pass_pairs: 1,
-        extra_staff_passes: 0,
+        staff_pass_adjustment: 0,
         num_staff_passes: 1,
         promotions_contacts: [],
         guest_list_requirements: { requires_phone_number: false, email_address_requirement: 'none', requires_email_address: false, staff_guest_requires_name: false },
@@ -340,7 +340,7 @@ describe('ShowForm', () => {
       expect(showsAPI.publish).toHaveBeenCalledWith(42);
     });
 
-    it('should send extra staff passes and show the total', async () => {
+    it('should send more staff passes than pass pairs as a positive adjustment', async () => {
       vi.mocked(showsAPI.create).mockResolvedValue(
         { id: 1 } as Awaited<ReturnType<typeof showsAPI.create>>,
       );
@@ -362,10 +362,14 @@ describe('ShowForm', () => {
       fireEvent.change(screen.getByLabelText(/close time/i), { target: { value: '18:00' } });
 
       fireEvent.change(screen.getByLabelText(/number of pass pairs/i), { target: { value: '3' } });
-      expect(screen.queryByLabelText(/extra staff passes/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: /staff pass adjustment/i })).not.toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: /advanced/i }));
-      fireEvent.change(screen.getByLabelText(/extra staff passes/i), { target: { value: '2' } });
-      expect(screen.getByText(/5 staff passes in total/)).toBeInTheDocument();
+      expect(screen.getByText(/no adjustment: the standard 3 staff passes/i)).toBeInTheDocument();
+      const more = screen.getByRole('button', { name: /one more staff pass/i });
+      fireEvent.click(more);
+      fireEvent.click(more);
+      expect(screen.getByRole('status')).toHaveTextContent('+2');
+      expect(screen.getByText(/2 more than the standard 3: this show will have 5 staff passes/)).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
 
@@ -373,7 +377,52 @@ describe('ShowForm', () => {
         expect(mockNavigate).toHaveBeenCalledWith('/promotions/shows');
       });
       expect(showsAPI.create).toHaveBeenCalledWith(
-        expect.objectContaining({ num_pass_pairs: 3, extra_staff_passes: 2 }),
+        expect.objectContaining({ num_pass_pairs: 3, staff_pass_adjustment: 2 }),
+      );
+    });
+
+    it('should send fewer staff passes than pass pairs as a negative adjustment', async () => {
+      vi.mocked(showsAPI.create).mockResolvedValue(
+        { id: 1 } as Awaited<ReturnType<typeof showsAPI.create>>,
+      );
+
+      renderShowForm();
+
+      await waitFor(() => {
+        expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+      });
+
+      const eventNameInput = screen.getByLabelText(/event name/i);
+      eventNameInput.textContent = 'Test Event';
+      fireEvent.input(eventNameInput);
+      fireEvent.change(screen.getByLabelText(/genre/i), { target: { value: 'Rock' } });
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), { target: { value: '1' } });
+      fireEvent.change(screen.getByLabelText(/show date/i), { target: { value: '2024-12-31' } });
+      fireEvent.change(screen.getByLabelText(/show time/i), { target: { value: '20:00' } });
+      fireEvent.change(screen.getByLabelText(/close date/i), { target: { value: '2024-12-31' } });
+      fireEvent.change(screen.getByLabelText(/close time/i), { target: { value: '18:00' } });
+
+      fireEvent.change(screen.getByLabelText(/number of pass pairs/i), { target: { value: '3' } });
+      fireEvent.click(screen.getByRole('button', { name: /advanced/i }));
+      const fewer = screen.getByRole('button', { name: /one fewer staff pass/i });
+      fireEvent.click(fewer);
+      fireEvent.click(fewer);
+      expect(screen.getByRole('status')).toHaveTextContent('−2');
+      expect(screen.getByText(/2 fewer than the standard 3: this show will have 1 staff pass\./)).toBeInTheDocument();
+
+      // Cutting pairs below the reduction stops the total at 0, not below it.
+      fireEvent.change(screen.getByLabelText(/number of pass pairs/i), { target: { value: '1' } });
+      expect(screen.getByRole('status')).toHaveTextContent('−1');
+      expect(fewer).toBeDisabled();
+      expect(screen.getByText(/won't be able to claim a pass/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('/promotions/shows');
+      });
+      expect(showsAPI.create).toHaveBeenCalledWith(
+        expect.objectContaining({ num_pass_pairs: 1, staff_pass_adjustment: -1 }),
       );
     });
   });

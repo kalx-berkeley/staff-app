@@ -46,7 +46,7 @@ const makeShow = (overrides: Partial<ShowSummary> = {}): ShowSummary => ({
   movie_rating: null,
   wheelchair_accessible: 'yes',
   num_pass_pairs: 2,
-  extra_staff_passes: 0,
+  staff_pass_adjustment: 0,
   num_staff_passes: 2,
   status: 'published',
   available_pair_count: 2,

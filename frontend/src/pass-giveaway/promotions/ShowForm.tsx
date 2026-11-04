@@ -185,7 +185,11 @@ const ShowForm = () => {
   const [movieRating, setMovieRating] = useState<MovieRating>('NR');
   const [wheelchairAccessible, setWheelchairAccessible] = useState<WheelchairAccessible>('yes');
   const [numPassPairs, setNumPassPairs] = useState<number>(1);
-  const [extraStaffPasses, setExtraStaffPasses] = useState<number>(0);
+  const [storedStaffPassAdjustment, setStaffPassAdjustment] = useState<number>(0);
+  // The adjustment is kept when the pass pair count changes, so the total follows
+  // the pairs, but it can't drop below 0 when pairs are reduced.
+  const staffPassAdjustment = Math.max(storedStaffPassAdjustment, -numPassPairs);
+  const totalStaffPasses = numPassPairs + staffPassAdjustment;
   const [plannedCloseDate, setPlannedCloseDate] = useState('');
   const [plannedCloseTime, setPlannedCloseTime] = useState('');
   const [autoClose, setAutoClose] = useState(true);
@@ -263,7 +267,7 @@ const ShowForm = () => {
           setMovieRating(show.movie_rating ?? 'NR');
           setWheelchairAccessible(show.wheelchair_accessible);
           setNumPassPairs(show.num_pass_pairs);
-          setExtraStaffPasses(show.extra_staff_passes);
+          setStaffPassAdjustment(show.staff_pass_adjustment);
           setPlannedCloseDate(show.planned_close_date ?? '');
           setPlannedCloseTime(show.planned_close_time ?? '');
           setAutoClose(show.auto_close ?? false);
@@ -483,10 +487,6 @@ const ShowForm = () => {
       newErrors.num_pass_pairs = 'Number of pass pairs must be between 1 and 5';
     }
 
-    if (extraStaffPasses < 0 || extraStaffPasses > 10) {
-      newErrors.extra_staff_passes = 'Extra staff passes must be between 0 and 10';
-    }
-
     if (!plannedCloseDate || !plannedCloseTime) {
       newErrors.planned_close_date = 'Planned close date and time are required';
     }
@@ -544,7 +544,7 @@ const ShowForm = () => {
           movie_rating: isMovieTheater ? movieRating : null,
           wheelchair_accessible: wheelchairAccessible,
           num_pass_pairs: numPassPairs,
-          extra_staff_passes: extraStaffPasses,
+          staff_pass_adjustment: staffPassAdjustment,
           planned_close_date: plannedCloseDate || null,
           planned_close_time: plannedCloseTime || null,
           auto_close: autoClose,
@@ -580,7 +580,7 @@ const ShowForm = () => {
           movie_rating: isMovieTheater ? movieRating : null,
           wheelchair_accessible: wheelchairAccessible,
           num_pass_pairs: numPassPairs,
-          extra_staff_passes: extraStaffPasses,
+          staff_pass_adjustment: staffPassAdjustment,
           planned_close_date: plannedCloseDate || null,
           planned_close_time: plannedCloseTime || null,
           auto_close: autoClose,
@@ -974,7 +974,7 @@ const ShowForm = () => {
               <label htmlFor="num_pass_pairs">
                 Number of Pass Pairs <span className="required">*</span>
               </label>
-              <Tooltip text="How many pass pairs to create for on-air giveaways. Each pair admits 2 people. Maximum 5 per show. One staff pass is also created for each pair. Add more under Advanced → Extra Staff Passes." />
+              <Tooltip text="How many pass pairs to create for on-air giveaways. Each pair admits 2 people. Maximum 5 per show. One staff pass is also created for each pair. Change that under Advanced → Staff Pass Adjustment." />
             </div>
             <input
               type="number"
@@ -1145,27 +1145,42 @@ const ShowForm = () => {
 
               <div className="form-group">
                 <div className="label-with-help">
-                  <label htmlFor="extra_staff_passes">Extra Staff Passes</label>
-                  <Tooltip text="Staff passes the venue or promoter gives us beyond the usual one per pass pair. Usually 0. Maximum 10." />
+                  <label id="staff_pass_adjustment_label">Staff Pass Adjustment</label>
+                  <Tooltip text="Every show gets the standard one staff pass per pass pair. Only change this when the venue or promoter gives us more or fewer than that." />
                 </div>
-                <input
-                  type="number"
-                  id="extra_staff_passes"
-                  value={extraStaffPasses}
-                  onChange={(e) => setExtraStaffPasses(parseInt(e.target.value) || 0)}
-                  min={0}
-                  max={10}
-                  className={errors.extra_staff_passes ? 'input-error' : ''}
-                  disabled={submitting}
-                  style={{ width: '6rem' }}
-                />
+                <div
+                  role="group"
+                  aria-labelledby="staff_pass_adjustment_label"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  <button
+                    type="button"
+                    className="btn-small btn-secondary"
+                    aria-label="One fewer staff pass"
+                    onClick={() => setStaffPassAdjustment(staffPassAdjustment - 1)}
+                    disabled={submitting || totalStaffPasses === 0}
+                  >
+                    −
+                  </button>
+                  <output style={{ minWidth: '2rem', textAlign: 'center', fontWeight: staffPassAdjustment === 0 ? undefined : 'bold' }}>
+                    {staffPassAdjustment > 0 ? `+${staffPassAdjustment}` : staffPassAdjustment < 0 ? `−${-staffPassAdjustment}` : '0'}
+                  </output>
+                  <button
+                    type="button"
+                    className="btn-small btn-secondary"
+                    aria-label="One more staff pass"
+                    onClick={() => setStaffPassAdjustment(staffPassAdjustment + 1)}
+                    disabled={submitting || staffPassAdjustment >= 10}
+                  >
+                    +
+                  </button>
+                </div>
                 <span className="field-hint" style={{ display: 'block', marginTop: '0.25rem' }}>
-                  {numPassPairs + extraStaffPasses} staff pass{numPassPairs + extraStaffPasses === 1 ? '' : 'es'} in total
-                  ({numPassPairs} for the pass pair{numPassPairs === 1 ? '' : 's'}, plus {extraStaffPasses} extra).
+                  {staffPassAdjustment === 0
+                    ? `No adjustment: the standard ${numPassPairs} staff pass${numPassPairs === 1 ? '' : 'es'}, one per pass pair.`
+                    : `${Math.abs(staffPassAdjustment)} ${staffPassAdjustment > 0 ? 'more' : 'fewer'} than the standard ${numPassPairs}: this show will have ${totalStaffPasses} staff pass${totalStaffPasses === 1 ? '' : 'es'}.`}
+                  {totalStaffPasses === 0 && ' Staff won\'t be able to claim a pass or enter a lottery for this show.'}
                 </span>
-                {errors.extra_staff_passes && (
-                  <span className="field-error">{errors.extra_staff_passes}</span>
-                )}
               </div>
             </div>
           )}

@@ -85,8 +85,11 @@ class ShowCreate(BaseModel):
         ..., description="Whether the venue is wheelchair accessible: yes, no or unknown"
     )
     num_pass_pairs: int = Field(..., ge=1, le=5, description="Number of pass pairs (1-5)")
-    extra_staff_passes: int = Field(
-        0, ge=0, le=10, description="Staff passes beyond one per pass pair (0-10)"
+    staff_pass_adjustment: int = Field(
+        0,
+        ge=-5,
+        le=10,
+        description="Staff passes above or below one per pass pair (-5 to 10)",
     )
     planned_close_date: date | None = Field(None, description="Date to close the show")
     planned_close_time: time | None = Field(
@@ -121,6 +124,12 @@ class ShowCreate(BaseModel):
     def validate_time_required_for_single_day(self) -> "ShowCreate":
         if self.show_start_date is None and self.show_time is None:
             raise ValueError("show_time is required when show_start_date is not provided")
+        return self
+
+    @model_validator(mode="after")
+    def validate_staff_pass_total(self) -> "ShowCreate":
+        if self.num_pass_pairs + self.staff_pass_adjustment < 0:
+            raise ValueError("A show can't have fewer than 0 staff passes")
         return self
 
     @model_validator(mode="after")
@@ -192,8 +201,11 @@ class ShowUpdate(BaseModel):
     num_pass_pairs: int | None = Field(
         None, ge=1, le=5, description="Number of pass pairs (1-5)"
     )
-    extra_staff_passes: int | None = Field(
-        None, ge=0, le=10, description="Staff passes beyond one per pass pair (0-10)"
+    staff_pass_adjustment: int | None = Field(
+        None,
+        ge=-5,
+        le=10,
+        description="Staff passes above or below one per pass pair (-5 to 10)",
     )
     planned_close_date: date | None = Field(None, description="Date to close the show")
     planned_close_time: time | None = Field(
@@ -354,7 +366,7 @@ class ShowResponse(BaseModel):
     movie_rating: str | None = None
     wheelchair_accessible: str
     num_pass_pairs: int
-    extra_staff_passes: int = 0
+    staff_pass_adjustment: int = 0
     num_staff_passes: int = 0
     promotions_contacts: list[PromotionsContact] = Field(
         default_factory=list,
@@ -437,7 +449,7 @@ class ShowSummary(BaseModel):
     wheelchair_accessible: str
     status: str
     num_pass_pairs: int
-    extra_staff_passes: int = 0
+    staff_pass_adjustment: int = 0
     num_staff_passes: int = 0
     available_pair_count: int = 0
     available_staff_count: int = 0

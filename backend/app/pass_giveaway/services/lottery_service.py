@@ -73,6 +73,16 @@ class LotteryService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="The lottery window for this show is not active",
             )
+        has_staff_passes = (
+            db.query(Pass)
+            .filter(Pass.show_id == show.id, Pass.pass_type == "staff")
+            .first()
+        )
+        if not has_staff_passes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This show has no staff passes",
+            )
         staff = db.query(Staff).filter(Staff.id == staff_id).first()
         if staff:
             ensure_not_on_leave_for_show(staff, show)

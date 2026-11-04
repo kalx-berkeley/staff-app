@@ -4,6 +4,7 @@ import pytest
 from datetime import date, datetime, time, timedelta, timezone
 from unittest.mock import patch
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.lottery_entry import LotteryEntry
@@ -97,6 +98,28 @@ def _make_lottery_show(
         db.add(Pass(show_id=show.id, pass_type="pair", status="available"))
     db.commit()
     return show
+
+
+def test_cannot_enter_staff_lottery_for_show_without_staff_passes(
+    db: Session, venue: Venue, joe: Staff
+):
+    show = _make_lottery_show(db, venue, num_staff_passes=0, num_pair_passes=1)
+
+    with pytest.raises(HTTPException) as exc_info:
+        LotteryService.enter_staff_lottery(db, show.id, joe.id)
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "This show has no staff passes"
+
+
+def test_can_enter_staff_lottery_for_show_with_staff_passes(
+    db: Session, venue: Venue, joe: Staff
+):
+    show = _make_lottery_show(db, venue, num_staff_passes=1)
+
+    entry = LotteryService.enter_staff_lottery(db, show.id, joe.id)
+
+    assert entry.staff_id == joe.id
 
 
 def _make_staff_entry(

@@ -622,41 +622,57 @@ def test_create_show_defaults_to_one_staff_pass_per_pair(
 
     assert response.status_code == 201
     data = response.json()
-    assert data["extra_staff_passes"] == 0
+    assert data["staff_pass_adjustment"] == 0
     assert data["num_staff_passes"] == 3
     assert _pass_counts(db, data["id"]) == (3, 3)
 
 
-def test_create_show_with_extra_staff_passes(
+def test_create_show_with_staff_pass_adjustment(
     client: TestClient, test_venue, test_promotions_staff, db: Session
 ):
     response = client.post(
         "/api/shows",
-        json=_new_show_data(test_venue.id, num_pass_pairs=3, extra_staff_passes=2),
+        json=_new_show_data(test_venue.id, num_pass_pairs=3, staff_pass_adjustment=2),
         headers={"X-Forwarded-User": test_promotions_staff.email},
     )
 
     assert response.status_code == 201
     data = response.json()
-    assert data["extra_staff_passes"] == 2
+    assert data["staff_pass_adjustment"] == 2
     assert data["num_staff_passes"] == 5
     assert data["available_staff_count"] == 5
     assert _pass_counts(db, data["id"]) == (3, 5)
 
 
-@pytest.mark.parametrize("extra", [-1, 11])
-def test_extra_staff_passes_validation(
-    client: TestClient, test_venue, test_promotions_staff, extra: int
+def test_create_show_with_fewer_staff_passes_than_pairs(
+    client: TestClient, test_venue, test_promotions_staff, db: Session
 ):
     response = client.post(
         "/api/shows",
-        json=_new_show_data(test_venue.id, extra_staff_passes=extra),
+        json=_new_show_data(test_venue.id, num_pass_pairs=3, staff_pass_adjustment=-3),
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["staff_pass_adjustment"] == -3
+    assert data["num_staff_passes"] == 0
+    assert _pass_counts(db, data["id"]) == (3, 0)
+
+
+# The test show has 2 pass pairs, so -3 would leave it with -1 staff passes.
+@pytest.mark.parametrize("adjustment", [-6, -3, 11])
+def test_staff_pass_adjustment_validation(
+    client: TestClient, test_venue, test_promotions_staff, adjustment: int
+):
+    response = client.post(
+        "/api/shows",
+        json=_new_show_data(test_venue.id, staff_pass_adjustment=adjustment),
         headers={"X-Forwarded-User": test_promotions_staff.email},
     )
     assert response.status_code == 422
 
 
-def test_update_extra_staff_passes_resizes_staff_passes(
+def test_update_staff_pass_adjustment_resizes_staff_passes(
     client: TestClient, test_venue, test_promotions_staff, db: Session
 ):
     from app.models.pass_model import Pass
@@ -667,7 +683,7 @@ def test_update_extra_staff_passes_resizes_staff_passes(
     ).json()["id"]
 
     response = client.put(
-        f"/api/shows/{show_id}", json={"extra_staff_passes": 4}, headers=headers
+        f"/api/shows/{show_id}", json={"staff_pass_adjustment": 4}, headers=headers
     )
     assert response.status_code == 200
     assert response.json()["num_staff_passes"] == 6
@@ -682,7 +698,7 @@ def test_update_extra_staff_passes_resizes_staff_passes(
     db.commit()
 
     response = client.put(
-        f"/api/shows/{show_id}", json={"extra_staff_passes": 0}, headers=headers
+        f"/api/shows/{show_id}", json={"staff_pass_adjustment": 0}, headers=headers
     )
     assert response.status_code == 200
     assert response.json()["num_staff_passes"] == 2
@@ -690,14 +706,51 @@ def test_update_extra_staff_passes_resizes_staff_passes(
     db.expire_all()
     assert db.get(Pass, claimed.id).status == "claimed"
 
+    # Going below one per pair removes the unclaimed pass first.
+    response = client.put(
+        f"/api/shows/{show_id}", json={"staff_pass_adjustment": -1}, headers=headers
+    )
+    assert response.status_code == 200
+    assert response.json()["num_staff_passes"] == 1
+    assert _pass_counts(db, show_id) == (2, 1)
+    db.expire_all()
+    assert db.get(Pass, claimed.id).status == "claimed"
 
-def test_update_num_pass_pairs_keeps_extra_staff_passes(
+
+def test_update_cannot_leave_a_show_with_negative_staff_passes(
     client: TestClient, test_venue, test_promotions_staff, db: Session
 ):
     headers = {"X-Forwarded-User": test_promotions_staff.email}
     show_id = client.post(
         "/api/shows",
-        json=_new_show_data(test_venue.id, extra_staff_passes=2),
+        json=_new_show_data(test_venue.id, staff_pass_adjustment=-2),
+        headers=headers,
+    ).json()["id"]
+    assert _pass_counts(db, show_id) == (2, 0)
+
+    # Fewer pairs on their own would take the total below 0
+    response = client.put(
+        f"/api/shows/{show_id}", json={"num_pass_pairs": 1}, headers=headers
+    )
+    assert response.status_code == 422
+    assert _pass_counts(db, show_id) == (2, 0)
+
+    response = client.put(
+        f"/api/shows/{show_id}",
+        json={"num_pass_pairs": 1, "staff_pass_adjustment": -1},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert _pass_counts(db, show_id) == (1, 0)
+
+
+def test_update_num_pass_pairs_keeps_staff_pass_adjustment(
+    client: TestClient, test_venue, test_promotions_staff, db: Session
+):
+    headers = {"X-Forwarded-User": test_promotions_staff.email}
+    show_id = client.post(
+        "/api/shows",
+        json=_new_show_data(test_venue.id, staff_pass_adjustment=2),
         headers=headers,
     ).json()["id"]
 
@@ -1303,7 +1356,7 @@ def published_auto_close_show(db: Session, test_venue):
 
 @pytest.mark.parametrize(
     "update",
-    [{"extra_staff_passes": 1}, {"event_name": "Renamed"}, {}],
+    [{"staff_pass_adjustment": 1}, {"event_name": "Renamed"}, {}],
 )
 def test_update_show_leaves_auto_close_job_alone_when_its_settings_are_unchanged(
     client: TestClient,
