@@ -105,7 +105,7 @@ def _make_staff_entry(
     staff: Staff,
     has_guest: bool = False,
     guest_name: str | None = None,
-    only_attend_with_guest: bool = False,
+    guest_fallback: str = "attend_alone",
 ) -> LotteryEntry:
     now = datetime.now(timezone.utc)
     entry = LotteryEntry(
@@ -114,7 +114,7 @@ def _make_staff_entry(
         staff_id=staff.id,
         has_guest=has_guest,
         guest_name=guest_name,
-        only_attend_with_guest=only_attend_with_guest,
+        guest_fallback=guest_fallback,
         status="pending",
         entered_at=now,
         created_at=now,
@@ -400,7 +400,7 @@ class TestStaffLotteryScenarios:
             alice,
             has_guest=True,
             guest_name="Alice+1",
-            only_attend_with_guest=True,
+            guest_fallback="release",
         )
 
         _run_lottery_ordered(db, show, [e_joe, e_alice])
@@ -424,7 +424,7 @@ class TestStaffLotteryScenarios:
             alice,
             has_guest=True,
             guest_name="Alice+1",
-            only_attend_with_guest=True,
+            guest_fallback="release",
         )
 
         _run_lottery(db, show)
@@ -451,7 +451,7 @@ class TestStaffLotteryScenarios:
             alice,
             has_guest=True,
             guest_name="Alice+1",
-            only_attend_with_guest=True,
+            guest_fallback="release",
         )
 
         _run_lottery_ordered(db, show, [e_joe, e_alice])
@@ -474,7 +474,7 @@ class TestStaffLotteryScenarios:
             alice,
             has_guest=True,
             guest_name="Alice+1",
-            only_attend_with_guest=True,
+            guest_fallback="release",
         )
 
         _run_lottery_ordered(db, show, [e_alice, e_joe])
@@ -501,7 +501,7 @@ class TestStaffLotteryScenarios:
         show = _make_lottery_show(db, venue, num_staff_passes=5)
         e_joe = _make_staff_entry(db, show, joe, has_guest=True)
         e_alice = _make_staff_entry(
-            db, show, alice, has_guest=True, only_attend_with_guest=True
+            db, show, alice, has_guest=True, guest_fallback="release"
         )
         e_bob = _make_staff_entry(db, show, bob, has_guest=True)
 
@@ -522,7 +522,7 @@ class TestStaffLotteryScenarios:
         show = _make_lottery_show(db, venue, num_staff_passes=5)
         e_joe = _make_staff_entry(db, show, joe, has_guest=True)
         e_alice = _make_staff_entry(
-            db, show, alice, has_guest=True, only_attend_with_guest=True
+            db, show, alice, has_guest=True, guest_fallback="release"
         )
         e_bob = _make_staff_entry(db, show, bob, has_guest=True)
 
@@ -543,7 +543,7 @@ class TestStaffLotteryScenarios:
         show = _make_lottery_show(db, venue, num_staff_passes=5)
         e_joe = _make_staff_entry(db, show, joe, has_guest=True)
         e_alice = _make_staff_entry(
-            db, show, alice, has_guest=True, only_attend_with_guest=True
+            db, show, alice, has_guest=True, guest_fallback="release"
         )
         e_bob = _make_staff_entry(db, show, bob, has_guest=True)
 
@@ -564,7 +564,7 @@ class TestStaffLotteryScenarios:
         show = _make_lottery_show(db, venue, num_staff_passes=5)
         e_joe = _make_staff_entry(db, show, joe, has_guest=True)
         e_alice = _make_staff_entry(
-            db, show, alice, has_guest=True, only_attend_with_guest=True
+            db, show, alice, has_guest=True, guest_fallback="release"
         )
         e_bob = _make_staff_entry(db, show, bob, has_guest=True)
 
@@ -585,7 +585,7 @@ class TestStaffLotteryScenarios:
         show = _make_lottery_show(db, venue, num_staff_passes=5)
         e_joe = _make_staff_entry(db, show, joe, has_guest=True)
         e_alice = _make_staff_entry(
-            db, show, alice, has_guest=True, only_attend_with_guest=True
+            db, show, alice, has_guest=True, guest_fallback="release"
         )
         e_bob = _make_staff_entry(db, show, bob, has_guest=True)
 
@@ -604,7 +604,7 @@ class TestStaffLotteryScenarios:
         show = _make_lottery_show(db, venue, num_staff_passes=5)
         e_joe = _make_staff_entry(db, show, joe, has_guest=True)
         e_alice = _make_staff_entry(
-            db, show, alice, has_guest=True, only_attend_with_guest=True
+            db, show, alice, has_guest=True, guest_fallback="release"
         )
         e_bob = _make_staff_entry(db, show, bob, has_guest=True)
 
@@ -625,7 +625,7 @@ class TestStaffLotteryScenarios:
     def test_s12a_joe_first_wins_with_guest_alice_loses(self, db, venue, joe, alice):
         show = _make_lottery_show(db, venue, num_staff_passes=3)
         e_joe = _make_staff_entry(
-            db, show, joe, has_guest=True, guest_name="Joe+1", only_attend_with_guest=True
+            db, show, joe, has_guest=True, guest_name="Joe+1", guest_fallback="release"
         )
         e_alice = _make_staff_entry(
             db,
@@ -633,7 +633,7 @@ class TestStaffLotteryScenarios:
             alice,
             has_guest=True,
             guest_name="Alice+1",
-            only_attend_with_guest=True,
+            guest_fallback="release",
         )
 
         _run_lottery_ordered(db, show, [e_joe, e_alice])
@@ -651,7 +651,7 @@ class TestStaffLotteryScenarios:
     def test_s12b_alice_first_wins_with_guest_joe_loses(self, db, venue, joe, alice):
         show = _make_lottery_show(db, venue, num_staff_passes=3)
         e_joe = _make_staff_entry(
-            db, show, joe, has_guest=True, guest_name="Joe+1", only_attend_with_guest=True
+            db, show, joe, has_guest=True, guest_name="Joe+1", guest_fallback="release"
         )
         e_alice = _make_staff_entry(
             db,
@@ -659,7 +659,7 @@ class TestStaffLotteryScenarios:
             alice,
             has_guest=True,
             guest_name="Alice+1",
-            only_attend_with_guest=True,
+            guest_fallback="release",
         )
 
         _run_lottery_ordered(db, show, [e_alice, e_joe])
@@ -991,7 +991,7 @@ class TestLotteryNotifications:
         assert "until the show closes" in kw["body_text"]
         assert "are on the guest list" not in kw["body_text"]
 
-    # Case 4: staff won, guest did not (has_guest=True, only_attend_with_guest=False).
+    # Case 4: staff won, guest did not (has_guest=True, the fallback is attend_alone).
 
     def test_notify_won_but_guest_lost(self, db, venue, joe, alice):
         show = _make_lottery_show(db, venue, num_staff_passes=2)
@@ -1038,7 +1038,7 @@ class TestLotteryNotifications:
             alice,
             has_guest=True,
             guest_name="Alice+1",
-            only_attend_with_guest=True,
+            guest_fallback="release",
         )
 
         # Joe first → Joe wins pass1, Alice wins pass2, but Alice can't get a guest
@@ -1055,14 +1055,14 @@ class TestLotteryNotifications:
         assert "initially selected" in alice_kw["body_text"].lower()
         assert "returned" in alice_kw["body_text"].lower()
 
-    # Case 8: lost from the start, had only_attend_with_guest.
+    # Case 8: lost from the start, had the release fallback.
 
     def test_notify_lost_only_with_guest(self, db, venue, joe, alice, bob):
         show = _make_lottery_show(db, venue, num_staff_passes=2)
         e_joe = _make_staff_entry(db, show, joe)
         e_alice = _make_staff_entry(db, show, alice)
         e_bob = _make_staff_entry(
-            db, show, bob, has_guest=True, guest_name="Bob+1", only_attend_with_guest=True
+            db, show, bob, has_guest=True, guest_name="Bob+1", guest_fallback="release"
         )
 
         # Bob ends up third and never gets a pass at all
@@ -1250,7 +1250,7 @@ class TestStaffShowPage:
             alice,
             has_guest=True,
             guest_name="Alice+1",
-            only_attend_with_guest=True,
+            guest_fallback="release",
         )
 
         _run_lottery_ordered(db, show, [e_joe, e_alice])

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { passesAPI, lotteryAPI, alternatesAPI } from '../api';
 import type { PassResponse, MyLotteryEntryResponse, MyAlternateEntry } from '../types';
 import type { APIError } from '../../common/types';
-import { isRecentShow } from '../utils';
+import { isRecentShow, waitingFallbackNote } from '../utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 
@@ -230,6 +230,21 @@ const MyPasses = () => {
                         <span className="info-value">{pass.guest_name || 'Reserved'}</span>
                       </div>
                     )}
+                    {pass.guest_waiting && (
+                      <div className="info-row">
+                        <span className="info-label">+1 Guest:</span>
+                        <span className="info-value">
+                          {pass.show_status === 'closed' ? (
+                            `${pass.guest_name || 'Your guest'}: see your email for the outcome`
+                          ) : (
+                            <>
+                              {pass.guest_name || 'Your guest'} is on the alternate list
+                              {pass.guest_position ? ` (guest #${pass.guest_position})` : ''}
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    )}
                     {pass.claimed_at && (
                       <div className="info-row">
                         <span className="info-label">Claimed:</span>
@@ -381,7 +396,8 @@ const MyPasses = () => {
                         <span className="info-label">+1 Guest:</span>
                         <span className="info-value">
                           {entry.guest_name || 'Requested'}
-                          {entry.only_attend_with_guest ? ' (only attending with guest)' : ''}
+                          {entry.guest_fallback === 'release' ? ' (only attending with guest)' : ''}
+                          {waitingFallbackNote(entry.guest_fallback)}
                         </span>
                       </div>
                     )}

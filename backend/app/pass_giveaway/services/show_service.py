@@ -16,6 +16,7 @@ from app.models.notification_preferences import NotificationPreferences
 from app.models.job_log import JobLog
 from app.models.lottery_entry import LotteryEntry
 from app.pass_giveaway.schemas.show import ShowCreate, ShowUpdate
+from app.pass_giveaway.services.close_digest import CloseDigest
 from app.pass_giveaway.services.lottery_service import LotteryService
 from app.pass_giveaway.services.pass_service import PassService, format_phone
 from app.common.services import notification_service
@@ -361,8 +362,22 @@ class ShowService:
             )
 
     @staticmethod
-    def close_show(db: Session, show_id: int) -> Show:
-        """Close a show (transition from published to closed)."""
+    def close_show(db: Session, show_id: int, digest: CloseDigest | None = None) -> Show:
+        """
+        Close a show (transition from published to closed).
+
+        Before the status changes, this draws any pending lottery and releases hosts
+        who asked to go only if their waiting guest had a pass by now. Those are the
+        last changes to the guest list.
+
+        :param digest: Collects the close's emails for the caller to add outcomes and
+            send. Without one, they're sent here.
+        """
+        from app.common.services import audit_service
+        from app.pass_giveaway.services.alternate_service import AlternateService
+
+        digest_to_send = CloseDigest() if digest is None else None
+        digest = digest or digest_to_send
         try:
             show = ShowService.get_show(db, show_id)
 
@@ -385,14 +400,37 @@ class ShowService:
                 is not None
             )
             if has_pending_entries:
-                LotteryService.run_lottery(db, show_id)
+                LotteryService.run_lottery(db, show_id, digest)
                 db.refresh(show)
+
+            results, released = AlternateService.release_hosts_without_guests(
+                db, show, digest
+            )
 
             show.status = "closed"
             show.updated_at = datetime.now(timezone.utc)
 
             db.commit()
             db.refresh(show)
+
+            for result in results:
+                AlternateService.finalize_promotions(db, result, digest)
+            for entry in released:
+                audit_service.log_event(
+                    db,
+                    event_type="pass_released_at_close",
+                    area=PASS_GIVEAWAY_AREA,
+                    actor_role="system",
+                    entity_type="staff_pass_alternate",
+                    entity_id=entry.id,
+                    details={
+                        "show_id": show.id,
+                        "staff_id": entry.staff_id,
+                        "guest_name": entry.guest_name,
+                    },
+                )
+            if digest_to_send is not None:
+                digest_to_send.send(db)
             return show
         except HTTPException:
             raise

@@ -9,6 +9,8 @@ from app.common.areas import PASS_GIVEAWAY_AREA
 from app.database import get_db
 from app.pass_giveaway.schemas.pass_schema import (
     ClaimData,
+    GuestAddData,
+    GuestNameData,
     ClothespinData,
     DjLeave,
     DjSuggestion,
@@ -18,6 +20,7 @@ from app.pass_giveaway.schemas.pass_schema import (
     PassResponse,
     WinnerReleaseData,
 )
+from app.pass_giveaway.services.alternate_service import AlternateService
 from app.pass_giveaway.services.pass_service import (
     PassService,
     normalize_phone,
@@ -278,7 +281,7 @@ def claim_pass(
         staff_id,
         has_guest=claim_data.has_guest,
         guest_name=claim_data.guest_name,
-        only_attend_with_guest=claim_data.only_attend_with_guest,
+        guest_fallback=claim_data.guest_fallback,
     )
 
     audit_service.log_event(
@@ -293,7 +296,7 @@ def claim_pass(
             "staff_id": staff_id,
             "show_id": pass_item.show_id,
             "has_guest": claim_data.has_guest,
-            "only_attend_with_guest": claim_data.only_attend_with_guest,
+            "guest_fallback": claim_data.guest_fallback,
         },
     )
 
@@ -347,6 +350,115 @@ def release_claim(
         details={"released_staff_id": prior_staff_id, "show_id": pass_item.show_id},
     )
 
+    return PassResponse.model_validate(pass_item)
+
+
+def _require_own_pass(pass_item: Pass, user, message: str) -> None:
+    if pass_item.staff_email is None or pass_item.staff_email.lower() != user.email.lower():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=message)
+
+
+@router.post("/passes/{pass_id}/guest", response_model=PassResponse)
+def add_guest(
+    pass_id: int,
+    guest_data: GuestAddData,
+    user_info: tuple = Depends(require_staff_pass_claimant),
+    db: Session = Depends(get_db),
+):
+    """Add a +1 guest to your own staff pass, seated or waiting on the alternate list."""
+    role, user = user_info
+    pass_item = PassService.get_guest_host_pass(db, pass_id)
+    _require_own_pass(pass_item, user, "You can only add a guest to your own staff pass")
+    pass_item = PassService.add_guest(
+        db, pass_item, guest_data.guest_name, guest_data.guest_fallback
+    )
+    audit_service.log_event(
+        db,
+        event_type="guest_added",
+        area=PASS_GIVEAWAY_AREA,
+        actor_email=user.email,
+        actor_role=role,
+        entity_type="pass",
+        entity_id=pass_item.id,
+        details={
+            "show_id": pass_item.show_id,
+            "guest_name": pass_item.guest_name,
+            "guest_fallback": pass_item.guest_fallback,
+            "guest_waiting": pass_item.guest_waiting,
+        },
+    )
+    return PassResponse.model_validate(pass_item)
+
+
+@router.patch("/passes/{pass_id}/guest", response_model=PassResponse)
+def update_guest_name(
+    pass_id: int,
+    guest_data: GuestNameData,
+    user_info: tuple = Depends(require_promotions_or_staff),
+    db: Session = Depends(get_db),
+):
+    """Correct the name of the +1 guest on your own staff pass."""
+    role, user = user_info
+    pass_item = PassService.get_guest_host_pass(db, pass_id)
+    _require_own_pass(
+        pass_item, user, "You can only change the guest on your own staff pass"
+    )
+    previous_name = pass_item.guest_name
+    pass_item = PassService.update_guest_name(db, pass_item, guest_data.guest_name)
+    audit_service.log_event(
+        db,
+        event_type="guest_name_changed",
+        area=PASS_GIVEAWAY_AREA,
+        actor_email=user.email,
+        actor_role=role,
+        entity_type="pass",
+        entity_id=pass_item.id,
+        details={
+            "show_id": pass_item.show_id,
+            "previous_name": previous_name,
+            "guest_name": pass_item.guest_name,
+        },
+    )
+    return PassResponse.model_validate(pass_item)
+
+
+@router.delete("/passes/{pass_id}/guest", response_model=PassResponse)
+def remove_guest(
+    pass_id: int,
+    user_info: tuple = Depends(require_promotions_or_staff),
+    db: Session = Depends(get_db),
+):
+    """
+    Remove the +1 guest from a staff pass, whether seated or waiting.
+
+    Staff members may only remove their own guest; promotions staff may remove any.
+    The host is emailed when someone else removes their guest.
+    """
+    role, user = user_info
+    pass_item = PassService.get_guest_host_pass(db, pass_id)
+    if role == "staff":
+        _require_own_pass(pass_item, user, "You can only remove your own guest")
+    guest_name = pass_item.guest_name
+    was_waiting = pass_item.guest_waiting
+    someone_else = (pass_item.staff_email or "").lower() != user.email.lower()
+    pass_item = PassService.remove_guest(db, pass_item, actor_email=user.email)
+    if someone_else:
+        AlternateService.email_guest_removed(db, pass_item, guest_name, user)
+    audit_service.log_event(
+        db,
+        event_type="guest_removed",
+        area=PASS_GIVEAWAY_AREA,
+        actor_email=user.email,
+        actor_role=role,
+        entity_type="pass",
+        entity_id=pass_item.id,
+        details={
+            "show_id": pass_item.show_id,
+            "staff_id": pass_item.staff_id,
+            "guest_name": guest_name,
+            "was_waiting": was_waiting,
+        },
+    )
     return PassResponse.model_validate(pass_item)
 
 

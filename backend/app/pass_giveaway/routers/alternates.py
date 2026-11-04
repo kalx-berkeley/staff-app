@@ -22,6 +22,7 @@ from app.pass_giveaway.schemas.alternate import (
     AlternateQueueResponse,
     AlternateUpdateRequest,
     MyAlternateEntryResponse,
+    WaitingGuestResponse,
 )
 from app.common.services import audit_service
 from app.pass_giveaway.services.alternate_service import AlternateService
@@ -58,6 +59,14 @@ def _my_waiting_entry(db: Session, show_id: int, staff: Staff) -> StaffPassAlter
             detail="You are not in the alternate queue for this show",
         )
     return entry
+
+
+def _next_guest_label(host: Pass) -> str:
+    """How the release warning names a waiting guest who would get the pass."""
+    host_name = host.staff_name or "another staff member"
+    if host.guest_name:
+        return f"{host.guest_name} ({host_name}'s guest)"
+    return f"{host_name}'s guest"
 
 
 @router.get("/alternates/my-entries", response_model=list[MyAlternateEntryResponse])
@@ -140,6 +149,7 @@ def get_alternate_queue(
 
     # If the current user holds a claim, tell them who would get it on release.
     next_candidate = None
+    next_guest_label = None
     my_claim = (
         db.query(Pass)
         .filter(
@@ -158,6 +168,10 @@ def get_alternate_queue(
         next_candidate = AlternateService.next_candidate(
             db, show, freed_passes=2 if has_guest_hold else 1
         )
+        if next_candidate is None:
+            guest_host = AlternateService.next_guest_candidate(db, show, my_claim.id)
+            if guest_host:
+                next_guest_label = _next_guest_label(guest_host)
 
     entries = [_entry_response(e, i) for i, e in enumerate(listed, start=1)]
     if role == "promotions":
@@ -165,12 +179,33 @@ def get_alternate_queue(
             response.staff_phone = entry.staff.phone
             response.staff_email = entry.staff.email
 
+    # Once a show closes, only promotions staff see who was still waiting.
+    guest_hosts = (
+        AlternateService.waiting_guests(db, show.id)
+        if show.status != "closed" or role == "promotions"
+        else []
+    )
+    waiting_guests = [
+        WaitingGuestResponse(
+            pass_id=host.id,
+            position=position,
+            guest_name=host.guest_name,
+            host_staff_id=host.staff_id,
+            host_name=host.staff_name,
+            is_mine=host.staff_id == staff.id,
+        )
+        for position, host in enumerate(guest_hosts, start=1)
+    ]
+
     return AlternateQueueResponse(
         queue_open=AlternateService.is_queue_open(db, show),
         entries=entries,
+        waiting_guests=waiting_guests,
         my_entry_id=my_entry_id,
         next_candidate_staff_id=next_candidate.staff_id if next_candidate else None,
-        next_candidate_name=next_candidate.staff_name if next_candidate else None,
+        next_candidate_name=(
+            next_candidate.staff_name if next_candidate else next_guest_label
+        ),
         my_outcome_pending=show.close_notifications_pending
         and any(e.staff_id == staff.id for e in expired),
     )
@@ -196,7 +231,7 @@ def join_alternate_queue(
         staff,
         has_guest=body.has_guest,
         guest_name=body.guest_name,
-        only_attend_with_guest=body.only_attend_with_guest,
+        guest_fallback=body.guest_fallback,
     )
     audit_service.log_event(
         db,
@@ -210,7 +245,7 @@ def join_alternate_queue(
             "show_id": show.id,
             "has_guest": entry.has_guest,
             "guest_name": entry.guest_name,
-            "only_attend_with_guest": entry.only_attend_with_guest,
+            "guest_fallback": entry.guest_fallback,
         },
     )
     queue = AlternateService.waiting_entries(db, show.id)
@@ -233,7 +268,7 @@ def update_my_alternate_entry(
         entry,
         has_guest=body.has_guest,
         guest_name=body.guest_name,
-        only_attend_with_guest=body.only_attend_with_guest,
+        guest_fallback=body.guest_fallback,
     )
     audit_service.log_event(
         db,
@@ -248,7 +283,7 @@ def update_my_alternate_entry(
             "status": entry.status,
             "has_guest": entry.has_guest,
             "guest_name": entry.guest_name,
-            "only_attend_with_guest": entry.only_attend_with_guest,
+            "guest_fallback": entry.guest_fallback,
         },
     )
     queue = AlternateService.waiting_entries(db, show.id)

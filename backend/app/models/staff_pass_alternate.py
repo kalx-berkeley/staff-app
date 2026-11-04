@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, text
 from sqlalchemy.orm import relationship
+from app.models.guest_fallback import GuestFallback
 from app.database import Base
 
 
@@ -22,8 +23,11 @@ class StaffPassAlternate(Base):
     staff_id = Column(Integer, ForeignKey("staff.id"), nullable=False, index=True)
     has_guest = Column(Boolean, nullable=False, default=False, server_default="false")
     guest_name = Column(String, nullable=True)
-    only_attend_with_guest = Column(
-        Boolean, nullable=False, default=False, server_default="false"
+    guest_fallback = Column(
+        String,
+        nullable=False,
+        default=GuestFallback.ATTEND_ALONE,
+        server_default=GuestFallback.ATTEND_ALONE,
     )
     # Ordering key: join time, lottery entered_at, or original claimed_at for a
     # claim cut by a pass-count reduction.

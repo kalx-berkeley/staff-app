@@ -11,15 +11,17 @@ promotes waiting alternates into real claims, in order:
    Both passes must be genuinely available (displacing another claimer's guest
    would only trade one guest for a later one); those who can't get a pair are
    skipped but keep their place.
-3. Leftover available passes go to the +1 guests of the alternates promoted in
-   step 1. Guest requests that can't be met are dropped.
+3. Leftover available passes go to guests, in priority order: guests waiting on
+   the alternate list, including those of the alternates just promoted, then the
+   other guests of alternates promoted in step 1. A guest whose fallback is to wait
+   stays on the list, and any other guest request that can't be met is dropped.
 
 ``fill_open_passes`` never commits. Callers commit together with the change that
 freed the pass, then call ``finalize_promotions`` to send emails and audit.
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
@@ -27,6 +29,8 @@ from sqlalchemy.orm import Session
 
 from app.common.areas import PASS_GIVEAWAY_AREA
 from app.config import settings
+from app.models.guest_fallback import GuestFallback
+from app.pass_giveaway.services.close_digest import CloseDigest
 from app.models.notification_preferences import NotificationPreferences
 from app.models.pass_model import Pass
 from app.models.show import Show
@@ -52,6 +56,14 @@ def _queue_key(entry: StaffPassAlternate):
 
 
 @dataclass
+class MovedGuest:
+    """A host's +1 guest who just lost their pass and went on the alternate list."""
+
+    primary: Pass
+    reason: str = "claimed"  # "claimed" or "capacity_change"
+
+
+@dataclass
 class Promotion:
     """An alternate who was just given a staff pass."""
 
@@ -62,6 +74,21 @@ class Promotion:
     trigger: str
     triggering_pass_id: int | None = None
     actor_email: str | None = None
+
+
+@dataclass
+class FillResult:
+    """What ``fill_open_passes`` changed, to report once the caller has committed."""
+
+    promotions: list[Promotion] = field(default_factory=list)
+    # Hosts whose waiting guest was just given a pass.
+    guests_seated: list[Pass] = field(default_factory=list)
+    guests_moved: list[MovedGuest] = field(default_factory=list)
+    trigger: str | None = None
+    actor_email: str | None = None
+
+    def add_moved_guest(self, primary: Pass, reason: str = "claimed") -> None:
+        self.guests_moved.append(MovedGuest(primary, reason))
 
 
 class AlternateService:
@@ -81,6 +108,21 @@ class AlternateService:
             .all()
         )
         return sorted(entries, key=_queue_key)
+
+    @staticmethod
+    def waiting_guests(db: Session, show_id: int) -> list[Pass]:
+        """Passes whose +1 guest is on the alternate list, next in line first."""
+        hosts = (
+            db.query(Pass)
+            .filter(
+                Pass.show_id == show_id,
+                Pass.pass_type == "staff",
+                Pass.status == "claimed",
+                Pass.guest_waiting.is_(True),
+            )
+            .all()
+        )
+        return sorted(hosts, key=lambda p: p.guest_queue_key)
 
     @staticmethod
     def entries_expired_at_close(db: Session, show_id: int) -> list[StaffPassAlternate]:
@@ -206,11 +248,25 @@ class AlternateService:
         if not waiting or freed_passes <= 0 or show.status != "published":
             return None
         for entry in waiting:
-            if not entry.only_attend_with_guest:
+            if entry.guest_fallback != GuestFallback.RELEASE:
                 return entry
         passes = AlternateService._staff_passes(db, show.id)
         available = len(AlternateService._available(passes)) + freed_passes
         return waiting[0] if available >= 2 else None
+
+    @staticmethod
+    def next_guest_candidate(
+        db: Session, show: Show, releasing_pass_id: int
+    ) -> Pass | None:
+        """The host whose waiting guest would get a released pass, if a guest would."""
+        if show.status != "published":
+            return None
+        for host in AlternateService.waiting_guests(db, show.id):
+            if host.id == releasing_pass_id:
+                continue
+            if not (host.staff and leave_covers_show(host.staff, show)):
+                return host
+        return None
 
     # ── Queue membership ────────────────────────────────────────────────────
 
@@ -235,7 +291,7 @@ class AlternateService:
         staff: Staff,
         has_guest: bool = False,
         guest_name: str | None = None,
-        only_attend_with_guest: bool = False,
+        guest_fallback: str = GuestFallback.ATTEND_ALONE,
     ) -> StaffPassAlternate:
         """Add a staff member to the bottom of a show's alternate queue."""
         from app.pass_giveaway.services.pass_service import PassService
@@ -280,7 +336,7 @@ class AlternateService:
             staff_id=staff.id,
             has_guest=has_guest,
             guest_name=guest_name if has_guest else None,
-            only_attend_with_guest=only_attend_with_guest if has_guest else False,
+            guest_fallback=guest_fallback if has_guest else GuestFallback.ATTEND_ALONE,
             priority_at=now,
             source="joined",
             status="waiting",
@@ -298,7 +354,7 @@ class AlternateService:
         entry: StaffPassAlternate,
         has_guest: bool,
         guest_name: str | None,
-        only_attend_with_guest: bool,
+        guest_fallback: str,
     ) -> StaffPassAlternate:
         """Change an entry's +1 details without changing its place in line."""
         guest_name = guest_name.strip() if guest_name else None
@@ -310,7 +366,7 @@ class AlternateService:
             )
         entry.has_guest = has_guest
         entry.guest_name = guest_name if has_guest else None
-        entry.only_attend_with_guest = only_attend_with_guest if has_guest else False
+        entry.guest_fallback = guest_fallback if has_guest else GuestFallback.ATTEND_ALONE
         entry.updated_at = datetime.now(timezone.utc)
 
         # Dropping the only-with-guest condition can make this entry promotable.
@@ -383,7 +439,7 @@ class AlternateService:
                     staff_id=lottery_entry.staff_id,
                     has_guest=lottery_entry.has_guest,
                     guest_name=lottery_entry.guest_name,
-                    only_attend_with_guest=lottery_entry.only_attend_with_guest,
+                    guest_fallback=lottery_entry.guest_fallback,
                     priority_at=lottery_entry.entered_at,
                     source="lottery",
                     status="waiting",
@@ -411,9 +467,9 @@ class AlternateService:
             StaffPassAlternate(
                 show_id=show.id,
                 staff_id=pass_item.staff_id,
-                has_guest=pass_item.has_guest,
+                has_guest=pass_item.has_guest or pass_item.guest_waiting,
                 guest_name=pass_item.guest_name,
-                only_attend_with_guest=pass_item.only_attend_with_guest,
+                guest_fallback=pass_item.guest_fallback,
                 priority_at=pass_item.claimed_at or now,
                 source="capacity_cut",
                 status="waiting",
@@ -476,31 +532,41 @@ class AlternateService:
         trigger: str,
         triggering_pass_id: int | None = None,
         actor_email: str | None = None,
-    ) -> list[Promotion]:
+        closing: bool = False,
+        digest: CloseDigest | None = None,
+    ) -> FillResult:
         """
-        Promote waiting alternates into any free staff passes. Does not commit.
+        Give any free staff passes to waiting alternates, then to waiting guests.
 
-        Returns the promotions made so the caller can ``finalize_promotions``
-        after committing.
+        Does not commit. Returns what changed so the caller can
+        ``finalize_promotions`` after committing.
+
+        :param closing: The show is closing, so an alternate who'd give up their pass
+            if their guest has none at close only gets a pass with one for the guest.
+        :param digest: Where a bump's email goes when part of a close.
         """
         from app.pass_giveaway.services.pass_service import PassService
 
+        result = FillResult(trigger=trigger, actor_email=actor_email)
         if show is None:
-            return []
+            return result
         db.flush()
         if AlternateService._promotion_blocked(db, show):
-            return []
+            return result
 
         waiting = AlternateService._eligible(
             show, AlternateService.waiting_entries(db, show.id)
         )
-        if not waiting:
-            return []
 
         passes = AlternateService._staff_passes(db, show.id)
         by_id = {p.id: p for p in passes}
         now = datetime.now(timezone.utc)
-        promotions: list[Promotion] = []
+        promotions = result.promotions
+
+        def needs_pair(entry: StaffPassAlternate) -> bool:
+            return entry.guest_fallback == GuestFallback.RELEASE or (
+                closing and entry.guest_fallback == GuestFallback.WAIT_THEN_RELEASE
+            )
 
         def take_seat() -> Pass | None:
             available = AlternateService._available(passes)
@@ -511,14 +577,16 @@ class AlternateService:
                 return None
             hold = holds[0]
             primary = by_id.get(hold.guest_of_pass_id)
-            PassService._displace_guest_hold(db, hold, primary, show, now)
+            PassService._displace_guest_hold(db, hold, primary, show, now, digest)
+            if primary is not None and primary.guest_waiting:
+                result.add_moved_guest(primary)
             return hold
 
         def promote(entry: StaffPassAlternate, seat: Pass, guest_pass: Pass | None) -> None:
             PassService._assign_claim(seat, entry.staff_id, now)
             if guest_pass is not None:
                 PassService._assign_guest_hold(
-                    seat, guest_pass, now, entry.guest_name, entry.only_attend_with_guest
+                    seat, guest_pass, now, entry.guest_name, entry.guest_fallback
                 )
             AlternateService._resolve(entry, "promoted", now)
             entry.promoted_pass_id = seat.id
@@ -540,13 +608,13 @@ class AlternateService:
             changed = False
 
             # Step 1: seats for alternates who will attend without their guest.
-            for entry in [e for e in waiting if not e.only_attend_with_guest]:
+            for entry in [e for e in waiting if not needs_pair(e)]:
                 seat = take_seat()
                 if seat is None:
                     break
                 promote(entry, seat, None)
                 changed = True
-            if any(not e.only_attend_with_guest for e in waiting):
+            if any(not needs_pair(e) for e in waiting):
                 # Still people waiting for a seat: nothing left for pairs.
                 continue
 
@@ -560,9 +628,47 @@ class AlternateService:
                 promote(entry, available[0], available[1])
                 changed = True
 
-        # Step 3: leftover passes go to guests of alternates promoted in step 1.
+        # Step 3: leftover passes go to guests. Waiting guests come first in priority
+        # order, including guests of the alternates just promoted if they can wait.
+        promotion_by_seat = {p.pass_item.id: p for p in promotions}
+        for promotion in promotions:
+            entry = promotion.entry
+            if (
+                promotion.guest_requested
+                and not promotion.guest_granted
+                and GuestFallback.waits(entry.guest_fallback)
+            ):
+                PassService._start_guest_waiting(
+                    promotion.pass_item, now, entry.guest_name, entry.guest_fallback
+                )
+
+        waiting_hosts = sorted(
+            (
+                p
+                for p in passes
+                if p.status == "claimed"
+                and p.guest_waiting
+                and not (p.staff and leave_covers_show(p.staff, show))
+            ),
+            key=lambda p: p.guest_queue_key,
+        )
+        for host in waiting_hosts:
+            available = AlternateService._available(passes)
+            if not available:
+                break
+            PassService._assign_guest_hold(
+                host, available[0], now, host.guest_name, host.guest_fallback
+            )
+            if host.id in promotion_by_seat:
+                promotion_by_seat[host.id].guest_granted = True
+            else:
+                result.guests_seated.append(host)
+
+        # Other guests of the alternates just promoted get whatever is left.
         for promotion in promotions:
             if not promotion.guest_requested or promotion.guest_granted:
+                continue
+            if GuestFallback.waits(promotion.entry.guest_fallback):
                 continue
             available = AlternateService._available(passes)
             if not available:
@@ -573,21 +679,53 @@ class AlternateService:
                 available[0],
                 now,
                 entry.guest_name,
-                entry.only_attend_with_guest,
+                entry.guest_fallback,
             )
             promotion.guest_granted = True
 
-        return promotions
+        return result
 
     @staticmethod
-    def finalize_promotions(db: Session, promotions: list[Promotion]) -> None:
-        """Email and audit promotions after the caller has committed them."""
+    def finalize_promotions(
+        db: Session, result: FillResult, digest: CloseDigest | None = None
+    ) -> None:
+        """
+        Email and audit what ``fill_open_passes`` did, after the caller commits it.
+
+        :param digest: Part of a close. Promotion news goes in the digest, and guest
+            news is left out, because the close outcome says where a guest ended up.
+        """
         from app.common.services import audit_service
 
-        for promotion in promotions:
+        moved_host_ids = {moved.primary.id for moved in result.guests_moved}
+        for moved in result.guests_moved:
+            # A guest given a new pass in the same change has nothing to report.
+            if not moved.primary.guest_waiting:
+                continue
+            AlternateService._report_guest_event(
+                db,
+                moved.primary,
+                "guest_moved_to_alternates",
+                None if digest is not None else AlternateService._email_guest_moved,
+                moved.reason,
+                result,
+            )
+        for host in result.guests_seated:
+            if host.id in moved_host_ids:
+                continue
+            AlternateService._report_guest_event(
+                db,
+                host,
+                "guest_given_pass",
+                None if digest is not None else AlternateService._email_guest_seated,
+                result.trigger,
+                result,
+            )
+
+        for promotion in result.promotions:
             entry = promotion.entry
             try:
-                AlternateService._email_promoted(db, promotion)
+                AlternateService._email_promoted(db, promotion, digest)
             except Exception:
                 logger.error(
                     "Failed to send alternate promotion email for entry %s",
@@ -613,16 +751,114 @@ class AlternateService:
                 },
             )
 
+    @staticmethod
+    def _report_guest_event(
+        db: Session,
+        host: Pass,
+        event_type: str,
+        send_email,
+        reason: str | None,
+        result: FillResult,
+    ) -> None:
+        """Email a host about their guest and write the audit log entry."""
+        from app.common.services import audit_service
+
+        details = {
+            "show_id": host.show_id,
+            "staff_id": host.staff_id,
+            "guest_name": host.guest_name,
+            "guest_fallback": host.guest_fallback,
+            "reason": reason,
+        }
+        try:
+            if send_email is not None:
+                send_email(db, host, reason)
+        except Exception:
+            logger.error(
+                "Failed to send %s email for pass %s", event_type, host.id, exc_info=True
+            )
+        audit_service.log_event(
+            db,
+            event_type=event_type,
+            area=PASS_GIVEAWAY_AREA,
+            actor_email=result.actor_email,
+            actor_role="system",
+            entity_type="pass",
+            entity_id=host.id,
+            details=details,
+        )
+
     # ── Show lifecycle ──────────────────────────────────────────────────────
 
     @staticmethod
-    def expire_on_close(db: Session, show: Show, notify: bool = True) -> int:
+    def release_hosts_without_guests(
+        db: Session, show: Show, digest: CloseDigest
+    ) -> tuple[list[FillResult], list[StaffPassAlternate]]:
         """
-        Close out the queue when the show closes and tell each alternate.
+        Release hosts who asked to go only if their waiting guest has a pass by close.
 
-        :param notify: False when the show's close emails are being held; send
-            them later with ``notify_expired_at_close``.
+        Runs while the show is still published, so the passes can still be used. It
+        releases one host at a time, last in guest order first, and reassigns the pass
+        each time, because it may seat an earlier guest and save that host.
+
+        Each released host gets an alternate entry with their original claim time,
+        which ``expire_on_close`` expires with the rest of the queue. That's how they
+        get their close email, appear under the guest list and return if the show
+        reopens. The entries are added at the end so that this close can't promote
+        them back. Does not commit.
+
+        :returns: The results to ``finalize_promotions``, and the new entries.
         """
+        from app.pass_giveaway.services.pass_service import PassService
+
+        now = datetime.now(timezone.utc)
+        results: list[FillResult] = []
+        released: list[StaffPassAlternate] = []
+        while True:
+            # The session doesn't autoflush, and the last pass may have seated a guest.
+            db.flush()
+            hosts = [
+                host
+                for host in AlternateService.waiting_guests(db, show.id)
+                if host.guest_fallback == GuestFallback.WAIT_THEN_RELEASE
+            ]
+            if not hosts:
+                break
+            host = hosts[-1]
+            if host.staff_id is not None:
+                released.append(
+                    StaffPassAlternate(
+                        show_id=show.id,
+                        staff_id=host.staff_id,
+                        has_guest=True,
+                        guest_name=host.guest_name,
+                        guest_fallback=host.guest_fallback,
+                        priority_at=host.claimed_at or now,
+                        source="released_at_close",
+                        status="waiting",
+                        created_at=now,
+                        updated_at=now,
+                    )
+                )
+            pass_id = host.id
+            PassService._clear_claim(host, now)
+            results.append(
+                AlternateService.fill_open_passes(
+                    db,
+                    show,
+                    trigger="close_release",
+                    triggering_pass_id=pass_id,
+                    closing=True,
+                    digest=digest,
+                )
+            )
+        db.add_all(released)
+        db.flush()
+        return results, released
+
+    @staticmethod
+    def expire_on_close(db: Session, show: Show) -> int:
+        """Close out the queue when the show closes. The caller tells each alternate."""
         waiting = AlternateService.waiting_entries(db, show.id)
         if not waiting:
             return 0
@@ -631,38 +867,46 @@ class AlternateService:
             AlternateService._resolve(entry, "expired", now)
         db.commit()
         AlternateService._audit_bulk(db, "alternates_expired", show, waiting)
-        if notify:
-            AlternateService._email_no_pass(db, show, waiting)
         return len(waiting)
 
     @staticmethod
-    def notify_expired_at_close(db: Session, show: Show) -> int:
-        """Send the held "no pass" email to everyone expired by the last close."""
+    def add_expired_outcomes(db: Session, show: Show, digest: CloseDigest) -> int:
+        """Add the close email for everyone expired by the last close."""
         entries = AlternateService.entries_expired_at_close(db, show.id)
-        AlternateService._email_no_pass(db, show, entries)
-        return len(entries)
-
-    @staticmethod
-    def _email_no_pass(db: Session, show: Show, entries: list[StaffPassAlternate]) -> None:
         for entry in entries:
-            AlternateService._email(
-                db,
-                entry.staff,
-                subject=f"No staff pass available: {show.event_name}",
-                lines=[
-                    (
-                        f"The guest list for {AlternateService._show_desc(show)} has been"
-                        " closed."
-                    ),
-                    "",
-                    (
-                        "Unfortunately, no staff pass became available while you were on"
-                        " the alternate list, so you will not be on the guest list."
-                    ),
-                    "",
-                    "Thank you for your interest!",
-                ],
-            )
+            desc = AlternateService._show_desc(show)
+            if entry.source == "released_at_close":
+                guest_label = entry.guest_name or "Your guest"
+                digest.add_outcome(
+                    entry.staff,
+                    f"Your staff pass has been released: {show.event_name}",
+                    [
+                        f"The guest list for {desc} has been closed.",
+                        "",
+                        (
+                            f"{guest_label} didn't get a pass before the show closed. You"
+                            " asked to release your pass in that case, so neither of you"
+                            " is on the guest list."
+                        ),
+                    ],
+                    subject_wins=True,
+                )
+            else:
+                digest.add_outcome(
+                    entry.staff,
+                    f"No staff pass available: {show.event_name}",
+                    [
+                        f"The guest list for {desc} has been closed.",
+                        "",
+                        (
+                            "Unfortunately, no staff pass became available while you were"
+                            " on the alternate list, so you will not be on the guest list."
+                        ),
+                        "",
+                        "Thank you for your interest!",
+                    ],
+                )
+        return len(entries)
 
     @staticmethod
     def restore_on_reopen(db: Session, show: Show, notify_restored: bool = True) -> int:
@@ -671,7 +915,8 @@ class AlternateService:
 
         :param notify_restored: False when the close's emails were being held, so
             restored alternates never heard they were off the list. Anyone promoted
-            is still told.
+            is still told, and so is anyone whose pass was released at that close,
+            who would otherwise still think they had it.
         """
         expired = (
             db.query(StaffPassAlternate)
@@ -683,33 +928,40 @@ class AlternateService:
         )
         now = datetime.now(timezone.utc)
         restored = []
+        released_ids = set()
         for entry in sorted(expired, key=_queue_key):
             # Someone may have claimed a pass or rejoined in the meantime.
             if AlternateService._has_claim(
                 db, show.id, entry.staff_id
             ) or AlternateService.get_waiting_entry(db, show.id, entry.staff_id):
                 continue
+            # From here they're an ordinary alternate, so a later close says so.
+            if entry.source == "released_at_close":
+                released_ids.add(entry.id)
+                entry.source = "joined"
             entry.status = "waiting"
             entry.resolved_at = None
             entry.updated_at = now
             db.flush()
             restored.append(entry)
+        # Runs even with nobody restored, because waiting guests can get free passes.
+        promotions = AlternateService.fill_open_passes(db, show, trigger="show_reopened")
+        db.commit()
+        if restored:
+            AlternateService._audit_bulk(db, "alternates_restored", show, restored)
+        AlternateService.finalize_promotions(db, promotions)
         if not restored:
             return 0
 
-        promotions = AlternateService.fill_open_passes(db, show, trigger="show_reopened")
-        db.commit()
-        AlternateService._audit_bulk(db, "alternates_restored", show, restored)
-        AlternateService.finalize_promotions(db, promotions)
-        if not notify_restored:
-            return len(restored)
-
-        promoted_ids = {p.entry.id for p in promotions}
+        promoted_ids = {p.entry.id for p in promotions.promotions}
         positions = {
             e.id: i for i, e in enumerate(AlternateService.waiting_entries(db, show.id), 1)
         }
         for entry in restored:
             if entry.id in promoted_ids or entry.id not in positions:
+                continue
+            was_released = entry.id in released_ids
+            if not notify_restored and not was_released:
                 continue
             AlternateService._email(
                 db,
@@ -719,6 +971,18 @@ class AlternateService:
                     (
                         f"{AlternateService._show_desc(show)} has been reopened, and you"
                         " are back on the staff pass alternate list."
+                    ),
+                    *(
+                        [
+                            "",
+                            (
+                                "Your staff pass was released when the show closed,"
+                                f" because {entry.guest_name or 'your guest'} didn't have"
+                                " a pass."
+                            ),
+                        ]
+                        if was_released
+                        else []
                     ),
                     "",
                     f"You are alternate #{positions[entry.id]}.",
@@ -823,7 +1087,115 @@ class AlternateService:
         )
 
     @staticmethod
-    def _email_promoted(db: Session, promotion: Promotion) -> None:
+    def _guest_waiting_lines(host: Pass) -> list[str]:
+        """Where a host's waiting guest stands, and what happens if no pass comes up."""
+        guest_label = host.guest_name or "Your guest"
+        if host.guest_fallback == GuestFallback.WAIT_THEN_RELEASE:
+            at_close = (
+                f"If {host.guest_name or 'your guest'} doesn't have a pass when the show"
+                " closes, your pass will be released too, and neither of you will be on"
+                " the guest list."
+            )
+        else:
+            at_close = (
+                f"If {host.guest_name or 'your guest'} doesn't have a pass when the show"
+                " closes, you'll still be on the guest list without them."
+            )
+        return [
+            (
+                f"{guest_label} is on the alternate list as guest #{host.guest_position}."
+                " Staff on the alternate list get freed passes first. After that, if a"
+                " pass frees up it will be held for your guest automatically, and we'll"
+                " email you."
+            ),
+            "",
+            at_close,
+        ]
+
+    @staticmethod
+    def _email_guest_moved(db: Session, host: Pass, reason: str | None) -> None:
+        """Tell a host that their guest lost their pass and is now waiting."""
+        show = host.show
+        if reason == "capacity_change":
+            cause = (
+                f"The number of staff passes for {AlternateService._show_desc(show)} has"
+                " been reduced, so there is no longer a pass for your guest."
+            )
+        else:
+            cause = (
+                "Another staff member has claimed a pass for"
+                f" {AlternateService._show_desc(show)}, so there is no longer a pass for"
+                " your guest."
+            )
+        AlternateService._email(
+            db,
+            host.staff,
+            subject=f"Your guest is on the alternate list: {show.event_name}",
+            lines=[
+                cause,
+                "",
+                *AlternateService._guest_waiting_lines(host),
+                "",
+                "You still have your own staff pass.",
+                "",
+                AlternateService._show_url(show),
+            ],
+        )
+
+    @staticmethod
+    def _email_guest_seated(db: Session, host: Pass, reason: str | None) -> None:
+        """Tell a host that their waiting guest now has a pass."""
+        show = host.show
+        guest_label = host.guest_name or "your guest"
+        AlternateService._email(
+            db,
+            host.staff,
+            subject=f"Your guest has a pass: {show.event_name}",
+            lines=[
+                (
+                    f"A staff pass has opened up for {AlternateService._show_desc(show)},"
+                    f" and it is now being held for {guest_label}."
+                ),
+                "",
+                (
+                    "Staff take priority over guests, so until the show closes, your"
+                    " guest's pass may go to another staff member who needs one. If that"
+                    " happens, your guest goes back to the same place on the alternate"
+                    " list and we'll email you. When the show closes, we'll email you to"
+                    " confirm your guest."
+                ),
+                "",
+                AlternateService._show_url(show),
+            ],
+        )
+
+    @staticmethod
+    def email_guest_removed(
+        db: Session, host: Pass, guest_name: str | None, remover: Staff
+    ) -> None:
+        """Tell a host that promotions staff removed their guest."""
+        show = host.show
+        AlternateService._email(
+            db,
+            host.staff,
+            subject=f"Your guest has been removed: {show.event_name}",
+            lines=[
+                (
+                    f"{remover.name or remover.email} from KALX Promotions has removed"
+                    f" {guest_name or 'your +1 guest'} from your staff pass for"
+                    f" {AlternateService._show_desc(show)}."
+                ),
+                "",
+                "You still have your own staff pass.",
+                "",
+                "If you think this was a mistake, please reply to promotions.",
+            ],
+        )
+
+    @staticmethod
+    def _email_promoted(
+        db: Session, promotion: Promotion, digest: CloseDigest | None = None
+    ) -> None:
         entry = promotion.entry
         show = entry.show
         guest_label = entry.guest_name or "your guest"
@@ -841,7 +1213,7 @@ class AlternateService:
             bumped_line = (
                 " Because you said you can only attend with your guest, your staff pass"
                 " would be released too."
-                if entry.only_attend_with_guest
+                if entry.guest_fallback == GuestFallback.RELEASE
                 else ""
             )
             lines.append(
@@ -850,6 +1222,9 @@ class AlternateService:
                 f" we'll email you.{bumped_line} When the show closes, we'll email you to"
                 " confirm your guest."
             )
+            lines.append("")
+        elif promotion.guest_requested and promotion.pass_item.guest_waiting:
+            lines.extend(AlternateService._guest_waiting_lines(promotion.pass_item))
             lines.append("")
         elif promotion.guest_requested:
             lines.append(
@@ -869,9 +1244,8 @@ class AlternateService:
             ),
             AlternateService._show_url(show),
         ])
-        AlternateService._email(
-            db,
-            entry.staff,
-            subject=f"You got a staff pass to {show.event_name}!",
-            lines=lines,
-        )
+        subject = f"You got a staff pass to {show.event_name}!"
+        if digest is not None:
+            digest.add_intro(entry.staff, subject, lines, short_lines=lines[:1])
+        else:
+            AlternateService._email(db, entry.staff, subject=subject, lines=lines)

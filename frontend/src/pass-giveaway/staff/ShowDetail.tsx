@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { showsAPI, passesAPI, lotteryAPI, specialtyShowsAPI, alternatesAPI } from '../api';
-import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, AlternateGuestForm } from '../components';
+import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, AlternateGuestForm, WaitingGuestsList, GuestFallbackOptions, ClaimGuestActions } from '../components';
 import MarkdownContent from '../../common/components/MarkdownContent';
 import { formatPhone, formatLeave, isOnLeave, leaveCoversShow, formatDateValue } from '../../common/utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { STAFF_PASSES_NOT_YET_ACTIVE, WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow, staffPassesNotYetActive } from '../utils';
-import type { ShowResponse, ClaimData, LotteryStatus, SpecialtyShowResponse, AlternateQueue, AlternateJoinRequest } from '../types';
+import { STAFF_PASSES_NOT_YET_ACTIVE, WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow, seatedFallbackNote, staffPassesNotYetActive, waitingFallbackNote } from '../utils';
+import type { ShowResponse, ClaimData, LotteryStatus, SpecialtyShowResponse, AlternateQueue, AlternateJoinRequest, GuestFallback } from '../types';
 import type { StaffProfile, APIError } from '../../common/types';
 
 const EmailIcon = () => (
@@ -53,7 +53,7 @@ const ShowDetail = () => {
   // +1 guest claim state
   const [guestClaimPassId, setGuestClaimPassId] = useState<number | null>(null);
   const [guestName, setGuestName] = useState('');
-  const [onlyWithGuest, setOnlyWithGuest] = useState(false);
+  const [guestFallback, setGuestFallback] = useState<GuestFallback>('attend_alone');
 
   // Alternate queue state
   const [alternateQueue, setAlternateQueue] = useState<AlternateQueue | null>(null);
@@ -71,7 +71,7 @@ const ShowDetail = () => {
   const [showStaffLotteryForm, setShowStaffLotteryForm] = useState(false);
   const [lotteryGuestName, setLotteryGuestName] = useState('');
   const [lotteryHasGuest, setLotteryHasGuest] = useState(false);
-  const [lotteryOnlyWithGuest, setLotteryOnlyWithGuest] = useState(false);
+  const [lotteryGuestFallback, setLotteryGuestFallback] = useState<GuestFallback>('attend_alone');
   // DJ lottery entry form state
   const [showDJLotteryForm, setShowDJLotteryForm] = useState(false);
   const [lotteryDJDate, setLotteryDJDate] = useState('');
@@ -240,14 +240,16 @@ const ShowDetail = () => {
     setPassActionError(null);
     setSuccessMessage(null);
     try {
-      await passesAPI.claim(passId, claimData);
-      const msg = claimData?.has_guest
-        ? 'Pass claimed with +1 guest reservation!'
-        : 'Pass claimed successfully!';
+      const claimed = await passesAPI.claim(passId, claimData);
+      const msg = claimed.guest_waiting
+        ? 'Pass claimed. Your guest is on the alternate list.'
+        : claimData?.has_guest
+          ? 'Pass claimed with +1 guest reservation!'
+          : 'Pass claimed successfully!';
       showEphemeralSuccess(msg);
       setGuestClaimPassId(null);
       setGuestName('');
-      setOnlyWithGuest(false);
+      setGuestFallback('attend_alone');
       await loadShow(true);
     } catch (err) {
       const apiError = err as APIError;
@@ -269,7 +271,7 @@ const ShowDetail = () => {
     await handleClaimPass(passId, {
       has_guest: true,
       guest_name: guestName.trim() || null,
-      only_attend_with_guest: onlyWithGuest,
+      guest_fallback: guestFallback,
     });
   };
 
@@ -428,12 +430,12 @@ const ShowDetail = () => {
       await lotteryAPI.enterStaff(show.id, {
         has_guest: lotteryHasGuest,
         guest_name: lotteryHasGuest ? (lotteryGuestName.trim() || null) : null,
-        only_attend_with_guest: lotteryHasGuest ? lotteryOnlyWithGuest : false,
+        guest_fallback: lotteryHasGuest ? lotteryGuestFallback : 'attend_alone',
       });
       setShowStaffLotteryForm(false);
       setLotteryHasGuest(false);
       setLotteryGuestName('');
-      setLotteryOnlyWithGuest(false);
+      setLotteryGuestFallback('attend_alone');
       showEphemeralSuccess("You've entered the lottery! You'll receive an email with the result after the lottery closes.");
       await loadShow(true);
     } catch (err) {
@@ -569,7 +571,8 @@ const ShowDetail = () => {
   const availableStaffCount = staffPasses.filter((p) => p.status === 'available').length;
   const guestHoldPassCount = staffPasses.filter((p) => p.status === 'claimed' && p.guest_of_pass_id !== null).length;
   const displayAvailableCount = availableStaffCount + guestHoldPassCount;
-  const canClaimWithGuest = availableStaffCount >= 2;
+  // A second free pass can seat a guest now. Without one, a guest can only wait.
+  const hasSpareGuestPass = availableStaffCount >= 2;
   const myEmail = user?.email?.toLowerCase() ?? null;
   // A staff member may hold at most one staff pass per show (enforced
   // server-side too) — used to disable claiming a second one from the UI.
@@ -638,6 +641,69 @@ const ShowDetail = () => {
     !leaveBlocksPasses;
   const releaseCandidateName = alternateQueue?.next_candidate_name ?? null;
   const myDJEntry = lotteryStatus?.my_dj_entry ?? null;
+
+  const claimWithGuestButton = (passId: number) => (
+    <button
+      onClick={() => {
+        setGuestClaimPassId(passId);
+        setGuestName('');
+        setGuestFallback(hasSpareGuestPass ? 'attend_alone' : 'wait');
+        setPassActionError(null);
+      }}
+      className="btn-small"
+      disabled={passActionId === passId || alreadyHasStaffPass || notYetActive}
+      title={claimBlockedTitle ?? 'Claim this pass with a +1 guest. Guest spot is tentative until show closes.'}
+    >
+      Claim with +1 Guest
+    </button>
+  );
+
+  const renderGuestClaimForm = (passId: number) => (
+    <div className="guest-claim-form">
+      <p className="guest-claim-info">
+        You're claiming this pass with a +1 guest. Your guest's spot is not
+        guaranteed — if another staff member claims a pass, your guest may be
+        bumped. You'll be notified immediately if that happens, and again when
+        the show closes to confirm whether your guest can attend.
+      </p>
+      {show.guest_list_requirements.staff_guest_requires_name && (
+        <div className="form-group">
+          <label htmlFor="guest-name">Guest name (required by this venue):</label>
+          <input
+            id="guest-name"
+            type="text"
+            value={guestName}
+            onChange={(e) => setGuestName(e.target.value)}
+            placeholder="Guest full name"
+            className="input-text"
+          />
+        </div>
+      )}
+      <GuestFallbackOptions
+        name="guest-fallback"
+        legend="If my guest can't attend:"
+        value={guestFallback}
+        onChange={setGuestFallback}
+        waitOnly={!hasSpareGuestPass}
+      />
+      <div className="form-actions">
+        <button
+          onClick={() => handleGuestClaimSubmit(passId)}
+          className="btn-small btn-primary"
+          disabled={passActionId === passId}
+        >
+          {passActionId === passId ? 'Claiming...' : 'Claim with +1'}
+        </button>
+        <button
+          onClick={() => { setGuestClaimPassId(null); setGuestName(''); setGuestFallback('attend_alone'); setPassActionError(null); }}
+          className="btn-small btn-secondary"
+          disabled={passActionId === passId}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
 
   const formatLotteryDeadline = (d: Date) =>
     d.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -1184,7 +1250,8 @@ const ShowDetail = () => {
                 {myStaffEntry.has_guest && (
                   <p>
                     +1 guest requested{myStaffEntry.guest_name ? `: ${myStaffEntry.guest_name}` : ''}
-                    {myStaffEntry.only_attend_with_guest ? ' (release pass if guest cannot attend)' : ''}
+                    {myStaffEntry.guest_fallback === 'release' ? ' (release pass if guest cannot attend)' : ''}
+                    {waitingFallbackNote(myStaffEntry.guest_fallback)}
                   </p>
                 )}
                 <button
@@ -1236,27 +1303,12 @@ const ShowDetail = () => {
                         />
                       </div>
                     )}
-                    <fieldset className="form-group radio-group">
-                      <legend>If there aren't enough passes for my guest to attend:</legend>
-                      <label className="radio-label">
-                        <input
-                          type="radio"
-                          name="lottery-only-with-guest"
-                          checked={!lotteryOnlyWithGuest}
-                          onChange={() => setLotteryOnlyWithGuest(false)}
-                        />
-                        {' '}I'll still attend without them
-                      </label>
-                      <label className="radio-label">
-                        <input
-                          type="radio"
-                          name="lottery-only-with-guest"
-                          checked={lotteryOnlyWithGuest}
-                          onChange={() => setLotteryOnlyWithGuest(true)}
-                        />
-                        {' '}Release my pass too (cancel both)
-                      </label>
-                    </fieldset>
+                    <GuestFallbackOptions
+                      name="lottery-guest-fallback"
+                      legend="If there aren't enough passes for my guest to attend:"
+                      value={lotteryGuestFallback}
+                      onChange={setLotteryGuestFallback}
+                    />
                   </>
                 )}
                 <div className="form-actions">
@@ -1268,7 +1320,7 @@ const ShowDetail = () => {
                     {lotteryActionLoading ? 'Entering…' : 'Enter Lottery'}
                   </button>
                   <button
-                    onClick={() => { setShowStaffLotteryForm(false); setLotteryHasGuest(false); setLotteryGuestName(''); setLotteryOnlyWithGuest(false); }}
+                    onClick={() => { setShowStaffLotteryForm(false); setLotteryHasGuest(false); setLotteryGuestName(''); setLotteryGuestFallback('attend_alone'); }}
                     className="btn-small btn-secondary"
                     disabled={lotteryActionLoading}
                   >
@@ -1304,19 +1356,56 @@ const ShowDetail = () => {
                         <p className="pass-guest-note">
                           +1 guest reserved
                           {pass.guest_name ? `: ${pass.guest_name}` : ''}
-                          {pass.only_attend_with_guest ? " (staff will release if guest can't attend)" : ''}
+                          {show.status !== 'closed' && pass.guest_fallback === 'release' ? " (staff will release if guest can't attend)" : ''}
+                          {show.status !== 'closed' && seatedFallbackNote(pass.guest_fallback)}
                           {' '}— <em>
-                            {!show.close_notifications_pending
-                              ? 'not confirmed until show closes'
-                              : isMine
+                            {show.close_notifications_pending
+                              ? isMine
                                 ? "not confirmed yet, you'll get an email"
-                                : 'not confirmed yet'}
+                                : 'not confirmed yet'
+                              : show.status === 'closed'
+                                ? 'confirmed'
+                                : 'not confirmed until show closes'}
                           </em>
+                        </p>
+                      )}
+                      {pass.guest_waiting && (
+                        <p className="pass-guest-note">
+                          {show.status !== 'closed' ? (
+                            <>
+                              +1 guest on the alternate list
+                              {pass.guest_name ? `: ${pass.guest_name}` : ''}
+                              {pass.guest_position ? ` (guest #${pass.guest_position})` : ''}
+                              {pass.guest_fallback === 'wait_then_release'
+                                ? " — staff's pass is released if they don't have one at close"
+                                : ''}
+                            </>
+                          ) : show.close_notifications_pending ? (
+                            <>
+                              +1 guest{pass.guest_name ? `: ${pass.guest_name}` : ''} — <em>
+                                {isMine ? "not confirmed yet, you'll get an email" : 'not confirmed yet'}
+                              </em>
+                            </>
+                          ) : (
+                            <>+1 guest didn't get a pass{pass.guest_name ? `: ${pass.guest_name}` : ''}</>
+                          )}
                         </p>
                       )}
                       {pass.staff_phone && <p><strong>Phone:</strong> {formatPhone(pass.staff_phone)}</p>}
                       {pass.claimed_at && (
                         <p><strong>Claimed:</strong> {formatDateTime(pass.claimed_at)}</p>
+                      )}
+                      {isMine && show.status === 'published' && (
+                        <ClaimGuestActions
+                          pass={pass}
+                          availableCount={availableStaffCount}
+                          requireGuestName={show.guest_list_requirements.staff_guest_requires_name}
+                          canAddGuest={!lotteryActive && !leaveBlocksPasses && !notYetActive}
+                          onChanged={async (message) => {
+                            showEphemeralSuccess(message);
+                            await loadShow(true);
+                          }}
+                        />
                       )}
                       {isMine && (
                         <>
@@ -1352,16 +1441,21 @@ const ShowDetail = () => {
                         {show.status === 'closed' ? 'Unavailable' : 'Available'}
                       </p>
                       {show.status !== 'closed' && !leaveBlocksPasses && (
-                        <div className="claim-buttons">
-                          <button
-                            onClick={() => handleClaimPass(pass.id)}
-                            className="btn-small btn-primary"
-                            disabled={passActionId === pass.id || alreadyHasStaffPass || notYetActive}
-                            title={claimBlockedTitle}
-                          >
-                            {passActionId === pass.id ? 'Claiming...' : 'Claim'}
-                          </button>
-                        </div>
+                        guestClaimPassId === pass.id ? (
+                          renderGuestClaimForm(pass.id)
+                        ) : (
+                          <div className="claim-buttons">
+                            <button
+                              onClick={() => handleClaimPass(pass.id)}
+                              className="btn-small btn-primary"
+                              disabled={passActionId === pass.id || alreadyHasStaffPass || notYetActive}
+                              title={claimBlockedTitle}
+                            >
+                              {passActionId === pass.id ? 'Claiming...' : 'Claim'}
+                            </button>
+                            {claimWithGuestButton(pass.id)}
+                          </div>
+                        )
                       )}
                     </div>
                   </div>
@@ -1378,64 +1472,7 @@ const ShowDetail = () => {
                     {show.status !== 'closed' && !lotteryActive && !leaveBlocksPasses && (
                       <>
                         {guestClaimPassId === pass.id ? (
-                          <div className="guest-claim-form">
-                            <p className="guest-claim-info">
-                              You're claiming this pass with a +1 guest. Your guest's spot is not
-                              guaranteed — if another staff member claims a pass, your guest may be
-                              bumped. You'll be notified immediately if that happens, and again when
-                              the show closes to confirm whether your guest can attend.
-                            </p>
-                            {show.guest_list_requirements.staff_guest_requires_name && (
-                              <div className="form-group">
-                                <label htmlFor="guest-name">Guest name (required by this venue):</label>
-                                <input
-                                  id="guest-name"
-                                  type="text"
-                                  value={guestName}
-                                  onChange={(e) => setGuestName(e.target.value)}
-                                  placeholder="Guest full name"
-                                  className="input-text"
-                                />
-                              </div>
-                            )}
-                            <fieldset className="form-group radio-group">
-                              <legend>If my guest can't attend:</legend>
-                              <label className="radio-label">
-                                <input
-                                  type="radio"
-                                  name="only-with-guest"
-                                  checked={!onlyWithGuest}
-                                  onChange={() => setOnlyWithGuest(false)}
-                                />
-                                {' '}I'll still attend without them
-                              </label>
-                              <label className="radio-label">
-                                <input
-                                  type="radio"
-                                  name="only-with-guest"
-                                  checked={onlyWithGuest}
-                                  onChange={() => setOnlyWithGuest(true)}
-                                />
-                                {' '}Release my pass too (cancel both)
-                              </label>
-                            </fieldset>
-                            <div className="form-actions">
-                              <button
-                                onClick={() => handleGuestClaimSubmit(pass.id)}
-                                className="btn-small btn-primary"
-                                disabled={passActionId === pass.id}
-                              >
-                                {passActionId === pass.id ? 'Claiming...' : 'Claim with +1'}
-                              </button>
-                              <button
-                                onClick={() => { setGuestClaimPassId(null); setGuestName(''); setOnlyWithGuest(false); setPassActionError(null); }}
-                                className="btn-small btn-secondary"
-                                disabled={passActionId === pass.id}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
+                          renderGuestClaimForm(pass.id)
                         ) : (
                           <div className="claim-buttons">
                             <button
@@ -1446,16 +1483,7 @@ const ShowDetail = () => {
                             >
                               {passActionId === pass.id ? 'Claiming...' : 'Claim'}
                             </button>
-                            {canClaimWithGuest && (
-                              <button
-                                onClick={() => { setGuestClaimPassId(pass.id); setGuestName(''); setOnlyWithGuest(false); }}
-                                className="btn-small"
-                                disabled={passActionId === pass.id || alreadyHasStaffPass || notYetActive}
-                                title={claimBlockedTitle ?? 'Claim this pass and reserve a second pass for a +1 guest. Guest spot is tentative until show closes.'}
-                              >
-                                Claim with +1 Guest
-                              </button>
-                            )}
+                            {claimWithGuestButton(pass.id)}
                           </div>
                         )}
                       </>
@@ -1510,7 +1538,7 @@ const ShowDetail = () => {
               {myAlternateEntry.position === 1
                 ? ' — you are next in line if a staff pass frees up.'
                 : ` — ${myAlternateEntry.position - 1} ${myAlternateEntry.position === 2 ? 'person is' : 'people are'} ahead of you.`}
-              {myAlternateEntry.only_attend_with_guest &&
+              {myAlternateEntry.guest_fallback === 'release' &&
                 ' Because you only want to attend with your guest, you will be skipped until two passes are free at once.'}
             </div>
           )}
@@ -1526,7 +1554,7 @@ const ShowDetail = () => {
                   initial={{
                     has_guest: entry.has_guest,
                     guest_name: entry.guest_name,
-                    only_attend_with_guest: entry.only_attend_with_guest,
+                    guest_fallback: entry.guest_fallback,
                   }}
                   submitLabel="Save"
                   busy={alternateActionLoading}
@@ -1555,6 +1583,7 @@ const ShowDetail = () => {
               )
             }
           />
+          <WaitingGuestsList guests={alternateQueue?.waiting_guests ?? []} />
         </div>
       </div>
 

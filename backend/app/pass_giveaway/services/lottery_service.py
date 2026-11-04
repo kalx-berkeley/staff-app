@@ -9,6 +9,8 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.common.areas import PASS_GIVEAWAY_AREA
+from app.models.guest_fallback import GuestFallback
+from app.pass_giveaway.services.close_digest import CloseDigest
 from app.models.lottery_entry import LotteryEntry
 from app.models.notification_preferences import NotificationPreferences
 from app.models.pass_model import Pass
@@ -52,7 +54,7 @@ class LotteryService:
         staff_id: int,
         has_guest: bool = False,
         guest_name: str | None = None,
-        only_attend_with_guest: bool = False,
+        guest_fallback: str = GuestFallback.ATTEND_ALONE,
     ) -> LotteryEntry:
         """Create or update a staff member's lottery entry for a show."""
         show = db.query(Show).filter(Show.id == show_id).first()
@@ -74,6 +76,10 @@ class LotteryService:
         staff = db.query(Staff).filter(Staff.id == staff_id).first()
         if staff:
             ensure_not_on_leave_for_show(staff, show)
+        if has_guest:
+            from app.pass_giveaway.services.pass_service import PassService
+
+            PassService._validate_guest_name(show, guest_name)
 
         existing = (
             db.query(LotteryEntry)
@@ -89,7 +95,7 @@ class LotteryService:
         if existing:
             existing.has_guest = has_guest
             existing.guest_name = guest_name
-            existing.only_attend_with_guest = only_attend_with_guest
+            existing.guest_fallback = guest_fallback
             existing.updated_at = now
             db.commit()
             db.refresh(existing)
@@ -101,7 +107,7 @@ class LotteryService:
             staff_id=staff_id,
             has_guest=has_guest,
             guest_name=guest_name,
-            only_attend_with_guest=only_attend_with_guest,
+            guest_fallback=guest_fallback,
             status="pending",
             entered_at=now,
             created_at=now,
@@ -290,13 +296,15 @@ class LotteryService:
             )
 
     @staticmethod
-    def run_lottery(db: Session, show_id: int) -> dict:
+    def run_lottery(db: Session, show_id: int, digest: CloseDigest | None = None) -> dict:
         """
         Execute the lottery for a show.
 
         Randomly assigns available passes to lottery entrants, then sends
         notification emails to all entrants (winners and losers).
         Returns a summary dict.
+
+        :param digest: The show is closing, so staff results go in the close's email.
         """
         show = db.query(Show).filter(Show.id == show_id).first()
         if not show:
@@ -328,7 +336,9 @@ class LotteryService:
 
         now = datetime.now(timezone.utc)
 
-        staff_summary = LotteryService._run_staff_lottery(db, show, staff_entries, now)
+        staff_summary = LotteryService._run_staff_lottery(
+            db, show, staff_entries, now, digest
+        )
         dj_summary = LotteryService._run_dj_lottery(db, show, dj_entries, now)
 
         logger.info(
@@ -340,12 +350,16 @@ class LotteryService:
 
     @staticmethod
     def _run_staff_lottery(
-        db: Session, show: Show, entries: list[LotteryEntry], now: datetime
+        db: Session,
+        show: Show,
+        entries: list[LotteryEntry],
+        now: datetime,
+        digest: CloseDigest | None = None,
     ) -> dict:
         """Run the staff pass lottery and claim passes for winners.
 
         Uses a two-loop algorithm: first award staff passes, then award guest
-        passes. If a staff member with only_attend_with_guest cannot get a guest
+        passes. If a staff member with the release fallback cannot get a guest
         pass, their staff pass is returned and both loops repeat until no further
         conversions occur.
 
@@ -374,7 +388,7 @@ class LotteryService:
         staff_pass: dict[int, Pass] = {}
         guest_pass: dict[int, Pass] = {}
         final_losers: set[int] = set()
-        # Entries converted from winner→loser at least once due to only_attend_with_guest
+        # Entries converted from winner→loser at least once due to the release fallback
         was_converted: set[int] = set()
         # Entries whose guest-pass fate is already settled (won or accepted loss)
         guest_decided: set[int] = set()
@@ -408,7 +422,7 @@ class LotteryService:
                 if passes:
                     guest_pass[entry.id] = passes.pop(0)
                     guest_decided.add(entry.id)
-                elif entry.only_attend_with_guest:
+                elif entry.guest_fallback == GuestFallback.RELEASE:
                     # Return the staff pass and remove from winners.
                     # Two-strike rule: if already converted once, go straight to
                     # final_losers to prevent an infinite cycle when no other
@@ -439,11 +453,21 @@ class LotteryService:
                 primary.staff_id = entry.staff_id
                 primary.claimed_at = entry.entered_at
                 primary.status = "claimed"
-                primary.has_guest = entry.id in guest_pass
-                primary.guest_name = entry.guest_name if entry.id in guest_pass else None
-                primary.only_attend_with_guest = (
-                    entry.only_attend_with_guest if entry.id in guest_pass else False
+                # A guest with no pass who can wait goes on the alternate list.
+                guest_seated = entry.id in guest_pass
+                guest_waiting = (
+                    entry.has_guest
+                    and not guest_seated
+                    and GuestFallback.waits(entry.guest_fallback)
                 )
+                keeps_guest = guest_seated or guest_waiting
+                primary.has_guest = guest_seated
+                primary.guest_waiting = guest_waiting
+                primary.guest_name = entry.guest_name if keeps_guest else None
+                primary.guest_fallback = (
+                    entry.guest_fallback if keeps_guest else GuestFallback.ATTEND_ALONE
+                )
+                primary.guest_priority_at = entry.entered_at if keeps_guest else None
                 primary.updated_at = now
 
                 if entry.id in guest_pass:
@@ -473,9 +497,14 @@ class LotteryService:
             AlternateService._audit_bulk(
                 db, "alternates_enqueued_from_lottery", show, queued
             )
-        AlternateService.finalize_promotions(db, promotions)
+        # A winner's guest given a leftover pass hears about it in the result email.
+        winner_pass_ids = {p.id for p in staff_pass.values()}
+        promotions.guests_seated = [
+            host for host in promotions.guests_seated if host.id not in winner_pass_ids
+        ]
+        AlternateService.finalize_promotions(db, promotions, digest)
 
-        promoted_staff_ids = {p.entry.staff_id for p in promotions}
+        promoted_staff_ids = {p.entry.staff_id for p in promotions.promotions}
         alternate_positions = {
             alt.staff_id: position
             for position, alt in enumerate(
@@ -503,11 +532,11 @@ class LotteryService:
             show_desc = f'"{show.event_name}" at {show.venue.name} on {show.show_date}'
 
             if entry.id in staff_pass:
-                if entry.id in guest_pass:
+                if staff_pass[entry.id].has_guest:
                     # Cases 3 & 6: staff won, guest won. The guest pass is a
                     # hold that another staff member can still take until the
                     # show closes.
-                    if entry.only_attend_with_guest:
+                    if entry.guest_fallback == GuestFallback.RELEASE:
                         bumped_line = (
                             " Because you said you can only attend with your guest,"
                             " your staff pass would be released too."
@@ -539,8 +568,26 @@ class LotteryService:
                         ),
                     ])
                     subject = f"You won passes to {show.event_name}!"
+                elif staff_pass[entry.id].guest_waiting:
+                    # Staff won, and their guest is waiting on the alternate list.
+                    body = "\n".join([
+                        (
+                            "Congratulations! You have been selected in the"
+                            f" lottery for {show_desc}."
+                        ),
+                        "",
+                        "Your staff pass has been reserved.",
+                        "",
+                        *AlternateService._guest_waiting_lines(staff_pass[entry.id]),
+                        "",
+                        (
+                            "No further action is needed. Your name will be on the guest"
+                            " list sent to the venue when the show closes."
+                        ),
+                    ])
+                    subject = f"You won a pass to {show.event_name}!"
                 elif entry.has_guest:
-                    # Case 4: staff won, guest lost (only_attend_with_guest is False here)
+                    # Case 4: staff won, guest lost (the fallback isn't release here)
                     body = "\n".join([
                         (
                             "Congratulations! You have been selected in the"
@@ -580,7 +627,7 @@ class LotteryService:
             else:
                 if entry.id in was_converted:
                     # Case 7: initially won a staff pass but returned it because no
-                    # guest pass was available and only_attend_with_guest is True
+                    # guest pass was available and the fallback is release
                     body = "\n".join([
                         f"The lottery for staff passes to {show_desc} has concluded.",
                         "",
@@ -599,8 +646,8 @@ class LotteryService:
                         "Thank you for entering!",
                     ])
                     subject = f"Lottery result for {show.event_name}"
-                elif entry.has_guest and entry.only_attend_with_guest:
-                    # Case 8: lost from the start, with only_attend_with_guest
+                elif entry.has_guest and entry.guest_fallback == GuestFallback.RELEASE:
+                    # Case 8: lost from the start, with the release fallback
                     body = "\n".join([
                         f"The lottery for staff passes to {show_desc} has concluded.",
                         "",
@@ -639,7 +686,8 @@ class LotteryService:
                     subject = f"Lottery result for {show.event_name}"
 
             position = alternate_positions.get(entry.staff_id)
-            if entry.id not in staff_pass and position is not None:
+            # A close ends the alternate list right after the draw.
+            if digest is None and entry.id not in staff_pass and position is not None:
                 body = body.replace(
                     "Thank you for entering!",
                     "\n".join([
@@ -655,6 +703,21 @@ class LotteryService:
                         "Thank you for entering!",
                     ]),
                 )
+
+            if digest is not None:
+                won = entry.id in staff_pass
+                digest.add_intro(
+                    staff_member,
+                    subject,
+                    [body],
+                    short_lines=[
+                        "Congratulations! You have been selected in the lottery for"
+                        f" {show_desc}."
+                        if won
+                        else body.replace("\n\nThank you for entering!", "")
+                    ],
+                )
+                continue
 
             notification_service.send_email(
                 to_email=staff_member.email,

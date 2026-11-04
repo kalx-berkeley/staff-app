@@ -9,6 +9,8 @@ import logging
 
 from app.common.areas import PASS_GIVEAWAY_AREA
 from app.config import settings
+from app.models.guest_fallback import GuestFallback
+from app.pass_giveaway.services.close_digest import CloseDigest
 from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.staff import Staff
@@ -46,6 +48,12 @@ def format_phone(phone: str) -> str:
     if len(digits) == 10:
         return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
     return phone
+
+
+NO_SPARE_PASS_DETAIL = (
+    "There's no pass free for your guest right now. Choose an option that puts them on"
+    " the alternate list, or continue without a guest."
+)
 
 
 class PassService:
@@ -407,15 +415,13 @@ class PassService:
         from app.pass_giveaway.services.alternate_service import AlternateService
 
         try:
-            promotions = []
-            if show:
-                promotions = AlternateService.fill_open_passes(
-                    db,
-                    show,
-                    trigger="release",
-                    triggering_pass_id=pass_item.id,
-                    actor_email=actor_email,
-                )
+            promotions = AlternateService.fill_open_passes(
+                db,
+                show,
+                trigger="release",
+                triggering_pass_id=pass_item.id,
+                actor_email=actor_email,
+            )
             db.commit()
             AlternateService.finalize_promotions(db, promotions)
             db.refresh(pass_item)
@@ -629,7 +635,9 @@ class PassService:
         pass_item.status = "claimed"
         pass_item.has_guest = False
         pass_item.guest_name = None
-        pass_item.only_attend_with_guest = False
+        pass_item.guest_fallback = GuestFallback.ATTEND_ALONE
+        pass_item.guest_waiting = False
+        pass_item.guest_priority_at = None
         pass_item.guest_of_pass_id = None
         pass_item.updated_at = now
 
@@ -639,17 +647,49 @@ class PassService:
         guest_pass: Pass,
         now: datetime,
         guest_name: str | None,
-        only_attend_with_guest: bool,
+        guest_fallback: str,
     ) -> None:
-        """Attach ``guest_pass`` to ``primary`` as its +1 guest hold."""
+        """
+        Attach ``guest_pass`` to ``primary`` as its +1 guest hold.
+
+        The hold's claim time is the guest's priority, so a guest seated again keeps
+        their place in the order guest holds are bumped.
+        """
         primary.has_guest = True
+        primary.guest_waiting = False
         primary.guest_name = guest_name
-        primary.only_attend_with_guest = only_attend_with_guest
+        primary.guest_fallback = guest_fallback
+        primary.guest_priority_at = primary.guest_priority_at or now
         guest_pass.staff_id = primary.staff_id
-        guest_pass.claimed_at = now
+        guest_pass.claimed_at = primary.guest_priority_at
         guest_pass.status = "claimed"
         guest_pass.guest_of_pass_id = primary.id
         guest_pass.updated_at = now
+
+    @staticmethod
+    def _start_guest_waiting(
+        primary: Pass,
+        now: datetime,
+        guest_name: str | None,
+        guest_fallback: str,
+    ) -> None:
+        """Put ``primary``'s +1 guest on the alternate list, keeping any earlier place."""
+        primary.has_guest = False
+        primary.guest_waiting = True
+        primary.guest_name = guest_name
+        primary.guest_fallback = guest_fallback
+        primary.guest_priority_at = primary.guest_priority_at or primary.claimed_at or now
+        primary.updated_at = now
+
+    @staticmethod
+    def _clear_guest(primary: Pass, now: datetime) -> None:
+        """Take any +1 guest off ``primary``. The caller deals with a linked hold."""
+        primary.has_guest = False
+        primary.guest_waiting = False
+        primary.guest_name = None
+        primary.guest_fallback = GuestFallback.ATTEND_ALONE
+        primary.guest_priority_at = None
+        primary.updated_at = now
 
     @staticmethod
     def _clear_claim(pass_item: Pass, now: datetime) -> None:
@@ -659,7 +699,9 @@ class PassService:
         pass_item.claimed_at = None
         pass_item.has_guest = False
         pass_item.guest_name = None
-        pass_item.only_attend_with_guest = False
+        pass_item.guest_fallback = GuestFallback.ATTEND_ALONE
+        pass_item.guest_waiting = False
+        pass_item.guest_priority_at = None
         pass_item.guest_of_pass_id = None
         pass_item.updated_at = now
 
@@ -670,26 +712,30 @@ class PassService:
         primary_pass: Pass | None,
         show: Show,
         now: datetime,
+        digest: CloseDigest | None = None,
     ) -> bool:
         """
         Detach a guest hold from its primary pass so it can be claimed by someone else.
 
         The primary's staff member is emailed. If they only wanted to attend with
-        their guest, their own pass is released too (it becomes available).
+        their guest, their own pass is released too (it becomes available). A guest
+        whose fallback is to wait goes on the alternate list, and the caller tells
+        their host once the change is committed, when their position is known.
 
         Returns True when the primary pass was released.
         """
         released = False
-        if primary_pass:
-            released = primary_pass.only_attend_with_guest
+        if primary_pass and GuestFallback.waits(primary_pass.guest_fallback):
+            PassService._start_guest_waiting(
+                primary_pass, now, primary_pass.guest_name, primary_pass.guest_fallback
+            )
+        elif primary_pass:
+            released = primary_pass.guest_fallback == GuestFallback.RELEASE
             # Notify before clearing staff_id so the staff relationship
             # is still intact when the email address is looked up.
-            PassService._notify_guest_bumped(db, primary_pass, show, released)
+            PassService._notify_guest_bumped(db, primary_pass, show, released, digest)
 
-            primary_pass.has_guest = False
-            primary_pass.guest_name = None
-            primary_pass.only_attend_with_guest = False
-            primary_pass.updated_at = now
+            PassService._clear_guest(primary_pass, now)
 
             if released:
                 PassService._clear_claim(primary_pass, now)
@@ -703,12 +749,10 @@ class PassService:
         primary_pass: Pass,
         show: Show,
         released: bool,
+        digest: CloseDigest | None = None,
     ) -> None:
-        """Send an email to a staff member whose guest was bumped by another staff claim."""
-        from app.common.services import notification_service
-
-        if not primary_pass.staff or not primary_pass.staff.email:
-            return
+        """Email a staff member whose guest was bumped, if they have email enabled."""
+        from app.pass_giveaway.services.alternate_service import AlternateService
 
         guest_name = primary_pass.guest_name
 
@@ -723,7 +767,7 @@ class PassService:
                     "Because you indicated you only wanted to attend if your guest"
                     " could also attend, your staff pass has been released."
                 )
-            body = "\n".join([
+            lines = [
                 f"Unfortunately, another staff member has claimed a pass for"
                 f' "{show.event_name}" at {show.venue.name} on {show.show_date}.',
                 "",
@@ -735,7 +779,7 @@ class PassService:
                     " show:"
                 ),
                 f"{settings.frontend_base_url}/pass-giveaway/staff/shows/{show.id}",
-            ])
+            ]
             subject = f"Your staff pass has been released: {show.event_name}"
         else:
             if guest_name:
@@ -747,7 +791,7 @@ class PassService:
                 guest_line = (
                     "There are no longer enough staff passes for your guest to attend."
                 )
-            body = "\n".join([
+            lines = [
                 f"Unfortunately, another staff member has claimed a pass for"
                 f' "{show.event_name}" at {show.venue.name} on {show.show_date}.',
                 "",
@@ -757,16 +801,13 @@ class PassService:
                     "You still have your own staff pass, and your name will be on the"
                     " guest list sent to the venue when the show closes."
                 ),
-            ])
+            ]
             subject = f"Your guest pass is no longer available: {show.event_name}"
 
-        notification_service.send_email(
-            to_email=primary_pass.staff.email,
-            subject=subject,
-            body_text=body,
-            db=db,
-            area=PASS_GIVEAWAY_AREA,
-        )
+        if digest is not None:
+            digest.add_intro(primary_pass.staff, subject, lines)
+        else:
+            AlternateService._email(db, primary_pass.staff, subject=subject, lines=lines)
 
     @staticmethod
     def claim_staff_pass(
@@ -775,7 +816,7 @@ class PassService:
         staff_id: int | None,
         has_guest: bool = False,
         guest_name: str | None = None,
-        only_attend_with_guest: bool = False,
+        guest_fallback: str = GuestFallback.ATTEND_ALONE,
     ) -> Pass:
         """
         Claim a staff pass, optionally reserving a second pass for a +1 guest.
@@ -792,7 +833,7 @@ class PassService:
             staff_id: Staff member ID (may be None for promotions staff)
             has_guest: Whether to also reserve a guest hold pass
             guest_name: Optional guest name for the reservation
-            only_attend_with_guest: Release this pass too if the guest loses their slot
+            guest_fallback: What happens if the guest loses their slot (GuestFallback)
 
         Returns:
             Updated primary pass
@@ -877,20 +918,11 @@ class PassService:
                         AlternateService._staff_passes(db, pass_item.show_id)
                     )[0]
 
-            now = datetime.now(timezone.utc)
-
-            if is_guest_hold:
-                # Displace the existing guest reservation.
-                primary_pass = (
-                    db.query(Pass).filter(Pass.id == pass_item.guest_of_pass_id).first()
-                )
-                PassService._displace_guest_hold(db, pass_item, primary_pass, show, now)
-
-            # Claim the primary pass for the staff member.
-            PassService._assign_claim(pass_item, staff_id, now)
-
-            if has_guest and not is_guest_hold:
-                # Find a second available staff pass on the same show.
+            # Checked before anything changes, because displacing a guest emails
+            # their host. Only a guest who can wait can go without a spare pass.
+            guest_pass = None
+            if has_guest:
+                PassService._validate_guest_name(show, guest_name)
                 guest_pass = (
                     db.query(Pass)
                     .filter(
@@ -901,14 +933,33 @@ class PassService:
                     )
                     .first()
                 )
-                if not guest_pass:
+                if not guest_pass and not GuestFallback.waits(guest_fallback):
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Not enough available staff passes to reserve a guest hold",
+                        detail=NO_SPARE_PASS_DETAIL,
                     )
-                PassService._assign_guest_hold(
-                    pass_item, guest_pass, now, guest_name, only_attend_with_guest
+
+            now = datetime.now(timezone.utc)
+
+            displaced_primary = None
+            if is_guest_hold:
+                # Displace the existing guest reservation.
+                displaced_primary = (
+                    db.query(Pass).filter(Pass.id == pass_item.guest_of_pass_id).first()
                 )
+                PassService._displace_guest_hold(
+                    db, pass_item, displaced_primary, show, now
+                )
+
+            # Claim the primary pass for the staff member.
+            PassService._assign_claim(pass_item, staff_id, now)
+
+            if guest_pass:
+                PassService._assign_guest_hold(
+                    pass_item, guest_pass, now, guest_name, guest_fallback
+                )
+            elif has_guest:
+                PassService._start_guest_waiting(pass_item, now, guest_name, guest_fallback)
 
             # A direct claim ends any place this staff member held in the
             # alternate queue, and a displaced only-with-guest claimer may
@@ -918,6 +969,8 @@ class PassService:
             promotions = AlternateService.fill_open_passes(
                 db, show, trigger="guest_conditional_release"
             )
+            if displaced_primary is not None and displaced_primary.guest_waiting:
+                promotions.add_moved_guest(displaced_primary)
 
             db.commit()
             AlternateService.finalize_promotions(db, promotions)
@@ -939,6 +992,164 @@ class PassService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database error occurred while claiming pass_item",
             )
+
+    @staticmethod
+    def _validate_guest_name(show: Show, guest_name: str | None) -> None:
+        """Reject a missing guest name when the show's guest list requires one."""
+        if show.promoted_by.staff_guest_requires_name and not (guest_name or "").strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This show requires a name for your +1 guest",
+            )
+
+    @staticmethod
+    def get_guest_host_pass(db: Session, pass_id: int) -> Pass:
+        """Return a claimed staff pass that can have a +1 guest, or raise."""
+        pass_item = db.query(Pass).filter(Pass.id == pass_id).first()
+        if not pass_item:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Pass with id {pass_id} not found",
+            )
+        if (
+            pass_item.pass_type != "staff"
+            or pass_item.status != "claimed"
+            or pass_item.guest_of_pass_id is not None
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Only a claimed staff pass can have a +1 guest",
+            )
+        return pass_item
+
+    @staticmethod
+    def _validate_guest_change_allowed(show: Show | None) -> None:
+        """Guests can't change once the show closes, just as passes can't be released."""
+        if show is None or show.status != "published":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Guests can only be changed while a show is open",
+            )
+
+    @staticmethod
+    def add_guest(
+        db: Session,
+        pass_item: Pass,
+        guest_name: str | None,
+        guest_fallback: str,
+    ) -> Pass:
+        """
+        Add a +1 guest to a pass claimed without one, or whose guest was removed.
+
+        The guest gets a free pass if there is one, and otherwise waits on the
+        alternate list, so a fallback that can't wait needs a free pass. Either way
+        they rank by when they were added, behind guests already waiting.
+        """
+        from app.pass_giveaway.services.alternate_service import AlternateService
+        from app.pass_giveaway.services.lottery_service import LotteryService
+
+        show = pass_item.show
+        PassService._validate_guest_change_allowed(show)
+        PassService._validate_show_claimable(show)
+        if LotteryService.is_lottery_active(show):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Guests can't be added during the lottery window",
+            )
+        if pass_item.staff:
+            ensure_not_on_leave_for_show(pass_item.staff, show)
+        if pass_item.has_guest or pass_item.guest_waiting:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This pass already has a +1 guest",
+            )
+        PassService._validate_guest_name(show, guest_name)
+        guest_name = guest_name.strip() if guest_name and guest_name.strip() else None
+
+        guest_pass = (
+            db.query(Pass)
+            .filter(
+                Pass.show_id == show.id,
+                Pass.pass_type == "staff",
+                Pass.status == "available",
+            )
+            .first()
+        )
+        if not guest_pass and not GuestFallback.waits(guest_fallback):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=NO_SPARE_PASS_DETAIL,
+            )
+
+        now = datetime.now(timezone.utc)
+        pass_item.guest_priority_at = now
+        if guest_pass:
+            PassService._assign_guest_hold(
+                pass_item, guest_pass, now, guest_name, guest_fallback
+            )
+        else:
+            PassService._start_guest_waiting(pass_item, now, guest_name, guest_fallback)
+        pass_item.updated_at = now
+
+        promotions = AlternateService.fill_open_passes(db, show, trigger="guest_added")
+        db.commit()
+        AlternateService.finalize_promotions(db, promotions)
+        db.refresh(pass_item)
+        return pass_item
+
+    @staticmethod
+    def remove_guest(db: Session, pass_item: Pass, actor_email: str | None = None) -> Pass:
+        """
+        Take the +1 guest off a pass, whether seated or waiting. The host keeps theirs.
+
+        A freed guest pass goes to the next person in line.
+        """
+        from app.pass_giveaway.services.alternate_service import AlternateService
+
+        show = pass_item.show
+        PassService._validate_guest_change_allowed(show)
+        if not pass_item.has_guest and not pass_item.guest_waiting:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This pass has no +1 guest",
+            )
+
+        now = datetime.now(timezone.utc)
+        guest_hold = db.query(Pass).filter(Pass.guest_of_pass_id == pass_item.id).first()
+        if guest_hold:
+            PassService._clear_claim(guest_hold, now)
+        PassService._clear_guest(pass_item, now)
+
+        promotions = AlternateService.fill_open_passes(
+            db,
+            show,
+            trigger="guest_removed",
+            triggering_pass_id=pass_item.id,
+            actor_email=actor_email,
+        )
+        db.commit()
+        AlternateService.finalize_promotions(db, promotions)
+        db.refresh(pass_item)
+        return pass_item
+
+    @staticmethod
+    def update_guest_name(db: Session, pass_item: Pass, guest_name: str | None) -> Pass:
+        """Correct a +1 guest's name. The guest keeps their pass or place in line."""
+        show = pass_item.show
+        PassService._validate_guest_change_allowed(show)
+        if not pass_item.has_guest and not pass_item.guest_waiting:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This pass has no +1 guest",
+            )
+        PassService._validate_guest_name(show, guest_name)
+        pass_item.guest_name = (
+            guest_name.strip() if guest_name and guest_name.strip() else None
+        )
+        pass_item.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(pass_item)
+        return pass_item
 
     @staticmethod
     def clothespin_blocker(show: Show, today: date) -> str | None:
@@ -1393,6 +1604,8 @@ class PassService:
 
         cut_staff_ids: list[int] = []
         staff_delta = new_num_pairs + (show.extra_staff_passes or 0) - len(staff_passes)
+        to_delete_ids: set[int] = set()
+        moved_guests: list[Pass] = []
         if staff_delta > 0:
             for _ in range(staff_delta):
                 db.add(Pass(show_id=show.id, pass_type="staff", status="available"))
@@ -1410,7 +1623,6 @@ class PassService:
                 for p in staff_passes
                 if p.status == "claimed" and p.guest_of_pass_id is None
             ]
-            to_delete_ids: set[int] = set()
 
             # Step 1: available unclaimed
             random.shuffle(available_s)
@@ -1427,7 +1639,12 @@ class PassService:
                     break
                 primary = next((p for p in primaries if p.id == gh.guest_of_pass_id), None)
                 if primary:
-                    if primary.only_attend_with_guest:
+                    if GuestFallback.waits(primary.guest_fallback):
+                        PassService._start_guest_waiting(
+                            primary, now, primary.guest_name, primary.guest_fallback
+                        )
+                        moved_guests.append(primary)
+                    elif primary.guest_fallback == GuestFallback.RELEASE:
                         affected_staff.append({
                             "name": primary.staff.name if primary.staff else "Unknown",
                             "phone": primary.staff.phone if primary.staff else None,
@@ -1440,10 +1657,7 @@ class PassService:
                             to_delete_ids.add(primary.id)
                             to_remove -= 1
                     else:
-                        primary.has_guest = False
-                        primary.guest_name = None
-                        primary.only_attend_with_guest = False
-                        primary.updated_at = now
+                        PassService._clear_guest(primary, now)
 
                 gh.guest_of_pass_id = None
                 to_delete_ids.add(gh.id)
@@ -1488,6 +1702,10 @@ class PassService:
         db.flush()
         db.expire(show, ["passes"])
         promotions = AlternateService.fill_open_passes(db, show, trigger="capacity_change")
+        for primary in moved_guests:
+            # A guest whose host's pass was then cut moves with the host instead.
+            if primary.id not in to_delete_ids:
+                promotions.add_moved_guest(primary, reason="capacity_change")
 
         db.commit()
         AlternateService.finalize_promotions(db, promotions)

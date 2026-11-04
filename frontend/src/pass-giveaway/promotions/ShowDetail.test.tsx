@@ -14,6 +14,7 @@ vi.mock('../api', () => ({
   passesAPI: {
     setPreassignment: vi.fn(),
     removePreassignment: vi.fn(),
+    removeGuest: vi.fn(),
     getPreassignSchedule: vi.fn().mockResolvedValue([]),
     getPreassignLeave: vi.fn().mockResolvedValue(null),
     getSuggestionsByDate: vi.fn(),
@@ -78,7 +79,7 @@ const basePass: PassResponse = {
   claimed_at: null,
   has_guest: false,
   guest_name: null,
-  only_attend_with_guest: false,
+  guest_fallback: 'attend_alone' as const,
   guest_of_pass_id: null,
   preassigned_dj: null,
   preassigned_date: null,
@@ -522,7 +523,7 @@ describe('Promotions ShowDetail — alternates', () => {
       position: 1,
       has_guest: false,
       guest_name: null,
-      only_attend_with_guest: false,
+      guest_fallback: 'attend_alone' as const,
       source: 'lottery',
       priority_at: '2024-01-01T00:00:00Z',
     };
@@ -586,7 +587,7 @@ describe('Promotions ShowDetail — alternates', () => {
           position: 1,
           has_guest: false,
           guest_name: null,
-          only_attend_with_guest: false,
+          guest_fallback: 'attend_alone' as const,
           source: 'joined',
           priority_at: '2024-01-01T00:00:00Z',
         },
@@ -603,6 +604,108 @@ describe('Promotions ShowDetail — alternates', () => {
     expect(label.closest('.alternate-card')).toHaveTextContent('wanda@example.com');
   });
 
+  describe('waiting guests', () => {
+    const waitingQueue = {
+      queue_open: false,
+      entries: [],
+      waiting_guests: [
+        {
+          pass_id: 12,
+          position: 1,
+          guest_name: 'Sam',
+          host_staff_id: 30,
+          host_name: 'Alex',
+          is_mine: false,
+        },
+      ],
+      my_entry_id: null,
+      next_candidate_staff_id: null,
+      next_candidate_name: null,
+      my_outcome_pending: false,
+    };
+
+    it('lets promotions staff remove a waiting guest', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue({ ...makeShow([]), status: 'published' });
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue(waitingQueue);
+      vi.mocked(passesAPI.removeGuest).mockResolvedValue({} as PassResponse);
+
+      await renderShowDetail();
+
+      expect(await screen.findByText('Sam (guest of Alex)')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /^remove$/i }));
+      expect(screen.getByText(/emailed that you removed their guest/i)).toBeInTheDocument();
+      const [, confirm] = screen.getAllByRole('button', { name: /^remove$/i });
+      fireEvent.click(confirm);
+
+      await waitFor(() => expect(passesAPI.removeGuest).toHaveBeenCalledWith(12));
+      await waitFor(() => expect(showsAPI.get).toHaveBeenCalledTimes(2));
+    });
+
+    it('says a seated guest is confirmed once the show has closed', async () => {
+      const host = {
+        ...makeShow([]).passes[0],
+        id: 20,
+        pass_type: 'staff' as const,
+        status: 'claimed' as const,
+        staff_id: 30,
+        staff_name: 'Alex',
+        staff_phone: '5551234567',
+        has_guest: true,
+        guest_name: 'Sam',
+      };
+      vi.mocked(showsAPI.get).mockResolvedValue({
+        ...makeShow([host]),
+        status: 'closed',
+        close_notifications_pending: false,
+      });
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue({ ...waitingQueue, waiting_guests: [] });
+
+      await renderShowDetail();
+
+      expect(await screen.findByText('confirmed')).toBeInTheDocument();
+      expect(screen.queryByText(/until show closes/i)).not.toBeInTheDocument();
+    });
+
+    it('marks staff released at close in the closed alternates list', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue({ ...makeShow([]), status: 'closed' });
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue({
+        ...waitingQueue,
+        waiting_guests: [],
+        entries: [
+          {
+            id: 7,
+            show_id: 1,
+            staff_id: 30,
+            staff_name: 'Alex',
+            staff_phone: null,
+            staff_email: null,
+            position: 1,
+            has_guest: true,
+            guest_name: 'Sam',
+            guest_fallback: 'wait_then_release' as const,
+            source: 'released_at_close',
+            priority_at: '2024-01-01T00:00:00Z',
+          },
+        ],
+      });
+
+      await renderShowDetail();
+
+      expect(await screen.findByText(/pass released at close/i)).toBeInTheDocument();
+    });
+
+    it('lists guests still waiting below the guest list once closed', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue({ ...makeShow([]), status: 'closed' });
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue(waitingQueue);
+
+      await renderShowDetail();
+
+      expect(await screen.findByText('Guests still waiting (1)')).toBeInTheDocument();
+      expect(screen.getByText('Sam (guest of Alex)')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^remove$/i })).not.toBeInTheDocument();
+    });
+  });
+
   describe('on a closed show', () => {
     const closedQueue = {
       queue_open: false,
@@ -617,7 +720,7 @@ describe('Promotions ShowDetail — alternates', () => {
           position: 1,
           has_guest: false,
           guest_name: null,
-          only_attend_with_guest: false,
+          guest_fallback: 'attend_alone' as const,
           source: 'joined',
           priority_at: '2024-01-01T00:00:00Z',
         },
@@ -680,7 +783,7 @@ describe('Promotions ShowDetail — alternates', () => {
           position: 1,
           has_guest: false,
           guest_name: null,
-          only_attend_with_guest: false,
+          guest_fallback: 'attend_alone' as const,
           source: 'joined',
           priority_at: '2024-01-01T00:00:00Z',
         },

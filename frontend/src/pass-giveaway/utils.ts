@@ -2,6 +2,7 @@ import type { UserResponse } from '../common/types';
 import { formatDateValue } from '../common/utils';
 import type {
   AgeRestriction,
+  GuestFallback,
   MovieRating,
   PassResponse,
   VenueType,
@@ -39,6 +40,24 @@ export function showsPassGiveawayAdminLink(user: UserResponse | null | undefined
 
 // My Passes pages hide passes for shows more than this many days in the past.
 /** Shown where "🆕" staff (not yet Active) would claim a staff pass. */
+/** How a list or card describes a guest fallback that puts the guest on the alternate list. */
+export const waitingFallbackNote = (fallback: GuestFallback): string => {
+  if (fallback === 'wait') return ' (guest will wait on the alternate list)';
+  if (fallback === 'wait_then_release') {
+    return " (guest will wait on the alternate list; staff's pass is released if they don't have one at close)";
+  }
+  return '';
+};
+
+/** The same note for a guest who has a pass, and only waits if they lose it. */
+export const seatedFallbackNote = (fallback: GuestFallback): string => {
+  if (fallback === 'wait') return ' (goes on the alternate list if bumped)';
+  if (fallback === 'wait_then_release') {
+    return " (goes on the alternate list if bumped; staff's pass is released if they don't have one at close)";
+  }
+  return '';
+};
+
 export const STAFF_PASSES_NOT_YET_ACTIVE = 'Staff passes open to you once your status is Active.';
 
 /**

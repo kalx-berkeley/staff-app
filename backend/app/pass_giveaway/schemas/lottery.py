@@ -3,6 +3,8 @@
 from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, Field
 from app.common.schemas.types import UtcDatetime
+from app.models.guest_fallback import GuestFallback
+from app.pass_giveaway.schemas.guest_fallback import GuestFallbackChoice
 
 
 class StaffLotteryEntryCreate(BaseModel):
@@ -10,7 +12,7 @@ class StaffLotteryEntryCreate(BaseModel):
 
     has_guest: bool = False
     guest_name: str | None = None
-    only_attend_with_guest: bool = False
+    guest_fallback: GuestFallbackChoice = GuestFallback.ATTEND_ALONE
 
 
 class DJLotteryEntryCreate(BaseModel):
@@ -46,7 +48,7 @@ class LotteryEntryResponse(BaseModel):
     assignment_date: date | None
     has_guest: bool
     guest_name: str | None
-    only_attend_with_guest: bool
+    guest_fallback: str
     status: str
     entered_at: UtcDatetime
 

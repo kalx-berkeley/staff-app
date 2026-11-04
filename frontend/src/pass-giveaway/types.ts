@@ -1,5 +1,8 @@
 // TypeScript types matching backend Pydantic schemas for the Radio Pass Giveaway sub-site.
 
+// What happens to a +1 guest, and their staff host, if the guest has no pass.
+export type GuestFallback = 'attend_alone' | 'release' | 'wait' | 'wait_then_release';
+
 // Specialty show types
 export interface SpecialtyShowCreate {
   name: string;
@@ -371,7 +374,7 @@ export interface LotteryEntryResponse {
   assignment_date: string | null;
   has_guest: boolean;
   guest_name: string | null;
-  only_attend_with_guest: boolean;
+  guest_fallback: GuestFallback;
   status: string;
   entered_at: string;
 }
@@ -407,15 +410,26 @@ export interface AlternateEntry {
   position: number;
   has_guest: boolean;
   guest_name: string | null;
-  only_attend_with_guest: boolean;
+  guest_fallback: GuestFallback;
   source: string;
   priority_at: string;
 }
 
 /** A show's alternate queue as seen by the current user. */
+/** A staff member's +1 guest waiting on the alternate list. */
+export interface WaitingGuest {
+  pass_id: number;
+  position: number;
+  guest_name: string | null;
+  host_staff_id: number | null;
+  host_name: string | null;
+  is_mine: boolean;
+}
+
 export interface AlternateQueue {
   queue_open: boolean;
   entries: AlternateEntry[];
+  waiting_guests?: WaitingGuest[];
   my_entry_id: number | null;
   /** Who would get the current user's pass if they released it now. */
   next_candidate_staff_id: number | null;
@@ -435,7 +449,7 @@ export interface MyAlternateEntry extends AlternateEntry {
 export interface AlternateJoinRequest {
   has_guest: boolean;
   guest_name: string | null;
-  only_attend_with_guest: boolean;
+  guest_fallback: GuestFallback;
 }
 
 export interface LotteryScheduleItem {
@@ -452,7 +466,7 @@ export interface LotteryScheduleItem {
 export interface StaffLotteryEntryCreate {
   has_guest?: boolean;
   guest_name?: string | null;
-  only_attend_with_guest?: boolean;
+  guest_fallback?: GuestFallback;
 }
 
 export interface DJLotteryEntryCreate {
@@ -594,8 +608,11 @@ export interface PassResponse {
   // Staff +1 guest fields
   has_guest: boolean;
   guest_name: string | null;
-  only_attend_with_guest: boolean;
+  guest_fallback: GuestFallback;
   guest_of_pass_id: number | null;
+  /** The guest has no pass and is on the alternate list, at this position. */
+  guest_waiting?: boolean;
+  guest_position?: number | null;
 
   // For pre-assigned pairs
   preassigned_dj: string | null;
@@ -613,7 +630,7 @@ export interface PassResponse {
 export interface ClaimData {
   has_guest?: boolean;
   guest_name?: string | null;
-  only_attend_with_guest?: boolean;
+  guest_fallback?: GuestFallback;
 }
 
 export interface PreAssignmentData {

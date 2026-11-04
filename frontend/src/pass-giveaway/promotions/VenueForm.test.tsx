@@ -226,6 +226,13 @@ describe('VenueForm', () => {
   });
 
   describe('Close notifications setting', () => {
+    it('warns that held emails can leave staff unaware their pass was released', async () => {
+      render(<VenueForm venue={makeVenue()} onClose={mockOnClose} onSuccess={mockOnSuccess} />);
+      await act(async () => {});
+
+      expect(screen.getByText(/they lose it when the show closes/i)).toBeInTheDocument();
+    });
+
     it('loads and saves the setting', async () => {
       vi.mocked(venuesAPI.update).mockResolvedValue(makeVenue());
 

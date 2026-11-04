@@ -169,7 +169,7 @@ def enter_staff_lottery(
         staff_id=staff_member.id,
         has_guest=entry_data.has_guest,
         guest_name=entry_data.guest_name,
-        only_attend_with_guest=entry_data.only_attend_with_guest,
+        guest_fallback=entry_data.guest_fallback,
     )
     audit_service.log_event(
         db,
@@ -184,7 +184,7 @@ def enter_staff_lottery(
             "entry_type": "staff",
             "has_guest": entry_data.has_guest,
             "guest_name": entry_data.guest_name,
-            "only_attend_with_guest": entry_data.only_attend_with_guest,
+            "guest_fallback": entry_data.guest_fallback,
         },
     )
     return LotteryEntryResponse.model_validate(entry)

@@ -1,5 +1,12 @@
 import '@testing-library/jest-dom/vitest';
+import { configure } from '@testing-library/react';
 import { afterEach, beforeEach, vi } from 'vitest';
+
+// Sub-sites load their pages with lazy imports, and a file's first test waits for
+// that import. It can take over a second when every test file runs in parallel,
+// longer than the default one-second wait for findBy* and waitFor. A test that
+// passes still finishes as soon as what it's waiting for appears.
+configure({ asyncUtilTimeout: 5000 });
 
 // Fail any test that triggers React's "not wrapped in act(...)" warning, so
 // these get fixed when they're introduced instead of piling up as noise.

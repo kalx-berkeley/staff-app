@@ -3,6 +3,8 @@
 from datetime import date
 from pydantic import BaseModel, ConfigDict
 from app.common.schemas.types import UtcDatetime
+from app.models.guest_fallback import GuestFallback
+from app.pass_giveaway.schemas.guest_fallback import GuestFallbackChoice
 
 
 class AlternateJoinRequest(BaseModel):
@@ -10,7 +12,7 @@ class AlternateJoinRequest(BaseModel):
 
     has_guest: bool = False
     guest_name: str | None = None
-    only_attend_with_guest: bool = False
+    guest_fallback: GuestFallbackChoice = GuestFallback.ATTEND_ALONE
 
 
 class AlternateUpdateRequest(AlternateJoinRequest):
@@ -32,9 +34,20 @@ class AlternateEntryResponse(BaseModel):
     position: int
     has_guest: bool
     guest_name: str | None
-    only_attend_with_guest: bool
+    guest_fallback: str
     source: str
     priority_at: UtcDatetime
+
+
+class WaitingGuestResponse(BaseModel):
+    """A staff member's +1 guest waiting on the alternate list."""
+
+    pass_id: int
+    position: int
+    guest_name: str | None = None
+    host_staff_id: int | None = None
+    host_name: str | None = None
+    is_mine: bool = False
 
 
 class AlternateQueueResponse(BaseModel):
@@ -42,6 +55,7 @@ class AlternateQueueResponse(BaseModel):
 
     queue_open: bool
     entries: list[AlternateEntryResponse]
+    waiting_guests: list[WaitingGuestResponse] = []
     my_entry_id: int | None = None
     # Who would get the current user's pass if they released it now.
     next_candidate_staff_id: int | None = None
