@@ -191,6 +191,7 @@ route returns them.
 #### Log Monitoring
 - Review Apache logs: `/var/log/apache2/promotions-*.log`
 - Review backend logs: `journalctl --user -u staff-app-backend-production` (staging: `staff-app-backend-staging`)
+- Backend log lines from requests show the signed-in user's email and IP address, or `not-logged-in` and the IP address for guests, so the journal records who requested which URLs. Limit who can read it accordingly.
 - Look for suspicious patterns, failed authentication attempts, unusual traffic
 
 #### Database Backups

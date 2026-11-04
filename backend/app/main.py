@@ -46,6 +46,11 @@ from app.scheduler import (
 from app.auth import check_apache_auth_layer
 from app.config import settings
 from app.rate_limiter import RateLimitExceeded
+from app.request_logging import (
+    APP_LOG_FORMAT,
+    RequestUserMiddleware,
+    configure_request_logging,
+)
 from app.common.services.job_registry import register_job
 from app.common.services.profile_providers import (
     register_monthly_hours_provider,
@@ -79,7 +84,9 @@ for job in (
     register_job(job)
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+configure_request_logging()
+# force=True because importing smtp2go has already called basicConfig
+logging.basicConfig(level=logging.INFO, format=APP_LOG_FORMAT, force=True)
 logging.getLogger("musicbrainzngs").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
@@ -195,6 +202,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Added last so it runs first, and log lines from the middleware above show the user
+app.add_middleware(RequestUserMiddleware)
 
 
 # Global exception handlers
