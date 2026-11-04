@@ -597,6 +597,8 @@ describe('Staff ShowDetail', () => {
       show_id: 1,
       staff_id: 20,
       staff_name: 'Alex Alt',
+      staff_phone: null,
+      staff_email: null,
       position: 1,
       has_guest: false,
       guest_name: null,

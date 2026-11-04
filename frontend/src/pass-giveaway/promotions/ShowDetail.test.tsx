@@ -512,6 +512,8 @@ describe('Promotions ShowDetail — alternates', () => {
       show_id: 1,
       staff_id: 30,
       staff_name: 'Wanda Waiting',
+      staff_phone: '5551234567',
+      staff_email: 'wanda@example.com',
       position: 1,
       has_guest: false,
       guest_name: null,
@@ -540,6 +542,11 @@ describe('Promotions ShowDetail — alternates', () => {
 
     expect(await screen.findByText('Alternate #1')).toBeInTheDocument();
     expect(screen.getByText('Wanda Waiting')).toBeInTheDocument();
+    const card = screen.getByText('Alternate #1').closest('.alternate-card') as HTMLElement;
+    expect(within(card).getByText('Phone:').parentElement).toHaveTextContent('(555) 123-4567');
+    expect(within(card).getByText('Waiting since:').parentElement).toHaveTextContent('Dec 31, 4:00 PM');
+    // This venue doesn't ask for email addresses.
+    expect(within(card).queryByText('Email:')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
     const dialog = screen.getByRole('heading', { name: 'Remove Alternate' }).closest('.modal-content') as HTMLElement;
@@ -548,5 +555,43 @@ describe('Promotions ShowDetail — alternates', () => {
 
     await waitFor(() => expect(alternatesAPI.remove).toHaveBeenCalledWith(1, 7));
     await waitFor(() => expect(screen.queryByText('Alternate #1')).not.toBeInTheDocument());
+  });
+
+  it("shows alternates' email addresses when the venue requires them", async () => {
+    const show = makeShow([]);
+    vi.mocked(showsAPI.get).mockResolvedValue({
+      ...show,
+      guest_list_requirements: {
+        ...show.guest_list_requirements,
+        email_address_requirement: 'staff_passes',
+      },
+    });
+    vi.mocked(alternatesAPI.getQueue).mockResolvedValue({
+      queue_open: true,
+      entries: [
+        {
+          id: 7,
+          show_id: 1,
+          staff_id: 30,
+          staff_name: 'Wanda Waiting',
+          staff_phone: '5551234567',
+          staff_email: 'wanda@example.com',
+          position: 1,
+          has_guest: false,
+          guest_name: null,
+          only_attend_with_guest: false,
+          source: 'joined',
+          priority_at: '2024-01-01T00:00:00Z',
+        },
+      ],
+      my_entry_id: null,
+      next_candidate_staff_id: null,
+      next_candidate_name: null,
+    });
+
+    await renderShowDetail();
+
+    const label = await screen.findByText('Email:');
+    expect(label.closest('.alternate-card')).toHaveTextContent('wanda@example.com');
   });
 });

@@ -394,6 +394,10 @@ export interface AlternateEntry {
   show_id: number;
   staff_id: number;
   staff_name: string | null;
+  /** Only sent to promotions staff. */
+  staff_phone: string | null;
+  /** Only sent to promotions staff. */
+  staff_email: string | null;
   position: number;
   has_guest: boolean;
   guest_name: string | null;

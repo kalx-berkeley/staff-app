@@ -6,6 +6,8 @@ interface AlternateQueueListProps {
   myEntryId?: number | null;
   /** Rendered inside the current user's own card (edit/leave actions). */
   renderMyActions?: (entry: AlternateEntry) => React.ReactNode;
+  /** Rendered in every card, below the name and +1 details. */
+  renderDetails?: (entry: AlternateEntry) => React.ReactNode;
   /** Promotions only: remove someone from the queue. */
   onRemove?: (entry: AlternateEntry) => void;
   removingId?: number | null;
@@ -19,6 +21,7 @@ export const AlternateQueueList = ({
   entries,
   myEntryId = null,
   renderMyActions,
+  renderDetails,
   onRemove,
   removingId = null,
 }: AlternateQueueListProps) => {
@@ -48,6 +51,7 @@ export const AlternateQueueList = ({
                     {entry.only_attend_with_guest ? ' (only attending with guest)' : ''}
                   </p>
                 )}
+                {renderDetails?.(entry)}
                 {isMine && renderMyActions?.(entry)}
                 {onRemove && (
                   <button

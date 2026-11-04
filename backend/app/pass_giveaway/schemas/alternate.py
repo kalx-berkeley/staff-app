@@ -26,6 +26,9 @@ class AlternateEntryResponse(BaseModel):
     show_id: int
     staff_id: int
     staff_name: str | None = None
+    # Only filled in for promotions staff viewing the queue.
+    staff_phone: str | None = None
+    staff_email: str | None = None
     position: int
     has_guest: bool
     guest_name: str | None

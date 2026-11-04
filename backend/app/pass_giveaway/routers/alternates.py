@@ -90,8 +90,12 @@ def get_alternate_queue(
     user_info: tuple = Depends(require_promotions_or_staff),
     db: Session = Depends(get_db),
 ):
-    """Get a show's alternate queue in order, plus the current user's place in it."""
-    _, staff = user_info
+    """
+    Get a show's alternate queue in order, plus the current user's place in it.
+
+    Only promotions staff get the alternates' phone numbers and email addresses.
+    """
+    role, staff = user_info
     show = _get_show(db, show_id)
     queue = AlternateService.waiting_entries(db, show.id)
 
@@ -118,9 +122,15 @@ def get_alternate_queue(
             db, show, freed_passes=2 if has_guest_hold else 1
         )
 
+    entries = [_entry_response(e, i) for i, e in enumerate(queue, start=1)]
+    if role == "promotions":
+        for response, entry in zip(entries, queue):
+            response.staff_phone = entry.staff.phone
+            response.staff_email = entry.staff.email
+
     return AlternateQueueResponse(
         queue_open=AlternateService.is_queue_open(db, show),
-        entries=[_entry_response(e, i) for i, e in enumerate(queue, start=1)],
+        entries=entries,
         my_entry_id=my_entry_id,
         next_candidate_staff_id=next_candidate.staff_id if next_candidate else None,
         next_candidate_name=next_candidate.staff_name if next_candidate else None,

@@ -47,6 +47,8 @@ const entry: MyAlternateEntry = {
   show_id: 9,
   staff_id: 1,
   staff_name: 'Me',
+  staff_phone: null,
+  staff_email: null,
   position: 3,
   has_guest: true,
   guest_name: 'Pal',

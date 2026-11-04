@@ -1457,6 +1457,21 @@ const ShowDetail = () => {
         </div>
         <AlternateQueueList
           entries={alternates}
+          renderDetails={(entry) => (
+            <>
+              <p>
+                <strong>Phone:</strong> {formatPhone(entry.staff_phone)}
+              </p>
+              {includeStaffEmail && (
+                <p>
+                  <strong>Email:</strong> {entry.staff_email}
+                </p>
+              )}
+              <p>
+                <strong>Waiting since:</strong> {formatDateTime(entry.priority_at)}
+              </p>
+            </>
+          )}
           onRemove={show.status === 'published' ? setAlternateToRemove : undefined}
           removingId={removingAlternateId}
         />

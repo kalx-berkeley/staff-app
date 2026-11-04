@@ -623,6 +623,18 @@ class TestMembership:
         assert "Pat Promo" in _emails_to(mock_send, people["Ben"])[0]["body_text"]
         assert _queue_names(client, show, people["Ann"]) == []
 
+    def test_only_promotions_get_contact_details(self, client, db, venue, people, promo):
+        show = _make_show(db, venue, staff_passes=1)
+        _add_waiting(db, show, people["Ann"])
+
+        [entry] = _queue(client, show, promo)["entries"]
+        assert entry["staff_phone"] == people["Ann"].phone
+        assert entry["staff_email"] == people["Ann"].email
+
+        [entry] = _queue(client, show, people["Ben"])["entries"]
+        assert entry["staff_phone"] is None
+        assert entry["staff_email"] is None
+
     def test_my_entries(self, client, db, venue, people):
         show = _make_show(db, venue, 1)
         _claim(client, db, show, people["Ann"])
