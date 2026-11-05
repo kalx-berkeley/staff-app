@@ -6,6 +6,35 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.11.0] - 2026-11-05
+
+### Changed
+
+- Replace Extra Staff Passes on the show form with a Staff Pass Adjustment, which raises or lowers a show's staff passes from the standard one per pass pair. A show can have no staff passes, which also blocks staff lottery entry ([b077e95](https://github.com/kalx-berkeley/staff-app/commit/b077e95))
+- Send each person one email when a show closes, instead of a separate email for each outcome ([#13](https://github.com/kalx-berkeley/staff-app/pull/13))
+- List a show's staff passes by claim time: staff claims oldest first, then guest holds, then available passes ([e495246](https://github.com/kalx-berkeley/staff-app/commit/e495246))
+- Set lottery winners' claim times to when they entered, so a winner cut by a pass reduction rejoins the alternate list by entry time instead of behind every lottery loser ([e495246](https://github.com/kalx-berkeley/staff-app/commit/e495246))
+- Count only the pass pairs a DJ can give away on the DJ shows page, and offer View Show instead of Give Away when every pair left is pre-assigned to another DJ ([2882ff7](https://github.com/kalx-berkeley/staff-app/commit/2882ff7))
+- Stack list view row actions on phones on the DJ shows page, and scroll the table sideways instead of clipping its buttons ([0af699a](https://github.com/kalx-berkeley/staff-app/commit/0af699a))
+- Name the signed-in user, or `not-logged-in` for guests, along with the IP address on backend log lines, so limit who can read the journal accordingly ([1741f33](https://github.com/kalx-berkeley/staff-app/commit/1741f33))
+- Cache directory photos for a year, using URLs that change when the photo or its format does ([04cb8e9](https://github.com/kalx-berkeley/staff-app/commit/04cb8e9))
+
+### Added
+
+- Let staff put their +1 guest on the alternate list when claiming a pass, entering the lottery or joining the alternate list. Two new options choose whether the staff member still attends if their guest has no pass when the show closes. Waiting guests get freed passes behind staff alternates and are listed in their own section. Existing claims, entries and alternates keep the choice they already made ([#13](https://github.com/kalx-berkeley/staff-app/pull/13), [3331d1d](https://github.com/kalx-berkeley/staff-app/commit/3331d1d))
+- Let staff add a guest after claiming a pass, and remove their guest while keeping their own pass ([#13](https://github.com/kalx-berkeley/staff-app/pull/13))
+- Let venues and promoters hold the emails telling +1 hosts and alternates the outcome when a show closes, until a KALX promotions rep sends them from the show page. This gives a rep time to ask the venue for more passes, reopen and re-close the show before anyone is told. Held emails are dropped once the show date passes ([4b373c5](https://github.com/kalx-berkeley/staff-app/commit/4b373c5))
+- Add Clothespin to the DJ shows page, which reserves one unclaimed pass pair for today under a current DJ or specialty show name, and Release Reservation for a pre-assigned pair ([0af699a](https://github.com/kalx-berkeley/staff-app/commit/0af699a))
+- Show alternates' contact details and queue times to promotions staff, and list a closed show's alternates below its guest list ([b8559a1](https://github.com/kalx-berkeley/staff-app/commit/b8559a1), [98da000](https://github.com/kalx-berkeley/staff-app/commit/98da000))
+
+### Fixed
+
+- Fix deleting a show leaving its lottery entries in place with no notice to the entrants. They're now emailed and their entries removed ([f32afd3](https://github.com/kalx-berkeley/staff-app/commit/f32afd3))
+- Fix a direct staff claim bumping the guest on whichever card was clicked, which could bump an earlier claimer's guest. It now always bumps the newest guest ([e495246](https://github.com/kalx-berkeley/staff-app/commit/e495246))
+- Fix a restart auto-closing a show that a rep reopened after its planned close time ([4b373c5](https://github.com/kalx-berkeley/staff-app/commit/4b373c5))
+- Fix validation errors from schema validators returning a 500 instead of a 422 ([b077e95](https://github.com/kalx-berkeley/staff-app/commit/b077e95))
+- Fix DJs' My Giveaways missing pre-assigned pairs whose name differs only in case ([0af699a](https://github.com/kalx-berkeley/staff-app/commit/0af699a))
+
 ## [1.10.0] - 2026-11-01
 
 ### Changed
@@ -272,6 +301,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.11.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.9.1...v1.10.0
 [1.9.1]: https://github.com/kalx-berkeley/staff-app/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.8.0...v1.9.0
