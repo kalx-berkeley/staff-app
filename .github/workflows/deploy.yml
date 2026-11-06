@@ -3,23 +3,71 @@ name: Deploy
 on:
   push:
     branches: [ main ]
-  release:
-    types: [ published ]
+  schedule:
+    # Production deploys happen here, while no live DJs are using the system
+    - cron: '0 4 * * *'
+      timezone: America/Los_Angeles
   workflow_dispatch:
-
-env:
-  ENV_NAME: ${{ github.event_name == 'release' && 'Production' || 'Staging' }}
+    inputs:
+      deploy_production:
+        description: Deploy the newest release to production now, even during live DJ hours (run from main; leave unticked to only run tests)
+        type: boolean
+        default: false
 
 jobs:
+  check-release:
+    name: Check for a release to deploy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || inputs.deploy_production
+    permissions:
+      contents: read
+      deployments: read
+    outputs:
+      # The tag to deploy to production, or empty if there's nothing to deploy
+      release_tag: ${{ steps.check.outputs.release_tag }}
+
+    steps:
+    - name: Compare the newest release with what production has had deployed
+      id: check
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ] && [ "$GITHUB_REF" != "refs/heads/main" ]; then
+          echo "::error::Run the production deploy from main, not $GITHUB_REF"
+          exit 1
+        fi
+
+        TAG="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+
+        if [ "$GITHUB_EVENT_NAME" == "schedule" ]; then
+          DEPLOYMENT_IDS="$(gh api "repos/$GITHUB_REPOSITORY/deployments?environment=production&ref=$TAG&per_page=100" --jq '.[].id')"
+          for DEPLOYMENT_ID in $DEPLOYMENT_IDS; do
+            STATES="$(gh api "repos/$GITHUB_REPOSITORY/deployments/$DEPLOYMENT_ID/statuses?per_page=100" --jq '.[].state')"
+            if grep --quiet --line-regexp success <<< "$STATES"; then
+              echo "::notice::$TAG is already deployed to production"
+              exit 0
+            fi
+          done
+        fi
+
+        echo "::notice::Deploying $TAG to production"
+        echo "release_tag=$TAG" >> "$GITHUB_OUTPUT"
+
   test:
     name: Run Tests
+    needs: check-release
     runs-on: ubuntu-latest
+    # check-release is skipped on runs that don't involve production
+    if: ${{ !cancelled() && (needs.check-release.result == 'skipped' || needs.check-release.outputs.release_tag != '') }}
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        # Empty (the triggering commit) unless this run is deploying a release
+        ref: ${{ needs.check-release.outputs.release_tag && format('refs/tags/{0}', needs.check-release.outputs.release_tag) }}
 
     - name: Set up Python
-      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
       with:
         python-version: '3.14'
 
@@ -54,24 +102,36 @@ jobs:
 
   deploy:
     name: Deploy
-    needs: test
+    needs: [ check-release, test ]
     runs-on: ubuntu-latest
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'release' && github.event.action == 'published')
-    environment: ${{ github.event_name == 'release' && 'production' || 'staging' }}
+    if: ${{ !cancelled() && needs.test.result == 'success' && (needs.check-release.outputs.release_tag != '' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
+    permissions:
+      contents: read
+      deployments: write
+    environment:
+      name: ${{ needs.check-release.outputs.release_tag != '' && 'production' || 'staging' }}
+      # A production run's commit is main's, not the release's, so its automatic
+      # record would be wrong. "Record the deployment" below writes the right one.
+      deployment: ${{ needs.check-release.outputs.release_tag == '' }}
 
     env:
+      RELEASE_TAG: ${{ needs.check-release.outputs.release_tag }}
+      ENV_NAME: ${{ needs.check-release.outputs.release_tag != '' && 'production' || 'staging' }}
       DEPLOY_USER: staff-app
-      DEPLOY_PATH: ${{ github.event_name == 'release' && '/home/staff-app/staff-app-production' || '/home/staff-app/staff-app-staging' }}
+      DEPLOY_PATH: ${{ needs.check-release.outputs.release_tag != '' && '/home/staff-app/staff-app-production' || '/home/staff-app/staff-app-staging' }}
       SYSTEMD_USER_PATH: /home/staff-app/.config/systemd/user
-      SERVICE_NAME: ${{ github.event_name == 'release' && 'staff-app-backend-production' || 'staff-app-backend-staging' }}
-      BACKEND_PORT: ${{ github.event_name == 'release' && '8420' || '8421' }}
+      SERVICE_NAME: ${{ needs.check-release.outputs.release_tag != '' && 'staff-app-backend-production' || 'staff-app-backend-staging' }}
+      BACKEND_PORT: ${{ needs.check-release.outputs.release_tag != '' && '8420' || '8421' }}
       SITE_DOMAIN: ${{ vars.SITE_DOMAIN }}
-      FRONTEND_BASE_URL: ${{ github.event_name == 'release' && format('https://staff.{0}', vars.SITE_DOMAIN) || format('https://staff.stage.{0}', vars.SITE_DOMAIN) }}
+      FRONTEND_BASE_URL: ${{ needs.check-release.outputs.release_tag != '' && format('https://staff.{0}', vars.SITE_DOMAIN) || format('https://staff.stage.{0}', vars.SITE_DOMAIN) }}
       DJ_STUDIO_NETWORK: ${{ vars.DJ_STUDIO_NETWORK }}
       STATION_OFFICE_NETWORK: ${{ vars.STATION_OFFICE_NETWORK }}
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        # Empty (the triggering commit) unless this run is deploying a release
+        ref: ${{ needs.check-release.outputs.release_tag && format('refs/tags/{0}', needs.check-release.outputs.release_tag) }}
 
     - name: Validate required secrets and variables
       run: |
@@ -108,14 +168,6 @@ jobs:
         fi
 
         echo "All required secrets and variables are configured"
-
-    - name: Set environment variables
-      run: |
-        if [ "${{ github.event_name }}" == "release" ]; then
-          echo "ENV_NAME=production" >> $GITHUB_ENV
-        else
-          echo "ENV_NAME=staging" >> $GITHUB_ENV
-        fi
 
     - name: Connect to Netbird
       # uses: Alemiz112/netbird-connect@v1.0.1
@@ -163,8 +215,8 @@ jobs:
       working-directory: ./frontend
       run: |
         npm ci
-        if [ "${{ github.event_name }}" == "release" ]; then
-          VITE_RELEASE_VERSION="${{ github.event.release.tag_name }}" npm run build
+        if [ -n "$RELEASE_TAG" ]; then
+          VITE_RELEASE_VERSION="$RELEASE_TAG" npm run build
         else
           VITE_COMMIT_SHA="${{ github.sha }}" npm run build:staging
         fi
@@ -301,3 +353,15 @@ jobs:
           sleep 2
         done
         ENDSSH
+
+    # The nightly check reads this to tell that the release has been deployed
+    - name: Record the deployment
+      if: env.RELEASE_TAG != ''
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -ex
+        DEPLOYMENT_ID="$(jq --null-input --arg ref "$RELEASE_TAG" \
+          '{ref: $ref, environment: "production", auto_merge: false, required_contexts: []}' \
+          | gh api --method POST "repos/$GITHUB_REPOSITORY/deployments" --input - --jq .id)"
+        gh api --method POST "repos/$GITHUB_REPOSITORY/deployments/$DEPLOYMENT_ID/statuses" -f state=success

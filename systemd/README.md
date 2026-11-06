@@ -12,8 +12,8 @@ deploy directories and separate ports, so a staging deploy can never affect prod
   working directory `~/staff-app-staging/backend`
 
 Both run as the `staff-app` user. The GitHub Actions deploy workflow installs/updates and
-restarts the appropriate one automatically (production on a published release, staging on a
-push to `main`) — the manual steps below are only needed for first-time server setup.
+restarts the appropriate one automatically (production at 4am Pacific after a release is
+published, staging on a push to `main`) — the manual steps below are only needed for first-time server setup.
 
 ## Installation
 

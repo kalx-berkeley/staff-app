@@ -285,7 +285,12 @@ npm test
 ## Deployment
 
 Push to `main` → deploys to staging automatically.
-Publish a GitHub release → deploys to production.
+Publish a GitHub release → deploys to production at the next 4am Pacific, while no live DJs are
+using the system. A nightly job compares the newest release (the one GitHub marks "Latest") with
+what has been deployed, and does nothing if it's already live.
+
+To deploy sooner, or to redeploy the newest release, run the **Deploy** workflow from `main` in
+GitHub Actions and tick **deploy_production**.
 
 See `SETUP_GUIDE.md` for first-time server setup.
 
