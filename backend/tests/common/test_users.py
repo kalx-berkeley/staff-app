@@ -665,7 +665,7 @@ async def test_fetch_department_names_maps_record_ids_to_names():
     ) as fetch:
         names = await UserService.fetch_department_names()
 
-    fetch.assert_awaited_once_with("All departments")
+    fetch.assert_awaited_once_with("Department Heads")
     assert names == {PROMOTIONS_REC: "Promotions"}
 
 

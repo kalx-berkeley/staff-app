@@ -127,17 +127,10 @@ async def test_work_types_survive_the_department_sync(client: TestClient, db, pe
 
     heads_table = [{
         "id": "recDH1",
-        "fields": {"Department": ["recDEPMUSIC"], "Department Heads": ["recMEL"]},
+        "fields": {"Department": "Music", "Department Heads": ["recMEL"]},
     }]
-    with (
-        patch.object(
-            UserService, "fetch_airtable_records", AsyncMock(return_value=heads_table)
-        ),
-        patch.object(
-            UserService,
-            "fetch_department_names",
-            AsyncMock(return_value={"recDEPMUSIC": "Music"}),
-        ),
+    with patch.object(
+        UserService, "fetch_airtable_records", AsyncMock(return_value=heads_table)
     ):
         await sync_department_heads(db, {"errors": []})
 

@@ -201,7 +201,7 @@ class UserService:
         AIRTABLE_TABLE_NAME). Only records whose "Status" includes "Active" or
         "🆕" (a new student, not yet Active) are imported; records with
         neither are skipped as if absent. Each record's "Department"
-        field links to records in the "All departments" table (configurable
+        field links to records in the "Department Heads" table (configurable
         via AIRTABLE_DEPARTMENTS_TABLE_NAME); the API returns their record
         IDs, which are resolved to department names. Membership of the
         "Promotions" department grants the promotions role. If a record's

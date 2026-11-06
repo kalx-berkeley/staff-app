@@ -23,16 +23,16 @@ async def sync_department_heads(db: Session, result: Dict[str, Any]) -> None:
     """
     Copy the Airtable "Department Heads" table into the database.
 
-    Its "Department" field links to the departments table and is resolved to
-    names; its "Department Heads" field links to staff records and is stored
-    as their record IDs. If Airtable can't be read, the existing copy is kept
-    and the error is added to *result*["errors"].
+    Its "Department" field (the primary field) holds the department's name;
+    its "Department Heads" field links to staff records and is stored as their
+    record IDs. If Airtable can't be read, or no record has a usable department
+    name, the existing copy is kept and the error is added to
+    *result*["errors"].
     """
     try:
         records = await UserService.fetch_airtable_records(
             settings.airtable_department_heads_table_name
         )
-        department_names = await UserService.fetch_department_names()
     except HTTPException as e:
         result["errors"].append(f"Department heads sync failed: {e.detail}")
         return
@@ -44,22 +44,30 @@ async def sync_department_heads(db: Session, result: Dict[str, Any]) -> None:
     heads: Dict[str, set[str]] = {}
     for record in records:
         fields = record.get("fields", {})
-        linked = fields.get(DEPARTMENT_FIELD) or []
-        if isinstance(linked, str):
-            linked = [linked]
-        for department in linked:
-            name = department_names.get(department, department)
-            if not isinstance(name, str) or not name.strip():
-                continue
-            if name.startswith("rec") and name == department:
-                result["errors"].append(
-                    f"Department Heads: couldn't resolve department {department}"
-                )
-                continue
-            members = heads.setdefault(name.strip(), set())
-            for head in fields.get(HEADS_FIELD) or []:
-                if isinstance(head, str):
-                    members.add(head)
+        name = fields.get(DEPARTMENT_FIELD)
+        if name is None:
+            continue
+        if not isinstance(name, str):
+            result["errors"].append(
+                f"Department Heads: record {record.get('id')} has a"
+                f" {DEPARTMENT_FIELD} that isn't a name: {name!r}"
+            )
+            continue
+        if not name.strip():
+            continue
+        members = heads.setdefault(name.strip(), set())
+        for head in fields.get(HEADS_FIELD) or []:
+            if isinstance(head, str):
+                members.add(head)
+
+    if not heads:
+        # Wiping now would take away every head's access; a renamed or retyped
+        # column looks like this.
+        result["errors"].append(
+            f"Department Heads sync failed: no record has a {DEPARTMENT_FIELD} name;"
+            " keeping the existing copy"
+        )
+        return
 
     db.query(DepartmentHead).delete()
     db.query(WorkformDepartment).delete()

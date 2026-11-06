@@ -81,11 +81,12 @@ The app never writes `<Dept> : Approved` on submit. It writes it only from the
 review view. On a resubmit (Q3), the app sets Hours and Description for every
 known department, and clears departments that no longer have entries.
 
-**Department Heads**: "Department" links to "All departments" and resolves to
-names through the existing `fetch_department_names`. "Department Heads" links
+**Department Heads**: "Department" is the primary field and holds the
+department's name, which must exactly match its "<Dept> : ..." columns in the
+workforms table. The staff table's "Department" field links to this table, and
+`fetch_department_names` resolves those links to names. "Department Heads" links
 to "Online Staff App Directory" and is matched to `staff.airtable_record_id`.
-No name matching is needed. The departments in this table are the workform
-departments (Q7).
+The departments in this table are the workform departments (Q7).
 
 Linked fields come back as record IDs, so identity is matched entirely by
 `staff.airtable_record_id`. A staff member with no record ID can't submit and

@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     airtable_table_name: str = "Online Staff App Directory"
     # Table that the staff table's "Department" linked-record field links to.
     # Its "Department" (primary) field holds each department's name.
-    airtable_departments_table_name: str = "All departments"
+    airtable_departments_table_name: str = "Department Heads"
     # Whether the app may change the staff table (AIRTABLE_TABLE_NAME): staff
     # editing their details on the Staff Directory's profile page (and Paid
     # Staff anyone's), and department heads adding people to their department
@@ -36,9 +36,9 @@ class Settings(BaseSettings):
     # KALX Workforms: the table submitted workforms are written to. Staging uses
     # "Testing Workforms"; production sets "Workforms" (same structure).
     airtable_workforms_table_name: str = "Testing Workforms"
-    # Maps each department ("Department", linked to the departments table) to
-    # its heads ("Department Heads", linked to the staff table). Its
-    # departments are the departments a workform can report hours in.
+    # Maps each department (the "Department" primary field, its name) to its
+    # heads ("Department Heads", linked to the staff table). Its departments
+    # are the departments a workform can report hours in.
     airtable_department_heads_table_name: str = "Department Heads"
 
     # Whether the KALX Workforms sub-site is on: its API, scheduled jobs and

@@ -16,28 +16,22 @@ from app.workforms.services.departments import drop_inactive_drafts, sync_depart
 from tests.workforms.conftest import make_staff
 
 
-async def test_sync_department_heads_resolves_departments(db: Session):
+async def test_sync_department_heads_copies_departments(db: Session):
     db.add(WorkformDepartment(name="Old"))
     db.commit()
     heads_table = [
         {
             "id": "recDH1",
             "fields": {
-                "Department": ["recDEPMUSIC"],
+                "Department": " Music ",
                 "Department Heads": ["recMEL", "recMO"],
             },
         },
-        {"id": "recDH2", "fields": {"Department": ["recDEPSPORTS"]}},
+        {"id": "recDH2", "fields": {"Department": "Sports"}},
+        {"id": "recDH3", "fields": {"Department Heads": ["recMEL"]}},
     ]
-    with (
-        patch.object(
-            UserService, "fetch_airtable_records", AsyncMock(return_value=heads_table)
-        ),
-        patch.object(
-            UserService,
-            "fetch_department_names",
-            AsyncMock(return_value={"recDEPMUSIC": "Music", "recDEPSPORTS": "Sports"}),
-        ),
+    with patch.object(
+        UserService, "fetch_airtable_records", AsyncMock(return_value=heads_table)
     ):
         result = {"errors": []}
         await sync_department_heads(db, result)
@@ -70,6 +64,36 @@ async def test_sync_department_heads_keeps_copy_on_failure(db: Session):
         await sync_department_heads(db, result)
     assert result["errors"]
     assert db.query(WorkformDepartment).count() == 1
+
+
+async def test_sync_department_heads_reports_a_department_that_isnt_a_name(db: Session):
+    heads_table = [
+        {"id": "recDH1", "fields": {"Department": "Music"}},
+        {"id": "recDH2", "fields": {"Department": ["recDEPSPORTS"]}},
+    ]
+    with patch.object(
+        UserService, "fetch_airtable_records", AsyncMock(return_value=heads_table)
+    ):
+        result = {"errors": []}
+        await sync_department_heads(db, result)
+    assert len(result["errors"]) == 1
+    assert "recDH2" in result["errors"][0]
+    assert [d.name for d in db.query(WorkformDepartment)] == ["Music"]
+
+
+async def test_sync_department_heads_keeps_copy_when_no_record_has_a_name(db: Session):
+    db.add(WorkformDepartment(name="Music"))
+    db.add(DepartmentHead(department="Music", staff_airtable_record_id="recMEL"))
+    db.commit()
+    heads_table = [{"id": "recDH1", "fields": {"Renamed": "Music"}}]
+    with patch.object(
+        UserService, "fetch_airtable_records", AsyncMock(return_value=heads_table)
+    ):
+        result = {"errors": []}
+        await sync_department_heads(db, result)
+    assert result["errors"]
+    assert db.query(WorkformDepartment).count() == 1
+    assert db.query(DepartmentHead).count() == 1
 
 
 def test_drop_inactive_drafts(db: Session):
