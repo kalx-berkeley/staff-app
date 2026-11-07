@@ -13,6 +13,7 @@ import re
 from app.common import jobs as common_jobs
 from app.common.routers import admin as common_admin
 from app.common.routers import users
+from app.common.routers import version
 from app.directory.routers import admin as directory_admin
 from app.directory.routers import directory
 from app.directory import jobs as directory_jobs
@@ -299,6 +300,7 @@ _auth_check = [Depends(check_apache_auth_layer)]
 app.include_router(venues.router, dependencies=_auth_check)
 app.include_router(users.router, dependencies=_auth_check)
 app.include_router(common_admin.router, dependencies=_auth_check)
+app.include_router(version.router, dependencies=_auth_check)
 app.include_router(preferences.router, dependencies=_auth_check)
 app.include_router(shows.router, dependencies=_auth_check)
 app.include_router(passes.router, dependencies=_auth_check)

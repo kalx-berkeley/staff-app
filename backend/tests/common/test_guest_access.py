@@ -56,6 +56,8 @@ OFFICE_GUEST = {"X-Station-Office-Network": "1", "X-Forwarded-For": "192.168.2.5
 SHARED_GUEST_ROUTES = {
     # Identity: tells the SPA the caller is a network guest.
     "GET /api/users/me",
+    # The deployed version: tells an open tab when to reload.
+    "GET /api/version",
     # Browsing shows, venues and specialty shows. Show passes include winner
     # and staff contact details.
     "GET /api/shows",

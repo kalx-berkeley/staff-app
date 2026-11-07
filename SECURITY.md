@@ -143,6 +143,7 @@ requests through, and the backend decides what each request may do.
 
 Without a login, guests from these networks can:
 - see who they are to the app (`GET /api/users/me` reports a guest);
+- see the deployed version (`GET /api/version`), so an open tab knows when to reload;
 - browse shows, venues and specialty shows, including each show's passes (with contact details
   removed, as described below);
 - search winners by phone and release a winner (winner search).

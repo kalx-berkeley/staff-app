@@ -96,6 +96,11 @@ class Settings(BaseSettings):
     # Environment - controls staging-only features
     environment: str = "production"
 
+    # The deployed build: the release tag in production, the commit in staging.
+    # Deploys set this to match the frontend's build-time version, and open tabs
+    # reload when the two differ (see useNewVersionCheck.ts). Unset in local dev.
+    app_version: Optional[str] = None
+
     # Contact URL included in User-Agent for external API requests
     api_contact_url: str = "https://cs.cementhorizon.com/contact/"
 

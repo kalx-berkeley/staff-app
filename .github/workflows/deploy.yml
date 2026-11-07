@@ -274,6 +274,7 @@ jobs:
         CORS_ORIGINS=https://${{ env.SITE_DOMAIN }}
         FRONTEND_BASE_URL=${{ env.FRONTEND_BASE_URL }}
         ENVIRONMENT=${{ env.ENV_NAME }}
+        APP_VERSION=${{ needs.check-release.outputs.release_tag || github.sha }}
         SMTP2GO_API_KEY=${{ secrets.SMTP2GO_API_KEY }}
         EMAIL_FROM_ADDRESS=${{ vars.EMAIL_FROM_ADDRESS }}
         WEBMASTER_EMAIL=${{ vars.WEBMASTER_EMAIL }}

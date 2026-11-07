@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 import { AuthProvider } from './common/contexts/AuthContext.tsx'
+import { reloadAfterChunkLoadError } from './common/appVersion'
 import { isSignInPath, signInTarget } from './common/signIn'
 
 // Apache has already signed the user in by the time /sign-in loads, so send
@@ -10,6 +11,8 @@ import { isSignInPath, signInTarget } from './common/signIn'
 if (isSignInPath(window.location.pathname)) {
   window.location.replace(signInTarget(window.location.search))
 } else {
+  // A tab from before a deploy asking for a page's code that the deploy removed
+  window.addEventListener('vite:preloadError', reloadAfterChunkLoadError)
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <AuthProvider>

@@ -5443,3 +5443,31 @@ body.staging-active .workforms-review-detail {
 .guest-actions {
   margin: 0.4rem 0;
 }
+
+/* Bottom left, clear of the spin match toasts in the bottom right */
+.new-version-banner {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: #1f2937;
+  color: #fff;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.new-version-banner button {
+  flex-shrink: 0;
+  padding: 0.25rem 0.75rem;
+  border: none;
+  border-radius: 4px;
+  background: var(--primary-color);
+  color: #fff;
+  cursor: pointer;
+}

@@ -6,7 +6,7 @@
 #   - assumes Netbird is already connected and your SSH key is already in
 #     the staff-app user's authorized_keys
 #   - leaves the server's existing backend/.env alone (it holds secrets that
-#     only GitHub Actions writes)
+#     only GitHub Actions writes), apart from its APP_VERSION line
 #
 # Usage: NETBIRD_HOSTNAME=<staging-peer-name> ./scripts/deploy-staging.sh
 
@@ -78,9 +78,10 @@ fi
 echo "staging host: $SSH_HOST"
 
 log "Building frontend (staging mode)"
+APP_VERSION="local-$(git -C "$REPO_ROOT" rev-parse --short HEAD)-$(date +%s)"
 (
   cd "$FRONTEND_DIR"
-  VITE_COMMIT_SHA="local-$(git -C "$REPO_ROOT" rev-parse --short HEAD)-$(date +%s)" npm run build:staging
+  VITE_COMMIT_SHA="$APP_VERSION" npm run build:staging
 )
 
 log "Backing up remote database"
@@ -122,6 +123,11 @@ python3 -m venv venv
 venv/bin/pip install --upgrade pip -q
 venv/bin/pip install -r requirements.txt -q
 venv/bin/alembic upgrade head
+# The one line of .env this script changes: it must match the frontend build, or
+# open tabs would keep offering to reload
+touch .env
+sed --in-place '/^APP_VERSION=/d' .env
+echo "APP_VERSION=$APP_VERSION" >> .env
 ENDSSH
 
 log "Restarting $SERVICE_NAME"

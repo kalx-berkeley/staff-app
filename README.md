@@ -359,6 +359,7 @@ Client
 | `LOCAL_SMTP_HOST` | Hostname of the local SMTP relay used when `SMTP2GO_API_KEY` is unset | `localhost` |
 | `LOCAL_SMTP_PORT` | Port of the local SMTP relay used when `SMTP2GO_API_KEY` is unset | `25` |
 | `WEBMASTER_EMAIL` | Recipient for in-app feedback and bug reports | — |
+| `APP_VERSION` | The deployed build, which open tabs compare with their own to know when to reload. Set by the deploy | — (tabs don't check when unset) |
 | `SITE_ADMIN_EMAILS` | Comma-separated emails of extra site admins, besides department heads and Paid Staff (they must still be Active staff) | — |
 | `FEATURE_BIN_SHEET_ID` | Google Sheet ID for the KALX feature bin (new-arrivals) list | — (feature bin sync is disabled if unset) |
 | `FEATURE_BIN_SHEET_GID` | Worksheet `gid` of the sheet's "Current Active A-Z" tab | — (feature bin sync is disabled if unset) |

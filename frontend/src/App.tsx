@@ -1,6 +1,9 @@
 import { useState, type ComponentType } from 'react';
 import { AUTH_DIAG_KEY } from './common/api';
+import ErrorBoundary from './common/components/ErrorBoundary';
+import ErrorScreen from './common/components/ErrorScreen';
 import LoadingScreen from './common/components/LoadingScreen';
+import NewVersionBanner from './common/components/NewVersionBanner';
 import StagingBanner from './common/components/StagingBanner';
 import { useAuth } from './common/contexts/authHooks';
 import { isStagingEnvironment } from './common/utils';
@@ -65,26 +68,6 @@ function AuthDiagBanner() {
   );
 }
 
-// Error component
-function ErrorScreen({ message }: { message: string }) {
-  return (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: 'column',
-      justifyContent: 'center', 
-      alignItems: 'center', 
-      height: '100vh',
-      fontSize: '1.2rem',
-      color: '#d32f2f'
-    }}>
-      <p>Error: {message}</p>
-      <button onClick={() => window.location.reload()} style={{ marginTop: '1rem' }}>
-        Retry
-      </button>
-    </div>
-  );
-}
-
 // Each sub-site's app, keyed by its base path in SUBSITES (subsites.ts).
 const SUBSITE_APPS: Record<string, ComponentType> = {
   '/pass-giveaway': PassGiveawayApp,
@@ -113,7 +96,10 @@ function App() {
     <>
     <StagingBanner />
     <AuthDiagBanner />
-    <SubsiteApp />
+    <NewVersionBanner />
+    <ErrorBoundary>
+      <SubsiteApp />
+    </ErrorBoundary>
     </>
   );
 }
