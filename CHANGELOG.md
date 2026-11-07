@@ -6,6 +6,12 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.12.1] - 2026-11-07
+
+### Added
+
+- Let promotions staff enter staff pass alternates, in queue order and with any +1 guests, on the legacy import page, for new and existing shows. As in the app, staff must hold every staff pass first, with none held for a +1 guest. Imported alternates aren't emailed
+
 ## [1.12.0] - 2026-11-07
 
 ### Changed
@@ -316,6 +322,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.12.1]: https://github.com/kalx-berkeley/staff-app/compare/v1.12.0...v1.12.1
 [1.12.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.9.1...v1.10.0

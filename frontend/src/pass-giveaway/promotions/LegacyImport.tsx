@@ -51,6 +51,96 @@ const emptyStaffClaim = (): StaffClaimRow => ({
   guest_name: '',
 });
 
+interface StaffRowCardProps {
+  title: string;
+  idPrefix: string;
+  row: StaffClaimRow;
+  error?: string;
+  guestError?: string;
+  guestRequiresName: boolean;
+  staffOptions: { email: string; name: string }[];
+  disabled: boolean;
+  onRemove: () => void;
+  onChange: (changes: Partial<StaffClaimRow>) => void;
+  onStaffInputChange: (text: string) => void;
+  onStaffInputSubmit: (text: string) => void;
+}
+
+/** One staff member and their +1 guest, as a claimant or an alternate. */
+const StaffRowCard = ({
+  title,
+  idPrefix,
+  row,
+  error,
+  guestError,
+  guestRequiresName,
+  staffOptions,
+  disabled,
+  onRemove,
+  onChange,
+  onStaffInputChange,
+  onStaffInputSubmit,
+}: StaffRowCardProps) => (
+  <div className="pass-card" style={{ marginBottom: '0.75rem' }}>
+    <div className="pass-header">
+      <h3>{title}</h3>
+      <button
+        type="button"
+        className="btn-secondary btn-small"
+        onClick={onRemove}
+        disabled={disabled}
+        aria-label={`Remove ${title}`}
+      >
+        Remove
+      </button>
+    </div>
+    <div className="form-row">
+      <div className="form-group">
+        <label htmlFor={idPrefix}>Staff Member</label>
+        <PersonAutocomplete
+          id={idPrefix}
+          value={row.staff_input}
+          onChange={onStaffInputChange}
+          onSubmit={onStaffInputSubmit}
+          options={staffOptions}
+          placeholder="Staff name or email"
+          className={error ? 'input-error' : undefined}
+          disabled={disabled}
+        />
+        {error && <span className="field-error">{error}</span>}
+      </div>
+      <div className="form-group checkbox-group">
+        <label>
+          <input
+            type="checkbox"
+            checked={row.has_guest}
+            onChange={(e) => onChange({ has_guest: e.target.checked })}
+            disabled={disabled}
+          />
+          +1 Guest
+        </label>
+      </div>
+    </div>
+    {row.has_guest && (
+      <div className="form-group">
+        <label htmlFor={`${idPrefix}_guest`}>
+          Guest Name {guestRequiresName && <span className="required">*</span>}
+        </label>
+        <input
+          id={`${idPrefix}_guest`}
+          type="text"
+          value={row.guest_name}
+          onChange={(e) => onChange({ guest_name: e.target.value })}
+          className={guestError ? 'input-error' : ''}
+          disabled={disabled}
+          placeholder={guestRequiresName ? 'Required' : 'Optional'}
+        />
+        {guestError && <span className="field-error">{guestError}</span>}
+      </div>
+    )}
+  </div>
+);
+
 const LegacyImport = () => {
   usePageTitle('Legacy Import · Promotions');
   const navigate = useNavigate();
@@ -99,9 +189,10 @@ const LegacyImport = () => {
   const [showSearch, setShowSearch] = useState('');
   const [selectedShow, setSelectedShow] = useState<ShowSummary | null>(null);
 
-  // On-air winners and staff claimants — shared between both modes
+  // On-air winners, staff claimants and alternates — shared between both modes
   const [onAirWinners, setOnAirWinners] = useState<OnAirWinnerRow[]>([emptyWinner()]);
   const [staffClaims, setStaffClaims] = useState<StaffClaimRow[]>([]);
+  const [alternates, setAlternates] = useState<StaffClaimRow[]>([]);
 
   const staffCapacity = mode === 'new' ? numPassPairs : (selectedShow?.available_staff_count ?? 0);
 
@@ -210,6 +301,7 @@ const LegacyImport = () => {
     } else {
       setOnAirWinners(Array.from({ length: selectedShow?.available_pair_count ?? 0 }, emptyWinner));
       setStaffClaims([]);
+      setAlternates([]);
       setErrors({});
     }
   }, [mode, numPassPairs, selectedShow]);
@@ -265,6 +357,22 @@ const LegacyImport = () => {
     });
   };
 
+  const addAlternate = () => {
+    setAlternates((prev) => [...prev, emptyStaffClaim()]);
+  };
+
+  const removeAlternate = (index: number) => {
+    setAlternates((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateAlternate = (index: number, changes: Partial<StaffClaimRow>) => {
+    setAlternates((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], ...changes };
+      return next;
+    });
+  };
+
   const staffOptions = useMemo(
     () => staffList.map((s) => ({ email: s.email, name: s.name })),
     [staffList]
@@ -281,18 +389,16 @@ const LegacyImport = () => {
     return byName.length === 1 ? byName[0] : undefined;
   };
 
-  const handleStaffInputChange = (index: number, text: string) => {
-    updateStaffClaim(index, { staff_input: text, staff_id: resolveStaff(text)?.id ?? '' });
-  };
+  const staffInputChanges = (text: string): Partial<StaffClaimRow> => ({
+    staff_input: text,
+    staff_id: resolveStaff(text)?.id ?? '',
+  });
 
-  const handleStaffInputSubmit = (index: number, text: string) => {
+  const staffInputSubmitChanges = (text: string): Partial<StaffClaimRow> => {
     const staff = resolveStaff(text);
-    updateStaffClaim(
-      index,
-      staff
-        ? { staff_input: `${staff.name} (${staff.email})`, staff_id: staff.id }
-        : { staff_input: text, staff_id: '' }
-    );
+    return staff
+      ? { staff_input: `${staff.name} (${staff.email})`, staff_id: staff.id }
+      : { staff_input: text, staff_id: '' };
   };
 
   // How many staff pass slots the current claims consume (guests each take an extra slot)
@@ -337,6 +443,30 @@ const LegacyImport = () => {
       }
     });
 
+    // The same rule as joining the queue in the app. The backend also checks
+    // for passes held for guests already on an existing show.
+    if (alternates.length > 0 && (staffSlotsUsed < staffCapacity || staffClaims.some((c) => c.has_guest))) {
+      newErrors.alternates =
+        'Alternates can only be added when staff members hold every staff pass, with none held for a +1 guest';
+    }
+
+    const claimantIds = new Set(staffClaims.map((c) => c.staff_id));
+    const alternateIds = new Set<number>();
+    alternates.forEach((a, i) => {
+      if (a.staff_id === '') {
+        newErrors[`alternate_${i}`] = 'Pick a staff member from the list';
+      } else if (claimantIds.has(a.staff_id)) {
+        newErrors[`alternate_${i}`] = 'This staff member already has a staff pass';
+      } else if (alternateIds.has(a.staff_id)) {
+        newErrors[`alternate_${i}`] = 'This staff member is already an alternate';
+      } else {
+        alternateIds.add(a.staff_id);
+      }
+      if (guestRequiresName && a.has_guest && !a.guest_name.trim()) {
+        newErrors[`alternate_${i}_guest`] = 'This venue requires a guest name';
+      }
+    });
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -353,6 +483,7 @@ const LegacyImport = () => {
     setCallerSpecialInstructions('');
     setCoAnnounce(false);
     setStaffClaims([]);
+    setAlternates([]);
     setOnAirWinners(Array.from({ length: numPassPairs }, emptyWinner));
     // Venue is intentionally kept for the next import
   };
@@ -373,13 +504,16 @@ const LegacyImport = () => {
           given_away_by_dj: w.given_away_by_dj.trim() || null,
         }));
 
-      const staffPassPayload = staffClaims
-        .filter((c) => c.staff_id !== '')
-        .map((c) => ({
-          staff_id: c.staff_id as number,
-          has_guest: c.has_guest,
-          guest_name: c.has_guest && c.guest_name.trim() ? c.guest_name.trim() : null,
-        }));
+      const toStaffPayload = (rows: StaffClaimRow[]) =>
+        rows
+          .filter((c) => c.staff_id !== '')
+          .map((c) => ({
+            staff_id: c.staff_id as number,
+            has_guest: c.has_guest,
+            guest_name: c.has_guest && c.guest_name.trim() ? c.guest_name.trim() : null,
+          }));
+      const staffPassPayload = toStaffPayload(staffClaims);
+      const alternatesPayload = toStaffPayload(alternates);
 
       if (mode === 'new') {
         const finalGenres = genreInput.trim()
@@ -402,20 +536,22 @@ const LegacyImport = () => {
           co_announce: coAnnounce,
           on_air_winners: filledWinners,
           staff_passes: staffPassPayload,
+          alternates: alternatesPayload,
         });
 
         setSuccessMessage(
-          `Imported show #${result.show_id} — ${result.on_air_winners_created} on-air winner(s), ${result.staff_passes_claimed} staff pass(es) claimed.`
+          `Imported show #${result.show_id} — ${result.on_air_winners_created} on-air winner(s), ${result.staff_passes_claimed} staff pass(es) claimed, ${result.alternates_added} alternate(s).`
         );
         resetShowFields();
       } else if (selectedShow) {
         const result = await legacyImportAPI.mergeShow(selectedShow.id, {
           on_air_winners: filledWinners,
           staff_passes: staffPassPayload,
+          alternates: alternatesPayload,
         });
 
         setSuccessMessage(
-          `Added to "${selectedShow.event_name}" — ${result.on_air_winners_created} on-air winner(s), ${result.staff_passes_claimed} staff pass(es) claimed.`
+          `Added to "${selectedShow.event_name}" — ${result.on_air_winners_created} on-air winner(s), ${result.staff_passes_claimed} staff pass(es) claimed, ${result.alternates_added} alternate(s).`
         );
         // Reflect the new counts locally (and that a draft is now published)
         // so staff can keep adding more entries without re-picking the show.
@@ -506,7 +642,7 @@ const LegacyImport = () => {
         ) : (
           <>
             <strong>Add to Existing Show.</strong> Use this when a show was already entered in
-            staff-app before the cutover. Winners and claims are recorded against that show's
+            staff-app before the cutover. Winners, claims and alternates are recorded against that show's
             existing passes — a draft show is published as part of this so it continues to work
             normally afterward.
           </>
@@ -958,67 +1094,21 @@ const LegacyImport = () => {
             )}
 
             {staffClaims.map((claim, i) => (
-              <div key={i} className="pass-card" style={{ marginBottom: '0.75rem' }}>
-                <div className="pass-header">
-                  <h3>Claimant {i + 1}</h3>
-                  <button
-                    type="button"
-                    className="btn-secondary btn-small"
-                    onClick={() => removeStaffClaim(i)}
-                    disabled={submitting}
-                  >
-                    Remove
-                  </button>
-                </div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor={`li_staff_${i}`}>Staff Member</label>
-                    <PersonAutocomplete
-                      id={`li_staff_${i}`}
-                      value={claim.staff_input}
-                      onChange={(text) => handleStaffInputChange(i, text)}
-                      onSubmit={(text) => handleStaffInputSubmit(i, text)}
-                      options={staffOptions}
-                      placeholder="Staff name or email"
-                      className={errors[`staff_${i}`] ? 'input-error' : undefined}
-                      disabled={submitting}
-                    />
-                    {errors[`staff_${i}`] && (
-                      <span className="field-error">{errors[`staff_${i}`]}</span>
-                    )}
-                  </div>
-                  <div className="form-group checkbox-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={claim.has_guest}
-                        onChange={(e) => updateStaffClaim(i, { has_guest: e.target.checked })}
-                        disabled={submitting}
-                      />
-                      +1 Guest
-                    </label>
-                  </div>
-                </div>
-                {claim.has_guest && (
-                  <div className="form-group">
-                    <label htmlFor={`li_staff_${i}_guest`}>
-                      Guest Name {guestRequiresName && <span className="required">*</span>}
-                    </label>
-                    <input
-                      id={`li_staff_${i}_guest`}
-                      type="text"
-                      value={claim.guest_name}
-                      onChange={(e) => updateStaffClaim(i, { guest_name: e.target.value })}
-                      className={errors[`staff_${i}_guest`] ? 'input-error' : ''}
-                      disabled={submitting}
-                      placeholder={guestRequiresName ? 'Required' : 'Optional'}
-                    />
-                    {errors[`staff_${i}_guest`] && (
-                      <span className="field-error">{errors[`staff_${i}_guest`]}</span>
-                    )}
-                  </div>
-                )}
-              </div>
+              <StaffRowCard
+                key={i}
+                title={`Claimant ${i + 1}`}
+                idPrefix={`li_staff_${i}`}
+                row={claim}
+                error={errors[`staff_${i}`]}
+                guestError={errors[`staff_${i}_guest`]}
+                guestRequiresName={guestRequiresName}
+                staffOptions={staffOptions}
+                disabled={submitting}
+                onRemove={() => removeStaffClaim(i)}
+                onChange={(changes) => updateStaffClaim(i, changes)}
+                onStaffInputChange={(text) => updateStaffClaim(i, staffInputChanges(text))}
+                onStaffInputSubmit={(text) => updateStaffClaim(i, staffInputSubmitChanges(text))}
+              />
             ))}
 
             {staffSlotsUsed < staffCapacity && (
@@ -1032,6 +1122,43 @@ const LegacyImport = () => {
                 + Add Staff Claimant
               </button>
             )}
+
+            {/* ── Alternates ─────────────────────────────────── */}
+            <h3>Staff Pass Alternates</h3>
+            <p className="field-hint">
+              Enter them in the order they're waiting. Only available when staff members hold every
+              staff pass, with none held for a +1 guest. They aren't emailed.
+              {mode === 'existing' && ' They go after anyone already on the show\'s list.'}
+            </p>
+            {errors.alternates && <div className="field-error">{errors.alternates}</div>}
+
+            {alternates.map((alternate, i) => (
+              <StaffRowCard
+                key={i}
+                title={`Alternate ${i + 1}`}
+                idPrefix={`li_alternate_${i}`}
+                row={alternate}
+                error={errors[`alternate_${i}`]}
+                guestError={errors[`alternate_${i}_guest`]}
+                guestRequiresName={guestRequiresName}
+                staffOptions={staffOptions}
+                disabled={submitting}
+                onRemove={() => removeAlternate(i)}
+                onChange={(changes) => updateAlternate(i, changes)}
+                onStaffInputChange={(text) => updateAlternate(i, staffInputChanges(text))}
+                onStaffInputSubmit={(text) => updateAlternate(i, staffInputSubmitChanges(text))}
+              />
+            ))}
+
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={addAlternate}
+              disabled={submitting}
+              style={{ marginBottom: '1rem' }}
+            >
+              + Add Alternate
+            </button>
 
             {/* ── Submit ─────────────────────────────────────── */}
             <div className="form-actions">

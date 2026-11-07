@@ -12,15 +12,18 @@ It has two modes, toggled at the top of the page:
 
 - **New Show** — accepts all standard show fields (event name, venue, date/time,
   description, age restriction, etc.), shows N rows for on-air winners (one per
-  pass pair) and N dropdowns for staff claimants. Blank winner/claimant rows are
-  skipped (partial entry is fine). Creates the show immediately in "published"
+  pass pair), N dropdowns for staff claimants and a list of alternates, in queue
+  order. Blank winner/claimant rows are skipped (partial entry is fine), but
+  alternates need every staff pass held by a staff member, as in the app.
+  Creates the show immediately in "published"
   status — no notifications, no publish/close lifecycle. After a successful
   import, the form resets so the next show can be entered without navigating
   away.
 - **Add to Existing Show** — for shows promotions staff already entered in
   staff-app (via the normal show form) before the paper-to-app cutover. Lets
   them search for that show and record on-air winners / staff claims against
-  its existing passes, instead of duplicating it. A draft show is published as
+  its existing passes, and add alternates to the end of its queue, instead of
+  duplicating it. A draft show is published as
   part of the merge.
 
 How to remove it later

@@ -1389,6 +1389,7 @@ export interface LegacyImportResult {
   show_id: number;
   on_air_winners_created: number;
   staff_passes_claimed: number;
+  alternates_added: number;
 }
 
 export const legacyImportAPI = {
@@ -1426,6 +1427,7 @@ export const legacyImportAPI = {
     co_announce: boolean;
     on_air_winners: LegacyOnAirWinnerPayload[];
     staff_passes: LegacyStaffPassPayload[];
+    alternates: LegacyStaffPassPayload[];
   }): Promise<LegacyImportResult> => {
     try {
       const response = await apiClient.post('/legacy-import/shows', data);
@@ -1440,6 +1442,7 @@ export const legacyImportAPI = {
     data: {
       on_air_winners: LegacyOnAirWinnerPayload[];
       staff_passes: LegacyStaffPassPayload[];
+      alternates: LegacyStaffPassPayload[];
     }
   ): Promise<LegacyImportResult> => {
     try {

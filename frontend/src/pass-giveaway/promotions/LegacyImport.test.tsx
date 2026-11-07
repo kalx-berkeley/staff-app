@@ -104,6 +104,7 @@ describe('LegacyImport movie rating', () => {
       show_id: 7,
       on_air_winners_created: 0,
       staff_passes_claimed: 0,
+      alternates_added: 0,
     });
     await renderLegacyImport();
 
@@ -119,5 +120,79 @@ describe('LegacyImport movie rating', () => {
     expect(legacyImportAPI.importShow).toHaveBeenCalledWith(
       expect.objectContaining({ venue_id: 2, movie_rating: 'R', age_restriction: null })
     );
+  });
+});
+
+describe('LegacyImport alternates', () => {
+  const staff = [
+    { id: 1, name: 'Ann Claimant', email: 'ann@test.com' },
+    { id: 2, name: 'Bo Alternate', email: 'bo@test.com' },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(legacyImportAPI.checkEnabled).mockResolvedValue(true);
+    vi.mocked(legacyImportAPI.listStaff).mockResolvedValue(staff);
+    vi.mocked(venuesAPI.list).mockResolvedValue([musicHall]);
+  });
+
+  const fillShowFields = () => {
+    fireEvent.change(screen.getByLabelText(/event name/i), { target: { value: 'Paper Show' } });
+    fireEvent.change(screen.getByLabelText(/show date/i), { target: { value: '2099-12-31' } });
+    fireEvent.change(screen.getByLabelText(/show time/i), { target: { value: '20:00' } });
+  };
+
+  const addRow = (button: RegExp, labelIndex: number, text: string) => {
+    fireEvent.click(screen.getByRole('button', { name: button }));
+    fireEvent.change(screen.getAllByLabelText(/staff member/i)[labelIndex], {
+      target: { value: text },
+    });
+  };
+
+  it('sends alternates once staff hold every staff pass', async () => {
+    vi.mocked(legacyImportAPI.importShow).mockResolvedValue({
+      show_id: 7,
+      on_air_winners_created: 0,
+      staff_passes_claimed: 1,
+      alternates_added: 1,
+    });
+    await renderLegacyImport();
+    fillShowFields();
+    addRow(/add staff claimant/i, 0, 'ann@test.com');
+    addRow(/add alternate/i, 1, 'bo@test.com');
+
+    fireEvent.click(screen.getByRole('button', { name: /import show/i }));
+
+    expect(await screen.findByText(/1 alternate\(s\)/i)).toBeInTheDocument();
+    expect(legacyImportAPI.importShow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        staff_passes: [{ staff_id: 1, has_guest: false, guest_name: null }],
+        alternates: [{ staff_id: 2, has_guest: false, guest_name: null }],
+      })
+    );
+    expect(screen.queryByLabelText(/staff member/i)).not.toBeInTheDocument();
+  });
+
+  it('blocks alternates while a staff pass is left over', async () => {
+    await renderLegacyImport();
+    fillShowFields();
+    addRow(/add alternate/i, 0, 'bo@test.com');
+
+    fireEvent.click(screen.getByRole('button', { name: /import show/i }));
+
+    expect(await screen.findByText(/alternates can only be added/i)).toBeInTheDocument();
+    expect(legacyImportAPI.importShow).not.toHaveBeenCalled();
+  });
+
+  it('blocks an alternate who also has a staff pass', async () => {
+    await renderLegacyImport();
+    fillShowFields();
+    addRow(/add staff claimant/i, 0, 'ann@test.com');
+    addRow(/add alternate/i, 1, 'ann@test.com');
+
+    fireEvent.click(screen.getByRole('button', { name: /import show/i }));
+
+    expect(await screen.findByText(/already has a staff pass/i)).toBeInTheDocument();
+    expect(legacyImportAPI.importShow).not.toHaveBeenCalled();
   });
 });

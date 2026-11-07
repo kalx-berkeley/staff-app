@@ -22,7 +22,7 @@ class OnAirWinnerImport(BaseModel):
 
 
 class StaffPassImport(BaseModel):
-    """A staff pass claim, optionally with a +1 guest."""
+    """A staff pass claim or alternate entry, optionally with a +1 guest."""
 
     staff_id: int
     has_guest: bool = False
@@ -48,6 +48,8 @@ class LegacyShowImport(BaseModel):
     co_announce: bool = False
     on_air_winners: list[OnAirWinnerImport] = Field(default_factory=list)
     staff_passes: list[StaffPassImport] = Field(default_factory=list)
+    # In queue order, first in line first
+    alternates: list[StaffPassImport] = Field(default_factory=list)
 
     @field_validator("genre", mode="before")
     @classmethod
@@ -56,10 +58,12 @@ class LegacyShowImport(BaseModel):
 
 
 class LegacyShowMerge(BaseModel):
-    """On-air winners and staff claims to merge into an existing show."""
+    """On-air winners, staff claims and alternates to merge into an existing show."""
 
     on_air_winners: list[OnAirWinnerImport] = Field(default_factory=list)
     staff_passes: list[StaffPassImport] = Field(default_factory=list)
+    # In queue order, first in line first
+    alternates: list[StaffPassImport] = Field(default_factory=list)
 
 
 class LegacyImportResult(BaseModel):
@@ -68,3 +72,4 @@ class LegacyImportResult(BaseModel):
     show_id: int
     on_air_winners_created: int
     staff_passes_claimed: int
+    alternates_added: int = 0
