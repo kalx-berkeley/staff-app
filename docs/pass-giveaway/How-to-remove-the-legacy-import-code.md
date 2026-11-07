@@ -24,7 +24,9 @@ It has two modes, toggled at the top of the page:
   them search for that show and record on-air winners / staff claims against
   its existing passes, and add alternates to the end of its queue, instead of
   duplicating it. A draft show is published as
-  part of the merge.
+  part of the merge. It also lists the show's recorded on-air winners and staff
+  claims, each with a Release button that calls the app's normal release
+  endpoints, so the usual emails and alternate promotions happen.
 
 How to remove it later
 

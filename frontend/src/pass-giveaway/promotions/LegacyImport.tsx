@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { legacyImportAPI, venuesAPI, showsAPI, autocompleteAPI, specialtyShowsAPI } from '../api';
-import type { VenueResponse, AgeRestriction, MovieRating, ShowSummary, WheelchairAccessible } from '../types';
+import { legacyImportAPI, passesAPI, venuesAPI, showsAPI, autocompleteAPI, specialtyShowsAPI } from '../api';
+import type { PassResponse, VenueResponse, AgeRestriction, MovieRating, ShowSummary, WheelchairAccessible } from '../types';
 import { MOVIE_RATING_LABELS } from '../utils';
 import {
   DatePicker,
@@ -12,6 +12,7 @@ import {
   extractPersonEmail,
 } from '../components';
 import DjNameAutocomplete from '../components/DjNameAutocomplete';
+import { formatPhone } from '../../common/utils';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 
 type Mode = 'new' | 'existing';
@@ -50,6 +51,13 @@ const emptyStaffClaim = (): StaffClaimRow => ({
   has_guest: false,
   guest_name: '',
 });
+
+/** Grow or shrink the winner rows, keeping what's been typed in the ones that stay. */
+const resizeWinners = (rows: OnAirWinnerRow[], count: number): OnAirWinnerRow[] => {
+  const next = rows.slice(0, count);
+  while (next.length < count) next.push(emptyWinner());
+  return next;
+};
 
 interface StaffRowCardProps {
   title: string;
@@ -141,6 +149,100 @@ const StaffRowCard = ({
   </div>
 );
 
+interface RecordedPassCardProps {
+  pass: PassResponse;
+  title: string;
+  details: string[];
+  /** Explains what releasing does, shown when asking to confirm. */
+  releaseNote: string;
+  /** On-air winners need a reason, which goes in the email to the show's promotions reps. */
+  asksForReason: boolean;
+  disabled: boolean;
+  /** Resolves to whether the release worked. */
+  onRelease: (reason: string) => Promise<boolean>;
+}
+
+/** A winner or claim already recorded on an existing show, which can be released. */
+const RecordedPassCard = ({
+  pass,
+  title,
+  details,
+  releaseNote,
+  asksForReason,
+  disabled,
+  onRelease,
+}: RecordedPassCardProps) => {
+  const [confirming, setConfirming] = useState(false);
+  const [reason, setReason] = useState('');
+  const reasonId = `li_release_reason_${pass.id}`;
+
+  const handleConfirm = async () => {
+    if (await onRelease(reason.trim())) {
+      setConfirming(false);
+      setReason('');
+    }
+  };
+
+  return (
+    <div className="pass-card" style={{ marginBottom: '0.75rem' }}>
+      <div className="pass-header">
+        <h3>{title}</h3>
+        {!confirming && (
+          <button
+            type="button"
+            className="btn-secondary btn-small"
+            onClick={() => setConfirming(true)}
+            disabled={disabled}
+            aria-label={`Release ${title}`}
+          >
+            Release
+          </button>
+        )}
+      </div>
+      {details.length > 0 && (
+        <div className="pass-details">
+          {details.map((detail) => <p key={detail}>{detail}</p>)}
+        </div>
+      )}
+      {confirming && (
+        <>
+          <p className="field-hint">{releaseNote}</p>
+          {asksForReason && (
+            <div className="form-group">
+              <label htmlFor={reasonId}>Reason <span className="required">*</span></label>
+              <textarea
+                id={reasonId}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                disabled={disabled}
+              />
+            </div>
+          )}
+          <div className="form-actions">
+            <button
+              type="button"
+              className="btn-secondary btn-small"
+              onClick={() => setConfirming(false)}
+              disabled={disabled}
+            >
+              Keep
+            </button>
+            <button
+              type="button"
+              className="btn-primary btn-small"
+              onClick={handleConfirm}
+              disabled={disabled || (asksForReason && !reason.trim())}
+            >
+              Confirm Release
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 const LegacyImport = () => {
   usePageTitle('Legacy Import · Promotions');
   const navigate = useNavigate();
@@ -188,6 +290,11 @@ const LegacyImport = () => {
   const [existingShowsError, setExistingShowsError] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState('');
   const [selectedShow, setSelectedShow] = useState<ShowSummary | null>(null);
+  // The selected show's passes, for releasing the winners and claims it already has
+  const [showPasses, setShowPasses] = useState<PassResponse[] | null>(null);
+  const [showPassesError, setShowPassesError] = useState<string | null>(null);
+  const [releasing, setReleasing] = useState(false);
+  const showPassesRequest = useRef(0);
 
   // On-air winners, staff claimants and alternates — shared between both modes
   const [onAirWinners, setOnAirWinners] = useState<OnAirWinnerRow[]>([emptyWinner()]);
@@ -286,25 +393,88 @@ const LegacyImport = () => {
     }
   };
 
-  // Keep the winner/claim rows sized to the current capacity — the chosen
-  // pass-pair count in New Show mode, or the selected show's remaining
-  // available passes in Existing Show mode. Also clears stale entries
-  // whenever the target show changes (or a submission just succeeded), so
-  // leftover text never gets attributed to the wrong show.
+  // In New Show mode, keep one winner row per chosen pass pair.
   useEffect(() => {
-    if (mode === 'new') {
-      setOnAirWinners((prev) => {
-        const next = [...prev];
-        while (next.length < numPassPairs) next.push(emptyWinner());
-        return next.slice(0, numPassPairs);
-      });
-    } else {
-      setOnAirWinners(Array.from({ length: selectedShow?.available_pair_count ?? 0 }, emptyWinner));
-      setStaffClaims([]);
-      setAlternates([]);
-      setErrors({});
+    if (mode !== 'new') return;
+    setOnAirWinners((prev) => resizeWinners(prev, numPassPairs));
+  }, [mode, numPassPairs]);
+
+  // Existing Show mode's rows are cleared whenever the target show changes (or
+  // a submission just succeeded), so leftover text never gets attributed to the
+  // wrong show. Releasing a pass doesn't clear them, so entries in progress stay.
+  const clearExistingShowRows = (availablePairs: number) => {
+    setOnAirWinners(Array.from({ length: availablePairs }, emptyWinner));
+    setStaffClaims([]);
+    setAlternates([]);
+    setErrors({});
+  };
+
+  const loadShowPasses = useCallback(async (showId: number) => {
+    const request = ++showPassesRequest.current;
+    setShowPassesError(null);
+    try {
+      const passes = await passesAPI.getForShow(showId);
+      if (request !== showPassesRequest.current) return;
+      const availableCount = (passType: PassResponse['pass_type']) =>
+        passes.filter((p) => p.pass_type === passType && p.status === 'available').length;
+      const counts = {
+        available_pair_count: availableCount('pair'),
+        available_staff_count: availableCount('staff'),
+      };
+      setShowPasses(passes);
+      setSelectedShow((prev) => (prev?.id === showId ? { ...prev, ...counts } : prev));
+      setExistingShows((prev) => prev.map((s) => (s.id === showId ? { ...s, ...counts } : s)));
+      setOnAirWinners((prev) => resizeWinners(prev, counts.available_pair_count));
+    } catch {
+      if (request === showPassesRequest.current) {
+        setShowPassesError("Failed to load this show's winners and claims.");
+      }
     }
-  }, [mode, numPassPairs, selectedShow]);
+  }, []);
+
+  const selectShow = (show: ShowSummary | null) => {
+    showPassesRequest.current++;
+    setSelectedShow(show);
+    setShowPasses(null);
+    setShowPassesError(null);
+    setApiError(null);
+    setSuccessMessage(null);
+    clearExistingShowRows(show?.available_pair_count ?? 0);
+    if (show) loadShowPasses(show.id);
+  };
+
+  const runRelease = async (release: () => Promise<string>): Promise<boolean> => {
+    if (!selectedShow) return false;
+    setApiError(null);
+    setSuccessMessage(null);
+    setReleasing(true);
+    try {
+      const message = await release();
+      await loadShowPasses(selectedShow.id);
+      setSuccessMessage(message);
+      return true;
+    } catch (err: unknown) {
+      setApiError((err as { detail?: string })?.detail ?? 'Release failed. Please try again.');
+      return false;
+    } finally {
+      setReleasing(false);
+    }
+  };
+
+  const releaseWinner = (pass: PassResponse, reason: string) =>
+    runRelease(async () => {
+      await passesAPI.releaseWinner(pass.id, { reason });
+      return `Released ${pass.recipient_name}'s passes, so they can be given away again.`;
+    });
+
+  const releaseClaim = (pass: PassResponse) =>
+    runRelease(async () => {
+      const updated = await passesAPI.releaseClaim(pass.id);
+      const released = `Released ${pass.staff_name ?? 'the'}${pass.staff_name ? "'s" : ''} staff pass`;
+      return updated.status === 'claimed' && updated.staff_name
+        ? `${released}. It went to the next alternate, ${updated.staff_name}.`
+        : `${released}.`;
+    });
 
   const addGenre = (value: string) => {
     const trimmed = value.trim();
@@ -555,16 +725,15 @@ const LegacyImport = () => {
         );
         // Reflect the new counts locally (and that a draft is now published)
         // so staff can keep adding more entries without re-picking the show.
-        setSelectedShow((prev) =>
-          prev
-            ? {
-                ...prev,
-                status: 'published',
-                available_pair_count: prev.available_pair_count - result.on_air_winners_created,
-                available_staff_count: prev.available_staff_count - staffSlotsUsed,
-              }
-            : prev
-        );
+        const availablePairs = selectedShow.available_pair_count - result.on_air_winners_created;
+        setSelectedShow({
+          ...selectedShow,
+          status: 'published',
+          available_pair_count: availablePairs,
+          available_staff_count: selectedShow.available_staff_count - staffSlotsUsed,
+        });
+        clearExistingShowRows(availablePairs);
+        await loadShowPasses(selectedShow.id);
       }
     } catch (err: unknown) {
       const msg =
@@ -589,6 +758,21 @@ const LegacyImport = () => {
     setApiError(null);
     setSuccessMessage(null);
     setErrors({});
+    if (next === 'existing') selectShow(selectedShow);
+  };
+
+  // The passes staff can release. A guest hold goes with its staff member's claim.
+  const recordedWinners = (showPasses ?? []).filter(
+    (p) => p.pass_type === 'pair' && p.status === 'given_away' && p.recipient_name
+  );
+  const recordedClaims = (showPasses ?? []).filter(
+    (p) => p.pass_type === 'staff' && p.status === 'claimed' && !p.guest_of_pass_id
+  );
+
+  const guestDetail = (pass: PassResponse): string[] => {
+    const name = pass.guest_name ? `: ${pass.guest_name}` : '';
+    if (pass.guest_waiting) return [`+1 guest on the alternate list${name}`];
+    return pass.has_guest ? [`+1 guest${name}`] : [];
   };
 
   if (loading) return <div className="page-loading">Loading…</div>;
@@ -644,7 +828,7 @@ const LegacyImport = () => {
             <strong>Add to Existing Show.</strong> Use this when a show was already entered in
             staff-app before the cutover. Winners, claims and alternates are recorded against that show's
             existing passes — a draft show is published as part of this so it continues to work
-            normally afterward.
+            normally afterward. Winners and claims the show already has can be released here too.
           </>
         )}
       </div>
@@ -959,7 +1143,7 @@ const LegacyImport = () => {
                         key={show.id}
                         className="pass-card"
                         style={{ cursor: 'pointer' }}
-                        onClick={() => setSelectedShow(show)}
+                        onClick={() => selectShow(show)}
                       >
                         <div className="pass-header">
                           <h3>{show.event_name}</h3>
@@ -981,8 +1165,8 @@ const LegacyImport = () => {
                   <button
                     type="button"
                     className="btn-secondary btn-small"
-                    onClick={() => setSelectedShow(null)}
-                    disabled={submitting}
+                    onClick={() => selectShow(null)}
+                    disabled={submitting || releasing}
                   >
                     Change Show
                   </button>
@@ -1001,8 +1185,28 @@ const LegacyImport = () => {
 
         {(mode === 'new' || selectedShow) && (
           <>
+            {showPassesError && <div className="error-message">{showPassesError}</div>}
+
             {/* ── On-air winners ─────────────────────────────── */}
             <h3>On-Air Pass Winners</h3>
+
+            {mode === 'existing' && recordedWinners.map((pass) => (
+              <RecordedPassCard
+                key={pass.id}
+                pass={pass}
+                title={`Winner: ${pass.recipient_name}`}
+                details={[
+                  ...(pass.recipient_phone ? [formatPhone(pass.recipient_phone)] : []),
+                  ...(pass.recipient_email ? [pass.recipient_email] : []),
+                  ...(pass.given_away_by_dj ? [`Given away by ${pass.given_away_by_dj}`] : []),
+                ]}
+                releaseNote="These passes can then be given away again. The show's KALX promotions reps are emailed the reason."
+                asksForReason
+                disabled={submitting || releasing}
+                onRelease={(reason) => releaseWinner(pass, reason)}
+              />
+            ))}
+
             <p className="field-hint">Leave a row blank if that pass was not yet given away.</p>
 
             {onAirWinners.map((winner, i) => (
@@ -1089,7 +1293,20 @@ const LegacyImport = () => {
             </h3>
             {errors.staff_passes && <div className="field-error">{errors.staff_passes}</div>}
 
-            {staffClaims.length === 0 && (
+            {mode === 'existing' && recordedClaims.map((pass) => (
+              <RecordedPassCard
+                key={pass.id}
+                pass={pass}
+                title={`Claimed by ${pass.staff_name ?? 'unknown staff member'}`}
+                details={guestDetail(pass)}
+                releaseNote="If anyone is on the show's alternate list, the next alternate gets this pass and is emailed. Any +1 guest is released too."
+                asksForReason={false}
+                disabled={submitting || releasing}
+                onRelease={() => releaseClaim(pass)}
+              />
+            ))}
+
+            {staffClaims.length === 0 && recordedClaims.length === 0 && (
               <p className="field-hint">No staff passes claimed yet.</p>
             )}
 
@@ -1174,7 +1391,7 @@ const LegacyImport = () => {
                 type="button"
                 className="btn-primary"
                 onClick={handleSubmit}
-                disabled={submitting || (mode === 'new' ? venueId === '' : !selectedShow)}
+                disabled={submitting || releasing || (mode === 'new' ? venueId === '' : !selectedShow)}
               >
                 {submitting
                   ? mode === 'new' ? 'Importing…' : 'Adding…'
