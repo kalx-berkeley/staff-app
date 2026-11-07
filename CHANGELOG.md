@@ -6,6 +6,21 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.12.0] - 2026-11-07
+
+### Changed
+
+- Deploy production releases at 4am Pacific instead of as soon as they're published, so production doesn't restart while live DJs are using the system. A manual workflow run can still deploy the newest release right away ([44b33ef](https://github.com/kalx-berkeley/staff-app/commit/44b33ef))
+- Read department names from the Department Heads table, since the All departments table is gone. The existing departments are kept if no record has a usable name ([4dd2cbf](https://github.com/kalx-berkeley/staff-app/commit/4dd2cbf))
+
+### Added
+
+- Reload open tabs after a deploy, so a tab left open, like the one in the DJ studio, doesn't keep running old code against the new backend. A tab reloads on the next page change or after 10 idle minutes, or after an idle hour if something was typed on the page, and offers a Reload button until then ([0668cc4](https://github.com/kalx-berkeley/staff-app/commit/0668cc4))
+
+### Fixed
+
+- Fix a page that fails to render or load leaving a blank screen. It now shows an error with a Retry button, and a tab asking for page code that a deploy removed reloads itself ([0668cc4](https://github.com/kalx-berkeley/staff-app/commit/0668cc4))
+
 ## [1.11.0] - 2026-11-05
 
 ### Changed
@@ -301,6 +316,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.12.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.9.1...v1.10.0
 [1.9.1]: https://github.com/kalx-berkeley/staff-app/compare/v1.9.0...v1.9.1
