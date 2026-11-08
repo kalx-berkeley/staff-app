@@ -1951,6 +1951,10 @@ fieldset.radio-group legend {
   margin-top: 0.25rem;
 }
 
+.kalx-winner-edit-btn {
+  margin-left: 0.5rem;
+}
+
 .kalx-attempt-note {
   color: var(--warning-color);
 }

@@ -19,6 +19,7 @@ from app.pass_giveaway.schemas.pass_schema import (
     SelfPreassignmentData,
     PassResponse,
     WinnerReleaseData,
+    WinnerUpdateData,
 )
 from app.pass_giveaway.services.alternate_service import AlternateService
 from app.pass_giveaway.services.pass_service import (
@@ -51,7 +52,11 @@ from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.venue import Venue
 from app.models.specialty_show import SpecialtyShow
-from app.pass_giveaway.guest_redaction import GuestRedactingRoute, keeps_winner_contact
+from app.pass_giveaway.guest_redaction import (
+    GuestRedactingRoute,
+    keeps_winner_contact,
+    keeps_winner_email,
+)
 
 router = APIRouter(prefix="/api", tags=["passes"], route_class=GuestRedactingRoute)
 
@@ -155,41 +160,10 @@ def give_away_pass(
     # Check winner eligibility before the giveaway to detect overrides.
     override_details: dict | None = None
     pre_pass = db.query(Pass).filter(Pass.id == pass_id).first()
-    if pre_pass:
-        pre_show = db.query(Show).filter(Show.id == pre_pass.show_id).first()
-        if pre_show:
-            pre_venue = db.query(Venue).filter(Venue.id == pre_show.venue_id).first()
-            if pre_venue and pre_venue.win_frequency_days:
-
-                previous = (
-                    db.query(OnAirWinner)
-                    .join(Show, Show.id == OnAirWinner.show_id)
-                    .filter(
-                        OnAirWinner.venue_id == pre_venue.id,
-                        OnAirWinner.recipient_phone
-                        == normalize_phone(giveaway_data.recipient_phone),
-                    )
-                    .order_by(Show.show_date.desc())
-                    .first()
-                )
-                if previous:
-                    prev_show = db.query(Show).filter(Show.id == previous.show_id).first()
-                    if prev_show:
-                        current_date = pre_show.show_date
-                        prev_date = prev_show.show_date
-                        if hasattr(current_date, "date"):
-                            current_date = current_date.date()
-                        if hasattr(prev_date, "date"):
-                            prev_date = prev_date.date()
-                        days_between = abs((current_date - prev_date).days)
-                        if days_between < pre_venue.win_frequency_days:
-                            override_details = {
-                                "recipient_phone": giveaway_data.recipient_phone,
-                                "days_since_last_win": days_between,
-                                "required_days": pre_venue.win_frequency_days,
-                                "last_win_show": prev_show.event_name,
-                                "venue_id": pre_venue.id,
-                            }
+    if pre_pass and pre_pass.show:
+        override_details = PassService.find_win_frequency_conflict(
+            db, pre_pass.show, giveaway_data.recipient_phone
+        )
 
     pass_item = PassService.give_away_pass_pair(db, pass_id, giveaway_data)
 
@@ -217,6 +191,97 @@ def give_away_pass(
             entity_type="pass",
             entity_id=pass_item.id,
             details={**override_details, "dj": giveaway_data.given_away_by_dj},
+        )
+
+    return PassResponse.model_validate(pass_item)
+
+
+@router.get("/passes/{pass_id}/winner", response_model=PassResponse)
+@keeps_winner_email
+def get_winner_for_edit(
+    pass_id: int,
+    dj_name: str = Query(..., min_length=1, max_length=100),
+    dj_access: bool = Depends(check_dj_giveaway_access),
+    db: Session = Depends(get_db),
+):
+    """
+    Get a pass pair's on-air winner, including their email, for the DJ to correct.
+
+    Requires DJ studio network access (or, in staging, Sublist DJ staff), the
+    name of the DJ who gave the passes away, less than 4 hours since the
+    giveaway, and a show that isn't closed. Unlike other guest responses, this
+    one keeps the winner's email, so the edit form can show what was typed.
+
+    Args:
+        pass_id: Pass ID
+        dj_name: The DJ name typed in the DJ view
+        dj_access: DJ giveaway access validation
+
+    Returns:
+        The pass, with the winner's details
+    """
+    pass_item = PassService.get_winner_for_dj_edit(db, pass_id, dj_name)
+    return PassResponse.model_validate(pass_item)
+
+
+@router.patch("/passes/{pass_id}/winner", response_model=PassResponse)
+def update_winner(
+    pass_id: int,
+    update_data: WinnerUpdateData,
+    dj_access: bool = Depends(check_dj_giveaway_access),
+    db: Session = Depends(get_db),
+):
+    """
+    Correct a pass pair's on-air winner (for example, a typo in their name).
+
+    Has the same requirements as get_winner_for_edit, with the DJ name in
+    update_data.given_away_by_dj. Clearing the email is refused when the venue
+    requires one. A new phone number is checked against the venue's
+    win-frequency limit and an override is audit-logged, as for a giveaway.
+
+    Args:
+        pass_id: Pass ID
+        update_data: The corrected details and the DJ's name
+        dj_access: DJ giveaway access validation
+
+    Returns:
+        The updated pass
+    """
+    dj_name = update_data.given_away_by_dj.strip()
+    pass_item = PassService.get_winner_for_dj_edit(db, pass_id, dj_name)
+
+    override_details = None
+    if normalize_phone(update_data.recipient_phone) != pass_item.recipient_phone:
+        override_details = PassService.find_win_frequency_conflict(
+            db, pass_item.show, update_data.recipient_phone, exclude_pass_id=pass_item.id
+        )
+
+    before, after = PassService.update_on_air_winner(db, pass_item, update_data)
+
+    audit_service.log_event(
+        db,
+        event_type="on_air_winner_updated",
+        area=PASS_GIVEAWAY_AREA,
+        actor_role="dj",
+        entity_type="pass",
+        entity_id=pass_item.id,
+        details={
+            "dj": dj_name,
+            "show_id": pass_item.show_id,
+            "before": before,
+            "after": after,
+        },
+    )
+
+    if override_details:
+        audit_service.log_event(
+            db,
+            event_type="venue_frequency_override",
+            area=PASS_GIVEAWAY_AREA,
+            actor_role="dj",
+            entity_type="pass",
+            entity_id=pass_item.id,
+            details={**override_details, "dj": dj_name, "winner_edit": True},
         )
 
     return PassResponse.model_validate(pass_item)
@@ -993,6 +1058,7 @@ def check_winner_eligibility(
     venue_id: int,
     phone: str,
     show_id: int,
+    exclude_pass_id: int | None = None,
     dj_access: bool = Depends(check_dj_access),
     db: Session = Depends(get_db),
 ):
@@ -1000,7 +1066,8 @@ def check_winner_eligibility(
     Check if a phone number is eligible to win passes at this venue.
 
     Returns eligibility status and, if ineligible, details about when the person
-    last won at this venue.
+    last won at this venue. ``exclude_pass_id`` ignores that pass's own winner,
+    for checking a corrected phone number.
     """
     venue = db.query(Venue).filter(Venue.id == venue_id).first()
     if not venue:
@@ -1021,6 +1088,7 @@ def check_winner_eligibility(
         .filter(
             OnAirWinner.venue_id == venue_id,
             OnAirWinner.recipient_phone == normalize_phone(phone),
+            *([OnAirWinner.pass_id != exclude_pass_id] if exclude_pass_id else []),
         )
         .order_by(Show.show_date.desc())
         .first()

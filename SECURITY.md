@@ -150,6 +150,8 @@ Without a login, guests from these networks can:
 
 DJ studio guests can also:
 - give away passes, record failed giveaway attempts and check winner eligibility;
+- correct the name, phone and email of a winner they recorded, under the same DJ name, within 4
+  hours of the giveaway and before the show closes;
 - see their own giveaways and the on-air DJ;
 - see and dismiss spin matches;
 - reserve an unclaimed pass pair for today under a current DJ or specialty show name
@@ -172,6 +174,10 @@ before a response goes out:
 - Station office guests: winner phone numbers too, except in winner search results.
 - DJ studio guests keep winner names and phone numbers, which the DJ view shows for each show's
   previous winners and the DJ's own giveaways.
+- DJ studio guests also get the winner's email from `GET /api/passes/{pass_id}/winner`, which
+  answers only under the DJ name that recorded the winner, within 4 hours, so the DJ can correct
+  it. Anyone at the studio computer who types that DJ name can read it, as the DJ name isn't
+  verified.
 
 Every pass giveaway router applies this, so new endpoints are covered. The redaction tests in
 `backend/tests/common/test_guest_access.py` seed contact details and fail if any guest-reachable

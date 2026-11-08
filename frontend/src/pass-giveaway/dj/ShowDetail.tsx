@@ -5,7 +5,8 @@ import { DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, KalxLiveBa
 import MarkdownContent from '../../common/components/MarkdownContent';
 import { formatPhone } from '../../common/utils';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
+import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, canDjEditWinner, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
+import WinnerEditForm from './WinnerEditForm';
 import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
 import type { ShowResponse, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
@@ -18,6 +19,7 @@ const ShowDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [djName, setDjName] = useState(localStorage.getItem(DJ_NAME_KEY) || '');
+  const [editingPassId, setEditingPassId] = useState<number | null>(null);
 
   const loadShow = useCallback(async () => {
     if (!id) return;
@@ -91,6 +93,16 @@ const ShowDetail = () => {
       const bPriority = bIsMe ? 1 : bIsUnassigned ? 2 : 3;
       return aPriority - bPriority;
     });
+  };
+
+  const handleWinnerSaved = (updated: PassResponse) => {
+    setShow((prev) =>
+      prev && {
+        ...prev,
+        passes: prev.passes.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)),
+      },
+    );
+    setEditingPassId(null);
   };
 
   if (loading) {
@@ -246,12 +258,33 @@ const ShowDetail = () => {
             <h4 className="kalx-previous-winners-title">Previous Giveaway Activity</h4>
             {givenAwayPasses.map((pass) => (
               <div key={pass.id} className="kalx-pass-row">
-                <div className="kalx-pass-given-info">
-                  Winner: <strong>{pass.recipient_name}</strong>
-                  {pass.recipient_phone && ` · ${formatPhone(pass.recipient_phone)}`}
-                  {pass.given_away_by_dj && ` · DJ: ${pass.given_away_by_dj}`}
-                  {pass.given_away_at && ` · ${formatDateTime(pass.given_away_at)}`}
-                </div>
+                {editingPassId === pass.id ? (
+                  <WinnerEditForm
+                    pass={pass}
+                    venueId={show.venue.id}
+                    djName={djName}
+                    requiresEmail={show.guest_list_requirements.requires_email_address}
+                    onSaved={handleWinnerSaved}
+                    onCancel={() => setEditingPassId(null)}
+                  />
+                ) : (
+                  <div className="kalx-pass-given-info">
+                    Winner: <strong>{pass.recipient_name}</strong>
+                    {pass.recipient_phone && ` · ${formatPhone(pass.recipient_phone)}`}
+                    {pass.given_away_by_dj && ` · DJ: ${pass.given_away_by_dj}`}
+                    {pass.given_away_at && ` · ${formatDateTime(pass.given_away_at)}`}
+                    {canDjEditWinner(pass, show, djName) && (
+                      <button
+                        type="button"
+                        className="btn-small btn-secondary kalx-winner-edit-btn"
+                        onClick={() => setEditingPassId(pass.id)}
+                        title={`Fix a typo in the winner's details. You can edit them for ${DJ_SHOW_GIVEAWAY_WINDOW_HOURS} hours after the giveaway.`}
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
             {show.attempts.map((attempt) => (

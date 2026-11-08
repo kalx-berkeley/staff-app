@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   addressHasStateOrZip,
+  canDjEditWinner,
   canUsePassGiveawayAdmin,
   findRecentDjGiveaway,
   formatShowRating,
@@ -10,6 +11,7 @@ import {
 } from './utils';
 import { formatDateValue } from '../common/utils';
 import type { UserResponse } from '../common/types';
+import type { PassResponse } from './types';
 
 describe('isStagingSublistDjStaff', () => {
   const baseUser: UserResponse = {
@@ -76,6 +78,55 @@ describe('findRecentDjGiveaway', () => {
   it('finds nothing when no DJ name is entered', () => {
     const passes = [pass(null, null), pass('DJ Test', '2026-10-14T19:00:00Z')];
     expect(findRecentDjGiveaway(passes, ' ', now)).toBeUndefined();
+  });
+});
+
+describe('canDjEditWinner', () => {
+  const now = new Date('2026-10-14T20:00:00Z');
+  type EditablePass = Pick<PassResponse, 'status' | 'given_away_by_dj' | 'given_away_at'>;
+  const pass = (overrides: Partial<EditablePass> = {}): EditablePass => ({
+    status: 'given_away',
+    given_away_by_dj: 'DJ Test',
+    given_away_at: '2026-10-14T17:30:00Z',
+    ...overrides,
+  });
+  const show = (overrides = {}) => ({
+    status: 'published' as const,
+    planned_close_date: null,
+    planned_close_time: null,
+    ...overrides,
+  });
+
+  it('lets the DJ who gave the passes away edit within 4 hours', () => {
+    expect(canDjEditWinner(pass(), show(), 'DJ Test', now)).toBe(true);
+  });
+
+  it('ignores case and surrounding spaces in the DJ name', () => {
+    expect(canDjEditWinner(pass(), show(), '  dj test ', now)).toBe(true);
+  });
+
+  it('refuses another DJ or a blank DJ name', () => {
+    expect(canDjEditWinner(pass(), show(), 'DJ Other', now)).toBe(false);
+    expect(canDjEditWinner(pass(), show(), ' ', now)).toBe(false);
+  });
+
+  it('refuses once 4 hours have passed', () => {
+    const old = pass({ given_away_at: '2026-10-14T16:00:00Z' });
+    expect(canDjEditWinner(old, show(), 'DJ Test', now)).toBe(false);
+  });
+
+  it('refuses passes that are not given away', () => {
+    expect(canDjEditWinner(pass({ status: 'available' }), show(), 'DJ Test', now)).toBe(false);
+  });
+
+  it('refuses closed shows and shows past their planned close time', () => {
+    expect(canDjEditWinner(pass(), show({ status: 'closed' }), 'DJ Test', now)).toBe(false);
+    const closeAt = new Date(now.getTime() - 60 * 1000);
+    const pastClose = show({
+      planned_close_date: formatDateValue(closeAt),
+      planned_close_time: `${String(closeAt.getHours()).padStart(2, '0')}:${String(closeAt.getMinutes()).padStart(2, '0')}:00`,
+    });
+    expect(canDjEditWinner(pass(), pastClose, 'DJ Test', now)).toBe(false);
   });
 });
 

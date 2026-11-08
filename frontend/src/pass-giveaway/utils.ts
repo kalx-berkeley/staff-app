@@ -5,6 +5,7 @@ import type {
   GuestFallback,
   MovieRating,
   PassResponse,
+  ShowResponse,
   VenueType,
   WheelchairAccessible,
 } from './types';
@@ -98,6 +99,30 @@ export function findRecentDjGiveaway(
       !!p.given_away_at &&
       new Date(p.given_away_at).getTime() >= windowStart,
   );
+}
+
+// Whether the DJ named djName may still correct this pass pair's winner: they
+// gave it away (names compared ignoring case and surrounding spaces), within
+// DJ_SHOW_GIVEAWAY_WINDOW_HOURS, and the show isn't closed or past its planned
+// close time (in the studio's local time). The backend checks the same rules.
+export function canDjEditWinner(
+  pass: Pick<PassResponse, 'status' | 'given_away_by_dj' | 'given_away_at'>,
+  show: Pick<ShowResponse, 'status' | 'planned_close_date' | 'planned_close_time'>,
+  djName: string,
+  now: Date = new Date(),
+): boolean {
+  const name = djName.trim().toLowerCase();
+  if (pass.status !== 'given_away' || !name || !pass.given_away_at) return false;
+  if (pass.given_away_by_dj?.trim().toLowerCase() !== name) return false;
+  const windowMs = DJ_SHOW_GIVEAWAY_WINDOW_HOURS * 60 * 60 * 1000;
+  if (now.getTime() - new Date(pass.given_away_at).getTime() >= windowMs) return false;
+  if (show.status === 'closed') return false;
+  if (show.planned_close_date && show.planned_close_time) {
+    const [y, m, d] = show.planned_close_date.split('-').map(Number);
+    const [h, min] = show.planned_close_time.split(':').map(Number);
+    if (now >= new Date(y, m - 1, d, h, min)) return false;
+  }
+  return true;
 }
 
 export const WHEELCHAIR_ACCESSIBLE_LABELS: Record<WheelchairAccessible, string> = {

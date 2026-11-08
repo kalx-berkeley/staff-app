@@ -11,6 +11,9 @@ removes the contact details guests don't need:
 - Station office guests: winner phone numbers too, except from endpoints marked
   with :func:`keeps_winner_contact` (winner search). DJ studio guests keep
   winner names and phones, which the DJ view shows.
+- DJ studio guests keep the winner email in responses from endpoints marked
+  with :func:`keeps_winner_email` (the winner the on-air DJ may still correct,
+  which that endpoint checks).
 
 Each pass giveaway router uses :class:`GuestRedactingRoute`, so new endpoints
 are covered without extra code.
@@ -47,6 +50,12 @@ def keeps_winner_contact(endpoint: Callable) -> Callable:
     return endpoint
 
 
+def keeps_winner_email(endpoint: Callable) -> Callable:
+    """Mark an endpoint whose DJ studio guests may see the winner's email."""
+    endpoint.keeps_winner_email = True
+    return endpoint
+
+
 def _is_dj_studio_guest(request: Request) -> bool:
     if request.headers.get("X-DJ-Network") == "1":
         return True
@@ -77,6 +86,7 @@ class GuestRedactingRoute(APIRoute):
     def get_route_handler(self) -> Callable:
         handler = super().get_route_handler()
         keeps_winner = getattr(self.endpoint, "keeps_winner_contact", False)
+        keeps_email = getattr(self.endpoint, "keeps_winner_email", False)
 
         async def redacting_handler(request: Request) -> Response:
             response = await handler(request)
@@ -87,8 +97,11 @@ class GuestRedactingRoute(APIRoute):
             if response.media_type != "application/json" or not response.body:
                 return response
             hidden = set(_HIDDEN_VALUES)
-            if not keeps_winner and not _is_dj_studio_guest(request):
+            dj_studio_guest = _is_dj_studio_guest(request)
+            if not keeps_winner and not dj_studio_guest:
                 hidden |= _WINNER_CONTACT
+            if keeps_email and dj_studio_guest:
+                hidden.discard("recipient_email")
             body = json.dumps(_redact(json.loads(response.body), hidden)).encode()
             headers = {
                 k: v for k, v in response.headers.items() if k.lower() != "content-length"

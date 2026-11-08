@@ -22,7 +22,7 @@ from app.common.services.leave_service import (
 from app.models.on_air_winner import OnAirWinner
 from app.models.job_log import JobLog
 from app.models.specialty_show import SpecialtyShow
-from app.pass_giveaway.schemas.pass_schema import GiveawayData
+from app.pass_giveaway.schemas.pass_schema import GiveawayData, WinnerUpdateData
 from app.pass_giveaway.services.spinitron_schedule_service import SpinitronScheduleService
 
 import re
@@ -30,6 +30,10 @@ import re
 logger = logging.getLogger(__name__)
 
 _LA = ZoneInfo("America/Los_Angeles")
+
+# Each DJ may give away one pass pair per show within this window (one DJ
+# shift), and may correct that winner's details within the same window.
+DJ_SHOW_GIVEAWAY_WINDOW = timedelta(hours=4)
 
 
 def _as_utc(dt: datetime | None) -> datetime:
@@ -186,7 +190,7 @@ class PassService:
                     )
 
             # Enforce one giveaway per DJ per show within a 4-hour shift window
-            four_hours_ago = datetime.now(timezone.utc) - timedelta(hours=4)
+            four_hours_ago = datetime.now(timezone.utc) - DJ_SHOW_GIVEAWAY_WINDOW
             recent_dj_giveaway = (
                 db.query(OnAirWinner)
                 .filter(
@@ -242,6 +246,188 @@ class PassService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database error occurred while recording giveaway",
             )
+
+    @staticmethod
+    def find_win_frequency_conflict(
+        db: Session, show: Show, phone: str, exclude_pass_id: int | None = None
+    ) -> dict | None:
+        """
+        Find a previous win at the show's venue that breaks its win-frequency limit.
+
+        Args:
+            db: Database session
+            show: The show the passes are for
+            phone: The winner's phone number, in any format
+            exclude_pass_id: A pass whose own winner record to ignore (when
+                correcting that winner's details)
+
+        Returns:
+            The override details to audit-log, or None when the phone is eligible
+        """
+        venue = show.venue
+        if not venue or not venue.win_frequency_days:
+            return None
+        query = (
+            db.query(OnAirWinner)
+            .join(Show, Show.id == OnAirWinner.show_id)
+            .filter(
+                OnAirWinner.venue_id == venue.id,
+                OnAirWinner.recipient_phone == normalize_phone(phone),
+            )
+        )
+        if exclude_pass_id is not None:
+            query = query.filter(OnAirWinner.pass_id != exclude_pass_id)
+        previous = query.order_by(Show.show_date.desc()).first()
+        if not previous:
+            return None
+        prev_show = previous.show
+        current_date = show.show_date
+        prev_date = prev_show.show_date
+        if hasattr(current_date, "date"):
+            current_date = current_date.date()
+        if hasattr(prev_date, "date"):
+            prev_date = prev_date.date()
+        days_between = abs((current_date - prev_date).days)
+        if days_between >= venue.win_frequency_days:
+            return None
+        return {
+            "recipient_phone": phone,
+            "days_since_last_win": days_between,
+            "required_days": venue.win_frequency_days,
+            "last_win_show": prev_show.event_name,
+            "venue_id": venue.id,
+        }
+
+    @staticmethod
+    def get_winner_for_dj_edit(db: Session, pass_id: int, dj_name: str) -> Pass:
+        """
+        Get a given-away pass pair whose winner the on-air DJ may still correct.
+
+        The DJ may correct the winner when the typed DJ name matches the DJ who
+        gave the passes away (ignoring case and surrounding spaces), less than
+        DJ_SHOW_GIVEAWAY_WINDOW has passed since the giveaway, and the show
+        isn't closed or past its planned close time.
+
+        Args:
+            db: Database session
+            pass_id: Pass ID
+            dj_name: The DJ name typed in the DJ view
+
+        Returns:
+            The pass, with its on_air_winner
+
+        Raises:
+            HTTPException: 404 if there's no such winner, 403 if this DJ can't
+                edit it (another DJ's, or the window has passed), 400 if the
+                show is closed or past its planned close time
+        """
+        pass_item = db.query(Pass).filter(Pass.id == pass_id).first()
+        if (
+            not pass_item
+            or pass_item.pass_type != "pair"
+            or pass_item.status != "given_away"
+            or not pass_item.on_air_winner
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="This pass pair has no on-air winner",
+            )
+        giver = (pass_item.given_away_by_dj or "").strip().lower()
+        if not giver or giver != dj_name.strip().lower():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the DJ who gave away these passes can edit the winner",
+            )
+        if (
+            not pass_item.given_away_at
+            or datetime.now(timezone.utc) - _as_utc(pass_item.given_away_at)
+            >= DJ_SHOW_GIVEAWAY_WINDOW
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "The winner can only be edited within 4 hours of the giveaway."
+                    " Ask the promotions department to fix it."
+                ),
+            )
+        show = pass_item.show
+        if show.status == "closed":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot edit the winner for a closed show",
+            )
+        if show.planned_close_date and show.planned_close_time:
+            planned_dt = datetime.combine(
+                show.planned_close_date, show.planned_close_time, tzinfo=_LA
+            )
+            if datetime.now(_LA) >= planned_dt:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Cannot edit the winner: the planned close time for this show"
+                        " has passed"
+                    ),
+                )
+        return pass_item
+
+    @staticmethod
+    def update_on_air_winner(
+        db: Session, pass_item: Pass, data: WinnerUpdateData
+    ) -> tuple[dict, dict]:
+        """
+        Correct an on-air winner's name, phone and email.
+
+        Call get_winner_for_dj_edit first to check the DJ may edit it.
+
+        Args:
+            db: Database session
+            pass_item: The given-away pass pair
+            data: The corrected details
+
+        Returns:
+            The winner's details before and after, for the audit log
+
+        Raises:
+            HTTPException: 400 if the email is cleared for a venue that requires
+                one, or on a database error
+        """
+        winner = pass_item.on_air_winner
+        email = (data.recipient_email or "").strip() or None
+        if not email and pass_item.show.promoted_by.requires_email_address:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Winner email address is required by this venue",
+            )
+        before = {
+            "recipient_name": winner.recipient_name,
+            "recipient_phone": winner.recipient_phone,
+            "recipient_email": winner.recipient_email,
+        }
+        after = {
+            "recipient_name": data.recipient_name.strip(),
+            "recipient_phone": normalize_phone(data.recipient_phone),
+            "recipient_email": email,
+        }
+        if not after["recipient_name"] or not after["recipient_phone"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Winner name and phone are required",
+            )
+        try:
+            winner.recipient_name = after["recipient_name"]
+            winner.recipient_phone = after["recipient_phone"]
+            winner.recipient_email = after["recipient_email"]
+            pass_item.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            db.refresh(pass_item)
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"Database error editing winner of pass {pass_item.id}: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database error occurred while editing the winner",
+            )
+        return before, after
 
     @staticmethod
     def get_dj_history(db: Session, dj_name: str) -> list[Pass]:

@@ -602,6 +602,14 @@ export interface GiveawayData {
   given_away_by_dj: string;
 }
 
+/** Corrected details for an on-air winner; given_away_by_dj is the DJ's typed name. */
+export interface WinnerUpdateData {
+  recipient_name: string;
+  recipient_phone: string;
+  recipient_email: string | null;
+  given_away_by_dj: string;
+}
+
 export interface PassResponse {
   id: number;
   show_id: number;

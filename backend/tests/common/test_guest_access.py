@@ -19,8 +19,9 @@ handlers that look a record up before checking access give their real answer.
 Change an allowlist only after deciding the guest should have that access.
 
 The redaction tests check what guests get back from those routes: no staff,
-promotions, venue or specialty-show owner contact details, no winner emails,
-and winner phone numbers only in the DJ view and in winner search.
+promotions, venue or specialty-show owner contact details, no winner emails
+(except to the DJ correcting their own winner), and winner phone numbers only
+in the DJ view and in winner search.
 """
 
 import re
@@ -88,6 +89,9 @@ DJ_GUEST_ROUTES = SHARED_GUEST_ROUTES | {
     "POST /api/dj/spin-matches/{spin_id}/dismiss",
     "GET /api/passes/my-giveaways",
     "POST /api/passes/{pass_id}/giveaway",
+    # Correcting the winner the DJ just recorded, within 4 hours.
+    "GET /api/passes/{pass_id}/winner",
+    "PATCH /api/passes/{pass_id}/winner",
     "DELETE /api/passes/{pass_id}/preassign",
     "POST /api/shows/{show_id}/attempt",
     "POST /api/shows/{show_id}/clothespin",
@@ -327,3 +331,24 @@ def test_signed_in_users_still_see_contact_details(
 
     assert "claimer@example.com" in response.text
     assert WINNER_EMAIL in response.text
+
+
+def test_dj_guests_see_the_winner_email_only_when_correcting_their_winner(
+    client: TestClient, contact_details, no_outbound_requests
+):
+    editing = client.get("/api/passes/1/winner", params={"dj_name": "dj"}, headers=DJ_GUEST)
+    passes = client.get("/api/shows/1/passes", headers=DJ_GUEST).json()
+
+    assert editing.json()["recipient_email"] == WINNER_EMAIL
+    winner = next(p for p in passes if p["recipient_name"] == "Winner")
+    assert winner["recipient_email"] is None
+
+
+def test_office_guests_cannot_get_a_winner_to_correct(
+    client: TestClient, contact_details, no_outbound_requests
+):
+    response = client.get(
+        "/api/passes/1/winner", params={"dj_name": "DJ"}, headers=OFFICE_GUEST
+    )
+
+    assert response.status_code == 401

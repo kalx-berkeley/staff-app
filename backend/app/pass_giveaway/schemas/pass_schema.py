@@ -43,6 +43,32 @@ class GiveawayData(BaseModel):
     )
 
 
+class WinnerUpdateData(BaseModel):
+    """Schema for the on-air DJ correcting a pass pair winner's details."""
+
+    recipient_name: str = Field(
+        ..., min_length=1, max_length=100, description="Winner's name"
+    )
+    recipient_phone: str = Field(
+        ..., min_length=1, max_length=20, description="Winner's phone number"
+    )
+    recipient_email: str | None = Field(
+        None,
+        max_length=200,
+        description=(
+            "Winner's email address; blank clears it (refused when the venue requires one)"
+        ),
+    )
+    given_away_by_dj: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description=(
+            "The DJ name typed in the DJ view; must match the DJ who gave the passes away"
+        ),
+    )
+
+
 class PreassignmentData(BaseModel):
     """Schema for pre-assigning a pass pair to a DJ."""
 

@@ -61,6 +61,7 @@ import type {
   WheelchairAccessible,
   WinnerEligibility,
   WinnerReleaseData,
+  WinnerUpdateData,
 } from './types';
 
 /**
@@ -615,6 +616,31 @@ export const passesAPI = {
    * 
    * @returns Promise resolving to array of passes
    */
+  /**
+   * Get the winner the on-air DJ recorded, including their email, to correct it.
+   * Only answers the DJ who gave the passes away, within 4 hours.
+   */
+  getWinnerForEdit: async (passId: number, djName: string): Promise<PassResponse> => {
+    try {
+      const response = await apiClient.get<PassResponse>(`/passes/${passId}/winner`, {
+        params: { dj_name: djName },
+      });
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /** Correct the winner the on-air DJ recorded (same rules as getWinnerForEdit). */
+  updateWinner: async (passId: number, data: WinnerUpdateData): Promise<PassResponse> => {
+    try {
+      const response = await apiClient.patch<PassResponse>(`/passes/${passId}/winner`, data);
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
   getMyGiveaways: async (djName: string): Promise<PassResponse[]> => {
     try {
       const response = await apiClient.get<PassResponse[]>('/passes/my-giveaways', {
@@ -1062,10 +1088,16 @@ export const adminAPI = {
  * Passes check-winner API.
  */
 export const venuePassesAPI = {
-  checkWinner: async (venueId: number, phone: string, showId: number): Promise<WinnerEligibility> => {
+  /** excludePassId ignores that pass's own winner, when correcting their phone. */
+  checkWinner: async (
+    venueId: number,
+    phone: string,
+    showId: number,
+    excludePassId?: number,
+  ): Promise<WinnerEligibility> => {
     try {
       const response = await apiClient.get<WinnerEligibility>(`/venues/${venueId}/check-winner`, {
-        params: { phone, show_id: showId },
+        params: { phone, show_id: showId, exclude_pass_id: excludePassId },
       });
       return response.data;
     } catch (error) {
