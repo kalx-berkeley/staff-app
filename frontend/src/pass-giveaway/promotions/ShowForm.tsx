@@ -7,6 +7,14 @@ import { usePageTitle } from '../../common/hooks/usePageTitle';
 import type { ShowCreate, ShowUpdate, ShowBand, MusicBrainzArtist, VenueResponse, AgeRestriction, MovieRating, PassResponse, PromoterResponse, PassAdjustmentResult, VenueType, WheelchairAccessible } from '../types';
 import { MOVIE_RATING_LABELS } from '../utils';
 import type { APIError, ValidationError } from '../../common/types';
+import EnteredWinnersSection from './EnteredWinnersSection';
+import {
+  enteredWinnersError,
+  freePassesAfterAdjustment,
+  toOnAirPayload,
+  toStaffPayload,
+} from './enteredWinners';
+import type { OnAirWinnerRow, StaffWinnerRow } from './enteredWinners';
 
 interface DeleteConfirmModalProps {
   eventName: string;
@@ -198,6 +206,11 @@ const ShowForm = () => {
   const [lotteryWindowHours, setLotteryWindowHours] = useState('24');
   const [djPreassignProhibitionDays, setDjPreassignProhibitionDays] = useState('');
   const isMovieTheater = venueType === 'movie_theater';
+  const [showStatus, setShowStatus] = useState<string>('draft');
+  const [enteredOnAir, setEnteredOnAir] = useState<OnAirWinnerRow[]>([]);
+  const [enteredStaff, setEnteredStaff] = useState<StaffWinnerRow[]>([]);
+  // Winners can be entered on draft and published shows, not closed ones
+  const canEnterWinners = showStatus === 'draft' || showStatus === 'published';
 
   useEffect(() => {
     const loadData = async () => {
@@ -250,6 +263,7 @@ const ShowForm = () => {
           setEventName(show.event_name);
           setEventNameSnapshot(show.event_name);
           setShowPasses(show.passes);
+          setShowStatus(show.status);
           setGenres(show.genre ?? []);
           setVenueId(show.venue.id);
           setPromoterId(show.promoter_id ?? null);
@@ -460,6 +474,17 @@ const ShowForm = () => {
     });
   };
 
+  // The promoter's or, when there's none, the venue's guest list rules apply
+  const guestListRules =
+    (promoterId !== null ? promotersList.find((p) => p.id === promoterId) : undefined) ??
+    (venueId !== '' ? venues.find((v) => v.id === venueId) : undefined);
+  const freeForWinners = isEditing
+    ? freePassesAfterAdjustment(showPasses, numPassPairs, totalStaffPasses)
+    : { pairs: numPassPairs, staff: totalStaffPasses };
+  const enteredWinners = canEnterWinners
+    ? { on_air_winners: toOnAirPayload(enteredOnAir), staff_winners: toStaffPayload(enteredStaff) }
+    : {};
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -501,6 +526,20 @@ const ShowForm = () => {
             (plannedCloseTime !== '' && plannedCloseTime >= effectiveShowTime)))
       ) {
         newErrors.planned_close_date = 'Planned close date/time must be before the show date/time';
+      }
+    }
+
+    if (canEnterWinners) {
+      const winnersError = enteredWinnersError(
+        enteredOnAir,
+        enteredStaff,
+        freeForWinners,
+        guestListRules?.requires_email_address ?? false,
+        guestListRules?.staff_guest_requires_name ?? false,
+      );
+      if (winnersError) {
+        newErrors.entered_winners = winnersError;
+        setAdvancedOpen(true);
       }
     }
 
@@ -557,6 +596,7 @@ const ShowForm = () => {
           bands: bands.map(({ musicbrainz_id, band_name, start_pos, end_pos, artist_type, artist_country, artist_disambiguation, artist_tags }) => ({
             musicbrainz_id, band_name, start_pos, end_pos, artist_type, artist_country, artist_disambiguation, artist_tags,
           })),
+          ...enteredWinners,
         };
         const updatedShow = await showsAPI.update(parseInt(id), updateData);
         if (updatedShow.pass_adjustment &&
@@ -593,6 +633,7 @@ const ShowForm = () => {
           bands: bands.map(({ musicbrainz_id, band_name, start_pos, end_pos, artist_type, artist_country, artist_disambiguation, artist_tags }) => ({
             musicbrainz_id, band_name, start_pos, end_pos, artist_type, artist_country, artist_disambiguation, artist_tags,
           })),
+          ...enteredWinners,
         };
         const newShow = await showsAPI.create(createData);
         if (publish) {
@@ -1182,6 +1223,21 @@ const ShowForm = () => {
                   {totalStaffPasses === 0 && ' Staff won\'t be able to claim a pass or enter a lottery for this show.'}
                 </span>
               </div>
+
+              {canEnterWinners && (
+                <EnteredWinnersSection
+                  onAirRows={enteredOnAir}
+                  staffRows={enteredStaff}
+                  onOnAirRowsChange={setEnteredOnAir}
+                  onStaffRowsChange={setEnteredStaff}
+                  free={freeForWinners}
+                  requiresEmail={guestListRules?.requires_email_address ?? false}
+                  guestRequiresName={guestListRules?.staff_guest_requires_name ?? false}
+                  existingPasses={isEditing ? showPasses : []}
+                  error={errors.entered_winners ?? null}
+                  disabled={submitting}
+                />
+              )}
             </div>
           )}
         </div>

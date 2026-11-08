@@ -291,6 +291,28 @@ export type MovieRating = 'G' | 'PG' | 'PG-13' | 'R' | 'NC-17' | 'NR';
 export type WheelchairAccessible = 'yes' | 'no' | 'unknown';
 export type ShowStatus = 'draft' | 'published' | 'closed' | 'deleted';
 
+// A winner a promotions rep enters on the show form (see the preassigned-winners spec)
+export interface EnteredOnAirWinner {
+  recipient_name: string;
+  recipient_phone: string;
+  recipient_email?: string | null;
+  given_away_by_dj?: string | null; // blank is stored as "Unknown"
+}
+
+// A staff member a promotions rep gives a staff pass on the show form
+export interface EnteredStaffWinner {
+  staff_id: number;
+  has_guest: boolean;
+  guest_name?: string | null;
+}
+
+// An Active staff member who can get a staff pass, for the show form's picker
+export interface StaffPassClaimant {
+  id: number;
+  name: string | null;
+  email: string;
+}
+
 export interface ShowCreate {
   event_name: string;
   genre: string[];
@@ -314,6 +336,8 @@ export interface ShowCreate {
   lottery_window_hours?: number;
   dj_preassign_prohibition_days?: number | null;
   bands?: ShowBandCreate[];
+  on_air_winners?: EnteredOnAirWinner[];
+  staff_winners?: EnteredStaffWinner[];
 }
 
 export interface ShowUpdate {
@@ -339,6 +363,8 @@ export interface ShowUpdate {
   lottery_window_hours?: number;
   dj_preassign_prohibition_days?: number | null;
   bands?: ShowBandCreate[] | null;
+  on_air_winners?: EnteredOnAirWinner[];
+  staff_winners?: EnteredStaffWinner[];
 }
 
 export interface PromotionsContact {

@@ -25,7 +25,6 @@ from app.pass_giveaway.schemas.legacy_import import (
     StaffPassImport,
 )
 from app.auth import get_promotions_staff, ACTIVE_STATUS
-from app.models.on_air_winner import OnAirWinner
 from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.staff import Staff
@@ -33,7 +32,9 @@ from app.models.staff_pass_alternate import StaffPassAlternate
 from app.models.staff_status import StaffStatus
 from app.models.venue import Venue
 from app.pass_giveaway.services.alternate_service import AlternateService
-from app.pass_giveaway.services.pass_service import normalize_phone
+from app.pass_giveaway.services.entered_winners_service import (
+    assign_winners_and_claims,
+)
 from app.pass_giveaway.services.show_service import apply_venue_rating
 from app.pass_giveaway.guest_redaction import GuestRedactingRoute
 
@@ -89,51 +90,10 @@ def _assign_winners_and_claims(
     created or pre-existing) in place and creates OnAirWinner rows for each
     winner. Returns (on_air_winners_created, staff_passes_claimed).
     """
-    on_air_winners_created = 0
-    for i, winner_data in enumerate(on_air_winners):
-        pair_pass = pair_pool[i]
-        pair_pass.status = "given_away"
-        pair_pass.given_away_by_dj = winner_data.given_away_by_dj or "Unknown"
-        pair_pass.given_away_at = now
-        pair_pass.updated_at = now
-
-        winner = OnAirWinner(
-            pass_id=pair_pass.id,
-            venue_id=show.venue_id,
-            show_id=show.id,
-            recipient_name=winner_data.recipient_name,
-            recipient_phone=normalize_phone(winner_data.recipient_phone),
-            recipient_email=winner_data.recipient_email,
-            given_away_by_dj=winner_data.given_away_by_dj or "Unknown",
-            created_at=now,
-        )
-        db.add(winner)
-        on_air_winners_created += 1
-
-    # Claim staff passes, creating guest holds. Each staff claimant with a
-    # guest consumes two pool slots: their own pass plus a guest hold.
-    pool_idx = 0
-    for i, sp_data in enumerate(staff_passes):
-        primary = staff_pool[pool_idx]
-        pool_idx += 1
-
-        primary.status = "claimed"
-        primary.staff_id = claimants[i].id
-        primary.claimed_at = now
-        primary.has_guest = sp_data.has_guest
-        primary.guest_name = sp_data.guest_name if sp_data.has_guest else None
-        primary.updated_at = now
-
-        if sp_data.has_guest:
-            guest_hold = staff_pool[pool_idx]
-            pool_idx += 1
-            guest_hold.status = "claimed"
-            guest_hold.staff_id = claimants[i].id
-            guest_hold.claimed_at = now
-            guest_hold.guest_of_pass_id = primary.id
-            guest_hold.updated_at = now
-
-    return on_air_winners_created, len(staff_passes)
+    assign_winners_and_claims(
+        db, show, pair_pool, staff_pool, on_air_winners, staff_passes, claimants, now
+    )
+    return len(on_air_winners), len(staff_passes)
 
 
 def _reject_alternates(db: Session, status_code: int, detail: str) -> HTTPException:

@@ -44,6 +44,7 @@ import type {
   ShowBand,
   ShowBandCreate,
   ShowCreate,
+  StaffPassClaimant,
   ShowListParams,
   ShowResponse,
   ShowSearchParams,
@@ -125,6 +126,19 @@ export const showsAPI = {
    * @param data - Show creation data
    * @returns Promise resolving to created show
    */
+  /**
+   * List the Active staff who can get a staff pass, for the show form's staff
+   * winner picker (promotions staff only).
+   */
+  listStaffPassClaimants: async (): Promise<StaffPassClaimant[]> => {
+    try {
+      const response = await apiClient.get<StaffPassClaimant[]>('/shows/staff-pass-claimants');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
   create: async (data: ShowCreate): Promise<ShowResponse> => {
     try {
       const response = await apiClient.post<ShowResponse>('/shows', data);

@@ -53,6 +53,25 @@ class ShowBandResponse(BaseModel):
     artist_tags: list[str] | None
 
 
+class EnteredOnAirWinner(BaseModel):
+    """An on-air winner a promotions rep enters on the show form."""
+
+    recipient_name: str = Field(..., min_length=1, max_length=100)
+    recipient_phone: str = Field(..., min_length=1, max_length=20)
+    recipient_email: str | None = Field(None, max_length=200)
+    given_away_by_dj: str | None = Field(
+        None, max_length=100, description='Blank is stored as "Unknown"'
+    )
+
+
+class EnteredStaffWinner(BaseModel):
+    """A staff member a promotions rep gives a staff pass on the show form."""
+
+    staff_id: int
+    has_guest: bool = False
+    guest_name: str | None = Field(None, max_length=200)
+
+
 class ShowCreate(BaseModel):
     """Schema for creating a new show."""
 
@@ -111,6 +130,14 @@ class ShowCreate(BaseModel):
     )
     bands: list[ShowBandCreate] = Field(
         default_factory=list, description="Band annotations"
+    )
+    on_air_winners: list[EnteredOnAirWinner] = Field(
+        default_factory=list,
+        description="On-air winners to put on free pass pairs",
+    )
+    staff_winners: list[EnteredStaffWinner] = Field(
+        default_factory=list,
+        description="Staff members to give free staff passes",
     )
 
     @field_validator("genre", mode="before")
@@ -227,6 +254,14 @@ class ShowUpdate(BaseModel):
     )
     bands: list[ShowBandCreate] | None = Field(
         None, description="Replace band list; omit to leave unchanged"
+    )
+    on_air_winners: list[EnteredOnAirWinner] = Field(
+        default_factory=list,
+        description="On-air winners to put on free pass pairs",
+    )
+    staff_winners: list[EnteredStaffWinner] = Field(
+        default_factory=list,
+        description="Staff members to give free staff passes",
     )
 
     @field_validator("genre", mode="before")

@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ShowForm from './ShowForm';
 import { showsAPI, venuesAPI, venuesMyAPI } from '../api';
-import type { DescriptionAnalysis, VenueResponse } from '../types';
+import type { DescriptionAnalysis, PassResponse, ShowResponse, VenueResponse } from '../types';
 
 // Mock the API
 vi.mock('../api', () => ({
@@ -14,6 +14,7 @@ vi.mock('../api', () => ({
     publish: vi.fn(),
     listGenres: vi.fn(),
     analyzeDescription: vi.fn(),
+    listStaffPassClaimants: vi.fn(),
   },
   venuesAPI: {
     list: vi.fn(),
@@ -872,6 +873,166 @@ describe('ShowForm', () => {
 
       expect(await screen.findByRole('button', { name: 'Remove shoegaze' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Remove dream pop' })).toBeInTheDocument();
+    });
+  });
+
+  describe('Entering Winners', () => {
+    const fillRequiredFields = () => {
+      const eventNameInput = screen.getByLabelText(/event name/i);
+      eventNameInput.textContent = 'Replacement Show';
+      fireEvent.input(eventNameInput);
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), { target: { value: '1' } });
+      fireEvent.change(screen.getByLabelText(/show date/i), { target: { value: '2099-12-31' } });
+      fireEvent.change(screen.getByLabelText(/show time/i), { target: { value: '20:00' } });
+      fireEvent.change(screen.getByLabelText(/close date/i), { target: { value: '2099-12-31' } });
+      fireEvent.change(screen.getByLabelText(/close time/i), { target: { value: '18:00' } });
+    };
+
+    const openWinners = async () => {
+      fireEvent.click(screen.getByRole('button', { name: /advanced/i }));
+      // Opening fetches the staff list, so let it settle
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /enter winners from a previous show/i }));
+      });
+    };
+
+    beforeEach(() => {
+      vi.mocked(showsAPI.listStaffPassClaimants).mockResolvedValue([
+        { id: 7, name: 'Ann Staff', email: 'ann@test.com' },
+      ]);
+    });
+
+    it('hides the winner fields until the rep asks for them', async () => {
+      renderShowForm();
+      await waitFor(() => expect(screen.queryByText('Loading...')).not.toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: /advanced/i }));
+      expect(screen.getByText(/most shows should leave this alone/i)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /add on-air winner/i })).not.toBeInTheDocument();
+      expect(showsAPI.listStaffPassClaimants).not.toHaveBeenCalled();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /enter winners from a previous show/i }));
+      });
+
+      expect(screen.getByText(/no one is notified/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /add on-air winner/i })).toBeInTheDocument();
+      // No empty rows until Add is clicked
+      expect(screen.queryByLabelText(/^name/i)).not.toBeInTheDocument();
+    });
+
+    it('sends the entered winners and counts them when collapsed', async () => {
+      vi.mocked(showsAPI.create).mockResolvedValue({ id: 1 } as ShowResponse);
+      renderShowForm();
+      await waitFor(() => expect(screen.queryByText('Loading...')).not.toBeInTheDocument());
+      fillRequiredFields();
+      // The staff winner's +1 guest needs a second staff pass
+      fireEvent.change(screen.getByLabelText(/number of pass pairs/i), { target: { value: '2' } });
+      await openWinners();
+
+      fireEvent.click(screen.getByRole('button', { name: /add on-air winner/i }));
+      fireEvent.change(screen.getByLabelText(/^name/i), { target: { value: 'Caller One' } });
+      fireEvent.change(screen.getByLabelText(/^phone/i), { target: { value: '510-555-1234' } });
+      fireEvent.click(screen.getByRole('button', { name: /add staff winner/i }));
+      const staffInput = screen.getByLabelText(/staff member/i);
+      fireEvent.change(staffInput, { target: { value: 'ann' } });
+      fireEvent.mouseDown(await screen.findByText(/ann staff/i));
+      fireEvent.click(screen.getByLabelText(/\+1 guest/i));
+      fireEvent.change(screen.getByLabelText(/guest name/i), { target: { value: 'Pal' } });
+
+      fireEvent.click(screen.getByRole('button', { name: /enter winners from a previous show/i }));
+      expect(
+        screen.getByRole('button', { name: /enter winners from a previous show \(2 entered\)/i }),
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+      await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/promotions/shows'));
+      expect(showsAPI.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          on_air_winners: [
+            {
+              recipient_name: 'Caller One',
+              recipient_phone: '510-555-1234',
+              recipient_email: null,
+              given_away_by_dj: null,
+            },
+          ],
+          staff_winners: [{ staff_id: 7, has_guest: true, guest_name: 'Pal' }],
+        }),
+      );
+    });
+
+    it('blocks saving when there are more winners than free passes', async () => {
+      renderShowForm();
+      await waitFor(() => expect(screen.queryByText('Loading...')).not.toBeInTheDocument());
+      fillRequiredFields();
+      await openWinners();
+
+      // The form defaults to 1 pass pair
+      const add = screen.getByRole('button', { name: /add on-air winner/i });
+      fireEvent.click(add);
+      fireEvent.click(add);
+      const names = screen.getAllByLabelText(/^name/i);
+      const phones = screen.getAllByLabelText(/^phone/i);
+      names.forEach((input, i) => fireEvent.change(input, { target: { value: `Caller ${i}` } }));
+      phones.forEach((input) => fireEvent.change(input, { target: { value: '5105551234' } }));
+      expect(screen.getByText(/1 pass pair short/i)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+      expect(
+        await screen.findByText(/more on-air winners than free pass pairs \(1\)/i),
+      ).toBeInTheDocument();
+      expect(showsAPI.create).not.toHaveBeenCalled();
+    });
+
+    const existingShow = (status: string, passes: Partial<PassResponse>[]) =>
+      ({
+        id: 5,
+        event_name: 'Existing Show',
+        genre: [],
+        venue: mockVenues[0],
+        promoter_id: null,
+        show_date: '2099-12-31',
+        show_time: '20:00',
+        show_start_date: null,
+        wheelchair_accessible: 'yes',
+        num_pass_pairs: 2,
+        staff_pass_adjustment: 0,
+        status,
+        passes,
+        bands: [],
+      }) as unknown as ShowResponse;
+
+    it("doesn't count DJ-reserved pairs as free on an existing show", async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue(
+        existingShow('published', [
+          { id: 1, pass_type: 'pair', status: 'available', preassigned_dj: 'DJ Reserved' },
+          { id: 2, pass_type: 'pair', status: 'given_away', recipient_name: 'Old Winner', recipient_phone: '5105550000' },
+          { id: 3, pass_type: 'staff', status: 'available' },
+          { id: 4, pass_type: 'staff', status: 'available' },
+        ]),
+      );
+      renderShowForm('/promotions/shows/5/edit');
+      await waitFor(() => expect(screen.queryByText('Loading...')).not.toBeInTheDocument());
+      await openWinners();
+
+      expect(screen.getByText(/on-air: old winner/i)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /add on-air winner/i }));
+      expect(screen.getByText(/uses 1 of 0 free pass pairs/i)).toBeInTheDocument();
+    });
+
+    it('is not offered on a closed show', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue(existingShow('closed', []));
+      renderShowForm('/promotions/shows/5/edit');
+      await waitFor(() => expect(screen.queryByText('Loading...')).not.toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: /advanced/i }));
+
+      expect(
+        screen.queryByRole('button', { name: /enter winners from a previous show/i }),
+      ).not.toBeInTheDocument();
     });
   });
 });

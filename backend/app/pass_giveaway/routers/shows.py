@@ -25,6 +25,7 @@ from app.pass_giveaway.schemas.show import (
 from app.pass_giveaway.services.language_analysis_service import analyze_description
 from app.pass_giveaway.services.show_service import ShowService
 from app.pass_giveaway.services.pass_service import PassService
+from app.pass_giveaway.services import entered_winners_service
 from app.common.services.leave_service import today_pt
 from app.pass_giveaway.services.lottery_service import LotteryService
 from app.pass_giveaway.services.feature_bin_service import (
@@ -33,6 +34,7 @@ from app.pass_giveaway.services.feature_bin_service import (
 )
 from app.pass_giveaway.services.kalx_live_service import KalxLiveService, KalxLiveIndex
 from app.auth import (
+    ACTIVE_STATUS,
     get_site_or_promotions_admin,
     get_user_role,
     get_user_role_or_dj,
@@ -44,6 +46,7 @@ from app.auth import (
     require_authentication,
 )
 from app.models.staff import Staff
+from app.models.staff_status import StaffStatus
 from app.models.show import Show
 from app.models.show_band import ShowBand
 from app.common.services.cache_service import fetch_cached
@@ -672,6 +675,23 @@ def create_show(
     db: Session = Depends(get_db),
 ):
     """Create a new show (promotions staff only)."""
+    claimants: list[Staff] = []
+    if show_data.on_air_winners or show_data.staff_winners:
+        claimants = entered_winners_service.validate(
+            db,
+            rules_owner=entered_winners_service.guest_list_rules_owner(
+                db, show_data.venue_id, show_data.promoter_id
+            ),
+            first_day=show_data.show_start_date or show_data.show_date,
+            last_day=show_data.show_date,
+            free=entered_winners_service.FreePasses(
+                pairs=show_data.num_pass_pairs,
+                staff=show_data.num_pass_pairs + show_data.staff_pass_adjustment,
+            ),
+            on_air_winners=show_data.on_air_winners,
+            staff_winners=show_data.staff_winners,
+        )
+
     show = ShowService.create_show(db, show_data)
 
     if show_data.bands:
@@ -696,6 +716,14 @@ def create_show(
             "show_date": str(show.show_date),
         },
     )
+    entered_winners_service.enter(
+        db,
+        show,
+        show_data.on_air_winners,
+        show_data.staff_winners,
+        claimants,
+        actor_email=promotions.email,
+    )
     return _build_show_response(show)
 
 
@@ -713,6 +741,24 @@ def analyze_on_air_description(
     nothing about it blocks saving the show.
     """
     return analyze_description(analysis_request.text)
+
+
+@router.get("/staff-pass-claimants")
+def list_staff_pass_claimants(
+    _: Staff = Depends(get_promotions_staff),
+    db: Session = Depends(get_db),
+):
+    """List the staff who can get a staff pass, for the show form's staff winner picker.
+
+    Declared before `/{show_id}` so it isn't swallowed by that route.
+    """
+    staff_members = (
+        db.query(Staff)
+        .filter(Staff.statuses.any(StaffStatus.status == ACTIVE_STATUS))
+        .order_by(Staff.name)
+        .all()
+    )
+    return [{"id": s.id, "name": s.name, "email": s.email} for s in staff_members]
 
 
 @router.get("/deleted", response_model=list[ShowResponse])
@@ -1019,6 +1065,29 @@ def update_show(
             detail="A show can't have fewer than 0 staff passes",
         )
 
+    claimants: list[Staff] = []
+    if show_data.on_air_winners or show_data.staff_winners:
+        claimants = entered_winners_service.validate(
+            db,
+            rules_owner=entered_winners_service.guest_list_rules_owner(
+                db,
+                show_data.venue_id or existing.venue_id,
+                (
+                    show_data.promoter_id
+                    if "promoter_id" in _fields_set
+                    else existing.promoter_id
+                ),
+            ),
+            first_day=merged_show_start_date or merged_show_date,
+            last_day=merged_show_date,
+            free=entered_winners_service.free_passes_after_adjustment(
+                existing, merged_pairs, merged_adjustment
+            ),
+            on_air_winners=show_data.on_air_winners,
+            staff_winners=show_data.staff_winners,
+            show=existing,
+        )
+
     old_num_pass_pairs = existing.num_pass_pairs
     old_staff_pass_adjustment = existing.staff_pass_adjustment
 
@@ -1070,6 +1139,15 @@ def update_show(
                 result["affected_djs"],
                 result["affected_staff"],
             )
+
+    entered_winners_service.enter(
+        db,
+        show,
+        show_data.on_air_winners,
+        show_data.staff_winners,
+        claimants,
+        actor_email=promotions.email,
+    )
 
     after = {f: str(getattr(show, f)) for f in _tracked_fields}
     changed_fields = {
