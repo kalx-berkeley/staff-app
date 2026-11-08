@@ -203,12 +203,15 @@ def test_guests_reach_only_allowlisted_routes(
     assert sorted(allowed - answering) == [], "allowlisted routes guests can't reach"
 
 
-def test_directory_is_never_open_to_guests(
-    client: TestClient, seeded, no_outbound_requests
-):
-    for headers in (DJ_GUEST, OFFICE_GUEST):
-        answering = _routes_answering(client, headers)
-        assert not {r for r in answering if " /api/directory" in r}
+def test_directory_is_never_allowlisted_for_guests():
+    # test_guests_reach_only_allowlisted_routes fails if a guest reaches any
+    # route that isn't allowlisted, so keeping the directory out of the
+    # allowlists keeps it closed to guests.
+    allowlisted = DJ_GUEST_ROUTES | OFFICE_GUEST_ROUTES
+    for flagged in FLAGGED_GUEST_ROUTES.values():
+        allowlisted |= flagged
+
+    assert not {r for r in allowlisted if " /api/directory" in r}
 
 
 # Contact details seeded by the contact_details fixture.
@@ -272,37 +275,37 @@ def _shows_contact(response, contact: str) -> bool:
     )
 
 
-@pytest.mark.parametrize("headers", [DJ_GUEST, OFFICE_GUEST], ids=["dj", "office"])
-def test_guests_never_see_staff_contacts_or_winner_emails(
-    client: TestClient, contact_details, no_outbound_requests, headers
+# Where each kind of guest may see winner phone numbers: anywhere in the DJ
+# view, and only in winner search from station office computers.
+@pytest.mark.parametrize(
+    "headers, winner_phone_routes",
+    [(DJ_GUEST, None), (OFFICE_GUEST, WINNER_SEARCH_ROUTES)],
+    ids=["dj", "office"],
+)
+def test_guests_never_see_hidden_contact_details(
+    client: TestClient, contact_details, no_outbound_requests, headers, winner_phone_routes
 ):
-    leaks = [
-        f"{route}: {contact}"
-        for route, response in _guest_responses(client, headers).items()
-        for contact in STAFF_CONTACTS + [WINNER_EMAIL]
-        if _shows_contact(response, contact)
-    ]
+    leaks = []
+    for route, response in _guest_responses(client, headers).items():
+        hidden = STAFF_CONTACTS + [WINNER_EMAIL]
+        if winner_phone_routes is not None and route not in winner_phone_routes:
+            hidden.append(WINNER_PHONE)
+        leaks += [
+            f"{route}: {contact}" for contact in hidden if _shows_contact(response, contact)
+        ]
 
     assert leaks == []
 
 
-def test_office_guests_see_winner_phones_only_in_winner_search(
+def test_office_guests_see_winner_phones_in_winner_search(
     client: TestClient, contact_details, no_outbound_requests
 ):
-    responses = _guest_responses(client, OFFICE_GUEST)
-
-    leaks = [
-        route
-        for route, response in responses.items()
-        if route not in WINNER_SEARCH_ROUTES and _shows_contact(response, WINNER_PHONE)
-    ]
     found = client.get(
         "/api/passes/search-by-phone",
         params={"phone": "510-555-0122"},
         headers=OFFICE_GUEST,
     )
 
-    assert leaks == []
     assert found.json()[0]["recipient_phone"] is not None
 
 

@@ -1405,9 +1405,7 @@ def _mb_url_rel(rel_type: str, url: str, ended: bool = False) -> dict:
     return {"type": rel_type, "ended": ended, "url": {"resource": url}}
 
 
-def test_artist_info_includes_links(
-    client: TestClient, test_promotions_staff, monkeypatch
-):
+def test_artist_info_includes_links(client: TestClient, test_promotions_staff, monkeypatch):
     """The band popup's lookup returns the artist's MusicBrainz links, in order."""
     mb_data = {
         "relations": [

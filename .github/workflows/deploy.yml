@@ -53,8 +53,8 @@ jobs:
         echo "::notice::Deploying $TAG to production"
         echo "release_tag=$TAG" >> "$GITHUB_OUTPUT"
 
-  test:
-    name: Run Tests
+  test-backend:
+    name: Run Backend Tests
     needs: check-release
     runs-on: ubuntu-latest
     # check-release is skipped on runs that don't involve production
@@ -82,7 +82,20 @@ jobs:
       working-directory: ./backend
       run: |
         black --check .
-        pytest --cov=app --cov-report=xml
+        pytest -n 4 --cov=app --cov-report=xml
+
+  test-frontend:
+    name: Run Frontend Tests
+    needs: check-release
+    runs-on: ubuntu-latest
+    # check-release is skipped on runs that don't involve production
+    if: ${{ !cancelled() && (needs.check-release.result == 'skipped' || needs.check-release.outputs.release_tag != '') }}
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      with:
+        # Empty (the triggering commit) unless this run is deploying a release
+        ref: ${{ needs.check-release.outputs.release_tag && format('refs/tags/{0}', needs.check-release.outputs.release_tag) }}
 
     - name: Set up Node.js
       uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
@@ -102,9 +115,9 @@ jobs:
 
   deploy:
     name: Deploy
-    needs: [ check-release, test ]
+    needs: [ check-release, test-backend, test-frontend ]
     runs-on: ubuntu-latest
-    if: ${{ !cancelled() && needs.test.result == 'success' && (needs.check-release.outputs.release_tag != '' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
+    if: ${{ !cancelled() && needs.test-backend.result == 'success' && needs.test-frontend.result == 'success' && (needs.check-release.outputs.release_tag != '' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     permissions:
       contents: read
       deployments: write

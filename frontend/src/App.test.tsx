@@ -268,9 +268,7 @@ describe('App - Role-Based UI Elements', () => {
   });
 
   describe('Role-Based Redirects', () => {
-    // Note: This test occasionally fails due to a race condition in React Router
-    // The functionality works correctly in practice (see other promotions tests passing)
-    it.skip('should redirect promotions staff to promotions view by default', async () => {
+    it('should redirect promotions staff to promotions view by default', async () => {
       const user: UserResponse = {
         email: 'promotions-redirect@example.com',
         role: 'promotions',
@@ -281,7 +279,9 @@ describe('App - Role-Based UI Elements', () => {
 
       await renderAppWithUser(user);
 
-      expect(screen.getByRole('heading', { name: /Radio Pass Giveaway/i })).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /Radio Pass Giveaway/i })).toBeInTheDocument();
+      });
     });
 
     it('should redirect staff members to staff view by default', async () => {

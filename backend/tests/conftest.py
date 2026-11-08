@@ -27,6 +27,7 @@ engine = create_engine(
     poolclass=StaticPool,  # Keep the same connection for all threads
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base.metadata.create_all(bind=engine)
 
 
 @pytest.fixture(autouse=True)
@@ -39,20 +40,19 @@ def reset_rate_limiter():
 def db() -> Session:
     """
     Create a fresh database session for each test.
-    Tables are created before the test and dropped after.
+    The tables are created once per run and emptied after each test, which is
+    much faster than creating and dropping all of them every time. Integer IDs
+    still start at 1 in each test, since no table uses SQLite's AUTOINCREMENT.
     """
-    # Create all tables
-    Base.metadata.create_all(bind=engine)
-
-    # Create a new session for the test
     session = TestingSessionLocal()
 
     try:
         yield session
     finally:
         session.close()
-        # Drop all tables after the test
-        Base.metadata.drop_all(bind=engine)
+        with engine.begin() as connection:
+            for table in reversed(Base.metadata.sorted_tables):
+                connection.execute(table.delete())
 
 
 @pytest.fixture(scope="function")
