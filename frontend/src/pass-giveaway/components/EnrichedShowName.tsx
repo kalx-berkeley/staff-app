@@ -1,6 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import type { ShowBand } from '../types';
+import type { ArtistLink, ShowBand } from '../types';
 import { showsAPI } from '../api';
+import ArtistLinks from './ArtistLinks';
 
 interface EnrichedShowNameProps {
   eventName: string;
@@ -20,6 +21,7 @@ function BandPopup({ band, onClose, anchorRect, onGenreClick }: BandPopupProps) 
   const popupRef = useRef<HTMLDivElement>(null);
   const [extract, setExtract] = useState<string | null>(null);
   const [wikipediaUrl, setWikipediaUrl] = useState<string | null>(null);
+  const [links, setLinks] = useState<ArtistLink[]>([]);
   const [extractLoading, setExtractLoading] = useState(false);
 
   useEffect(() => {
@@ -39,10 +41,12 @@ function BandPopup({ band, onClose, anchorRect, onGenreClick }: BandPopupProps) 
     if (!band.musicbrainz_id) return;
     let cancelled = false;
     setExtractLoading(true);
-    showsAPI.getArtistWikipedia(band.musicbrainz_id).then((result) => {
+    setLinks([]);
+    showsAPI.getArtistInfo(band.musicbrainz_id).then((result) => {
       if (!cancelled) {
         setExtract(result.extract);
         setWikipediaUrl(result.wikipedia_url);
+        setLinks(result.links);
         setExtractLoading(false);
       }
     });
@@ -104,6 +108,7 @@ function BandPopup({ band, onClose, anchorRect, onGenreClick }: BandPopupProps) 
           ))}
         </div>
       )}
+      <ArtistLinks links={links} />
       {extractLoading && (
         <div className="band-popup__extract-loading">Loading…</div>
       )}

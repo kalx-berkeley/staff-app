@@ -67,7 +67,7 @@ SHARED_GUEST_ROUTES = {
     "GET /api/shows/{show_id}",
     "GET /api/shows/{show_id}/passes",
     "GET /api/shows/musicbrainz/search",
-    "GET /api/shows/musicbrainz/artist/{artist_id}/wikipedia",
+    "GET /api/shows/musicbrainz/artist/{artist_id}/info",
     "GET /api/venues",
     "GET /api/venues/{venue_id}",
     "GET /api/venues/{venue_id}/logo",

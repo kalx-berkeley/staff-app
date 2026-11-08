@@ -11,6 +11,7 @@ import type {
   AlternateEntry,
   AlternateJoinRequest,
   AlternateQueue,
+  ArtistInfo,
   AutoCloseScheduleItem,
   ClaimData,
   DJLotteryEntryCreate,
@@ -359,14 +360,15 @@ export const showsAPI = {
     }
   },
 
-  getArtistWikipedia: async (artistId: string): Promise<{ extract: string | null; wikipedia_url: string | null }> => {
+  /** The artist's Wikipedia extract and MusicBrainz links, for the band popup. */
+  getArtistInfo: async (artistId: string): Promise<ArtistInfo> => {
     try {
-      const response = await apiClient.get<{ extract: string | null; wikipedia_url: string | null }>(
-        `/shows/musicbrainz/artist/${artistId}/wikipedia`
+      const response = await apiClient.get<ArtistInfo>(
+        `/shows/musicbrainz/artist/${artistId}/info`
       );
-      return response.data;
+      return { ...response.data, links: response.data.links ?? [] };
     } catch {
-      return { extract: null, wikipedia_url: null };
+      return { extract: null, wikipedia_url: null, links: [] };
     }
   },
 };

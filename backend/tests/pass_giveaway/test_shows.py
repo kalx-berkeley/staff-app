@@ -1399,3 +1399,97 @@ def test_update_show_unschedules_auto_close_job_when_auto_close_turned_off(
 
     assert response.status_code == 200
     assert auto_close_calls == [("unschedule", published_auto_close_show.id)]
+
+
+def _mb_url_rel(rel_type: str, url: str, ended: bool = False) -> dict:
+    return {"type": rel_type, "ended": ended, "url": {"resource": url}}
+
+
+def test_artist_info_includes_links(
+    client: TestClient, test_promotions_staff, monkeypatch
+):
+    """The band popup's lookup returns the artist's MusicBrainz links, in order."""
+    mb_data = {
+        "relations": [
+            _mb_url_rel("soundcloud", "https://soundcloud.com/wolfparade"),
+            _mb_url_rel("free streaming", "https://open.spotify.com/artist/x"),
+            _mb_url_rel("free streaming", "https://open.spotify.com/artist/x"),
+            _mb_url_rel("official homepage", "https://old.example.com", ended=True),
+            _mb_url_rel("official homepage", "https://wolfparade.example.com"),
+            _mb_url_rel("bandcamp", "https://wolfparade.bandcamp.com"),
+            _mb_url_rel("discogs", "https://www.discogs.com/artist/1"),
+            _mb_url_rel("lyrics", "https://genius.com/artists/Wolf-parade"),
+            _mb_url_rel("streaming", "https://music.apple.com/artist/1"),
+            _mb_url_rel("bandcamp", "javascript:alert(1)"),
+        ]
+    }
+    monkeypatch.setattr(
+        "app.pass_giveaway.routers.shows.fetch_cached", lambda db, url, **kw: mb_data
+    )
+
+    response = client.get(
+        "/api/shows/musicbrainz/artist/abc/info",
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "extract": None,
+        "wikipedia_url": None,
+        "links": [
+            {"type": "official homepage", "url": "https://wolfparade.example.com"},
+            {"type": "bandcamp", "url": "https://wolfparade.bandcamp.com"},
+            {"type": "discogs", "url": "https://www.discogs.com/artist/1"},
+            {"type": "lyrics", "url": "https://genius.com/artists/Wolf-parade"},
+            {"type": "free streaming", "url": "https://open.spotify.com/artist/x"},
+            {"type": "soundcloud", "url": "https://soundcloud.com/wolfparade"},
+        ],
+    }
+
+
+def test_artist_info_keeps_links_when_wikipedia_fails(
+    client: TestClient, test_promotions_staff, monkeypatch
+):
+    """A failed Wikipedia lookup still returns the MusicBrainz links."""
+    mb_data = {
+        "relations": [
+            _mb_url_rel("wikidata", "https://www.wikidata.org/wiki/Q1"),
+            _mb_url_rel("bandcamp", "https://wolfparade.bandcamp.com"),
+        ]
+    }
+
+    def fake_fetch(db, url, **kw):
+        if "musicbrainz.org" in url:
+            return mb_data
+        raise RuntimeError("Wikidata is down")
+
+    monkeypatch.setattr("app.pass_giveaway.routers.shows.fetch_cached", fake_fetch)
+
+    response = client.get(
+        "/api/shows/musicbrainz/artist/abc/info",
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.json() == {
+        "extract": None,
+        "wikipedia_url": None,
+        "links": [{"type": "bandcamp", "url": "https://wolfparade.bandcamp.com"}],
+    }
+
+
+def test_artist_info_without_musicbrainz(
+    client: TestClient, test_promotions_staff, monkeypatch
+):
+    """A failed MusicBrainz lookup returns no extract and no links."""
+
+    def fake_fetch(db, url, **kw):
+        raise RuntimeError("MusicBrainz is down")
+
+    monkeypatch.setattr("app.pass_giveaway.routers.shows.fetch_cached", fake_fetch)
+
+    response = client.get(
+        "/api/shows/musicbrainz/artist/abc/info",
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.json() == {"extract": None, "wikipedia_url": None, "links": []}

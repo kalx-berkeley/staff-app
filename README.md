@@ -84,7 +84,9 @@ area:
   and genre tags (`frontend/src/pass-giveaway/components/BandAnnotator.tsx`).
 - **Enriched show names.** Anywhere a tagged event name is displayed, the tagged spans become
   clickable: a popup shows a live Wikipedia extract (via MusicBrainz → Wikidata → Wikipedia), the
-  artist's genre tags (click one to filter the show list by that genre), and a MusicBrainz link
+  artist's genre tags (click one to filter the show list by that genre), icons linking to the
+  artist's homepage, Bandcamp, Discogs, lyrics, free streaming and SoundCloud pages (whichever
+  MusicBrainz lists), and a MusicBrainz link
   (`frontend/src/pass-giveaway/components/EnrichedShowName.tsx`). If a show has no genre set, the app
   falls back to looking up the artist's MusicBrainz tags automatically.
 - **Full show lifecycle** — draft → published → closed — plus soft-delete/undelete for shows,

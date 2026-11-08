@@ -819,15 +819,54 @@ def musicbrainz_search(name: str):
         return []
 
 
-@router.get("/musicbrainz/artist/{artist_id}/wikipedia")
-def get_artist_wikipedia(artist_id: str, db: Session = Depends(get_db)):
-    """Fetch Wikipedia extract for a MusicBrainz artist via Wikidata sitelink."""
+# MusicBrainz artist URL relation types shown as icons in the band popup, in
+# the order they're shown.
+ARTIST_LINK_TYPES = (
+    "official homepage",
+    "bandcamp",
+    "discogs",
+    "lyrics",
+    "free streaming",
+    "soundcloud",
+)
+
+
+def _artist_links(mb_data: dict) -> list[dict]:
+    """Return the artist's current links of the ARTIST_LINK_TYPES types.
+
+    Ended relations (links MusicBrainz marks as no longer valid) and anything
+    that isn't an http(s) URL are skipped, as are duplicates.
+    """
+    links = []
+    seen = set()
+    for rel in mb_data.get("relations", []):
+        rel_type = rel.get("type")
+        url = (rel.get("url") or {}).get("resource") or ""
+        if rel_type not in ARTIST_LINK_TYPES or rel.get("ended"):
+            continue
+        if not url.startswith(("https://", "http://")) or (rel_type, url) in seen:
+            continue
+        seen.add((rel_type, url))
+        links.append({"type": rel_type, "url": url})
+    links.sort(key=lambda link: ARTIST_LINK_TYPES.index(link["type"]))
+    return links
+
+
+@router.get("/musicbrainz/artist/{artist_id}/info")
+def get_artist_info(artist_id: str, db: Session = Depends(get_db)):
+    """Fetch a MusicBrainz artist's Wikipedia extract and links.
+
+    The extract comes via the artist's Wikidata sitelink. The links are the
+    artist's homepage, Bandcamp, Discogs, lyrics, free streaming and
+    SoundCloud URLs from MusicBrainz.
+    """
     import re
 
     headers = {
         "User-Agent": f"kalx-promotions/1.0 ({settings.api_contact_url})",
         "Accept-Encoding": "gzip, deflate",
     }
+    result = {"extract": None, "wikipedia_url": None, "links": []}
 
     try:
         mb_data = fetch_cached(
@@ -835,7 +874,13 @@ def get_artist_wikipedia(artist_id: str, db: Session = Depends(get_db)):
             f"https://musicbrainz.org/ws/2/artist/{artist_id}?inc=url-rels&fmt=json",
             headers=headers,
         )
+    except Exception as exc:
+        logger.warning("MusicBrainz lookup failed for artist '%s': %s", artist_id, exc)
+        return result
 
+    result["links"] = _artist_links(mb_data)
+
+    try:
         wikidata_id = None
         for rel in mb_data.get("relations", []):
             if rel.get("type") == "wikidata":
@@ -846,7 +891,7 @@ def get_artist_wikipedia(artist_id: str, db: Session = Depends(get_db)):
                     break
 
         if not wikidata_id:
-            return {"extract": None}
+            return result
 
         wd_data = fetch_cached(
             db,
@@ -859,7 +904,7 @@ def get_artist_wikipedia(artist_id: str, db: Session = Depends(get_db)):
         entity = wd_data.get("entities", {}).get(wikidata_id, {})
         wiki_title = entity.get("sitelinks", {}).get("enwiki", {}).get("title")
         if not wiki_title:
-            return {"extract": None}
+            return result
 
         wp_data = fetch_cached(
             db,
@@ -867,14 +912,14 @@ def get_artist_wikipedia(artist_id: str, db: Session = Depends(get_db)):
             headers=headers,
         )
 
-        return {
-            "extract": wp_data.get("extract"),
-            "wikipedia_url": wp_data.get("content_urls", {}).get("desktop", {}).get("page"),
-        }
-
+        result["extract"] = wp_data.get("extract")
+        result["wikipedia_url"] = (
+            wp_data.get("content_urls", {}).get("desktop", {}).get("page")
+        )
     except Exception as exc:
         logger.warning("Wikipedia lookup failed for artist '%s': %s", artist_id, exc)
-        return {"extract": None, "wikipedia_url": None}
+
+    return result
 
 
 @router.put("/{show_id}/bands", response_model=list[ShowBandResponse])

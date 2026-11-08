@@ -227,6 +227,27 @@ export interface MusicBrainzArtist {
   tags?: string[];
 }
 
+/** A MusicBrainz artist URL relation type shown in the band popup. */
+export type ArtistLinkType =
+  | 'official homepage'
+  | 'bandcamp'
+  | 'discogs'
+  | 'lyrics'
+  | 'free streaming'
+  | 'soundcloud';
+
+export interface ArtistLink {
+  type: ArtistLinkType;
+  url: string;
+}
+
+/** What the band popup shows about a MusicBrainz artist. */
+export interface ArtistInfo {
+  extract: string | null;
+  wikipedia_url: string | null;
+  links: ArtistLink[];
+}
+
 export interface ShowBandCreate {
   musicbrainz_id: string | null;
   band_name: string;

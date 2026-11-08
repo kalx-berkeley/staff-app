@@ -3713,6 +3713,30 @@ fieldset.radio-group legend {
   gap: 0.25rem;
 }
 
+.band-popup__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.band-popup__link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  color: #444;
+  background: #f2f2f2;
+  transition: background 0.15s, color 0.15s;
+}
+
+.band-popup__link-icon:hover,
+.band-popup__link-icon:focus-visible {
+  background: #e1ecf7;
+  color: #0070c0;
+}
+
 .band-popup__extract {
   font-size: 0.83rem;
   color: #333;
