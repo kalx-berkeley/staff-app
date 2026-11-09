@@ -4128,6 +4128,338 @@ fieldset.radio-group legend {
   }
 }
 
+/* KALX Staff Analytics (/analytics) */
+.analytics-page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.analytics-page h1 {
+  font-size: 1.6rem;
+  margin: 0.5rem 0;
+}
+
+.analytics-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border-color);
+  margin: 0.75rem 0;
+}
+
+.analytics-tabs a {
+  padding: 0.5rem 0.85rem;
+  color: #444;
+  text-decoration: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+}
+
+.analytics-tabs a:hover {
+  color: #111;
+}
+
+.analytics-tabs a.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+  font-weight: 600;
+}
+
+.analytics-window {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.analytics-window label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8rem;
+  color: #555;
+  gap: 0.2rem;
+}
+
+.analytics-window select,
+.analytics-window input {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background: #fff;
+}
+
+.analytics-window-dates {
+  color: #666;
+  font-size: 0.85rem;
+  padding-bottom: 0.4rem;
+}
+
+.analytics-tab h2 {
+  font-size: 1.3rem;
+  margin: 0.5rem 0;
+}
+
+.analytics-back {
+  display: inline-block;
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.analytics-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.analytics-stat,
+.analytics-metric {
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+}
+
+.analytics-metric {
+  margin: 1rem 0;
+}
+
+.analytics-metric-title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  color: #333;
+}
+
+.analytics-stat .analytics-metric-title {
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.analytics-stat-value {
+  font-size: 1.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #111;
+}
+
+.analytics-stat-note {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 0.2rem;
+}
+
+.analytics-empty {
+  color: #777;
+  font-size: 0.9rem;
+}
+
+.analytics-explain {
+  position: relative;
+  display: inline-flex;
+}
+
+.analytics-explain-button {
+  border: none;
+  background: none;
+  color: var(--primary-color);
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 0 0.15rem;
+  line-height: 1;
+}
+
+.analytics-explain-popover {
+  position: absolute;
+  z-index: 20;
+  top: 1.5rem;
+  left: -0.5rem;
+  width: min(22rem, 80vw);
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 0.75rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: #333;
+  line-height: 1.45;
+}
+
+.analytics-explain-popover p {
+  margin: 0 0 0.5rem;
+}
+
+.analytics-explain-popover dl {
+  margin: 0;
+}
+
+.analytics-explain-popover dt {
+  font-weight: 600;
+  margin-top: 0.4rem;
+}
+
+.analytics-explain-popover dd {
+  margin: 0.1rem 0 0;
+}
+
+.analytics-table .analytics-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.analytics-sort {
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.analytics-row-flag td {
+  background: #fff6e0;
+}
+
+.analytics-row-low td {
+  color: #999;
+}
+
+.analytics-low-tag {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  color: #777;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 0 0.25rem;
+  white-space: nowrap;
+}
+
+.analytics-table .analytics-expand-cell {
+  width: 1%;
+  padding-right: 0;
+}
+
+.analytics-expand {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.analytics-details-row > td {
+  background: var(--light-bg);
+  padding: 0.5rem 0.75rem 0.75rem 2rem;
+}
+
+.analytics-table-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.analytics-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.analytics-balance-track {
+  position: relative;
+  display: inline-block;
+  width: 80px;
+  height: 10px;
+  background: #eef0f3;
+  border-radius: 2px;
+}
+
+.analytics-balance-track::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: #888;
+}
+
+.analytics-balance-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.analytics-balance-bar.on-air {
+  background: #2f6fb3;
+}
+
+.analytics-balance-bar.staff {
+  background: #d9822b;
+}
+
+.analytics-balance-label {
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.analytics-stat-value .analytics-balance-track {
+  width: 120px;
+  height: 14px;
+}
+
+.analytics-stat-value .analytics-balance-label {
+  font-size: 1.4rem;
+}
+
+.analytics-chart-toggle {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.25rem;
+}
+
+.analytics-heatmap-wrapper {
+  overflow-x: auto;
+}
+
+.analytics-heatmap {
+  border-collapse: separate;
+  border-spacing: 2px;
+  font-size: 0.7rem;
+  color: #666;
+}
+
+.analytics-heatmap th {
+  font-weight: 400;
+  padding: 0 0.25rem;
+  text-align: left;
+}
+
+.analytics-heatmap td {
+  width: 22px;
+  height: 18px;
+  background: #f1f3f5;
+  border-radius: 2px;
+}
+
+@media (max-width: 700px) {
+  .analytics-page {
+    padding: 1rem;
+  }
+}
+
 /* KALX Staff Directory (/directory) */
 .directory-page {
   max-width: 1280px;

@@ -79,6 +79,8 @@ SHARED_GUEST_ROUTES = {
     # Winner search.
     "GET /api/passes/search-by-phone",
     "POST /api/passes/{pass_id}/release-winner",
+    # KALX Staff Analytics: counts guest sessions. Records only, returns nothing.
+    "POST /api/pass-giveaway/analytics/session",
 }
 
 # The DJ view, used from the air studio.
@@ -96,6 +98,9 @@ DJ_GUEST_ROUTES = SHARED_GUEST_ROUTES | {
     "POST /api/shows/{show_id}/attempt",
     "POST /api/shows/{show_id}/clothespin",
     "GET /api/venues/{venue_id}/check-winner",
+    # KALX Staff Analytics: "I'm off the mic" page visits. Record only.
+    "POST /api/pass-giveaway/analytics/giveaway-visits",
+    "PUT /api/pass-giveaway/analytics/giveaway-visits/{visit_id}/dj",
 }
 
 # Winner search, used from station office computers.

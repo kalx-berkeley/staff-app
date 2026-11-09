@@ -46,6 +46,12 @@ from app.auth import (
 )
 from app.config import settings
 from app.rate_limiter import create_rate_limit_dependency
+from app.pass_giveaway.services.tracking import (
+    DjTracking,
+    dj_tracking,
+    record_giveaway_after_suggestion,
+    record_visit_outcome,
+)
 from app.models.staff import Staff
 from app.models.on_air_winner import OnAirWinner
 from app.models.pass_model import Pass
@@ -140,6 +146,7 @@ def give_away_pass(
     pass_id: int,
     giveaway_data: GiveawayData,
     dj_access: bool = Depends(check_dj_giveaway_access),
+    dj: DjTracking | None = Depends(dj_tracking),
     db: Session = Depends(get_db),
 ):
     """
@@ -192,6 +199,16 @@ def give_away_pass(
             entity_id=pass_item.id,
             details={**override_details, "dj": giveaway_data.given_away_by_dj},
         )
+
+    record_visit_outcome(
+        db,
+        dj,
+        giveaway_data.visit_id,
+        pass_item.show_id,
+        "given_away",
+        giveaway_data.given_away_by_dj,
+    )
+    record_giveaway_after_suggestion(db, dj, pass_item.show_id, pass_item.id)
 
     return PassResponse.model_validate(pass_item)
 

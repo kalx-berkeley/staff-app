@@ -20,3 +20,5 @@ class ShortLinkResponse(BaseModel):
     created_by_email: str
     created_at: UtcDatetime
     updated_at: UtcDatetime
+    # Redirects in the last 30 days (KALX Staff Analytics); only in the list
+    clicks_30_days: int = 0

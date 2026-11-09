@@ -168,6 +168,24 @@ async def sync_dj_shifts():
         db.close()
 
 
+async def roll_up_analytics_events():
+    """
+    Scheduled task to roll analytics events older than 13 months into daily
+    counts, for KALX Staff Analytics. Runs nightly at 4:30 AM Pacific.
+    """
+    from app.database import SessionLocal
+    from app.common.services.analytics_rollup import roll_up_old_events
+
+    db = SessionLocal()
+    try:
+        n = roll_up_old_events(db)
+        logger.info(f"Rolled up {n} analytics event(s)")
+    except Exception as e:
+        logger.error(f"Analytics rollup failed: {str(e)}", exc_info=True)
+    finally:
+        db.close()
+
+
 async def refresh_workform_records():
     """
     Scheduled task to refresh the local copy of the Airtable workforms table.
@@ -670,6 +688,16 @@ def start_scheduler():
         replace_existing=True,
     )
 
+    # Roll analytics events older than 13 months into daily counts at 4:30 AM
+    # Pacific
+    scheduler.add_job(
+        roll_up_analytics_events,
+        trigger=CronTrigger(hour=4, minute=30, timezone=_PT),
+        id="analytics_rollup",
+        name="Roll up analytics events older than 13 months",
+        replace_existing=True,
+    )
+
     if settings.directory_enabled:
         # Copy the Spinitron playlists the Sublist DJ shift requirement checks,
         # daily at 3:30 AM Pacific
@@ -705,7 +733,8 @@ def start_scheduler():
     logger.info(
         "Scheduler started - Feature bin sync at 1 AM PT, KALX Live sync at 1:30 AM PT,"
         " Airtable sync at 2 AM PT, stale preassignment expiry at 3 AM PT, unclosed past"
-        " show notifications at 4 AM PT, Spinitron schedule sync every 6 hours"
+        " show notifications at 4 AM PT, analytics rollup at 4:30 AM PT, Spinitron"
+        " schedule sync every 6 hours"
         + (", DJ shift sync at 3:30 AM PT" if settings.directory_enabled else "")
         + (
             ", workforms refresh at 2:30 AM PT, workform emails at 9 AM PT"

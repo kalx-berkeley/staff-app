@@ -265,12 +265,18 @@ export const showsAPI = {
    *
    * @param showId - Show ID
    * @param djName - Name of DJ who attempted the giveaway
+   * @param visitId - The giveaway page visit, for KALX Staff Analytics
    * @returns Promise resolving to created ShowAttempt
    */
-  recordAttempt: async (showId: number, djName: string): Promise<ShowAttempt> => {
+  recordAttempt: async (
+    showId: number,
+    djName: string,
+    visitId?: string | null,
+  ): Promise<ShowAttempt> => {
     try {
       const response = await apiClient.post<ShowAttempt>(`/shows/${showId}/attempt`, {
         dj_name: djName,
+        ...(visitId ? { visit_id: visitId } : {}),
       });
       return response.data;
     } catch (error) {
@@ -1032,11 +1038,16 @@ export const onAirAPI = {
    *
    * @param spinId - The Spinitron spin ID from the match
    * @param showId - The show ID from the match
+   * @param action - Whether the DJ dismissed it or clicked through, for KALX Staff Analytics
    */
-  dismissSpinMatch: async (spinId: number, showId: number): Promise<void> => {
+  dismissSpinMatch: async (
+    spinId: number,
+    showId: number,
+    action?: 'dismissed' | 'clicked',
+  ): Promise<void> => {
     try {
       await apiClient.post(`/dj/spin-matches/${spinId}/dismiss`, null, {
-        params: { show_id: showId },
+        params: { show_id: showId, ...(action ? { action } : {}) },
       });
     } catch (error) {
       return handleAPIError(error);

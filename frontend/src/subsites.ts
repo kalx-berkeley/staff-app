@@ -52,6 +52,14 @@ export const SUBSITES: Subsite[] = [
     // an admin keeps them while impersonating someone who isn't one.
     isAvailable: (user) => !!user?.is_site_admin || !!user?.is_promotions_admin,
   },
+  {
+    basePath: '/analytics',
+    name: 'KALX Staff Analytics',
+    description:
+      'How the staff sites are used: pass giveaway metrics by venue, DJ and promotions rep, short link clicks and site visits.',
+    // Site admins and promotions admins, checked against the real user
+    isAvailable: (user) => !!user?.is_site_admin || !!user?.is_promotions_admin,
+  },
 ];
 
 export const HOME_TITLE = 'KALX Staff Portal';

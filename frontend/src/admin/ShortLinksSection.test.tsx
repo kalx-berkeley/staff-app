@@ -60,6 +60,17 @@ describe('ShortLinksSection', () => {
     expect(screen.getByText('/go/schedule')).toBeInTheDocument();
   });
 
+  it("links each short link's recent clicks to KALX Staff Analytics", async () => {
+    vi.mocked(adminAPI.listShortLinks).mockResolvedValue([link({ clicks_30_days: 12 })]);
+    await renderAndSettle(<ShortLinksSection />);
+
+    const clicks = within(rowFor('fundraiser')).getByRole('link', {
+      name: 'Clicks on /go/fundraiser in KALX Staff Analytics',
+    });
+    expect(clicks).toHaveTextContent('12');
+    expect(clicks).toHaveAttribute('href', '/analytics/short-links?slug=fundraiser');
+  });
+
   it('creates a link and adds it in slug order', async () => {
     vi.mocked(adminAPI.createShortLink).mockResolvedValue(
       link({ id: 3, slug: 'party', target_url: 'https://example.net/', note: null })

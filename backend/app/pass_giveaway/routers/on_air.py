@@ -3,6 +3,8 @@
 from datetime import datetime, timezone
 from typing import Optional, Union
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
@@ -16,6 +18,12 @@ from app.pass_giveaway.schemas.on_air import (
     SpinMatchShow,
 )
 from app.pass_giveaway.services.spin_match_service import SpinMatchService
+from app.pass_giveaway.services.tracking import (
+    DjTracking,
+    dj_tracking,
+    record_spin_action,
+    record_spin_suggestions,
+)
 from app.pass_giveaway.guest_redaction import GuestRedactingRoute
 
 router = APIRouter(prefix="/api/dj", tags=["dj"], route_class=GuestRedactingRoute)
@@ -86,6 +94,7 @@ def get_on_air(
 @router.get("/spin-matches", response_model=list[SpinMatchSchema])
 async def get_spin_matches(
     dj_access: bool = Depends(check_dj_access),
+    dj: Optional[DjTracking] = Depends(dj_tracking),
     db: Session = Depends(get_db),
 ):
     """Return current spins that match a show with passes to give away.
@@ -97,6 +106,8 @@ async def get_spin_matches(
     not re-displaying a match it's already shown.
     """
     matches = await SpinMatchService.get_current_matches(db)
+    # KALX Staff Analytics counts each match once, the first time it's offered
+    record_spin_suggestions(db, dj, [(m.spin_id, m.show.id) for m in matches])
     return [
         SpinMatchSchema(
             spin_id=m.spin_id,
@@ -118,6 +129,7 @@ async def get_spin_matches(
 def dismiss_spin_match(
     spin_id: int,
     show_id: int,
+    action: Optional[Literal["dismissed", "clicked"]] = None,
     dj_access: bool = Depends(check_dj_access),
     db: Session = Depends(get_db),
 ):
@@ -128,5 +140,10 @@ def dismiss_spin_match(
     as each tab's next GET /spin-matches poll runs. A spin_id that matched
     multiple shows needs one call per show_id — dismissing one leaves the
     others showing.
+
+    *action* says whether the DJ dismissed the popup or clicked through, for
+    KALX Staff Analytics.
     """
     SpinMatchService.dismiss(db, spin_id=spin_id, show_id=show_id)
+    if action:
+        record_spin_action(db, spin_id, show_id, action)

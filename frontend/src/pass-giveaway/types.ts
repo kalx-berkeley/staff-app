@@ -626,6 +626,8 @@ export interface GiveawayData {
   recipient_phone: string;
   recipient_email?: string | null;
   given_away_by_dj: string;
+  /** The giveaway page visit, for KALX Staff Analytics. */
+  visit_id?: string | null;
 }
 
 /** Corrected details for an on-air winner; given_away_by_dj is the DJ's typed name. */

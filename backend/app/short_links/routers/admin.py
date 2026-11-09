@@ -15,6 +15,7 @@ from app.common.services.audit_service import log_event
 from app.database import get_db
 from app.models.short_link import ShortLink
 from app.models.staff import Staff
+from app.short_links.analytics import click_counts
 from app.short_links.schemas.short_links import ShortLinkRequest, ShortLinkResponse
 
 router = APIRouter(prefix="/api/short-links", tags=["short-links"])
@@ -106,8 +107,14 @@ def _note(note: str | None) -> str | None:
 
 @router.get("", response_model=list[ShortLinkResponse])
 def list_short_links(admin: Staff = Depends(get_site_admin), db: Session = Depends(get_db)):
-    """Every short link, by slug."""
-    return db.query(ShortLink).order_by(ShortLink.slug).all()
+    """Every short link, by slug, with its redirects in the last 30 days."""
+    clicks = click_counts(db)
+    return [
+        ShortLinkResponse.model_validate(link, from_attributes=True).model_copy(
+            update={"clicks_30_days": clicks.get(link.id, 0)}
+        )
+        for link in db.query(ShortLink).order_by(ShortLink.slug).all()
+    ]
 
 
 @router.post("", response_model=ShortLinkResponse, status_code=status.HTTP_201_CREATED)

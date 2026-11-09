@@ -6,7 +6,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.common.routers.users import determine_user_role
 from app.common.areas import PASS_GIVEAWAY_AREA
@@ -24,6 +24,11 @@ from app.pass_giveaway.schemas.show import (
 )
 from app.pass_giveaway.services.language_analysis_service import analyze_description
 from app.pass_giveaway.services.show_service import ShowService
+from app.pass_giveaway.services.tracking import (
+    DjTracking,
+    dj_tracking,
+    record_visit_outcome,
+)
 from app.pass_giveaway.services.pass_service import PassService
 from app.pass_giveaway.services import entered_winners_service
 from app.common.services.leave_service import today_pt
@@ -70,6 +75,8 @@ router = APIRouter(prefix="/api/shows", tags=["shows"], route_class=GuestRedacti
 
 class AttemptRequest(BaseModel):
     dj_name: str
+    # The giveaway page visit, for KALX Staff Analytics
+    visit_id: str | None = Field(None, max_length=64)
 
 
 def _passes_with_pending_guests(db, show) -> list:
@@ -1452,6 +1459,7 @@ def record_show_attempt(
     show_id: int,
     body: AttemptRequest,
     dj_access: bool = Depends(check_dj_giveaway_access),
+    dj: DjTracking | None = Depends(dj_tracking),
     db: Session = Depends(get_db),
 ):
     """
@@ -1462,4 +1470,5 @@ def record_show_attempt(
     record a real attempt.
     """
     attempt = ShowService.record_attempt(db, show_id, body.dj_name)
+    record_visit_outcome(db, dj, body.visit_id, show_id, "tried", body.dj_name)
     return ShowAttemptResponse.model_validate(attempt)
