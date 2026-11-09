@@ -1,6 +1,7 @@
 """Tests for pass_item endpoints."""
 
 import pytest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from datetime import date, datetime, time, timedelta, timezone
@@ -1233,11 +1234,17 @@ def test_claim_bumps_guest_when_no_other_pass_available(
     guest_hold = db.query(Pass).filter(Pass.guest_of_pass_id == primary_id).first()
     assert guest_hold is not None
 
-    response = client.post(
-        f"/api/passes/{guest_hold.id}/claim",
-        headers={"X-Forwarded-User": staff_member2.email},
-    )
+    with patch("app.common.services.notification_service.send_email") as mock_send:
+        response = client.post(
+            f"/api/passes/{guest_hold.id}/claim",
+            headers={"X-Forwarded-User": staff_member2.email},
+        )
     assert response.status_code == 200
+    mock_send.assert_called_once()
+    assert mock_send.call_args.kwargs["to_email"] == staff_member.email
+    assert mock_send.call_args.kwargs["subject"].startswith(
+        "Your guest pass is no longer available"
+    )
     claimed = response.json()
     assert claimed["id"] == guest_hold.id
     assert claimed["staff_id"] == staff_member2.id
@@ -1306,9 +1313,12 @@ def test_claim_bumps_newest_guest_whichever_hold_was_clicked(
         _set_claimed_at(db, pass_id, now - timedelta(hours=1))
     first_hold_id, second_hold_id = first_hold.id, second_hold.id
 
-    claimed = _claim(client, first_hold_id, third)
+    with patch("app.common.services.notification_service.send_email") as mock_send:
+        claimed = _claim(client, first_hold_id, third)
 
     assert claimed["id"] == second_hold_id
+    mock_send.assert_called_once()
+    assert mock_send.call_args.kwargs["to_email"] == staff_member2.email
     db.expire_all()
     assert db.get(Pass, first_primary).has_guest is True
     assert db.get(Pass, first_hold_id).guest_of_pass_id == first_primary
