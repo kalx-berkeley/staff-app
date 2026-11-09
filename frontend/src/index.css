@@ -4411,6 +4411,10 @@ fieldset.radio-group legend {
 }
 
 .analytics-balance-label {
+  /* Wide enough for "+100 pts", so the track lines up whatever the value. */
+  display: inline-block;
+  min-width: 8.5ch;
+  text-align: right;
   font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
 }
