@@ -236,7 +236,7 @@ const GiveawayPage = () => {
                   <PassGiveawayForm
                     pass={pass}
                     venueId={show.venue.id}
-                    onSuccess={() => navigate(`/dj/shows/${id}`)}
+                    onSuccess={() => navigate(`/dj/shows/${id}`, { state: { justGaveAway: true } })}
                     djName={djName}
                     winFrequencyDays={show.venue.win_frequency_days}
                     requiresEmail={show.guest_list_requirements.requires_email_address}

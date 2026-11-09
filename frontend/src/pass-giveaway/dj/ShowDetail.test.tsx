@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import ShowDetail from './ShowDetail';
 import { showsAPI, passesAPI } from '../api';
 import { renderAndSettle } from '../../test/render';
@@ -114,5 +114,39 @@ describe('DJ ShowDetail winner editing', () => {
 
     expect(await screen.findByText('Jane Winner')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+  });
+});
+
+describe('DJ ShowDetail right after a giveaway', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  const available = { id: 6, show_id: 1, pass_type: 'pair', status: 'available' } as PassResponse;
+
+  const renderAt = async (state: unknown) => {
+    localStorage.setItem('kalx_dj_name', 'DJ Test');
+    vi.mocked(showsAPI.get).mockResolvedValue(makeShow([winner(), available], { available_pair_count: 1 }));
+    await renderAndSettle(
+      <MemoryRouter initialEntries={[{ pathname: '/dj/shows/1', state }]}>
+        <ShowDetail />
+      </MemoryRouter>
+    );
+    await screen.findAllByText('Jnae Winner');
+  };
+
+  it('hides the limit warning and the off-the-mic button just after giving away', async () => {
+    await renderAt({ justGaveAway: true });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Pass pair given away to Jnae Winner. Thanks!');
+    expect(screen.queryByRole('button', { name: "I'm off the mic" })).not.toBeInTheDocument();
+  });
+
+  it('shows the limit warning and the button when the DJ comes back later', async () => {
+    await renderAt(null);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent("You've already given away a pass pair");
+    expect(screen.getByRole('button', { name: "I'm off the mic" })).toBeInTheDocument();
   });
 });

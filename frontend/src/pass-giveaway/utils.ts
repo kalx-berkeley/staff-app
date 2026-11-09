@@ -85,11 +85,11 @@ export const DJ_SHOW_GIVEAWAY_WINDOW_HOURS = 4;
 
 // The pass pair this DJ already gave away for the show within the window, if
 // any. Names are compared ignoring case and surrounding spaces.
-export function findRecentDjGiveaway(
-  passes: Pick<PassResponse, 'given_away_by_dj' | 'given_away_at'>[],
+export function findRecentDjGiveaway<T extends Pick<PassResponse, 'given_away_by_dj' | 'given_away_at'>>(
+  passes: T[],
   djName: string,
   now: Date = new Date(),
-): Pick<PassResponse, 'given_away_by_dj' | 'given_away_at'> | undefined {
+): T | undefined {
   const name = djName.trim().toLowerCase();
   if (!name) return undefined;
   const windowStart = now.getTime() - DJ_SHOW_GIVEAWAY_WINDOW_HOURS * 60 * 60 * 1000;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { showsAPI } from '../api';
 import { DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, KalxLiveBadge } from '../components';
 import MarkdownContent from '../../common/components/MarkdownContent';
@@ -14,6 +14,19 @@ import type { APIError } from '../../common/types';
 const ShowDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Set by GiveawayPage after a successful giveaway. The DJ has just used their
+  // one pair for this show, so the "already given away" warning and the
+  // "I'm off the mic" button would only confuse them. Read once, then cleared
+  // from history so a reload or a later visit shows the page as usual.
+  const [justGaveAway] = useState(
+    () => (location.state as { justGaveAway?: boolean } | null)?.justGaveAway === true,
+  );
+  useEffect(() => {
+    if (justGaveAway) navigate(location.pathname, { replace: true, state: null });
+    // Only on mount: clearing the state must not re-run when location changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [show, setShow] = useState<ShowResponse | null>(null);
   usePageTitle(`${show?.event_name ?? 'Show'} · DJ`);
   const [loading, setLoading] = useState(true);
@@ -216,7 +229,14 @@ const ShowDetail = () => {
         </div>
       </div>
 
-      {recentDjGiveaway && (
+      {justGaveAway && (
+        <div className="success-message dj-giveaway-success" role="status">
+          Pass pair given away
+          {recentDjGiveaway?.recipient_name && <> to <strong>{recentDjGiveaway.recipient_name}</strong></>}. Thanks!
+        </div>
+      )}
+
+      {recentDjGiveaway && !justGaveAway && (
         <div className="dj-show-limit-warning" role="alert">
           <p>
             <strong>You've already given away a pass pair to this show this DJ shift</strong>
@@ -229,7 +249,7 @@ const ShowDetail = () => {
         </div>
       )}
 
-      {availablePasses.length > 0 && (
+      {availablePasses.length > 0 && !justGaveAway && (
         <div className="kalx-winner-cta">
           <p className="kalx-winner-cta-hint">
             After your mic-break, when you're ready to take calls from listeners,
