@@ -398,7 +398,8 @@ per-environment deploy path, systemd unit name, and port (production: `~/staff-a
 `staff-app-backend-staging.service`, port 8421), then:
 
 1. **Runs tests** — backend (`pytest`) and frontend (`tsc`, `eslint`, `npm test`)
-2. **Builds the frontend** — `npm run build` produces `frontend/dist/`
+2. **Builds the frontend** — the frontend test job runs `vite build` alongside the backend tests and
+   hands `frontend/dist/` to the deploy job as a workflow artifact
 3. **Connects to the server** via Netbird VPN using `NETBIRD_SETUP_KEY`
 4. **Backs up the database** — copies `staff-app.db` to a timestamped file before touching anything
 5. **Rsyncs the backend** — copies `backend/` to the environment's deploy path on the server, excluding `venv/` and cache files
