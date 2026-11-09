@@ -10,6 +10,7 @@ import type { ShowResponse, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
 import { formatShowRating, isMovieShow } from '../utils';
+import { useGiveawayVisit } from '../tracking';
 
 const GiveawayPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +21,8 @@ const GiveawayPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [djName, setDjName] = useState(localStorage.getItem(DJ_NAME_KEY) || '');
+  // KALX Staff Analytics counts each visit to this page and what came of it
+  const visitId = useGiveawayVisit(id ? parseInt(id) : null, djName, !isPromotionsPreview);
 
   const loadShow = useCallback(async () => {
     if (!id) return;
@@ -238,6 +241,7 @@ const GiveawayPage = () => {
                     winFrequencyDays={show.venue.win_frequency_days}
                     requiresEmail={show.guest_list_requirements.requires_email_address}
                     readOnly={isPromotionsPreview}
+                    visitId={visitId}
                   />
                 ) : (
                   <div

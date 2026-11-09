@@ -170,10 +170,34 @@ describe('PassGiveawayForm', () => {
       fireEvent.click(noWinnerButton);
 
       await waitFor(() => {
-        expect(showsAPI.recordAttempt).toHaveBeenCalledWith(1, 'DJ Mike');
+        expect(showsAPI.recordAttempt).toHaveBeenCalledWith(1, 'DJ Mike', undefined);
       });
 
       expect(mockOnSuccess).toHaveBeenCalled();
+    });
+
+    it('sends the giveaway page visit with a no-winner, for KALX Staff Analytics', async () => {
+      vi.mocked(showsAPI.recordAttempt).mockResolvedValue({
+        id: 1,
+        dj_name: 'DJ Mike',
+        attempted_at: '2024-01-01T12:00:00',
+      });
+
+      render(
+        <PassGiveawayForm
+          pass={mockPass}
+          venueId={1}
+          onSuccess={mockOnSuccess}
+          visitId="visit-123"
+        />,
+      );
+      fireEvent.change(screen.getByLabelText(/dj name/i), { target: { value: 'DJ Mike' } });
+      fireEvent.click(screen.getByRole('button', { name: /tried/i }));
+
+      await waitFor(() => {
+        expect(showsAPI.recordAttempt).toHaveBeenCalledWith(1, 'DJ Mike', 'visit-123');
+      });
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalled());
     });
   });
 

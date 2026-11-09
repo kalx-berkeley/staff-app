@@ -15,9 +15,11 @@ interface PassGiveawayFormProps {
   requiresEmail?: boolean;
   /** Preview mode: renders the form but disables actually recording a giveaway. */
   readOnly?: boolean;
+  /** The giveaway page visit, sent with the giveaway or attempt for KALX Staff Analytics. */
+  visitId?: string | null;
 }
 
-const PassGiveawayForm = ({ pass, venueId, onSuccess, djName: propDjName, winFrequencyDays, requiresEmail, readOnly }: PassGiveawayFormProps) => {
+const PassGiveawayForm = ({ pass, venueId, onSuccess, djName: propDjName, winFrequencyDays, requiresEmail, readOnly, visitId }: PassGiveawayFormProps) => {
   const [formData, setFormData] = useState<GiveawayData>({
     recipient_name: '',
     recipient_phone: '',
@@ -146,6 +148,7 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName: propDjName, winFre
       const payload: GiveawayData = {
         ...formData,
         recipient_email: formData.recipient_email?.trim() || null,
+        ...(visitId ? { visit_id: visitId } : {}),
       };
       await passesAPI.giveaway(pass.id, payload);
       saveDJName(formData.given_away_by_dj);
@@ -174,7 +177,7 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName: propDjName, winFre
 
     try {
       setLoading(true);
-      await showsAPI.recordAttempt(pass.show_id, formData.given_away_by_dj);
+      await showsAPI.recordAttempt(pass.show_id, formData.given_away_by_dj, visitId);
       saveDJName(formData.given_away_by_dj);
       setSuccessMessage('No winner recorded.');
       setTimeout(() => setSuccessMessage(null), 2500);

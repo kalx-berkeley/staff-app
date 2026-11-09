@@ -41,6 +41,9 @@ class GiveawayData(BaseModel):
     given_away_by_dj: str = Field(
         ..., min_length=1, max_length=100, description="DJ who gave away the passes"
     )
+    visit_id: str | None = Field(
+        None, max_length=64, description="The giveaway page visit, for KALX Staff Analytics"
+    )
 
 
 class WinnerUpdateData(BaseModel):

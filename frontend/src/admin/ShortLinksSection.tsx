@@ -186,6 +186,7 @@ export default function ShortLinksSection() {
                   <th>Note</th>
                   <th>Created By</th>
                   <th>Updated</th>
+                  <th>Clicks (30 days)</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -221,6 +222,7 @@ export default function ShortLinksSection() {
                       </td>
                       <td>{link.created_by_email}</td>
                       <td className="audit-log-time">{formatUpdated(link.updated_at)}</td>
+                      <td>{link.clicks_30_days ?? 0}</td>
                       <td className="short-links-actions">
                         <button
                           className="btn-primary btn-small"
@@ -251,6 +253,14 @@ export default function ShortLinksSection() {
                       <td>{link.note}</td>
                       <td>{link.created_by_email}</td>
                       <td className="audit-log-time">{formatUpdated(link.updated_at)}</td>
+                      <td>
+                        <a
+                          href={`/analytics/short-links?slug=${encodeURIComponent(link.slug)}`}
+                          aria-label={`Clicks on /go/${link.slug} in KALX Staff Analytics`}
+                        >
+                          {link.clicks_30_days ?? 0}
+                        </a>
+                      </td>
                       <td className="short-links-actions">
                         <button
                           className="btn-secondary btn-small"

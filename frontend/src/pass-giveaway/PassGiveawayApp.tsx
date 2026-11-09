@@ -6,6 +6,7 @@ import { useAuth } from '../common/contexts/authHooks';
 import { lazySection } from '../common/lazySection';
 import ProfileSettings from './components/ProfileSettings';
 import { canUsePassGiveawayAdmin, isStagingSublistDjStaff } from './utils';
+import { isNetworkGuest, useGuestSession } from './tracking';
 
 // Each role's section (promotions, staff, dj) is its own lazily loaded chunk;
 // see lazySection.
@@ -159,9 +160,17 @@ function DJNetworkOnlyRoute({ children }: { children: React.ReactNode }) {
 
 // The Radio Pass Giveaway sub-site, served under /pass-giveaway. Its routes
 // and links are relative to that basename.
+// Counts DJ studio and station office guest sessions for KALX Staff Analytics
+function GuestSessionTracker() {
+  const { user } = useAuth();
+  useGuestSession(isNetworkGuest(user));
+  return null;
+}
+
 export default function PassGiveawayApp() {
   return (
     <BrowserRouter basename="/pass-giveaway">
+      <GuestSessionTracker />
       <Suspense fallback={<LoadingScreen />}>
       <Routes>
         {/* Default redirect based on role */}

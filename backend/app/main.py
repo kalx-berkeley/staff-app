@@ -10,13 +10,16 @@ import ipaddress
 import logging
 import re
 
+from app.common import analytics as common_analytics
 from app.common import jobs as common_jobs
+from app.common.routers import analytics as common_analytics_router
 from app.common.routers import admin as common_admin
 from app.common.routers import users
 from app.common.routers import version
 from app.directory.routers import admin as directory_admin
 from app.directory.routers import directory
 from app.directory import jobs as directory_jobs
+from app.short_links import analytics as short_links_analytics
 from app.short_links.routers import admin as short_links_admin
 from app.short_links.routers import redirect as short_links_redirect
 from app.workforms.routers import review as workforms_review
@@ -35,7 +38,9 @@ from app.pass_giveaway.routers import (
     preferences,
 )
 from app.pass_giveaway.routers import legacy_import as legacy_import_router
+from app.pass_giveaway import analytics as pass_giveaway_analytics
 from app.pass_giveaway import jobs as pass_giveaway_jobs
+from app.pass_giveaway.routers import analytics as pass_giveaway_analytics_router
 from app.scheduler import (
     start_scheduler,
     shutdown_scheduler,
@@ -53,6 +58,7 @@ from app.request_logging import (
     RequestUserMiddleware,
     configure_request_logging,
 )
+from app.common.services.analytics_registry import register_metric_group
 from app.common.services.job_registry import register_job
 from app.common.services.profile_providers import (
     register_monthly_hours_provider,
@@ -84,6 +90,14 @@ for job in (
     + (workforms_jobs.ADMIN_JOBS if settings.workforms_enabled else [])
 ):
     register_job(job)
+
+# Every sub-site's metrics are shown in KALX Staff Analytics
+for group in (
+    pass_giveaway_analytics.METRIC_GROUPS
+    + short_links_analytics.METRIC_GROUPS
+    + common_analytics.METRIC_GROUPS
+):
+    register_metric_group(group)
 
 # Configure logging
 configure_request_logging()
@@ -310,6 +324,8 @@ app.include_router(lottery.router, dependencies=_auth_check)
 app.include_router(alternates.router, dependencies=_auth_check)
 app.include_router(specialty_shows.router, dependencies=_auth_check)
 app.include_router(on_air.router, dependencies=_auth_check)
+app.include_router(pass_giveaway_analytics_router.router, dependencies=_auth_check)
+app.include_router(common_analytics_router.router, dependencies=_auth_check)
 if settings.directory_enabled:
     app.include_router(directory.router, dependencies=_auth_check)
     app.include_router(directory_admin.router, dependencies=_auth_check)

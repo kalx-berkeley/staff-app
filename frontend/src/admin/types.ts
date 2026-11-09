@@ -66,6 +66,8 @@ export interface ShortLink {
   created_by_email: string;
   created_at: string;
   updated_at: string;
+  /** Redirects in the last 30 days, from KALX Staff Analytics. */
+  clicks_30_days?: number;
 }
 
 export interface ShortLinkRequest {

@@ -3,7 +3,8 @@
 from sqlalchemy.orm import Session
 
 from app.common.schemas.admin import JobRunResult
-from app.common.areas import COMMON_AREA
+from app.common.areas import ANALYTICS_AREA, COMMON_AREA
+from app.common.services.analytics_rollup import roll_up_old_events
 from app.common.services.job_registry import AdminJob
 from app.common.services.user_service import UserService
 
@@ -22,11 +23,22 @@ async def _run_airtable_user_sync(db: Session) -> JobRunResult:
     return JobRunResult(success=True, message=msg)
 
 
+async def _run_analytics_rollup(db: Session) -> JobRunResult:
+    n = roll_up_old_events(db)
+    return JobRunResult(success=True, message=f"Rolled up {n} analytics event(s)")
+
+
 ADMIN_JOBS = [
     AdminJob(
         id="airtable_user_sync",
         name="Sync users from Airtable",
         area=COMMON_AREA,
         run=_run_airtable_user_sync,
+    ),
+    AdminJob(
+        id="analytics_rollup",
+        name="Roll up analytics events older than 13 months",
+        area=ANALYTICS_AREA,
+        run=_run_analytics_rollup,
     ),
 ]

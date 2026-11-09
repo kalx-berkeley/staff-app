@@ -40,6 +40,7 @@ from .workform_work_types import WorkformWorkTypes
 from .short_link import ShortLink
 from .dj_quiz_deadline import DjQuizDeadline
 from .dj_shift_playlist import DjShiftPlaylist
+from .analytics_event import AnalyticsDailyCount, AnalyticsEvent
 
 __all__ = [
     "AuditLog",
@@ -84,4 +85,6 @@ __all__ = [
     "ShortLink",
     "DjQuizDeadline",
     "DjShiftPlaylist",
+    "AnalyticsEvent",
+    "AnalyticsDailyCount",
 ]

@@ -78,10 +78,10 @@ const SpinMatchNotifier = () => {
 
   if (matches.length === 0) return null;
 
-  const dismiss = (match: SpinMatch) => {
+  const dismiss = (match: SpinMatch, action: 'dismissed' | 'clicked') => {
     dismissedKeysRef.current.add(matchKey(match));
     setMatches((prev) => prev.filter((m) => matchKey(m) !== matchKey(match)));
-    onAirAPI.dismissSpinMatch(match.spin_id, match.show.id).catch(() => {});
+    onAirAPI.dismissSpinMatch(match.spin_id, match.show.id, action).catch(() => {});
   };
 
   return (
@@ -90,7 +90,7 @@ const SpinMatchNotifier = () => {
         <div className="spin-match-toast" key={matchKey(match)}>
           <button
             className="spin-match-toast-close"
-            onClick={() => dismiss(match)}
+            onClick={() => dismiss(match, 'dismissed')}
             aria-label="Dismiss"
           >
             ×
@@ -107,7 +107,7 @@ const SpinMatchNotifier = () => {
             <Link
               className="spin-match-toast-link"
               to={`/dj/shows/${match.show.id}`}
-              onClick={() => dismiss(match)}
+              onClick={() => dismiss(match, 'clicked')}
             >
               Go to show →
             </Link>

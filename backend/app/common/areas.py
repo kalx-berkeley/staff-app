@@ -11,6 +11,7 @@ PASS_GIVEAWAY_AREA = "Radio Pass Giveaway"
 WORKFORMS_AREA = "KALX Workforms"
 SHORT_LINKS_AREA = "Short Links"
 DIRECTORY_AREA = "KALX Staff Directory"
+ANALYTICS_AREA = "KALX Staff Analytics"
 
 AREAS = [
     COMMON_AREA,
@@ -18,4 +19,5 @@ AREAS = [
     WORKFORMS_AREA,
     SHORT_LINKS_AREA,
     DIRECTORY_AREA,
+    ANALYTICS_AREA,
 ]

@@ -6,8 +6,10 @@ import LoadingScreen from './common/components/LoadingScreen';
 import NewVersionBanner from './common/components/NewVersionBanner';
 import StagingBanner from './common/components/StagingBanner';
 import { useAuth } from './common/contexts/authHooks';
+import { useActiveDayBeacon } from './common/hooks/useActiveDayBeacon';
 import { isStagingEnvironment } from './common/utils';
 import AdminApp from './admin/AdminApp';
+import AnalyticsApp from './analytics/AnalyticsApp';
 import DirectoryApp from './directory/DirectoryApp';
 import HomeApp from './home/HomeApp';
 import PassGiveawayApp from './pass-giveaway/PassGiveawayApp';
@@ -74,10 +76,14 @@ const SUBSITE_APPS: Record<string, ComponentType> = {
   '/directory': DirectoryApp,
   '/workforms': WorkformsApp,
   '/admin': AdminApp,
+  '/analytics': AnalyticsApp,
 };
 
 function App() {
-  const { loading, error } = useAuth();
+  const { loading, error, user } = useAuth();
+  const subsite = subsiteForPath(window.location.pathname);
+  // The sub-site's name in KALX Staff Analytics, such as "pass-giveaway"
+  useActiveDayBeacon(user, subsite ? subsite.basePath.slice(1) : 'home');
 
   if (loading) {
     return <><StagingBanner /><AuthDiagBanner /><LoadingScreen /></>;
@@ -89,7 +95,6 @@ function App() {
 
   // Each sub-site has its own router, chosen once from the URL: moving between
   // sub-sites is a full page load, so the choice never changes while mounted.
-  const subsite = subsiteForPath(window.location.pathname);
   const SubsiteApp = subsite ? SUBSITE_APPS[subsite.basePath] : HomeApp;
 
   return (

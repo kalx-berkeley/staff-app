@@ -354,3 +354,49 @@ def test_redirect_without_apache_layer_is_refused(client: TestClient, people):
     response = client.get("/go/fundraiser", follow_redirects=False)
 
     assert response.status_code == 400
+
+
+# --- KALX Staff Analytics ---
+
+
+def test_redirects_are_tracked_for_analytics(client: TestClient, db: Session, people):
+    from app.models.analytics_event import AnalyticsEvent
+
+    link = _create(client)
+    client.get("/go/fundraiser", headers=_as(STAFF), follow_redirects=False)
+    client.get("/go/FUNDRAISER/", headers=_as(STAFF), follow_redirects=False)
+    client.get("/go/fundraiser", headers=_as(ADMIN), follow_redirects=False)
+    client.get("/go/fundraiser", headers=_as(INACTIVE), follow_redirects=False)
+    client.get(
+        "/go/fundraiser",
+        headers={"X-DJ-Network": "1", "X-Forwarded-For": "192.168.1.100"},
+        follow_redirects=False,
+    )
+    client.get("/go/nothing-here", headers=_as(STAFF), follow_redirects=False)
+
+    results = sorted(
+        e.dimension
+        for e in db.query(AnalyticsEvent).filter(AnalyticsEvent.entity_id == link["id"])
+    )
+    assert results == [
+        "blocked_dj_network",
+        "blocked_not_staff",
+        "redirected",
+        "redirected",
+        "redirected",
+    ]
+
+    listed = client.get("/api/short-links", headers=_as(ADMIN)).json()
+    assert listed[0]["clicks_30_days"] == 3
+
+    response = client.get("/api/analytics/tabs/short_links", headers=_as(PROMOTIONS))
+    metrics = {m["id"]: m for m in response.json()["metrics"]}
+    row = metrics["short_links"]["rows"][0]
+    assert row == {
+        "slug": "fundraiser",
+        "redirects": 3,
+        "users": 2,
+        "blocked_not_staff": 1,
+        "blocked_dj_network": 1,
+    }
+    assert metrics["short_link_redirects_per_day"]["rows"][-1]["fundraiser"] == 3

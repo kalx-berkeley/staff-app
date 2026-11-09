@@ -80,6 +80,8 @@ This application implements several security best practices:
     giveaway's admin page, and in KALX Staff Admin can see the scheduled jobs (without running
     them) and the pass giveaway's audit log entries only (`auth.get_site_or_promotions_admin`,
     with the audit log filtered by its `area` column).
+  Both groups can use KALX Staff Analytics (`/analytics/`), which shows pass giveaway winners'
+  names and phone numbers, signed-in staff's active days and short link use (counts only).
 - **Defense-in-depth authentication check**: the backend independently verifies that every `/api/`
   request carries a Google identity (`X-Forwarded-User`) or comes from the DJ studio or station
   office network. If neither is present, the request is rejected with HTTP 400 and a CRITICAL
@@ -146,7 +148,8 @@ Without a login, guests from these networks can:
 - see the deployed version (`GET /api/version`), so an open tab knows when to reload;
 - browse shows, venues and specialty shows, including each show's passes (with contact details
   removed, as described below);
-- search winners by phone and release a winner (winner search).
+- search winners by phone and release a winner (winner search);
+- record a guest session for KALX Staff Analytics (`POST /api/pass-giveaway/analytics/session`).
 
 DJ studio guests can also:
 - give away passes, record failed giveaway attempts and check winner eligibility;
@@ -155,7 +158,13 @@ DJ studio guests can also:
 - see their own giveaways and the on-air DJ;
 - see and dismiss spin matches;
 - reserve an unclaimed pass pair for today under a current DJ or specialty show name
-  ("Clothespin"), and remove their own pass pre-assignment.
+  ("Clothespin"), and remove their own pass pre-assignment;
+- record visits to a show's "I'm off the mic" page and the DJ name on them, for KALX Staff
+  Analytics (`/api/pass-giveaway/analytics/giveaway-visits`).
+
+The KALX Staff Analytics tracking routes only record an event. They accept a few short,
+validated fields, return nothing, and are rate-limited per IP address. The metrics themselves
+(`/api/analytics`) need a login as a site admin or promotions admin.
 
 Guests cannot reach anything else, including the KALX Staff Directory, KALX Workforms, user
 profiles and preferences, promoters, the admin pages, or any create/edit/delete action for shows, venues and

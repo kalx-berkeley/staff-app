@@ -13,8 +13,12 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.auth import get_staff_member
+from app.common.areas import SHORT_LINKS_AREA
+from app.common.services import tracking_service
 from app.database import get_db
 from app.models.short_link import ShortLink
+
+SHORT_LINK_REDIRECT = "short_link_redirect"
 
 router = APIRouter(prefix="/go", tags=["short-links"])
 
@@ -146,10 +150,19 @@ def follow_short_link(
     x_forwarded_user: str | None = Header(None, alias="X-Forwarded-User"),
     db: Session = Depends(get_db),
 ):
-    """Redirect (302) to the short link's target. Slugs ignore case."""
+    """
+    Redirect (302) to the short link's target. Slugs ignore case.
+
+    Each attempt to follow an existing link is recorded for KALX Staff
+    Analytics, with whether it was redirected or blocked.
+    """
+    slug = slug.removesuffix("/").lower()
+    link = db.query(ShortLink).filter(ShortLink.slug == slug).first() if slug else None
+
     if not x_forwarded_user:
         # Only DJ studio computers get here unsigned: everywhere else Apache
         # sends people through the Google login first
+        _track(db, link, None, "blocked_dj_network")
         return _page(
             status.HTTP_401_UNAUTHORIZED,
             "Sign in required",
@@ -162,19 +175,35 @@ def follow_short_link(
     try:
         get_staff_member(x_forwarded_user, db)
     except HTTPException:
+        _track(db, link, x_forwarded_user, "blocked_not_staff")
         return _page(
             status.HTTP_403_FORBIDDEN,
             "This Google account can't follow KALX short links",
             _wrong_account(request, x_forwarded_user),
         )
 
-    slug = slug.removesuffix("/").lower()
-    link = db.query(ShortLink).filter(ShortLink.slug == slug).first() if slug else None
     if not link:
         message = (
             f"There's no short link named “{slug}”." if slug else "No short link was given."
         )
         return _page(status.HTTP_404_NOT_FOUND, "Short link not found", _message(message))
+    _track(db, link, x_forwarded_user, "redirected")
     return RedirectResponse(
         link.target_url, status_code=status.HTTP_302_FOUND, headers=NO_STORE
+    )
+
+
+def _track(db: Session, link: ShortLink | None, email: str | None, result: str) -> None:
+    """Record an attempt to follow *link* (if it exists) and its result."""
+    if link is None:
+        return
+    tracking_service.record_event(
+        db,
+        SHORT_LINK_REDIRECT,
+        area=SHORT_LINKS_AREA,
+        actor_email=email,
+        entity_type="short_link",
+        entity_id=link.id,
+        dimension=result,
+        details={"slug": link.slug},
     )
