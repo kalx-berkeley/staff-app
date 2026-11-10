@@ -39,10 +39,23 @@ jobs:
       id: check
       env:
         GH_TOKEN: ${{ github.token }}
+        # GitHub sometimes starts scheduled runs hours late. A scheduled run
+        # that starts outside this window (Pacific time, HHMM, start inclusive,
+        # end exclusive) deploys nothing, and the release waits for the next night.
+        WINDOW_START: '0305'
+        WINDOW_END: '0550'
       run: |
         if [ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ] && [ "$GITHUB_REF" != "refs/heads/main" ]; then
           echo "::error::Run the production deploy from main, not $GITHUB_REF"
           exit 1
+        fi
+
+        if [ "$GITHUB_EVENT_NAME" == "schedule" ]; then
+          NOW="$(TZ=America/Los_Angeles date +%H%M)"
+          if (( 10#$NOW < 10#$WINDOW_START || 10#$NOW >= 10#$WINDOW_END )); then
+            echo "::warning::This scheduled run started at $NOW Pacific, outside the $WINDOW_START-$WINDOW_END deploy window, so it won't deploy"
+            exit 0
+          fi
         fi
 
         TAG="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"

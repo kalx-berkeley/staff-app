@@ -289,7 +289,9 @@ npm test
 Push to `main` → deploys to staging automatically.
 Publish a GitHub release → deploys to production at the next 4am Pacific, while no live DJs are
 using the system. A nightly job compares the newest release (the one GitHub marks "Latest") with
-what has been deployed, and does nothing if it's already live.
+what has been deployed, and does nothing if it's already live. GitHub sometimes starts scheduled
+runs hours late, so a run that starts outside 3:05–5:50am Pacific deploys nothing, and the
+release waits for the next night.
 
 To deploy sooner, or to redeploy the newest release, run the **Deploy** workflow from `main` in
 GitHub Actions and tick **deploy_production**.
