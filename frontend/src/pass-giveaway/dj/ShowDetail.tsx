@@ -16,8 +16,8 @@ const ShowDetail = () => {
   const navigate = useNavigate();
   const location = useLocation();
   // Set by GiveawayPage after a successful giveaway. The DJ has just used their
-  // one pair for this show, so the "already given away" warning and the
-  // "I'm off the mic" button would only confuse them. Read once, then cleared
+  // one pair for this show, so the "I'm off the mic" button would only
+  // confuse them. Read once, then cleared
   // from history so a reload or a later visit shows the page as usual.
   const [justGaveAway] = useState(
     () => (location.state as { justGaveAway?: boolean } | null)?.justGaveAway === true,
@@ -33,6 +33,8 @@ const ShowDetail = () => {
   const [error, setError] = useState<string | null>(null);
   const [djName, setDjName] = useState(localStorage.getItem(DJ_NAME_KEY) || '');
   const [editingPassId, setEditingPassId] = useState<number | null>(null);
+  // Whether the DJ clicked through the "pre-assigned to another DJ" warning.
+  const [acknowledgedOthersPreassigned, setAcknowledgedOthersPreassigned] = useState(false);
 
   const loadShow = useCallback(async () => {
     if (!id) return;
@@ -142,8 +144,70 @@ const ShowDetail = () => {
   const availablePasses = sortAvailablePasses(passPairs.filter((p) => p.status === 'available'));
   const givenAwayPasses = passPairs.filter((p) => p.status === 'given_away');
   const hasPreviousActivity = givenAwayPasses.length > 0 || show.attempts.length > 0;
+  // The show list only links here with "View" after a recent giveaway, and
+  // the backend refuses a second pair for the show this DJ shift.
   const recentDjGiveaway = findRecentDjGiveaway(givenAwayPasses, djName);
+  const canGiveAway = availablePasses.length > 0 && !justGaveAway && !recentDjGiveaway;
+  // Every pair left is pre-assigned to another DJ, so giving one away on air
+  // takes it from them. The DJ must click through a warning first.
+  const normalizedDjName = djName.trim().toLowerCase();
+  const othersPreassignedPasses = availablePasses.filter(
+    (p) => p.preassigned_dj && p.preassigned_dj.trim().toLowerCase() !== normalizedDjName,
+  );
+  // One line per DJ and airdate, with how many pairs they hold.
+  const othersPreassignedGroups = [
+    ...othersPreassignedPasses
+      .reduce((groups, p) => {
+        const key = `${p.preassigned_dj}|${p.preassigned_date ?? ''}`;
+        const group = groups.get(key) ?? { dj: p.preassigned_dj!, date: p.preassigned_date, count: 0 };
+        group.count += 1;
+        return groups.set(key, group);
+      }, new Map<string, { dj: string; date: string | null; count: number }>())
+      .values(),
+  ];
+  const onlyOthersPreassigned =
+    canGiveAway && othersPreassignedPasses.length === availablePasses.length;
   const age = show.age_restriction;
+
+  if (onlyOthersPreassigned && !acknowledgedOthersPreassigned) {
+    return (
+      <div className="dj-show-document">
+        <DjNameInput value={djName} onChange={setDjName} id="dj-detail-name" />
+        <div className="dj-preassigned-gate" role="alert">
+          <h2>These passes are pre-assigned to another DJ</h2>
+          <p>
+            Every pass pair left for <strong>{show.event_name}</strong> is
+            pre-assigned:
+          </p>
+          <ul>
+            {othersPreassignedGroups.map((g) => (
+              <li key={`${g.dj}|${g.date ?? ''}`}>
+                {g.count > 1 && `${g.count} pairs: `}
+                <strong>{g.dj}</strong>
+                {g.date && ` for their show on ${formatDate(g.date)}`}
+              </li>
+            ))}
+          </ul>
+          <p>
+            If you announce these passes on air, you'll be giving away a pair
+            meant for another DJ. If that's not what you want, please pick a
+            different show.
+          </p>
+          <div className="dj-preassigned-gate-actions">
+            <button onClick={() => navigate('/dj/shows')} className="btn-primary">
+              ← Pick a different show
+            </button>
+            <button
+              onClick={() => setAcknowledgedOthersPreassigned(true)}
+              className="btn-secondary"
+            >
+              I understand, show me this show
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dj-show-document">
@@ -236,20 +300,7 @@ const ShowDetail = () => {
         </div>
       )}
 
-      {recentDjGiveaway && !justGaveAway && (
-        <div className="dj-show-limit-warning" role="alert">
-          <p>
-            <strong>You've already given away a pass pair to this show this DJ shift</strong>
-            {recentDjGiveaway.given_away_at && ` (at ${formatDateTime(recentDjGiveaway.given_away_at)})`}.
-          </p>
-          <p>
-            DJs are limited to 1 pair of passes for each show within{' '}
-            {DJ_SHOW_GIVEAWAY_WINDOW_HOURS} hours, so please pick a different show.
-          </p>
-        </div>
-      )}
-
-      {availablePasses.length > 0 && !justGaveAway && (
+      {canGiveAway && (
         <div className="kalx-winner-cta">
           <p className="kalx-winner-cta-hint">
             After your mic-break, when you're ready to take calls from listeners,

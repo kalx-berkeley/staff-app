@@ -605,6 +605,45 @@ describe('ShowBrowser', () => {
       expect(within(showRow).getByRole('link', { name: 'Give Away' })).toBeInTheDocument();
     });
 
+    describe('a show this DJ already gave a pair away for this shift', () => {
+      const givenAway = (hoursAgo: number): PassResponse => ({
+        ...reservedPass(),
+        id: 30,
+        show_id: 1,
+        status: 'given_away',
+        preassigned_dj: null,
+        preassigned_date: null,
+        given_away_by_dj: 'DJ Wolfman',
+        given_away_at: new Date(Date.now() - hoursAgo * 60 * 60 * 1000).toISOString(),
+      });
+
+      const mainCard = (eventName: string) =>
+        screen
+          .getAllByText(eventName)
+          .map((el) => el.closest('.show-card') as HTMLElement)
+          .find((el) => el && !el.closest('.assigned-shows-section'))!;
+
+      it('offers View Show instead of Give Away within the shift', async () => {
+        vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([reservedPass(), givenAway(1)]);
+        await renderWithDj();
+
+        const rockCard = mainCard('Rock Concert');
+        expect(within(rockCard).queryByRole('link', { name: 'Give Away Passes' })).not.toBeInTheDocument();
+        expect(within(rockCard).getByRole('link', { name: 'View Show' })).toHaveAttribute('href', '/dj/shows/1');
+        expect(rockCard).toHaveClass('show-card-dimmed');
+        expect(rockCard.getAttribute('title')).toMatch(/already gave away a pass pair for this show this DJ shift/);
+      });
+
+      it('offers Give Away again once the shift is over', async () => {
+        vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([reservedPass(), givenAway(5)]);
+        await renderWithDj();
+
+        const rockCard = mainCard('Rock Concert');
+        expect(within(rockCard).getByRole('link', { name: 'Give Away Passes' })).toBeInTheDocument();
+        expect(rockCard).not.toHaveClass('show-card-dimmed');
+      });
+    });
+
     describe('pairs pre-assigned to other DJs', () => {
       // Both available pairs are pre-assigned, so none is open to any DJ.
       const reservedShow: ShowSummary = {

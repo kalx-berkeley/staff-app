@@ -1838,18 +1838,30 @@ fieldset.radio-group legend {
   margin-top: 1rem;
 }
 
-/* Shown when this DJ already gave away a pair for the show this shift */
-.dj-show-limit-warning {
+/* Covers the show details when every pair left is pre-assigned to another DJ */
+.dj-preassigned-gate {
   background: #fff3cd;
-  border: 1px solid var(--warning-color);
+  border: 2px solid var(--warning-color);
   border-radius: 4px;
-  padding: 0.75rem 1rem;
+  padding: 1rem 1.25rem;
   margin: 1rem 0;
   font-size: 1.1rem;
 }
 
-.dj-show-limit-warning p {
-  margin: 0.25rem 0;
+.dj-preassigned-gate h2 {
+  margin: 0 0 0.5rem;
+}
+
+.dj-preassigned-gate p,
+.dj-preassigned-gate ul {
+  margin: 0.5rem 0;
+}
+
+.dj-preassigned-gate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
 /* Winner CTA — now floated above the pass list */

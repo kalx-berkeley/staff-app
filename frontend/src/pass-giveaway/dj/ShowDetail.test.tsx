@@ -136,17 +136,67 @@ describe('DJ ShowDetail right after a giveaway', () => {
     await screen.findAllByText('Jnae Winner');
   };
 
-  it('hides the limit warning and the off-the-mic button just after giving away', async () => {
+  it('thanks the DJ and hides the off-the-mic button just after giving away', async () => {
     await renderAt({ justGaveAway: true });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Pass pair given away to Jnae Winner. Thanks!');
     expect(screen.queryByRole('button', { name: "I'm off the mic" })).not.toBeInTheDocument();
   });
 
-  it('shows the limit warning and the button when the DJ comes back later', async () => {
+  it('still hides the off-the-mic button, without a warning, when the DJ comes back this shift', async () => {
     await renderAt(null);
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent("You've already given away a pass pair");
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: "I'm off the mic" })).not.toBeInTheDocument();
+  });
+});
+
+describe('DJ ShowDetail with pairs pre-assigned to other DJs', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  const pair = (overrides: Partial<PassResponse>) =>
+    ({ id: 6, show_id: 1, pass_type: 'pair', status: 'available', ...overrides }) as PassResponse;
+
+  const renderWith = async (passes: PassResponse[]) => {
+    localStorage.setItem('kalx_dj_name', 'DJ Test');
+    vi.mocked(showsAPI.get).mockResolvedValue(
+      makeShow(passes, { available_pair_count: passes.length }),
+    );
+    await renderAndSettle(
+      <BrowserRouter>
+        <ShowDetail />
+      </BrowserRouter>
+    );
+  };
+
+  it('covers the show details with a warning the DJ must click through', async () => {
+    await renderWith([pair({ preassigned_dj: 'DJ Other', preassigned_date: '2099-12-30' })]);
+
+    const gate = await screen.findByRole('alert');
+    expect(gate).toHaveTextContent('These passes are pre-assigned to another DJ');
+    expect(gate).toHaveTextContent('DJ Other for their show on Wednesday, December 30, 2099');
+    expect(screen.queryByText('Venue:')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: "I'm off the mic" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'I understand, show me this show' }));
+
+    expect(await screen.findByText('Venue:')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: "I'm off the mic" })).toBeInTheDocument();
+  });
+
+  it('skips the warning when the DJ has an unassigned pair to give away', async () => {
+    await renderWith([pair({ preassigned_dj: 'DJ Other' }), pair({ id: 7, preassigned_dj: null })]);
+    expect(await screen.findByText('Venue:')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it("skips the warning for the DJ's own pre-assigned pair, ignoring case", async () => {
+    await renderWith([pair({ preassigned_dj: 'dj test' })]);
+    expect(await screen.findByText('Venue:')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

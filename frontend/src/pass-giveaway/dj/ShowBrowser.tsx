@@ -6,7 +6,7 @@ import { Tooltip, DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, K
 import type { ShowSummary, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow } from '../utils';
+import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, WHEELCHAIR_ACCESSIBLE_LABELS, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
 
 const VIEW_MODE_KEY = 'kalx_dj_view_mode';
 
@@ -35,7 +35,8 @@ const ShowBrowser = () => {
   const [currentGenre, setCurrentGenre] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'band' | 'venue' | 'published'>('date');
   const [djName, setDjName] = useState(localStorage.getItem(DJ_NAME_KEY) || '');
-  const [myAssignedPasses, setMyAssignedPasses] = useState<PassResponse[]>([]);
+  // Every pass this DJ gave away, plus the available ones pre-assigned to them.
+  const [myPasses, setMyPasses] = useState<PassResponse[]>([]);
   const [showAssigned, setShowAssigned] = useState(true);
   const [viewMode, setViewMode] = useState<'card' | 'compact'>(
     (localStorage.getItem(VIEW_MODE_KEY) as 'card' | 'compact') || 'card'
@@ -90,18 +91,14 @@ const ShowBrowser = () => {
 
   useEffect(() => {
     if (!djName.trim()) {
-      setMyAssignedPasses([]);
+      setMyPasses([]);
       return;
     }
     const timer = setTimeout(() => {
       passesAPI
         .getMyGiveaways(djName.trim())
-        .then((passes) =>
-          setMyAssignedPasses(
-            passes.filter((p) => p.status === 'available' && !!p.preassigned_dj)
-          )
-        )
-        .catch(() => setMyAssignedPasses([]));
+        .then(setMyPasses)
+        .catch(() => setMyPasses([]));
     }, 300);
     return () => clearTimeout(timer);
   }, [djName, assignedRefresh]);
@@ -111,6 +108,14 @@ const ShowBrowser = () => {
     localStorage.setItem(VIEW_MODE_KEY, mode);
   };
 
+  const myAssignedPasses = myPasses.filter((p) => p.status === 'available' && !!p.preassigned_dj);
+  // Shows this DJ already gave a pair away for this DJ shift. The backend
+  // allows one per show per shift, so these shows can't be given away again.
+  const recentGiveawayShowIds = new Set(
+    myPasses
+      .filter((p) => p.status === 'given_away' && findRecentDjGiveaway([p], djName))
+      .map((p) => p.show_id)
+  );
   const assignedShowIds = new Set(myAssignedPasses.map((p) => p.show_id));
   const myPairCountByShow = new Map<number, number>();
   for (const p of myAssignedPasses) {
@@ -125,6 +130,8 @@ const ShowBrowser = () => {
     );
     return { yours, reservedForOthers: show.available_pair_count - yours };
   };
+  const recentGiveawayTitle =
+    `You already gave away a pass pair for this show this DJ shift. DJs can give away 1 pair per show every ${DJ_SHOW_GIVEAWAY_WINDOW_HOURS} hours.`;
   const reservedLabel = (count: number) =>
     `${count} pre-assigned to ${djName.trim() ? 'other DJs' : 'DJs'}`;
   const todayStr = getLocalTodayStr();
@@ -365,9 +372,15 @@ const ShowBrowser = () => {
                           <td>{pass.preassigned_date ? formatDateShort(pass.preassigned_date) : '—'}</td>
                           <td>
                             <div className="show-row-actions">
-                              <Link to={`/dj/shows/${pass.show_id}`} className="btn-primary btn-small">
-                                Give Away Passes
-                              </Link>
+                              {recentGiveawayShowIds.has(pass.show_id) ? (
+                                <Link to={`/dj/shows/${pass.show_id}`} className="btn-secondary btn-small" title={recentGiveawayTitle}>
+                                  View
+                                </Link>
+                              ) : (
+                                <Link to={`/dj/shows/${pass.show_id}`} className="btn-primary btn-small">
+                                  Give Away Passes
+                                </Link>
+                              )}
                               {renderReleaseButton(pass, true)}
                             </div>
                           </td>
@@ -412,9 +425,15 @@ const ShowBrowser = () => {
                     </div>
 
                     <div className="show-card-footer show-card-actions">
-                      <Link to={`/dj/shows/${pass.show_id}`} className="btn-primary">
-                        Give Away Passes
-                      </Link>
+                      {recentGiveawayShowIds.has(pass.show_id) ? (
+                        <Link to={`/dj/shows/${pass.show_id}`} className="btn-secondary" title={recentGiveawayTitle}>
+                          View Show
+                        </Link>
+                      ) : (
+                        <Link to={`/dj/shows/${pass.show_id}`} className="btn-primary">
+                          Give Away Passes
+                        </Link>
+                      )}
                       {renderReleaseButton(pass, false)}
                     </div>
                   </div>
@@ -458,10 +477,12 @@ const ShowBrowser = () => {
             <tbody>
               {sortedShows.map((show) => {
                 const { yours, reservedForOthers } = pairCounts(show);
-                const noPairs = yours === 0;
+                const gaveAwayRecently = recentGiveawayShowIds.has(show.id);
+                const noPairs = yours === 0 || gaveAwayRecently;
                 const hasAssignment = assignedShowIds.has(show.id);
                 return (
                   <tr
+                    title={gaveAwayRecently ? recentGiveawayTitle : undefined}
                     key={show.id}
                     className={[noPairs ? 'show-dimmed' : '', hasAssignment ? 'has-assignment' : '', show.co_announce ? 'show-row-co-announce' : ''].filter(Boolean).join(' ') || undefined}
                   >
@@ -517,7 +538,8 @@ const ShowBrowser = () => {
         <div className="shows-grid">
           {sortedShows.map((show) => {
             const { yours, reservedForOthers } = pairCounts(show);
-            const noPairs = yours === 0;
+            const gaveAwayRecently = recentGiveawayShowIds.has(show.id);
+            const noPairs = yours === 0 || gaveAwayRecently;
             const hasAssignment = assignedShowIds.has(show.id);
             return (
               <div
@@ -526,7 +548,9 @@ const ShowBrowser = () => {
                 title={
                   !noPairs
                     ? undefined
-                    : reservedForOthers > 0
+                    : gaveAwayRecently
+                      ? recentGiveawayTitle
+                      : reservedForOthers > 0
                       ? 'Every pass pair left is pre-assigned to another DJ'
                       : 'No pass pairs available for this show'
                 }
