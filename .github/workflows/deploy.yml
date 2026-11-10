@@ -3,6 +3,14 @@ name: Deploy
 on:
   push:
     branches: [ main ]
+    # Pushes that change only these files skip the tests and the staging
+    # deploy. CHANGELOG.md is among them, so run backend/tests/common/test_changelog.py
+    # locally when cutting a release.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'apache/**'
+      - 'LICENSE'
   schedule:
     # Production deploys happen here, while no live DJs are using the system
     - cron: '0 4 * * *'
