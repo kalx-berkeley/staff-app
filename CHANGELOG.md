@@ -6,6 +6,25 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.13.0] - 2026-11-10
+
+### Added
+
+- Add KALX Staff Analytics at `/analytics/` for site admins and promotions admins. It shows pass giveaway, short link and site usage metrics for a chosen time window, with an explanation of each metric. It tracks signed-in active days, DJ studio and station office sessions, "I'm off the mic" page visits, spin match popups and `/go/` redirects, and rolls them up to daily counts after 13 months ([#18](https://github.com/kalx-berkeley/staff-app/pull/18))
+- Let promotions enter on-air and staff winners by hand when creating or editing a show, under Advanced, for carrying winners over from a cancelled, postponed or moved show. These winners skip the venue's win frequency limit and the lottery, and no one is notified ([a37ac1d](https://github.com/kalx-berkeley/staff-app/commit/a37ac1d))
+- Let the on-air DJ correct the name, phone and email of a pass pair winner they recorded, within 4 hours of the giveaway and before the show closes ([0b17b50](https://github.com/kalx-berkeley/staff-app/commit/0b17b50))
+- Link to a band's homepage, Bandcamp, Discogs, lyrics, free streaming and SoundCloud pages from its popup, whichever MusicBrainz lists ([aeaae3b](https://github.com/kalx-berkeley/staff-app/commit/aeaae3b))
+
+### Changed
+
+- Show a success message instead of the "already given away" warning right after a DJ gives away a pass pair ([92e3f41](https://github.com/kalx-berkeley/staff-app/commit/92e3f41))
+
+## [1.12.2] - 2026-11-07
+
+### Added
+
+- List an existing show's recorded on-air winners and staff claims on the legacy import page, each with a Release button. Releasing promotes alternates and sends emails as usual ([585893c](https://github.com/kalx-berkeley/staff-app/commit/585893c))
+
 ## [1.12.1] - 2026-11-07
 
 ### Added
@@ -322,6 +341,8 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.13.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.12.2...v1.13.0
+[1.12.2]: https://github.com/kalx-berkeley/staff-app/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/kalx-berkeley/staff-app/compare/v1.12.0...v1.12.1
 [1.12.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.10.0...v1.11.0
