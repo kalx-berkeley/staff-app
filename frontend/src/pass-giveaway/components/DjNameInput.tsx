@@ -8,9 +8,11 @@ interface DjNameInputProps {
   value: string;
   onChange: (name: string) => void;
   id?: string;
+  /** Marks the box as required, for pages whose actions need a DJ name. */
+  required?: boolean;
 }
 
-const DjNameInput = ({ value, onChange, id = 'dj-name-input' }: DjNameInputProps) => {
+const DjNameInput = ({ value, onChange, id = 'dj-name-input', required }: DjNameInputProps) => {
   const [djNames, setDjNames] = useState<string[]>([]);
   const [filteredDjNames, setFilteredDjNames] = useState<string[]>([]);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
@@ -61,7 +63,7 @@ const DjNameInput = ({ value, onChange, id = 'dj-name-input' }: DjNameInputProps
   return (
     <div className="dj-name-section">
       <div className="form-group-inline">
-        <label htmlFor={id}>DJ Name:</label>
+        <label htmlFor={id}>DJ Name{required ? ' *' : ''}:</label>
         <div className="autocomplete-wrapper" style={{ flex: 1, minWidth: 150, maxWidth: 320 }}>
           <input
             id={id}
@@ -71,6 +73,7 @@ const DjNameInput = ({ value, onChange, id = 'dj-name-input' }: DjNameInputProps
             onKeyDown={handleKeyDown}
             onBlur={() => setTimeout(() => setShowAutocomplete(false), 200)}
             placeholder="Enter your DJ name"
+            aria-required={required || undefined}
             autoComplete="off"
           />
           {showAutocomplete && (

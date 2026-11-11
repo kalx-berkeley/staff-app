@@ -12,6 +12,8 @@ import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
 import { formatShowRating, isMovieShow } from '../utils';
 import { useGiveawayVisit } from '../tracking';
 
+const DJ_NAME_INPUT_ID = 'dj-giveaway-name';
+
 const GiveawayPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -123,7 +125,7 @@ const GiveawayPage = () => {
         </div>
       )}
 
-      <DjNameInput value={djName} onChange={setDjName} id="dj-giveaway-name" />
+      <DjNameInput value={djName} onChange={setDjName} id={DJ_NAME_INPUT_ID} required />
 
       <div className="kalx-giveaway-split">
         <div className="kalx-giveaway-left">
@@ -238,6 +240,7 @@ const GiveawayPage = () => {
                     venueId={show.venue.id}
                     onSuccess={() => navigate(`/dj/shows/${id}`, { state: { justGaveAway: true } })}
                     djName={djName}
+                    onMissingDjName={() => document.getElementById(DJ_NAME_INPUT_ID)?.focus()}
                     winFrequencyDays={show.venue.win_frequency_days}
                     requiresEmail={show.guest_list_requirements.requires_email_address}
                     readOnly={isPromotionsPreview}
