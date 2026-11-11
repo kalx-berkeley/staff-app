@@ -19,11 +19,14 @@ const ShowDetail = () => {
   // one pair for this show, so the "I'm off the mic" button would only
   // confuse them. Read once, then cleared
   // from history so a reload or a later visit shows the page as usual.
-  const [justGaveAway] = useState(
-    () => (location.state as { justGaveAway?: boolean } | null)?.justGaveAway === true,
-  );
+  // GiveawayPage sets justTried instead after Tried: nobody called in, so the
+  // pass is still available and the off-the-mic button stays.
+  const [{ justGaveAway, justTried }] = useState(() => {
+    const state = location.state as { justGaveAway?: boolean; justTried?: boolean } | null;
+    return { justGaveAway: state?.justGaveAway === true, justTried: state?.justTried === true };
+  });
   useEffect(() => {
-    if (justGaveAway) navigate(location.pathname, { replace: true, state: null });
+    if (justGaveAway || justTried) navigate(location.pathname, { replace: true, state: null });
     // Only on mount: clearing the state must not re-run when location changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -297,6 +300,12 @@ const ShowDetail = () => {
         <div className="success-message dj-giveaway-success" role="status">
           Pass pair given away
           {recentDjGiveaway?.recipient_name && <> to <strong>{recentDjGiveaway.recipient_name}</strong></>}. Thanks!
+        </div>
+      )}
+
+      {justTried && (
+        <div className="success-message dj-giveaway-success" role="status">
+          Attempt recorded. No pass was given away, so it&apos;s still available. Thanks for trying!
         </div>
       )}
 

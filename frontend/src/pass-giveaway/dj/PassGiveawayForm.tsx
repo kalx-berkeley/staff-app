@@ -7,7 +7,8 @@ import type { APIError } from '../../common/types';
 interface PassGiveawayFormProps {
   pass: PassResponse;
   venueId: number;
-  onSuccess: () => void;
+  /** Called after Give Away (`'given_away'`) or Tried (`'tried'`) is recorded. */
+  onSuccess: (outcome: GiveawayOutcome) => void;
   /** The DJ name from the page's DJ Name box. Both Give Away and Tried need it. */
   djName: string;
   /** Called when Give Away or Tried is clicked without a DJ name, so the page can focus its DJ Name box. */
@@ -20,6 +21,8 @@ interface PassGiveawayFormProps {
   visitId?: string | null;
 }
 
+export type GiveawayOutcome = 'given_away' | 'tried';
+
 type WinnerFields = Omit<GiveawayData, 'given_away_by_dj' | 'visit_id'>;
 
 const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, winFrequencyDays, requiresEmail, readOnly, visitId }: PassGiveawayFormProps) => {
@@ -30,7 +33,6 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [winEligibility, setWinEligibility] = useState<WinnerEligibility | null>(null);
   const [overrideIneligible, setOverrideIneligible] = useState(false);
 
@@ -106,7 +108,7 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
         ...(visitId ? { visit_id: visitId } : {}),
       };
       await passesAPI.giveaway(pass.id, payload);
-      onSuccess();
+      onSuccess('given_away');
     } catch (err) {
       const apiError = err as APIError;
       setError(
@@ -129,9 +131,7 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
     try {
       setLoading(true);
       await showsAPI.recordAttempt(pass.show_id, djName.trim(), visitId);
-      setSuccessMessage('No winner recorded.');
-      setTimeout(() => setSuccessMessage(null), 2500);
-      onSuccess();
+      onSuccess('tried');
     } catch (err) {
       const apiError = err as APIError;
       setError(
@@ -163,7 +163,6 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
         </p>
       )}
 
-      {successMessage && <div className="success-message">{successMessage}</div>}
       {error && <div className="error-message">{error}</div>}
 
       <form onSubmit={handleGiveaway}>

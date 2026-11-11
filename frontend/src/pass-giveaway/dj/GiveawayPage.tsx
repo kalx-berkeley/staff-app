@@ -237,7 +237,11 @@ const GiveawayPage = () => {
                 <PassGiveawayForm
                   pass={firstAvailable}
                   venueId={show.venue.id}
-                  onSuccess={() => navigate(`/dj/shows/${id}`, { state: { justGaveAway: true } })}
+                  onSuccess={(outcome) =>
+                    navigate(`/dj/shows/${id}`, {
+                      state: outcome === 'tried' ? { justTried: true } : { justGaveAway: true },
+                    })
+                  }
                   djName={djName}
                   onMissingDjName={() => document.getElementById(DJ_NAME_INPUT_ID)?.focus()}
                   winFrequencyDays={show.venue.win_frequency_days}

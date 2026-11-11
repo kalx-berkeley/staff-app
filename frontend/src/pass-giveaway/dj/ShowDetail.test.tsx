@@ -143,6 +143,20 @@ describe('DJ ShowDetail right after a giveaway', () => {
     expect(screen.queryByRole('button', { name: "I'm off the mic" })).not.toBeInTheDocument();
   });
 
+  it('records the attempt without claiming a giveaway just after Tried', async () => {
+    vi.mocked(showsAPI.get).mockResolvedValue(makeShow([available], { available_pair_count: 1 }));
+    localStorage.setItem('kalx_dj_name', 'DJ Test');
+    await renderAndSettle(
+      <MemoryRouter initialEntries={[{ pathname: '/dj/shows/1', state: { justTried: true } }]}>
+        <ShowDetail />
+      </MemoryRouter>
+    );
+    const status = await screen.findByRole('status');
+    expect(status).toHaveTextContent('Attempt recorded. No pass was given away');
+    expect(status).not.toHaveTextContent('given away to');
+    expect(screen.getByRole('button', { name: "I'm off the mic" })).toBeInTheDocument();
+  });
+
   it('still hides the off-the-mic button, without a warning, when the DJ comes back this shift', async () => {
     await renderAt(null);
     expect(screen.queryByRole('status')).not.toBeInTheDocument();

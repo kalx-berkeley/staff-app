@@ -141,7 +141,7 @@ describe('PassGiveawayForm', () => {
         });
       });
 
-      expect(mockOnSuccess).toHaveBeenCalled();
+      expect(mockOnSuccess).toHaveBeenCalledWith('given_away');
     });
 
     it('asks for the page\'s DJ name when Tried is clicked without one', async () => {
@@ -184,7 +184,7 @@ describe('PassGiveawayForm', () => {
         expect(showsAPI.recordAttempt).toHaveBeenCalledWith(1, 'DJ Mike', undefined);
       });
 
-      expect(mockOnSuccess).toHaveBeenCalled();
+      expect(mockOnSuccess).toHaveBeenCalledWith('tried');
     });
 
     it('sends the giveaway page visit with a no-winner, for KALX Staff Analytics', async () => {
@@ -208,7 +208,7 @@ describe('PassGiveawayForm', () => {
       await waitFor(() => {
         expect(showsAPI.recordAttempt).toHaveBeenCalledWith(1, 'DJ Mike', 'visit-123');
       });
-      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalled());
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalledWith('tried'));
     });
   });
 
