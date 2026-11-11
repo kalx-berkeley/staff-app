@@ -838,7 +838,7 @@ const ShowDetail = () => {
 
         {show.promotions_contacts.length > 0 && (
           <div className="show-info-section">
-            <h3>Promotions Contact{show.promotions_contacts.length > 1 ? 's' : ''}</h3>
+            <h3>KALX Promotions Rep{show.promotions_contacts.length > 1 ? 's' : ''}</h3>
             {show.promotions_contacts.map((contact) => (
               <div key={contact.email} className="info-grid">
                 <div className="info-item">
