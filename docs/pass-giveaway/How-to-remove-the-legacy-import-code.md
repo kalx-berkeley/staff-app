@@ -42,4 +42,4 @@ Then remove these small hooks in existing files:
 - frontend/src/pass-giveaway/PassGiveawayApp.tsx — the LegacyImport lazySection and route
 - frontend/src/pass-giveaway/promotions/index.ts — the LegacyImport export line
 - frontend/src/pass-giveaway/promotions/PromotionsLayout.tsx — the legacyImportAPI import, the legacyImportEnabled state, and the nav <li>
-- .github/workflows/deploy.yml - LEGACY_IMPORT_ENABLED=${{ vars.LEGACY_IMPORT_ENABLED || 'false' }}
+- The server's `~/staff-app-production/backend/.env` and `~/staff-app-staging/backend/.env` - the `LEGACY_IMPORT_ENABLED` line, if there is one

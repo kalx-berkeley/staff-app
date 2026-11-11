@@ -19,11 +19,16 @@
     + [Frontend](#frontend)
     + [Running Tests](#running-tests)
   * [Deployment](#deployment)
+    + [Deploying by hand](#deploying-by-hand)
+    + [Checking on deploys](#checking-on-deploys)
+    + [Deploy emails](#deploy-emails)
+    + [When a deploy fails](#when-a-deploy-fails)
+    + [Server settings](#server-settings)
+    + [The GitHub token](#the-github-token)
   * [Architecture](#architecture)
   * [Configuration](#configuration)
     + [Backend Environment Variables](#backend-environment-variables)
     + [Airtable Schema](#airtable-schema)
-    + [GitHub Actions Secrets/Variables](#github-actions-secrets-variables)
   * [Project Structure](#project-structure)
   * [Maintenance](#maintenance)
     + [Logs](#logs)
@@ -55,7 +60,7 @@ Update these values before deploying to production:
    - Set `CORS_ORIGINS` to your production domain
    - Configure Airtable credentials for user sync
 
-3. **GitHub Secrets** — configured in repo settings for the deploy workflow
+3. **The server's deploy setup** — see [Deployment](#deployment) and `SETUP_GUIDE.md`
 
 ## Overview
 
@@ -246,7 +251,7 @@ two-month lookback, with no limit on future dates), complete with the performanc
 
 **Infrastructure:**
 - Apache 2.4+ with SSL (serves frontend, reverse proxies API)
-- GitHub Actions for CI/CD with Netbird VPN for deployment
+- GitHub Actions for the tests; the server deploys itself with systemd timers
 
 ## Local Development
 
@@ -286,17 +291,114 @@ npm test
 
 ## Deployment
 
-Push to `main` → deploys to staging automatically.
-Publish a GitHub release → deploys to production at the next 4am Pacific, while no live DJs are
-using the system. A nightly job compares the newest release (the one GitHub marks "Latest") with
-what has been deployed, and does nothing if it's already live. GitHub sometimes starts scheduled
-runs hours late, so a run that starts outside 3:05–5:50am Pacific deploys nothing, and the
-release waits for the next night.
+The server deploys both environments itself, and GitHub has no access to it.
+A systemd service, `staff-app-deploy@<environment>`, fetches the code from
+GitHub, builds the frontend, installs everything and restarts the backend.
+Only what starts it differs:
 
-To deploy sooner, or to redeploy the newest release, run the **Deploy** workflow from `main` in
-GitHub Actions and tick **deploy_production**.
+| Environment | What it deploys | When |
+|---|---|---|
+| Staging | The newest commit on `main` | Within about 2 minutes of its tests passing (`staff-app-deploy-staging.timer` checks every 2 minutes) |
+| Production | The newest release, the one GitHub marks "Latest" | 3:51am Pacific, while no live DJs are using the system (`staff-app-deploy-production.timer`) |
 
-See `SETUP_GUIDE.md` for first-time server setup.
+A commit is only deployed once its **Run Backend Tests** and **Run Frontend
+Tests** checks have passed in GitHub Actions. To release, publish a GitHub
+release: it goes live in production the next night.
+
+The design, and the one-time server setup, are in
+`docs/deployment/specs/server-side-deploy/plan.md`. The code is in `deploy/`
+and the units are in `systemd/`.
+
+### Deploying by hand
+
+SSH into the server as `staff-app`, then:
+
+```bash
+# Deploy the newest release to production now, if it isn't live yet
+systemctl --user start staff-app-deploy@production
+
+# Redeploy the release that's already live
+~/staff-app-deploy/production/fetch.py production --force
+
+# Go back to an older release (the older release's code must work with the
+# current database: migrations aren't undone)
+~/staff-app-deploy/production/fetch.py production --ref v1.12.2 --force
+
+# Redeploy staging's newest commit, for example after fixing a failed deploy
+~/staff-app-deploy/staging/fetch.py staging --force
+
+# Say what would be deployed, without changing anything
+~/staff-app-deploy/production/fetch.py production --dry-run
+```
+
+Deploying by hand during live DJ hours restarts the backend for everyone on
+the site. `systemctl --user start` waits until the deploy finishes and emails
+if it fails, like the nightly run. Running `fetch.py` directly shows the
+deploy's output on screen instead, and sends no failure email.
+
+### Checking on deploys
+
+```bash
+systemctl --user list-timers 'staff-app-deploy-*'      # when each deploy runs next and last ran
+journalctl --user -u staff-app-deploy@production       # production deploy logs
+journalctl --user -u staff-app-deploy@staging          # staging deploy logs
+cat ~/staff-app-production/DEPLOYED_VERSION            # what's live
+```
+
+Runs that find nothing to deploy log nothing, apart from systemd's own line
+saying the service ran.
+
+### Deploy emails
+
+Deploy emails go to `WEBMASTER_EMAIL` (from that environment's `.env`) through
+the server's local SMTP relay.
+
+| Event | Email |
+|---|---|
+| A deploy fails (either environment) | Yes, with what happened and the end of the log |
+| Production deploys a new release | Yes |
+| The newest release's tests failed | Yes, each night until a newer release passes |
+| The release marked "Latest" is older than what's live | Yes |
+| Production's nightly run can't reach GitHub | Yes |
+| GitHub rejects the token | Yes, at most once a day |
+| A staging commit's tests failed, or are still running | No (GitHub emails about failed runs) |
+| The newest release's tests are still running at 3:51am | No (it deploys the next night) |
+| Staging can't reach GitHub | No (it catches up on a later run) |
+
+The same failure isn't emailed again within 12 hours.
+
+### When a deploy fails
+
+- **Production** rolls itself back: it restores the database backup taken just
+  before the deploy and puts back the previous code. The failure email says
+  whether that worked or production may be down. The nightly run tries the
+  release again the next night.
+- **Staging** is left as it is, for you to look at. It doesn't try that commit
+  again until `main` has a newer commit, or you redeploy it with `--force`.
+
+Every deploy backs up the database first, to
+`backend/data/backup_<date>_<time>.db`.
+
+### Server settings
+
+Each environment's settings are in `~/staff-app-<environment>/backend/.env` on
+the server, and are edited by hand. Deploys only ever change `APP_VERSION`.
+After changing a setting, restart that backend, for example
+`systemctl --user restart staff-app-backend-production`. When a release needs a
+new setting, add it to production's `.env` before the release deploys.
+
+### The GitHub token
+
+The server uses a read-only GitHub token so GitHub doesn't throttle its checks.
+It allows 5,000 API requests an hour instead of 60. When it expires, deploys
+carry on without it, and an email says to replace it:
+
+1. In GitHub, make a fine-grained personal access token with **Repository
+   access: Public repositories (read-only)** and no permissions added. It can
+   only read what anyone can see.
+2. On the server, as `staff-app`, run
+   `install -D -m 600 /dev/stdin ~/.config/staff-app-deploy/github-token`, paste
+   the token, then press Enter and Ctrl-D.
 
 ## Architecture
 
@@ -393,26 +495,6 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 | `LOA start` | date (first day of a leave of absence, inclusive) |
 | `LOA end` | date (last day of a leave of absence, inclusive) |
 
-### GitHub Actions Secrets/Variables
-
-**Secrets:**
-- `NETBIRD_SETUP_KEY`
-- `SSH_PRIVATE_KEY` (deploy key for `staff-app` user)
-- `AIRTABLE_API_KEY`
-- `AIRTABLE_BASE_ID`
-- `SMTP2GO_API_KEY` (optional — falls back to the server's local SMTP relay if absent)
-- `FEATURE_BIN_SHEET_ID` (not public data — see the maintainers for the value; feature bin sync is disabled if unset)
-- `FEATURE_BIN_SHEET_GID` (not public data — see the maintainers for the value; the sheet's "Current Active A-Z" tab)
-
-**Variables:**
-- `SITE_DOMAIN`
-- `DJ_STUDIO_NETWORK`
-- `NETBIRD_HOSTNAME` (the bare Netbird peer hostname, not the FQDN)
-- `EMAIL_FROM_ADDRESS` (optional — defaults to `noreply@kalx.berkeley.edu`)
-- `WEBMASTER_EMAIL` (optional — in-app feedback is disabled if unset; in staging, this is the only address that receives real email)
-- `SITE_ADMIN_EMAILS` (optional — comma-separated emails of extra site admins; set it separately in the `staging` and `production` environments)
-- `KALX_LIVE_CALENDAR_ID` (not secret, just not worth hardcoding in a public repo — see the maintainers for the value; KALX Live! sync is disabled if unset)
-
 ## Project Structure
 
 ```
@@ -439,12 +521,11 @@ When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, 
 │   │   ├── pass-giveaway/      # Radio Pass Giveaway at /pass-giveaway/
 │   │   └── directory/          # Staff Directory at /directory/
 │   └── package.json
-├── systemd/                    # Systemd service files
-│   ├── staff-app-backend-production.service
-│   └── staff-app-backend-staging.service
-├── docs/pass-giveaway/         # Radio Pass Giveaway specs and how-tos
+├── deploy/                     # Server-side deploy scripts (fetch, install, notify) and their tests
+├── systemd/                    # systemd units: the backends, and the deploy service and timers
+├── docs/                       # Specs and how-tos, including deployment/
 └── .github/workflows/
-    └── deploy.yml
+    └── tests.yml               # The tests, which every deployed commit must pass
 ```
 
 ## Maintenance
@@ -487,7 +568,7 @@ source venv/bin/activate
 alembic upgrade head
 ```
 
-Migrations run automatically on each deployment.
+Migrations run automatically on each deploy.
 
 ### Troubleshooting Authentication
 

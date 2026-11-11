@@ -1,0 +1,10 @@
+# Settings for the deploy scripts' formatting and tests. The scripts run on the
+# server with the system python3 (Ubuntu 24.04's 3.12) and the standard library
+# only.
+
+[tool.black]
+line-length = 92
+target-version = ['py312']
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

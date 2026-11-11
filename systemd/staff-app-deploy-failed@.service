@@ -1,0 +1,9 @@
+# Emails WEBMASTER_EMAIL when staff-app-deploy@<environment>.service fails.
+# Only production deploys install this file.
+
+[Unit]
+Description=Email that the KALX Staff App %i deploy failed
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/staff-app-deploy/%i/notify.py failure %i

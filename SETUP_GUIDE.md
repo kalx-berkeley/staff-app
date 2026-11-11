@@ -11,7 +11,7 @@ Setup and deployment guide for the KALX Staff App.
 3. [Server Setup](#server-setup)
 4. [Apache Configuration](#apache-configuration)
 5. [Backend Service Setup](#backend-service-setup)
-6. [GitHub Actions Deployment Setup](#github-actions-deployment-setup)
+6. [Deploy Setup](#deploy-setup)
 7. [First Deployment](#first-deployment)
 8. [Verification & Testing](#verification--testing)
 9. [Deployment Operations](#deployment-operations)
@@ -27,8 +27,8 @@ Before starting, ensure you have:
 
 - [ ] Ubuntu 24.04 server with root access (or sudo rights to someone with root access)
 - [ ] Domain name registered with DNS configured
-- [ ] GitHub repository created with Actions enabled
-- [ ] Netbird account (for secure deployments)
+- [ ] GitHub repository created with Actions enabled (Actions only runs the tests)
+- [ ] A GitHub account to make the server's read-only token with
 - [ ] Google Cloud account to create OAuth2 credentials
 - [ ] Basic familiarity with Linux command line
 
@@ -90,13 +90,8 @@ These steps require root access and are typically done once by the server admini
 apt update
 # libjpeg-dev is a requirement for the Pillow PyPi package
 # Install mod_auth_openidc for Google OAuth
-apt install -y ca-certificates curl gnupg apache2 python3.12 python3.12-venv python3-pip sqlite3 libjpeg-dev libapache2-mod-auth-openidc certbot python3-certbot-apache
-# Install Netbird to enable deployments from GitHub Actions
-wget -O /etc/apt/keyrings/netbird.asc https://pkgs.netbird.io/debian/public.key
-echo 'deb [signed-by=/etc/apt/keyrings/netbird.asc] https://pkgs.netbird.io/debian stable main' | tee /etc/apt/sources.list.d/netbird.list
-apt update
-apt install netbird
-netbird up --setup-key NETBIRD_SETUP_KEY
+# git and rsync are used by the server's deploys (Node is installed by the deploys themselves)
+apt install -y ca-certificates curl gnupg git rsync apache2 python3.12 python3.12-venv python3-pip sqlite3 libjpeg-dev libapache2-mod-auth-openidc certbot python3-certbot-apache
 
 # Enable Apache modules needed for the app
 a2enmod auth_openidc proxy proxy_http headers remoteip ssl rewrite
@@ -114,15 +109,13 @@ loginctl enable-linger staff-app
 # Create log directory
 install --mode 0750 --owner staff-app --group adm --directory /var/log/staff-app
 
-# Set up SSH access for deployments
+# Let administrators SSH in as staff-app, to run systemctl --user and manual deploys
 mkdir -p /home/staff-app/.ssh
 chmod 700 /home/staff-app/.ssh
 touch /home/staff-app/.ssh/authorized_keys
 chmod 600 /home/staff-app/.ssh/authorized_keys
 chown --recursive staff-app:staff-app /home/staff-app/.ssh
-
-# Add deploy key (generated separately — see GitHub Actions setup)
-cat deploy_key.pub >> /home/staff-app/.ssh/authorized_keys
+cat your_key.pub >> /home/staff-app/.ssh/authorized_keys
 ```
 
 ### 3. Create Application Directories
@@ -334,102 +327,141 @@ curl http://127.0.0.1:8421/health
 
 ### 2. Backend Environment
 
-The `.env` file is **generated automatically by GitHub Actions** on every deployment from the configured GitHub secrets and variables — do not create it manually, as the workflow will overwrite it. Each environment gets its own `.env`, written to its own deploy path (`~/staff-app-production/backend/.env` or `~/staff-app-staging/backend/.env`).
+Each environment's settings are in its own `backend/.env`
+(`~/staff-app-production/backend/.env` and `~/staff-app-staging/backend/.env`),
+which you write by hand and keep with mode 600. Deploys never overwrite it: they
+only set its `APP_VERSION` line. After changing a setting, restart that backend.
 
-| Variable | Source |
+```bash
+install -m 600 /dev/null ~/staff-app-production/backend/.env
+nano ~/staff-app-production/backend/.env
+```
+
+| Variable | Value |
 |---|---|
-| `DATABASE_URL` | Hard-coded to the SQLite path under that environment's `backend/data/` |
-| `DJ_STUDIO_NETWORK` | GitHub Actions variable `DJ_STUDIO_NETWORK` |
-| `CORS_ORIGINS` | Derived from GitHub Actions variable `SITE_DOMAIN` |
-| `AIRTABLE_API_KEY` | GitHub Actions secret `AIRTABLE_API_KEY` |
-| `AIRTABLE_BASE_ID` | GitHub Actions secret `AIRTABLE_BASE_ID` |
-| `SMTP2GO_API_KEY` | GitHub Actions secret `SMTP2GO_API_KEY` (optional) |
-| `EMAIL_FROM_ADDRESS` | GitHub Actions variable `EMAIL_FROM_ADDRESS` (optional) |
-| `FEATURE_BIN_SHEET_ID` | GitHub Actions secret `FEATURE_BIN_SHEET_ID` (optional — feature bin sync is disabled if unset) |
-| `FEATURE_BIN_SHEET_GID` | GitHub Actions secret `FEATURE_BIN_SHEET_GID` (optional — feature bin sync is disabled if unset) |
+| `DATABASE_URL` | `sqlite:////home/staff-app/staff-app-production/backend/data/staff-app.db` (or `-staging`) |
+| `ENVIRONMENT` | `production` or `staging` |
+| `FRONTEND_BASE_URL` | `https://staff.kalx.berkeley.edu` (or `https://staff.stage.kalx.berkeley.edu`) |
+| `CORS_ORIGINS` | `https://kalx.berkeley.edu` |
+| `DJ_STUDIO_NETWORK`, `STATION_OFFICE_NETWORK` | The networks' CIDRs |
+| `AIRTABLE_API_KEY`, `AIRTABLE_BASE_ID` | Airtable credentials |
+| `SPINITRON_API_KEY` | Spinitron API key (optional) |
+| `WEBMASTER_EMAIL` | Gets in-app feedback, and the deploy emails |
+| `EMAIL_FROM_ADDRESS` | Optional; defaults to `noreply@kalx.berkeley.edu` |
+| `SMTP2GO_API_KEY` | Optional; without it, email goes through the local SMTP relay |
+| `SITE_ADMIN_EMAILS` | Optional extra site admins, comma-separated |
+| `WORKFORMS_ENABLED`, `DIRECTORY_ENABLED`, `LEGACY_IMPORT_ENABLED` | `true` or `false` |
+| `FEATURE_BIN_SHEET_ID`, `FEATURE_BIN_SHEET_GID`, `KALX_LIVE_CALENDAR_ID` | Optional; see the maintainers for the values |
+| `APP_VERSION` | Leave it out: deploys set it |
 
-Ensure all required values are configured in **Settings > Secrets and variables > Actions** before triggering the first deployment (see [GitHub Actions Deployment Setup](#github-actions-deployment-setup)).
-
-If `SMTP2GO_API_KEY` is absent, the deployment will still succeed — email notifications will be sent via the server's local SMTP relay (`localhost:25` by default) instead of smtp2go until the key is added.
+The README's "Backend Environment Variables" table lists every setting.
 
 ---
 
-## GitHub Actions Deployment Setup
+## Deploy Setup
 
-### 1. Generate Deploy Key
+The server deploys both environments itself, and GitHub has no access to it.
+`staff-app-deploy@<environment>.service` fetches the code from GitHub, builds
+the frontend, installs everything and restarts the backend. A timer starts it:
+every 2 minutes for staging, and at 3:51am Pacific for production. See the
+README's "Deployment" section for day-to-day use, and
+`docs/deployment/specs/server-side-deploy/plan.md` for the design.
+
+Do all of this SSHed in as `staff-app`.
+
+### 1. Clone the repository
+
+The deploys fetch code into this clone. The repository is public, so it needs
+no credentials.
 
 ```bash
-ssh-keygen -t ed25519 -C "kalx-promotions-deploy" -f deploy_key -N ""
+git clone https://github.com/kalx-berkeley/staff-app.git ~/staff-app-src
 ```
 
-- Add `deploy_key.pub` contents to `/home/staff-app/.ssh/authorized_keys` on the server
-- Add `deploy_key` (private key) as the `SSH_PRIVATE_KEY` GitHub secret
+### 2. Save a GitHub token
 
-### 2. Configure GitHub Secrets
+In GitHub, make a fine-grained personal access token with **Repository access:
+Public repositories (read-only)** and no permissions added. It only raises
+GitHub's API limit from 60 to 5,000 requests an hour. Then save it:
 
-In **Settings > Secrets and variables > Actions**, create the following for each environment (staging, production):
+```bash
+install -D -m 600 /dev/stdin ~/.config/staff-app-deploy/github-token
+# paste the token, press Enter, then Ctrl-D
+```
 
-**Secrets:**
-- `NETBIRD_SETUP_KEY` — Netbird setup key for VPN access
-- `SSH_PRIVATE_KEY` — private deploy key
-- `AIRTABLE_API_KEY` — Airtable API key (optional)
-- `AIRTABLE_BASE_ID` — Airtable base ID (optional)
-- `SMTP2GO_API_KEY` — smtp2go API key for sending notification emails (optional; falls back to the server's local SMTP relay if absent)
-- `FEATURE_BIN_SHEET_ID` — Google Sheet ID for the KALX feature bin (not public data; optional — feature bin sync is disabled if unset)
-- `FEATURE_BIN_SHEET_GID` — Worksheet `gid` of the sheet's "Current Active A-Z" tab (not public data; optional — feature bin sync is disabled if unset)
+### 3. Check what's live
 
-**Variables:**
-- `SITE_DOMAIN` — e.g., `staff.kalx.berkeley.edu` (the staff/app domain)
-- `DJ_STUDIO_NETWORK` — CIDR of DJ studio network, e.g., `10.0.1.0/24`
-- `NETBIRD_HOSTNAME` — Netbird peer name of the server (the bare hostname, not the FQDN)
-- `EMAIL_FROM_ADDRESS` — From address for notification emails (optional; defaults to `noreply@kalx.berkeley.edu`)
+Deploys skip a version that's already live, which they read from
+`~/staff-app-<environment>/DEPLOYED_VERSION`. On a server the old GitHub
+Actions deploy has deployed to, that file starts from the `APP_VERSION` in
+`.env`, so check those values are right:
+
+```bash
+grep '^APP_VERSION=' ~/staff-app-production/backend/.env   # the release production has, e.g. v1.13.1
+grep '^APP_VERSION=' ~/staff-app-staging/backend/.env      # the commit SHA staging has
+```
+
+If a line is missing, write the value yourself, for example
+`echo v1.13.1 > ~/staff-app-production/DEPLOYED_VERSION`. On a brand-new
+server, write the newest release for production and the newest commit on
+`main` for staging, then deploy each once by hand with `--force` (see the
+README).
+
+### 4. Install the deploy scripts and units
+
+```bash
+cd ~/staff-app-src
+for environment in staging production; do
+  install -D -m 755 -t ~/staff-app-deploy/$environment deploy/fetch.py deploy/notify.py deploy/deploy_common.py
+done
+cp systemd/staff-app-deploy@.service systemd/staff-app-deploy-failed@.service \
+   systemd/staff-app-deploy-production.timer systemd/staff-app-deploy-staging.timer \
+   ~/.config/systemd/user/
+systemd-analyze --user verify ~/.config/systemd/user/staff-app-deploy*
+systemctl --user daemon-reload
+```
+
+From then on, deploys keep these up to date themselves.
+
+### 5. Try it, then turn the timers on
+
+```bash
+~/staff-app-deploy/staging/fetch.py staging --dry-run
+~/staff-app-deploy/production/fetch.py production --dry-run
+systemctl --user enable --now staff-app-deploy-staging.timer staff-app-deploy-production.timer
+systemctl --user list-timers 'staff-app-deploy-*'
+```
+
+### 6. Check lingering and email
+
+```bash
+loginctl show-user staff-app -p Linger   # must say Linger=yes, or the timers stop when you log out
+python3 -c "import smtplib; smtplib.SMTP('localhost', 25).sendmail('noreply@kalx.berkeley.edu', ['YOU@example.com'], 'Subject: staff-app deploy email test\n\nIt works.')"
+```
 
 ---
 
 ## First Deployment
 
-All code deployment — backend and frontend — is handled by the GitHub Actions workflow defined in `.github/workflows/deploy.yml`. There is no manual code copy step.
+Once the timers are on, staging deploys the newest commit on `main` within
+about 2 minutes of its tests passing, and production deploys the newest release
+at 3:51am Pacific. Each deploy:
 
-### What the workflow does
+1. **Checks** that the target isn't live yet and that its **Run Backend Tests**
+   and **Run Frontend Tests** checks passed in GitHub Actions
+2. **Fetches the code** with `git` into `~/staff-app-build/<environment>`
+3. **Builds the frontend**, first installing or updating Node (the major
+   version in `frontend/.node-version`) in `~/opt`
+4. **Backs up the database** to `backend/data/backup_<date>_<time>.db`
+5. **Copies the backend and frontend into place**, runs `pip install` and the
+   migrations, and sets `APP_VERSION` in `.env`
+6. **Installs the systemd units** and restarts the backend
+7. **Verifies** that the backend answers `http://127.0.0.1:<port>/health`, then
+   records the version in `DEPLOYED_VERSION`
 
-On every push to `main` (staging) or published release (production) the workflow resolves a
-per-environment deploy path, systemd unit name, and port (production: `~/staff-app-production`,
-`staff-app-backend-production.service`, port 8420; staging: `~/staff-app-staging`,
-`staff-app-backend-staging.service`, port 8421), then:
-
-1. **Runs tests** — backend (`pytest`) and frontend (`tsc`, `eslint`, `npm test`)
-2. **Builds the frontend** — the frontend test job runs `vite build` alongside the backend tests and
-   hands `frontend/dist/` to the deploy job as a workflow artifact
-3. **Connects to the server** via Netbird VPN using `NETBIRD_SETUP_KEY`
-4. **Backs up the database** — copies `staff-app.db` to a timestamped file before touching anything
-5. **Rsyncs the backend** — copies `backend/` to the environment's deploy path on the server, excluding `venv/` and cache files
-6. **Rsyncs the frontend build** — copies `frontend/dist/` to the environment's deploy path
-7. **Writes `.env`** — generates `backend/.env` under the environment's deploy path from GitHub secrets and variables (overwrites any previous file)
-8. **Installs Python dependencies** — creates/updates `venv/` and runs `pip install -r requirements.txt`
-9. **Runs database migrations** — `venv/bin/alembic upgrade head`
-10. **Installs/enables/restarts the backend service** — the environment's systemd unit
-11. **Verifies** — polls until the backend responds on `http://127.0.0.1:<port>/health`
-
-Because production and staging use different deploy paths, ports, and systemd unit names, the two
-environments never overwrite each other's code, database, or running process even though they
-share the same server and OS user.
-
-### Prerequisites before first deployment
-
-The workflow assumes the server is already set up (see [Server Setup](#server-setup) and [Apache Configuration](#apache-configuration)) and in particular:
-
-- The `staff-app` user exists and the deploy SSH key is in its `authorized_keys`
-- Both systemd service files are installed (step 1 of [Backend Service Setup](#backend-service-setup)) — the workflow runs `enable` itself on every deploy, so this is only required as a fallback if the unit file doesn't exist yet on a brand-new environment
-- All GitHub Actions secrets and variables are configured
-
-### Trigger
-
-```
-push to main        →  staging  environment
-publish a release   →  production environment
-```
-
-To trigger manually: **Actions** tab → **Deploy** → **Run workflow**.
+Production and staging use different directories, ports and units, so they
+never touch each other's code, database or running backend. If a production
+deploy fails, it rolls back to what was live before.
 
 ---
 
@@ -442,11 +474,11 @@ To trigger manually: **Actions** tab → **Deploy** → **Run workflow**.
 systemctl --user status staff-app-backend-production
 systemctl --user status staff-app-backend-staging
 
+# Deploy timers
+systemctl --user list-timers 'staff-app-deploy-*'
+
 # Apache
 sudo systemctl status apache2
-
-# Netbird (on server)
-sudo netbird status
 ```
 
 ### Health Checks
@@ -476,17 +508,9 @@ curl https://staff.stage.kalx.berkeley.edu/api/health
 
 ### Code Deployment (Backend + Frontend)
 
-All code deployment is handled by GitHub Actions — there is no manual rsync or copy step for application code.
-
-Push to `main` to deploy to staging, publish a GitHub release to deploy to production, or trigger the workflow manually from the Actions tab.
-
-### Rollback
-
-```bash
-# Revert the commit on your local machine and push
-git revert HEAD
-git push origin main
-```
+The server deploys code itself: staging from `main`, production from the newest
+release. The README's "Deployment" section covers deploying by hand, going back
+to an older release, logs and emails.
 
 ### Update Apache Config
 
@@ -504,7 +528,7 @@ Secrets and variables live in `/etc/apache2/conf-available/kalx-secrets.conf` an
 The `/pass-giveaway/` location blocks live directly inside `apache/sites/staff.conf`
 (root-owned, in `/etc/apache2/sites-available/`) rather than in a file the `staff-app` OS user
 can write to. Changes to those blocks require manually copying the updated config and reloading
-Apache — the GitHub Actions workflow does not deploy them.
+Apache — deploys don't install Apache config.
 
 ---
 
@@ -545,6 +569,8 @@ systemctl --user restart staff-app-backend-production   # or -staging
 ```
 
 ### Database Backup
+
+Every deploy backs up the database first. To make a backup by hand:
 
 ```bash
 cp ~/staff-app-production/backend/data/staff-app.db \
@@ -652,11 +678,12 @@ chmod -R 755 ~/staff-app-production/frontend/dist
 
 ### Deployment Failed
 
-Check GitHub Actions logs in the browser. On the server:
+The failure email quotes the reason and the end of the log. On the server:
+
 ```bash
-sudo netbird status
-ssh staff-app@your-server   # Test SSH connectivity
-df -h                         # Check disk space
+journalctl --user -u staff-app-deploy@production   # or @staging
+systemctl --user list-timers 'staff-app-deploy-*'
+df -h                                               # check disk space
 ```
 
 ---
@@ -664,7 +691,7 @@ df -h                         # Check disk space
 ## Complete Checklist
 
 ### One-Time Server Setup
-- [ ] Installed Apache, mod_auth_openidc, Python, Netbird
+- [ ] Installed Apache, mod_auth_openidc, Python, git and rsync
 - [ ] Created `staff-app` user with lingering enabled
 - [ ] Created application directories
 
@@ -688,17 +715,19 @@ df -h                         # Check disk space
 ### Backend
 - [ ] Copied `staff-app-backend-production.service` and `staff-app-backend-staging.service` to `~/.config/systemd/user/` as the `staff-app` user
 - [ ] Ran `systemctl --user daemon-reload` and `systemctl --user enable` for both services (via SSH as `staff-app`, not via sudo)
-- [ ] **Note:** do not manually create `.env` — the GitHub Actions workflow generates it from secrets/variables on first deployment
+- [ ] Wrote each environment's `backend/.env` (mode 600)
 
-### GitHub Actions
-- [ ] `SSH_PRIVATE_KEY` secret configured
-- [ ] `NETBIRD_SETUP_KEY` secret configured
-- [ ] `SITE_DOMAIN`, `DJ_STUDIO_NETWORK`, `NETBIRD_HOSTNAME` variables set
-- [ ] Deploy key public key added to `staff-app` user's `authorized_keys`
+### Deploys
+- [ ] Cloned the repository to `~/staff-app-src`
+- [ ] Saved the read-only GitHub token to `~/.config/staff-app-deploy/github-token` (mode 600)
+- [ ] Checked or wrote each environment's `DEPLOYED_VERSION`
+- [ ] Installed the deploy scripts and units, and `systemd-analyze --user verify` passes
+- [ ] Turned on both deploy timers
+- [ ] Lingering is on, and a test email through the local relay arrived
 
 ### First Deployment
-- [ ] Pushed to `main` (staging) or published a release (production) to trigger GitHub Actions
-- [ ] Workflow passed all tests, deployed code, ran migrations, and health-checked successfully
+- [ ] Pushed to `main`: staging deployed it once the tests passed
+- [ ] Published a release: production deployed it at 3:51am, and the "deployed" email arrived
 - [ ] App loads at `https://staff.kalx.berkeley.edu`
 - [ ] Google login redirects correctly and returns to app
 - [ ] DJ view accessible without login from DJ studio network

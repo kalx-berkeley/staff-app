@@ -1,0 +1,16 @@
+# Deploys one environment (the instance name: staging or production) if it has
+# something new to deploy. Started by staff-app-deploy-<environment>.timer, or
+# by hand with: systemctl --user start staff-app-deploy@production
+#
+# Only production deploys install this file, so a change to it reaches the
+# server with a release. See docs/deployment/specs/server-side-deploy/plan.md.
+
+[Unit]
+Description=Deploy the KALX Staff App (%i)
+OnFailure=staff-app-deploy-failed@%i.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/staff-app-deploy/%i/fetch.py %i
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+TimeoutStartSec=30min

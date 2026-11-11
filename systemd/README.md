@@ -1,19 +1,31 @@
-# Systemd Service Files
+# Systemd Units
 
-This directory contains user systemd service files for the KALX Staff App.
-Production and staging run as two independent services on the same server, under separate
-deploy directories and separate ports, so a staging deploy can never affect production.
+This directory contains the user systemd units for the KALX Staff App, all run
+as the `staff-app` user. Production and staging run as two independent backends
+on the same server, under separate deploy directories and separate ports, so a
+staging deploy can never affect production.
 
-## Services
+## Units
 
 - `staff-app-backend-production.service`: Backend API service (uvicorn), port 8420,
   working directory `~/staff-app-production/backend`
 - `staff-app-backend-staging.service`: Backend API service (uvicorn), port 8421,
   working directory `~/staff-app-staging/backend`
+- `staff-app-deploy@.service`: deploys one environment (the instance name,
+  `staging` or `production`) if it has something new, by running
+  `~/staff-app-deploy/<environment>/fetch.py`
+- `staff-app-deploy-failed@.service`: emails `WEBMASTER_EMAIL` when a deploy
+  fails (the deploy service's `OnFailure=`)
+- `staff-app-deploy-staging.timer`: starts the staging deploy every 2 minutes
+- `staff-app-deploy-production.timer`: starts the production deploy at 3:51am
+  Pacific
 
-Both run as the `staff-app` user. The GitHub Actions deploy workflow installs/updates and
-restarts the appropriate one automatically (production at 4am Pacific after a release is
-published, staging on a push to `main`) — the manual steps below are only needed for first-time server setup.
+Each deploy installs and restarts its own backend unit and timer. The two
+`staff-app-deploy*@.service` templates are shared by both environments, so only
+production deploys install them, and a change to them reaches the server with a
+release. The manual steps below are only needed for first-time server setup;
+the deploy units' setup is in [SETUP_GUIDE.md](../SETUP_GUIDE.md) ("Deploy
+Setup"), and using them is in the README's "Deployment" section.
 
 ## Installation
 
@@ -43,7 +55,7 @@ systemctl --user start staff-app-backend-staging
 
 ### Automatic Installation
 
-These services are automatically installed during deployment by the GitHub Actions workflow.
+After first-time setup, each deploy installs these units itself (see above).
 See [SETUP_GUIDE.md](../SETUP_GUIDE.md) for first-time server setup.
 
 ## Managing Services

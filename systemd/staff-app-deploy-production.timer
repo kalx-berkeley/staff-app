@@ -1,0 +1,14 @@
+# Deploys the newest release to production at 3:51am Pacific, while no live
+# DJs are using the system. A run missed while the server was off is skipped,
+# not run late.
+
+[Unit]
+Description=Deploy the newest KALX Staff App release to production nightly
+
+[Timer]
+OnCalendar=*-*-* 03:51:00 America/Los_Angeles
+Persistent=false
+Unit=staff-app-deploy@production.service
+
+[Install]
+WantedBy=timers.target

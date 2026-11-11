@@ -1,0 +1,69 @@
+name: Tests
+
+# The tests run on every push to main, including docs-only pushes: the server
+# deploys a commit only once these checks have passed for it, so every commit
+# needs them. The server deploys staging and production itself (see
+# docs/deployment/specs/server-side-deploy/plan.md); GitHub has no access to it.
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  # The server checks for this job's name and "Run Frontend Tests" before it
+  # deploys a commit, so renaming either needs REQUIRED_CHECKS in
+  # deploy/deploy_common.py changing too.
+  test-backend:
+    name: Run Backend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+    - name: Set up Python
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+      with:
+        python-version: '3.14'
+
+    - name: Install backend dependencies
+      working-directory: ./backend
+      run: |
+        sudo apt install libjpeg-dev
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run backend tests
+      working-directory: ./backend
+      run: |
+        black --check .
+        pytest -n 4 --cov=app --cov-report=xml
+
+    - name: Run deploy script tests
+      working-directory: ./deploy
+      run: |
+        black --check .
+        python -m pytest
+
+  test-frontend:
+    name: Run Frontend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+    - name: Set up Node.js
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+      with:
+        # The server builds with the same major version (deploy/install.py)
+        node-version-file: frontend/.node-version
+
+    - name: Install frontend dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: Run frontend tests
+      working-directory: ./frontend
+      run: |
+        npm run lint
+        npx tsc --noEmit
+        npm test

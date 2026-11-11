@@ -1,0 +1,13 @@
+# Checks every 2 minutes whether main has a new commit whose CI passed, and
+# deploys it to staging.
+
+[Unit]
+Description=Deploy the newest KALX Staff App commit on main to staging
+
+[Timer]
+OnCalendar=*:0/2
+Persistent=false
+Unit=staff-app-deploy@staging.service
+
+[Install]
+WantedBy=timers.target
