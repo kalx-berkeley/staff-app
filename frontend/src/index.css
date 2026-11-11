@@ -2946,6 +2946,71 @@ fieldset.radio-group legend {
   background: var(--light-bg);
 }
 
+.venues-list-table td {
+  overflow-wrap: anywhere;
+}
+
+/* A venue's KALX promotions reps, one per line */
+.venue-reps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.venue-reps li {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.5rem;
+  align-items: baseline;
+}
+
+.venue-rep-name {
+  font-weight: 500;
+}
+
+.venue-rep-email {
+  font-size: 0.8rem;
+  color: var(--secondary-color);
+}
+
+.venue-reps-none {
+  color: var(--secondary-color);
+  font-style: italic;
+}
+
+.venues-reps-table td {
+  vertical-align: top;
+}
+
+.venues-reps-table th:first-child {
+  width: 45%;
+}
+
+.venue-reps-table-name {
+  font-weight: 600;
+}
+
+.venue-reps-table-address {
+  font-size: 0.8rem;
+  color: var(--secondary-color);
+}
+
+.venue-card-reps {
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.875rem;
+}
+
+.venue-card-reps-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 0.2rem;
+}
+
 /* Small inline star for assigned shows in compact list */
 .assignment-indicator {
   color: #28a745;

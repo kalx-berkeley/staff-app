@@ -4,3 +4,4 @@ export { default as ShowDetail } from './ShowDetail';
 export { default as MyPasses } from './MyPasses';
 export { default as SpecialtyShowList } from './SpecialtyShowList';
 export { default as SpecialtyShowDetail } from './SpecialtyShowDetail';
+export { default as VenueList } from './VenueList';

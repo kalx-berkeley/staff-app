@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { venuesAPI, venuesMyAPI } from '../api';
 import type { VenueResponse } from '../types';
+import { VenueRepList } from '../components';
+import { filterVenues } from '../venueSearch';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 
@@ -67,13 +69,7 @@ const VenueList = () => {
     );
   }
 
-  const filteredVenues = venueFilter.trim()
-    ? venues.filter(
-        (v) =>
-          v.name.toLowerCase().includes(venueFilter.toLowerCase()) ||
-          v.address.toLowerCase().includes(venueFilter.toLowerCase())
-      )
-    : venues;
+  const filteredVenues = filterVenues(venues, venueFilter, { includeAddress: true });
 
   return (
     <div className="venue-list">
@@ -101,7 +97,7 @@ const VenueList = () => {
       <div className="venue-filter">
         <input
           type="text"
-          placeholder="Filter venues by name or address..."
+          placeholder="Filter by venue, address, rep name or rep email..."
           value={venueFilter}
           onChange={(e) => setVenueFilter(e.target.value)}
           className="venue-filter-input"
@@ -144,6 +140,7 @@ const VenueList = () => {
               <tr>
                 <th>Name</th>
                 <th>Address</th>
+                <th>KALX Promotions Reps</th>
                 <th></th>
               </tr>
             </thead>
@@ -152,6 +149,9 @@ const VenueList = () => {
                 <tr key={venue.id}>
                   <td>{venue.name}</td>
                   <td>{venue.address}</td>
+                  <td>
+                    <VenueRepList reps={venue.owner_details} />
+                  </td>
                   <td>
                     <button
                       onClick={() => handleEditClick(venue)}
@@ -171,6 +171,12 @@ const VenueList = () => {
             <div key={venue.id} className="venue-card">
               <h3>{venue.name}</h3>
               <p className="venue-address">{venue.address}</p>
+              <div className="venue-card-reps">
+                <span className="venue-card-reps-label">
+                  KALX Promotions Rep{venue.owner_details.length === 1 ? '' : 's'}
+                </span>
+                <VenueRepList reps={venue.owner_details} />
+              </div>
               <button
                 onClick={() => handleEditClick(venue)}
                 className="btn-primary"

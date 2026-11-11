@@ -31,6 +31,7 @@ const StaffShowDetail = lazySection(loadStaff, 'ShowDetail');
 const StaffMyPasses = lazySection(loadStaff, 'MyPasses');
 const StaffSpecialtyShowList = lazySection(loadStaff, 'SpecialtyShowList');
 const StaffSpecialtyShowDetail = lazySection(loadStaff, 'SpecialtyShowDetail');
+const StaffVenueList = lazySection(loadStaff, 'VenueList');
 
 const loadDJ = () => import('./dj');
 const DJLayout = lazySection(loadDJ, 'DJLayout');
@@ -231,6 +232,7 @@ export default function PassGiveawayApp() {
           <Route path="my-passes" element={<StaffMyPasses />} />
           <Route path="specialty-shows" element={<StaffSpecialtyShowList />} />
           <Route path="specialty-shows/:id" element={<StaffSpecialtyShowDetail />} />
+          <Route path="venues" element={<StaffVenueList />} />
           <Route path="profile" element={<ProfileSettings section="Staff" />} />
         </Route>
 

@@ -64,6 +64,7 @@ const makeVenue = (overrides: Partial<VenueResponse> = {}): VenueResponse => ({
   promoter: null,
   shows_have_external_promoter: false,
   owner_emails: [],
+  owner_details: [],
   contacts: [],
   ...overrides,
 });

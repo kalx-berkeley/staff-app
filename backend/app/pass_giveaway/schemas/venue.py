@@ -23,6 +23,13 @@ class VenueContactCreate(BaseModel):
     phone: str | None = None
 
 
+class VenueOwnerInfo(BaseModel):
+    """A KALX promotions rep who owns the venue, for display."""
+
+    email: str
+    name: str | None = None
+
+
 class VenueContactResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -134,6 +141,8 @@ class VenueResponse(BaseModel):
     promoter: PromoterResponse | None = None
     shows_have_external_promoter: bool = False
     owner_emails: list[str] = Field(default_factory=list)
+    # The owners are the venue's KALX promotions reps
+    owner_details: list[VenueOwnerInfo] = Field(default_factory=list)
     contacts: list[VenueContactResponse] = Field(default_factory=list)
 
     @classmethod
@@ -171,5 +180,10 @@ class VenueResponse(BaseModel):
             ),
             shows_have_external_promoter=venue.shows_have_external_promoter,
             owner_emails=[o.promotions_staff_email for o in venue.owners],
+            owner_details=[
+                VenueOwnerInfo(email=o.staff.email, name=o.staff.name)
+                for o in venue.owners
+                if o.staff
+            ],
             contacts=[VenueContactResponse.model_validate(c) for c in venue.contacts],
         )

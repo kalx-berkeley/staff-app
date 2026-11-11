@@ -122,6 +122,12 @@ export interface VenueContactCreate {
   phone?: string | null;
 }
 
+/** A KALX promotions rep who owns a venue. */
+export interface VenueOwnerInfo {
+  email: string;
+  name: string | null;
+}
+
 export interface VenueContactResponse extends VenueContactCreate {
   id: number;
 }
@@ -213,6 +219,8 @@ export interface VenueResponse {
   promoter?: PromoterResponse | null;
   shows_have_external_promoter: boolean;
   owner_emails: string[];
+  // The venue's KALX promotions reps
+  owner_details: VenueOwnerInfo[];
   contacts: VenueContactResponse[];
 }
 

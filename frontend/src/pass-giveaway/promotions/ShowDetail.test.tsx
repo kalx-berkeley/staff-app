@@ -119,6 +119,7 @@ const makeShow = (passes: PassResponse[]): ShowResponse => ({
     deleted: false,
     shows_have_external_promoter: false,
     owner_emails: [],
+    owner_details: [],
     contacts: [],
   },
   show_date: '2099-12-31',

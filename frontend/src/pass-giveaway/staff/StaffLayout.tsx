@@ -60,6 +60,9 @@ const StaffLayout = () => {
           <li>
             <NavLink to="/staff/shows">Shows</NavLink>
           </li>
+          <li>
+            <NavLink to="/staff/venues">Venues</NavLink>
+          </li>
           {isSublistDj && (
             <li>
               <NavLink to="/staff/my-passes">My Passes</NavLink>

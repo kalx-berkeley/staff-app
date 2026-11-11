@@ -151,13 +151,17 @@ describe('App - Role-Based UI Elements', () => {
         expect(screen.getByRole('heading', { name: /Radio Pass Giveaway/i })).toBeInTheDocument();
       });
 
-      // Should have access to Shows and Profile only (section nav)
+      // Should have access to Shows, Venues and Profile (section nav)
       const nav = screen.getByRole('navigation');
       expect(nav).toHaveTextContent('Shows');
       expect(nav).toHaveTextContent('Profile');
 
-      // Should NOT have Venues in section nav
-      expect(screen.queryByRole('link', { name: /^Venues$/i })).not.toBeInTheDocument();
+      // Venues is the staff view's read-only venue and rep list, not the
+      // promotions venue editor
+      expect(screen.getByRole('link', { name: /^Venues$/i })).toHaveAttribute(
+        'href',
+        '/pass-giveaway/staff/venues',
+      );
 
       // Should display user email
       expect(screen.getByText(user.email!)).toBeInTheDocument();

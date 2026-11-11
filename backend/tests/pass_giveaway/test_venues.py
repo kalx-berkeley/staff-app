@@ -371,3 +371,35 @@ def test_update_venue_requires_promotions_staff(
         headers={"X-Forwarded-User": staff.email},
     )
     assert response.status_code == 403
+
+
+def test_list_venues_includes_promotions_rep_names(
+    client: TestClient, db: Session, test_promotions_staff
+):
+    """Each venue lists its KALX promotions reps' names and emails."""
+    second = Staff(email="rep2@test.com", name="Second Rep", phone="555-0101")
+    db.add(second)
+    db.flush()
+    db.add(StaffDepartment(staff_id=second.id, department="Promotions"))
+    db.add(StaffStatus(staff_id=second.id, status="Active"))
+    db.commit()
+
+    client.post(
+        "/api/venues",
+        json={
+            "name": "Shared Venue",
+            "address": "Somewhere",
+            "owner_emails": [test_promotions_staff.email, second.email],
+        },
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    response = client.get(
+        "/api/venues", headers={"X-Forwarded-User": test_promotions_staff.email}
+    )
+    assert response.status_code == 200
+    details = response.json()[0]["owner_details"]
+    assert sorted(details, key=lambda d: d["email"]) == [
+        {"email": "promotions@test.com", "name": "Test Promotions"},
+        {"email": "rep2@test.com", "name": "Second Rep"},
+    ]
