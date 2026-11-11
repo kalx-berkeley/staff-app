@@ -322,13 +322,21 @@ def fetch_code(sha: str, environment: Environment) -> None:
     archive = subprocess.Popen(
         ["git", "-C", str(source_repo()), "archive", "--format=tar", sha],
         stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
     extract = subprocess.run(
-        ["tar", "-x", "-C", str(environment.build_dir)], stdin=archive.stdout
+        ["tar", "-x", "-C", str(environment.build_dir)],
+        stdin=archive.stdout,
+        capture_output=True,
+        text=True,
     )
     archive.stdout.close()
+    archive_error = archive.stderr.read().decode(errors="replace").strip()
     if archive.wait() != 0 or extract.returncode != 0:
-        raise DeployFailed(f"Couldn't copy the code for {sha} into {environment.build_dir}")
+        detail = archive_error or extract.stderr.strip()
+        raise DeployFailed(
+            f"Couldn't copy the code for {sha} into {environment.build_dir}: {detail}"
+        )
 
 
 def run_install(
@@ -399,6 +407,9 @@ def deploy(environment: Environment, args: argparse.Namespace) -> int:
             )
         if not check_ci(environment, version, sha, args.dry_run):
             return 0
+        if environment.name == "staging" and not args.ref:
+            # git ls-remote only found the commit; fetch it so it can be copied
+            sha = resolve_commit(sha)
     except GitHubUnavailable as error:
         if production:
             raise DeployFailed(

@@ -1,6 +1,7 @@
 """Tests for fetch.py: deciding whether there's something to deploy."""
 
 import logging
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -26,6 +27,8 @@ class FakeServer:
     unavailable: bool = False
     install_succeeds: bool = True
     installs: list[tuple[str, str, str]] = field(default_factory=list)
+    # Commits fetched into the source clone, which git archive needs
+    fetched: list[str] = field(default_factory=list)
     api_calls: list[str] = field(default_factory=list)
 
     def git_network(self, arguments: list[str]) -> str:
@@ -45,7 +48,12 @@ class FakeServer:
     def resolve_commit(self, ref: str) -> str:
         if self.unavailable:
             raise GitHubUnavailable("no network")
-        return RELEASE_SHA if ref.startswith("v") else ref
+        sha = RELEASE_SHA if ref.startswith("v") else ref
+        self.fetched.append(sha)
+        return sha
+
+    def fetch_code(self, sha: str, environment: object) -> None:
+        assert sha in self.fetched, f"{sha} was copied without being fetched"
 
     def run_install(self, environment, version: str, deployed: str, verbose: bool) -> bool:
         self.installs.append((environment.name, version, deployed))
@@ -79,7 +87,7 @@ def server(home: Path, monkeypatch: pytest.MonkeyPatch) -> FakeServer:
     for name in ("git_network", "github_json", "resolve_commit", "run_install"):
         monkeypatch.setattr(fetch, name, getattr(fake, name))
     monkeypatch.setattr(fetch, "repo_slug", lambda: "kalx-berkeley/staff-app")
-    monkeypatch.setattr(fetch, "fetch_code", lambda sha, environment: None)
+    monkeypatch.setattr(fetch, "fetch_code", fake.fetch_code)
     for environment, live in (("staging", STAGING_LIVE), ("production", "v1.13.1")):
         write_env(
             home, environment, f"WEBMASTER_EMAIL=web@example.com\nAPP_VERSION={live}\n"
@@ -299,3 +307,38 @@ def test_staging_waits_quietly_before_ci_is_queued(server):
     server.checks[STAGING_NEW] = passing()
     assert deploy("staging") == 0
     assert server.installs == [("staging", STAGING_NEW, STAGING_LIVE)]
+
+
+def test_staging_fetches_a_new_commit_before_copying_it(server):
+    server.checks[STAGING_NEW] = passing()
+    assert deploy("staging") == 0
+    assert server.fetched == [STAGING_NEW]
+    assert server.installs == [("staging", STAGING_NEW, STAGING_LIVE)]
+
+
+def test_a_commit_pushed_after_the_clone_is_fetched_and_copied(home):
+    """With real git: the case the fake git missed, and staging hit."""
+
+    def git(*args: str, cwd: Path) -> str:
+        return subprocess.run(
+            ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
+        ).stdout.strip()
+
+    origin = home / "origin"
+    origin.mkdir()
+    git("init", "-q", "-b", "main", cwd=origin)
+    identity = ("-c", "user.name=t", "-c", "user.email=t@example.com")
+    (origin / "old.txt").write_text("old")
+    git("add", ".", cwd=origin)
+    git(*identity, "commit", "-qm", "old", cwd=origin)
+    git("clone", "-q", str(origin), str(home / "staff-app-src"), cwd=home)
+    (origin / "new.txt").write_text("new")
+    git("add", ".", cwd=origin)
+    git(*identity, "commit", "-qm", "new", cwd=origin)
+    new = git("rev-parse", "HEAD", cwd=origin)
+
+    staging = get_environment("staging")
+    sha, _ = fetch.choose_target(staging, None)
+    assert sha == new
+    fetch.fetch_code(fetch.resolve_commit(sha), staging)
+    assert (staging.build_dir / "new.txt").read_text() == "new"
