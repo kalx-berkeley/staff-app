@@ -225,7 +225,9 @@ def ci_status(environment: Environment, sha: str) -> str:
     :param sha: The commit
     :type sha: str
     :returns: ``passed`` when every required check succeeded, ``failed`` when
-        any finished another way, otherwise ``pending``
+        any finished another way, ``missing`` when none of them has started
+        (CI never ran for the commit, or GitHub hasn't queued it yet), otherwise
+        ``pending``
     :rtype: str
     :raises GitHubUnavailable: If GitHub can't be reached
     """
@@ -248,7 +250,7 @@ def ci_status(environment: Environment, sha: str) -> str:
         check.get("conclusion") == "success" for check in latest.values()
     ):
         return "passed"
-    return "pending"
+    return "pending" if latest else "missing"
 
 
 def check_ci(environment: Environment, version: str, sha: str, dry_run: bool) -> bool:
@@ -277,7 +279,8 @@ def check_ci(environment: Environment, version: str, sha: str, dry_run: bool) ->
         status = ci_status(environment, sha)
         if not dry_run:
             write_state(environment, "checked", f"{sha} {status}")
-        if status == "pending":
+        if status in ("pending", "missing"):
+            # Right after a push, the checks may not have been queued yet
             logger.debug("CI hasn't finished for %s yet", sha)
         elif status == "failed":
             logger.info("CI failed for %s, so staging stays as it is", sha)
@@ -287,6 +290,14 @@ def check_ci(environment: Environment, version: str, sha: str, dry_run: bool) ->
         raise DeployFailed(
             f"The tests failed for {version}, so it wasn't deployed to production. "
             "Publish a release whose tests pass, and the next nightly run deploys it."
+        )
+    if status == "missing":
+        raise DeployFailed(
+            f"The tests never ran for {version}'s commit ({sha[:7]}), so it can't be "
+            "deployed to production. This happens to a release whose commit only "
+            "changed files CI used to skip, such as CHANGELOG.md. Publish a new "
+            "release from a commit whose Run Backend Tests and Run Frontend Tests "
+            "checks passed, and the next nightly run deploys it."
         )
     if status == "pending":
         logger.info(

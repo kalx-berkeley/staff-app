@@ -61,6 +61,10 @@ holds what both share, and `deploy/notify.py` sends the failure email.
        when it will have passed.
      - If CI failed, send a failure email naming the release, and don't deploy
        it. Otherwise a release that can never deploy would go unnoticed.
+     - If CI never ran for the release's commit (GitHub has no check runs for
+       it at all), treat it like a failure. Releases made before every push
+       ran CI can have this, such as v1.13.1, whose commit only changed
+       `CHANGELOG.md`.
    - **Staging**:
      - If CI is still running, exit quietly and try again on the next run.
      - If CI failed, exit quietly and stay on the current version. GitHub has
@@ -258,6 +262,7 @@ There's no smtp2go support, since smtp2go is being removed from the app later.
 | Production's 3:51am run can't reach GitHub | Yes, as a failure |
 | GitHub rejects the token (either environment) | Yes, at most once a day |
 | The newest release's CI failed | Yes, as a failure, naming the release, each night until a newer release passes |
+| CI never ran for the newest release's commit | Yes, as a failure, naming the release and commit, each night until a newer release passes |
 | The newest release's CI is still running at 3:51am | No (it deploys the next night) |
 | Staging CI failed or is still running | No |
 | Staging can't reach GitHub | No |

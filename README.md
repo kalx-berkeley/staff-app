@@ -358,6 +358,7 @@ the server's local SMTP relay.
 | A deploy fails (either environment) | Yes, with what happened and the end of the log |
 | Production deploys a new release | Yes |
 | The newest release's tests failed | Yes, each night until a newer release passes |
+| The tests never ran for the newest release's commit | Yes, each night until a newer release passes |
 | The release marked "Latest" is older than what's live | Yes |
 | Production's nightly run can't reach GitHub | Yes |
 | GitHub rejects the token | Yes, at most once a day |

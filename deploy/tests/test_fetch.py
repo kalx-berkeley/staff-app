@@ -103,7 +103,7 @@ def test_staging_waits_quietly_while_ci_runs(server, caplog):
     with caplog.at_level(logging.INFO, logger="staff-app-deploy"):
         assert deploy("staging") == 0
     assert server.installs == []
-    assert read_state(get_environment("staging"), "checked") == f"{STAGING_NEW} pending"
+    assert read_state(get_environment("staging"), "checked") == f"{STAGING_NEW} missing"
     assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
 
 
@@ -171,6 +171,10 @@ def test_production_deploys_a_new_release_whose_ci_passed(server):
 
 
 def test_production_waits_for_the_next_night_while_ci_runs(server):
+    server.checks[RELEASE_SHA] = [
+        {"id": 1, "name": "Run Backend Tests", "status": "in_progress", "conclusion": None},
+        {"id": 2, "name": "Run Frontend Tests", "status": "queued", "conclusion": None},
+    ]
     assert deploy("production") == 0
     assert server.installs == []
     assert read_state(get_environment("production"), "last-failure") is None
@@ -279,3 +283,19 @@ def test_a_run_while_another_holds_the_lock_stops(server):
 )
 def test_is_older_release(target, deployed, older):
     assert fetch.is_older_release(target, deployed) is older
+
+
+def test_production_emails_when_ci_never_ran_for_a_release(server):
+    # v1.13.1's commit only changed CHANGELOG.md, which CI used to skip
+    assert deploy("production") == 1
+    reason = read_state(get_environment("production"), "last-failure")
+    assert "tests never ran for v1.14.0" in reason and RELEASE_SHA[:7] in reason
+    assert server.installs == []
+
+
+def test_staging_waits_quietly_before_ci_is_queued(server):
+    assert deploy("staging") == 0
+    assert read_state(get_environment("staging"), "last-failure") is None
+    server.checks[STAGING_NEW] = passing()
+    assert deploy("staging") == 0
+    assert server.installs == [("staging", STAGING_NEW, STAGING_LIVE)]
