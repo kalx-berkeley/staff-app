@@ -473,7 +473,10 @@ describe('Promotions ShowDetail — guest list', () => {
 
     expect((await screen.findByText(/1 pair of passes for Caller/)).textContent).toBe(
       [
+        'On-air giveaway winners:',
         '1 pair of passes for Caller and a guest',
+        '',
+        'KALX staff:',
         '1 pass for Solo',
         '1 pair of passes for John Doe and a guest',
       ].join('\n'),

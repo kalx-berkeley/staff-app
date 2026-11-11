@@ -30,6 +30,9 @@ _LA = ZoneInfo("America/Los_Angeles")
 
 # Must match the button on the promotions show page.
 NOTIFY_BUTTON_LABEL = "Notify Staff and Alternates"
+# Headings before each part of the venue guest list (match ShowDetail.tsx)
+ON_AIR_WINNERS_HEADING = "On-air giveaway winners:"
+STAFF_WINNERS_HEADING = "KALX staff:"
 
 
 def apply_venue_rating(show: Show, venue: Venue) -> None:
@@ -916,27 +919,29 @@ class ShowService:
                 extras.append(email)
             return f"{entry} ({', '.join(extras)})" if extras else entry
 
+        on_air_lines: list[str] = []
         for p in given_away:
             w = p.on_air_winner
-            lines.append(
+            on_air_lines.append(
                 with_extras(
                     f"1 pair of passes for {w.recipient_name} and a guest",
                     w.recipient_phone,
                     w.recipient_email if rules.requires_email_address else None,
                 )
             )
+        staff_lines: list[str] = []
         tablers = [
             p for p in show.passes if p.pass_type == "tabler" and p.status == "claimed"
         ]
         for p in claimed:
             staff_email = p.staff_email if rules.includes_staff_email_address else None
             if p.has_guest and rules.staff_guest_requires_name and p.guest_name:
-                lines.append(
+                staff_lines.append(
                     with_extras(f"1 pass for {p.staff_name}", p.staff_phone, staff_email)
                 )
-                lines.append(f"1 pass for {p.guest_name}")
+                staff_lines.append(f"1 pass for {p.guest_name}")
             elif p.has_guest:
-                lines.append(
+                staff_lines.append(
                     with_extras(
                         f"1 pair of passes for {p.staff_name} and a guest",
                         p.staff_phone,
@@ -944,17 +949,26 @@ class ShowService:
                     )
                 )
             else:
-                lines.append(
+                staff_lines.append(
                     with_extras(f"1 pass for {p.staff_name}", p.staff_phone, staff_email)
                 )
 
         for p in tablers:
             staff_email = p.staff_email if rules.includes_staff_email_address else None
-            lines.append(
+            staff_lines.append(
                 with_extras(
                     f"1 pass for {p.staff_name} ({TABLE_NAME})", p.staff_phone, staff_email
                 )
             )
+
+        if on_air_lines:
+            lines.append("")
+            lines.append(ON_AIR_WINNERS_HEADING)
+            lines.extend(on_air_lines)
+        if staff_lines:
+            lines.append("")
+            lines.append(STAFF_WINNERS_HEADING)
+            lines.extend(staff_lines)
 
         if not given_away and not claimed and not tablers:
             lines.append("No passes were given away for this show.")

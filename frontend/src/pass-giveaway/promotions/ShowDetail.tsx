@@ -733,10 +733,10 @@ const ShowDetail = () => {
     (p) => p.status === 'claimed' && p.guest_of_pass_id == null
   );
 
-  const guestListLines = [
-    ...passPairs
-      .filter((p) => p.status === 'given_away' && p.recipient_name)
-      .map((p) => `1 pair of passes for ${p.recipient_name} and a guest${buildExtras(p.recipient_phone, includeOnAirEmail ? p.recipient_email : null)}`),
+  const onAirWinnerLines = passPairs
+    .filter((p) => p.status === 'given_away' && p.recipient_name)
+    .map((p) => `1 pair of passes for ${p.recipient_name} and a guest${buildExtras(p.recipient_phone, includeOnAirEmail ? p.recipient_email : null)}`);
+  const staffWinnerLines = [
     ...primaryStaffPasses.flatMap((p) => buildStaffPassLines(p)),
     ...(show?.passes ?? [])
       .filter((p) => p.pass_type === 'tabler' && p.status === 'claimed' && p.staff_name)
@@ -745,6 +745,16 @@ const ShowDetail = () => {
           `1 pass for ${p.staff_name} (${KALX_TABLE_NAME})${buildExtras(p.staff_phone, includeStaffEmail ? p.staff_email : null)}`
       ),
   ];
+  // Each part of the guest list starts with a heading line (match show_service.py)
+  const guestListSections = [
+    { heading: 'On-air giveaway winners:', lines: onAirWinnerLines },
+    { heading: 'KALX staff:', lines: staffWinnerLines },
+  ].filter((section) => section.lines.length > 0);
+  const guestListLines = guestListSections.flatMap((section, i) => [
+    ...(i > 0 ? [''] : []),
+    section.heading,
+    ...section.lines,
+  ]);
 
   const introLine = show
     ? `Here are the pass winners for ${show.event_name} on ${show.show_start_date ? formatDateRange(show.show_start_date, show.show_date) : formatShowDateTime(show.show_date, show.show_time!)}. These guests won their passes through KALX radio's on-air giveaway and we'd love to have them attend the show!`
