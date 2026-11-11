@@ -6,6 +6,12 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.13.3] - 2026-11-11
+
+### Fixed
+
+- Fix staging deploys failing for every commit after the first. Staging copied the newest commit on `main` out of the server's copy of the repository without fetching it first, so it couldn't find it. Production deploys weren't affected ([e4bed78](https://github.com/kalx-berkeley/staff-app/commit/e4bed78))
+
 ## [1.13.2] - 2026-11-11
 
 ### Changed
@@ -368,6 +374,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.13.3]: https://github.com/kalx-berkeley/staff-app/compare/v1.13.2...v1.13.3
 [1.13.2]: https://github.com/kalx-berkeley/staff-app/compare/v1.13.1...v1.13.2
 [1.13.1]: https://github.com/kalx-berkeley/staff-app/compare/v1.13.0...v1.13.1
 [1.13.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.12.2...v1.13.0
