@@ -21,6 +21,8 @@ ACTIVE_STATUS = "Active"
 NEW_STATUS = "🆕"
 CURRENT_STAFF_STATUSES = frozenset({ACTIVE_STATUS, NEW_STATUS})
 PROMOTIONS_DEPARTMENT = "Promotions"
+# Publicity staff the KALX Co-Announce Table at co-announce shows
+PUBLICITY_DEPARTMENT = "Publicity"
 SUBLIST_DJ_STATUS = "Sublist DJ"
 
 
@@ -140,6 +142,14 @@ def can_claim_staff_passes(staff: Staff | None) -> bool:
     and join the alternate queue. Only Active staff can, not "🆕" ones.
     """
     return staff is not None and ACTIVE_STATUS in _staff_statuses(staff)
+
+
+def can_claim_tabler_passes(staff: Staff | None) -> bool:
+    """
+    Return True if *staff* may claim a tabler pass for the KALX Co-Announce
+    Table: current staff (Active or 🆕) in the Publicity department.
+    """
+    return is_current_staff(staff) and PUBLICITY_DEPARTMENT in _staff_departments(staff)
 
 
 def _is_promotions_staff(staff: Staff) -> bool:

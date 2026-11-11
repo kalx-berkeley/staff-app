@@ -48,6 +48,11 @@ export interface UserResponse {
    */
   can_claim_staff_passes?: boolean;
   /**
+   * Whether the user can claim tabler passes for the KALX Co-Announce Table:
+   * current staff (Active or "🆕") in the Publicity department.
+   */
+  can_claim_tabler_passes?: boolean;
+  /**
    * Whether the signed-in user is a site admin, who can use all of KALX Staff
    * Admin. Describes the real user, not anyone they're impersonating.
    */

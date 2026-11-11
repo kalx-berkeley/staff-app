@@ -160,6 +160,12 @@ class GuestNameData(BaseModel):
     guest_name: str | None = Field(None, max_length=100)
 
 
+class TablerAssignData(BaseModel):
+    """Schema for promotions giving a staff member a tabler pass."""
+
+    staff_id: int
+
+
 class PassResponse(BaseModel):
     """Schema for pass_item response."""
 
@@ -167,7 +173,7 @@ class PassResponse(BaseModel):
 
     id: int
     show_id: int
-    pass_type: str  # "pair" or "staff"
+    pass_type: str  # "pair", "staff" or "tabler"
     status: str  # "available", "given_away", "claimed"
 
     # For pass pairs given away on-air

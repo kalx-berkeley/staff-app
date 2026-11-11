@@ -118,6 +118,15 @@ class ShowCreate(BaseModel):
         False, description="Automatically close show at planned close time"
     )
     co_announce: bool = Field(False, description="Whether this is a Co-Announce show")
+    num_tabler_passes: int | None = Field(
+        None,
+        ge=0,
+        le=15,
+        description=(
+            "Staff passes set aside as tabler passes for Publicity at the KALX"
+            " Co-Announce Table (co-announce shows only; defaults to 2)"
+        ),
+    )
     lottery_enabled: bool = Field(
         False, description="Enable lottery for staff claims and DJ pre-assignments"
     )
@@ -157,6 +166,37 @@ class ShowCreate(BaseModel):
     def validate_staff_pass_total(self) -> "ShowCreate":
         if self.num_pass_pairs + self.staff_pass_adjustment < 0:
             raise ValueError("A show can't have fewer than 0 staff passes")
+        return self
+
+    @model_validator(mode="after")
+    def validate_tabler_passes(self) -> "ShowCreate":
+        tablers = self.num_tabler_passes or 0
+        if tablers and not self.co_announce:
+            raise ValueError("Only co-announce shows have tabler passes")
+        if not self.co_announce:
+            return self
+        if self.num_tabler_passes is None:
+            # The default of 2, but no more than the show has staff passes
+            from app.pass_giveaway.services.tabler_service import DEFAULT_TABLER_PASSES
+
+            tablers = min(
+                DEFAULT_TABLER_PASSES, self.num_pass_pairs + self.staff_pass_adjustment
+            )
+            self.num_tabler_passes = tablers
+        staff_total = self.num_pass_pairs + self.staff_pass_adjustment
+        winners = len(self.staff_winners) + sum(
+            1 for w in self.staff_winners if w.has_guest
+        )
+        if tablers > staff_total:
+            raise ValueError(
+                f"A show with {staff_total} staff passes can't have {tablers} tabler"
+                " passes. Raise the Staff Pass Adjustment to make room."
+            )
+        if self.staff_winners and tablers + winners > staff_total:
+            raise ValueError(
+                "There aren't enough staff passes for the tabler passes and the staff"
+                " winners you entered"
+            )
         return self
 
     @model_validator(mode="after")
@@ -242,6 +282,22 @@ class ShowUpdate(BaseModel):
         None, description="Automatically close show at planned close time"
     )
     co_announce: bool | None = Field(None, description="Whether this is a Co-Announce show")
+    num_tabler_passes: int | None = Field(
+        None,
+        ge=0,
+        le=15,
+        description=(
+            "Staff passes set aside as tabler passes for Publicity at the KALX"
+            " Co-Announce Table (co-announce shows only)"
+        ),
+    )
+    confirm_release_tablers: bool = Field(
+        False,
+        description=(
+            "Confirms a save that releases claimed tabler passes; without it, such a"
+            " save is refused with a 409 listing the tablers"
+        ),
+    )
     lottery_enabled: bool | None = Field(
         None, description="Enable lottery for staff claims and DJ pre-assignments"
     )
@@ -382,6 +438,15 @@ class PromotionsContact(BaseModel):
     phone: str
 
 
+class TablerResponse(BaseModel):
+    """Someone holding a tabler pass for the KALX Co-Announce Table."""
+
+    pass_id: int
+    staff_id: int | None
+    staff_name: str | None
+    claimed_at: UtcDatetime | None = None
+
+
 class ShowResponse(BaseModel):
     """Schema for show response with nested venue and promotions contacts."""
 
@@ -402,7 +467,16 @@ class ShowResponse(BaseModel):
     wheelchair_accessible: str
     num_pass_pairs: int
     staff_pass_adjustment: int = 0
-    num_staff_passes: int = 0
+    num_staff_passes: int = Field(
+        default=0, description="All staff passes, including the tabler passes"
+    )
+    num_tabler_passes: int = 0
+    available_tabler_count: int = Field(
+        default=0, description="Number of unclaimed tabler passes"
+    )
+    tablers: list["TablerResponse"] = Field(
+        default_factory=list, description="Who holds the show's tabler passes"
+    )
     promotions_contacts: list[PromotionsContact] = Field(
         default_factory=list,
         description="Promotions staff contacts (the show's promoter's or venue's reps)",
@@ -486,6 +560,7 @@ class ShowSummary(BaseModel):
     num_pass_pairs: int
     staff_pass_adjustment: int = 0
     num_staff_passes: int = 0
+    num_tabler_passes: int = 0
     available_pair_count: int = 0
     available_staff_count: int = 0
     guest_hold_staff_count: int = 0

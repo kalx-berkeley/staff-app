@@ -5,7 +5,7 @@ import { Tooltip, BandAnnotator, DatePicker, DescriptionCheckFeedback, useDescri
 import { formatPhone } from '../../common/utils';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import type { ShowCreate, ShowUpdate, ShowBand, MusicBrainzArtist, VenueResponse, AgeRestriction, MovieRating, PassResponse, PromoterResponse, PassAdjustmentResult, VenueType, WheelchairAccessible } from '../types';
-import { MOVIE_RATING_LABELS } from '../utils';
+import { DEFAULT_TABLER_PASSES, KALX_TABLE_NAME, MOVIE_RATING_LABELS } from '../utils';
 import type { APIError, ValidationError } from '../../common/types';
 import EnteredWinnersSection from './EnteredWinnersSection';
 import {
@@ -148,6 +148,50 @@ const PassAdjustmentModal = ({ eventName, adjustment, onClose }: PassAdjustmentM
   </div>
 );
 
+/** The 409 the server sends when a save would release claimed tabler passes. */
+interface TablerReleaseConflict {
+  code: 'tabler_claims_released';
+  message: string;
+  tablers: string[];
+}
+
+const isTablerReleaseConflict = (detail: unknown): detail is TablerReleaseConflict =>
+  typeof detail === 'object' &&
+  detail !== null &&
+  !Array.isArray(detail) &&
+  (detail as { code?: string }).code === 'tabler_claims_released';
+
+interface TablerReleaseModalProps {
+  tablers: string[];
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+const TablerReleaseModal = ({ tablers, onConfirm, onCancel }: TablerReleaseModalProps) => (
+  <div className="modal-overlay" onClick={onCancel}>
+    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-header">
+        <h3>Release Tabler Passes?</h3>
+        <button className="btn-close" onClick={onCancel}>×</button>
+      </div>
+      <p>
+        Saving releases the tabler {tablers.length === 1 ? 'pass' : 'passes'} for the{' '}
+        {KALX_TABLE_NAME} that {tablers.length === 1 ? 'this person has' : 'these people have'}{' '}
+        claimed. {tablers.length === 1 ? "They'll" : "Each of them will"} get an email.
+      </p>
+      <ul style={{ margin: '0 0 1rem', paddingLeft: '1.25rem' }}>
+        {tablers.map((name, i) => (
+          <li key={i}>{name}</li>
+        ))}
+      </ul>
+      <div className="form-actions">
+        <button onClick={onCancel} className="btn-secondary">Cancel</button>
+        <button onClick={onConfirm} className="btn-danger">Release and Save</button>
+      </div>
+    </div>
+  </div>
+);
+
 const ShowForm = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -202,6 +246,18 @@ const ShowForm = () => {
   const [plannedCloseTime, setPlannedCloseTime] = useState('');
   const [autoClose, setAutoClose] = useState(true);
   const [coAnnounce, setCoAnnounce] = useState(false);
+  const [storedTablerPasses, setStoredTablerPasses] = useState<number>(DEFAULT_TABLER_PASSES);
+  // Whether the count was loaded or typed, rather than the default
+  const [tablerPassesChosen, setTablerPassesChosen] = useState(false);
+  const setTablerPasses = (n: number) => {
+    setStoredTablerPasses(n);
+    setTablerPassesChosen(true);
+  };
+  // Tabler passes come out of the staff passes, so there can't be more of them
+  const tablerPasses = coAnnounce ? Math.min(storedTablerPasses, totalStaffPasses) : 0;
+  const tablerPassesLowered =
+    coAnnounce && tablerPassesChosen && storedTablerPasses > totalStaffPasses;
+  const [tablerConflict, setTablerConflict] = useState<{ tablers: string[]; publish: boolean } | null>(null);
   const [lotteryEnabled, setLotteryEnabled] = useState(false);
   const [lotteryWindowHours, setLotteryWindowHours] = useState('24');
   const [djPreassignProhibitionDays, setDjPreassignProhibitionDays] = useState('');
@@ -286,6 +342,9 @@ const ShowForm = () => {
           setPlannedCloseTime(show.planned_close_time ?? '');
           setAutoClose(show.auto_close ?? false);
           setCoAnnounce(show.co_announce ?? false);
+          if (show.co_announce) {
+            setTablerPasses(show.num_tabler_passes ?? 0);
+          }
           setLotteryEnabled(show.lottery_enabled ?? false);
           setLotteryWindowHours(String(show.lottery_window_hours ?? 24));
           setDjPreassignProhibitionDays(
@@ -479,8 +538,11 @@ const ShowForm = () => {
     (promoterId !== null ? promotersList.find((p) => p.id === promoterId) : undefined) ??
     (venueId !== '' ? venues.find((v) => v.id === venueId) : undefined);
   const freeForWinners = isEditing
-    ? freePassesAfterAdjustment(showPasses, numPassPairs, totalStaffPasses)
-    : { pairs: numPassPairs, staff: totalStaffPasses };
+    ? freePassesAfterAdjustment(showPasses, numPassPairs, totalStaffPasses, tablerPasses)
+    : { pairs: numPassPairs, staff: totalStaffPasses - tablerPasses };
+  const claimedTablers = showPasses.filter(
+    (p) => p.pass_type === 'tabler' && p.status === 'claimed'
+  ).length;
   const enteredWinners = canEnterWinners
     ? { on_air_winners: toOnAirPayload(enteredOnAir), staff_winners: toStaffPayload(enteredStaff) }
     : {};
@@ -547,7 +609,7 @@ const ShowForm = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSave = async (publish: boolean) => {
+  const handleSave = async (publish: boolean, confirmReleaseTablers = false) => {
     // Finalize any in-progress genre input before validating
     const pendingGenres = genreInput
       .split(',')
@@ -588,6 +650,7 @@ const ShowForm = () => {
           planned_close_time: plannedCloseTime || null,
           auto_close: autoClose,
           co_announce: coAnnounce,
+          num_tabler_passes: tablerPasses,
           lottery_enabled: lotteryEnabled,
           lottery_window_hours: parseInt(lotteryWindowHours) || 24,
           dj_preassign_prohibition_days: djPreassignProhibitionDays.trim()
@@ -597,6 +660,7 @@ const ShowForm = () => {
             musicbrainz_id, band_name, start_pos, end_pos, artist_type, artist_country, artist_disambiguation, artist_tags,
           })),
           ...enteredWinners,
+          confirm_release_tablers: confirmReleaseTablers,
         };
         const updatedShow = await showsAPI.update(parseInt(id), updateData);
         if (updatedShow.pass_adjustment &&
@@ -625,6 +689,7 @@ const ShowForm = () => {
           planned_close_time: plannedCloseTime || null,
           auto_close: autoClose,
           co_announce: coAnnounce,
+          num_tabler_passes: tablerPasses,
           lottery_enabled: lotteryEnabled,
           lottery_window_hours: parseInt(lotteryWindowHours) || 24,
           dj_preassign_prohibition_days: djPreassignProhibitionDays.trim()
@@ -645,7 +710,9 @@ const ShowForm = () => {
       navigate('/promotions/shows');
     } catch (err) {
       const error = err as APIError;
-      if (typeof error.detail === 'string') {
+      if (isTablerReleaseConflict(error.detail)) {
+        setTablerConflict({ tablers: error.detail.tablers, publish });
+      } else if (typeof error.detail === 'string') {
         setApiError(error.detail);
       } else if (Array.isArray(error.detail)) {
         const fieldErrors: Record<string, string> = {};
@@ -1059,6 +1126,51 @@ const ShowForm = () => {
           </label>
         </div>
 
+        {coAnnounce && (
+          <div className="form-group">
+            <label htmlFor="num_tabler_passes">
+              Tabler passes (for Publicity at the {KALX_TABLE_NAME})
+            </label>
+            <input
+              type="number"
+              id="num_tabler_passes"
+              min={0}
+              max={totalStaffPasses}
+              value={tablerPasses}
+              onChange={(e) => {
+                const n = parseInt(e.target.value);
+                setTablerPasses(Number.isNaN(n) ? 0 : Math.max(0, Math.min(n, totalStaffPasses)));
+              }}
+              className={errors.num_tabler_passes ? 'input-error' : ''}
+              disabled={submitting}
+              style={{ maxWidth: '6rem' }}
+            />
+            {errors.num_tabler_passes && (
+              <span className="field-error">{errors.num_tabler_passes}</span>
+            )}
+            <span className="field-hint" style={{ display: 'block', marginTop: '0.25rem' }}>
+              Comes out of the {totalStaffPasses} staff pass{totalStaffPasses === 1 ? '' : 'es'};{' '}
+              {totalStaffPasses - tablerPasses} left for staff. To make room, raise the Staff
+              Pass Adjustment under Advanced.
+              {tablerPassesLowered &&
+                ` Lowered to ${tablerPasses} because the show has only ${totalStaffPasses} staff pass${totalStaffPasses === 1 ? '' : 'es'}.`}
+            </span>
+            {isEditing && tablerPasses < claimedTablers && (
+              <span className="field-hint" style={{ display: 'block', marginTop: '0.25rem' }}>
+                {claimedTablers === 1
+                  ? '1 tabler pass is claimed, so saving releases it.'
+                  : `${claimedTablers} tabler passes are claimed, so saving releases ${claimedTablers - tablerPasses} of them.`}
+              </span>
+            )}
+          </div>
+        )}
+        {isEditing && !coAnnounce && claimedTablers > 0 && (
+          <span className="field-hint" style={{ display: 'block', marginBottom: '1rem' }}>
+            Turning off Co-Announce releases the {claimedTablers} claimed tabler pass
+            {claimedTablers === 1 ? '' : 'es'}.
+          </span>
+        )}
+
         <div className="form-group">
           <div style={{ fontWeight: 500, fontSize: '0.9rem', marginBottom: '0.5rem' }}>
             Planned Close Date / Time (Pacific) <span className="required">*</span>
@@ -1299,6 +1411,18 @@ const ShowForm = () => {
           passes={showPasses}
           onConfirm={handleDelete}
           onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
+
+      {tablerConflict && (
+        <TablerReleaseModal
+          tablers={tablerConflict.tablers}
+          onCancel={() => setTablerConflict(null)}
+          onConfirm={() => {
+            const { publish } = tablerConflict;
+            setTablerConflict(null);
+            handleSave(publish, true);
+          }}
         />
       )}
 

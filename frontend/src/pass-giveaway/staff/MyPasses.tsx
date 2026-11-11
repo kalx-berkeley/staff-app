@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { passesAPI, lotteryAPI, alternatesAPI } from '../api';
 import type { PassResponse, MyLotteryEntryResponse, MyAlternateEntry } from '../types';
 import type { APIError } from '../../common/types';
-import { isRecentShow, waitingFallbackNote } from '../utils';
+import { KALX_TABLE_NAME, isRecentShow, waitingFallbackNote } from '../utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 
@@ -222,6 +222,12 @@ const MyPasses = () => {
                       <div className="info-row">
                         <span className="info-label">Date:</span>
                         <span className="info-value">{formatDate(pass.show_date)}</span>
+                      </div>
+                    )}
+                    {pass.pass_type === 'tabler' && (
+                      <div className="info-row">
+                        <span className="info-label">Pass:</span>
+                        <span className="info-value">🪑 {KALX_TABLE_NAME}</span>
                       </div>
                     )}
                     {pass.has_guest && (

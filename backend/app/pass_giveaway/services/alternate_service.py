@@ -32,7 +32,7 @@ from app.config import settings
 from app.models.guest_fallback import GuestFallback
 from app.pass_giveaway.services.close_digest import CloseDigest
 from app.models.notification_preferences import NotificationPreferences
-from app.models.pass_model import Pass
+from app.models.pass_model import STAFF_CLAIM_PASS_TYPES, Pass
 from app.models.show import Show
 from app.models.staff import Staff
 from app.models.staff_pass_alternate import StaffPassAlternate
@@ -272,11 +272,12 @@ class AlternateService:
 
     @staticmethod
     def _has_claim(db: Session, show_id: int, staff_id: int) -> bool:
+        """Whether the person holds a staff or tabler pass for the show."""
         return (
             db.query(Pass)
             .filter(
                 Pass.show_id == show_id,
-                Pass.pass_type == "staff",
+                Pass.pass_type.in_(STAFF_CLAIM_PASS_TYPES),
                 Pass.staff_id == staff_id,
                 Pass.status == "claimed",
                 Pass.guest_of_pass_id.is_(None),
@@ -295,6 +296,7 @@ class AlternateService:
     ) -> StaffPassAlternate:
         """Add a staff member to the bottom of a show's alternate queue."""
         from app.pass_giveaway.services.pass_service import PassService
+        from app.pass_giveaway.services import tabler_service
 
         if show.status != "published":
             raise HTTPException(
@@ -305,6 +307,7 @@ class AlternateService:
         PassService._validate_show_claimable(show)
         ensure_not_on_leave_for_show(staff, show)
 
+        tabler_service.ensure_holds_no_tabler_pass(db, show.id, staff.id, "You have")
         if AlternateService._has_claim(db, show.id, staff.id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

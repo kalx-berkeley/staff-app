@@ -468,7 +468,7 @@ class PassService:
     @staticmethod
     def get_staff_claims(db: Session, staff_id: int) -> list[Pass]:
         """
-        Get all staff passes currently claimed by a specific staff member.
+        Get all staff and tabler passes currently claimed by a specific staff member.
 
         Excludes guest-hold passes (the +1 reservation created alongside a
         claim, which also carries the claimant's staff_id) so each claim
@@ -479,12 +479,14 @@ class PassService:
             staff_id: Staff member ID
 
         Returns:
-            List of claimed staff passes (primary claims only)
+            List of claimed staff and tabler passes (primary claims only)
         """
+        from app.models.pass_model import STAFF_CLAIM_PASS_TYPES
+
         return (
             db.query(Pass)
             .filter(
-                Pass.pass_type == "staff",
+                Pass.pass_type.in_(STAFF_CLAIM_PASS_TYPES),
                 Pass.staff_id == staff_id,
                 Pass.status == "claimed",
                 Pass.guest_of_pass_id.is_(None),
@@ -1029,6 +1031,7 @@ class PassService:
                            not enough passes available for a guest hold
         """
         from app.pass_giveaway.services.alternate_service import AlternateService
+        from app.pass_giveaway.services import tabler_service
 
         try:
             pass_item = db.query(Pass).filter(Pass.id == pass_id).first()
@@ -1049,18 +1052,12 @@ class PassService:
                     )
                 ensure_not_on_leave_for_show(staff, show)
 
-                # A staff member may hold at most one staff pass per show.
-                existing_claim = (
-                    db.query(Pass)
-                    .filter(
-                        Pass.show_id == pass_item.show_id,
-                        Pass.pass_type == "staff",
-                        Pass.staff_id == staff_id,
-                        Pass.status == "claimed",
-                        Pass.guest_of_pass_id.is_(None),
+                # A staff member may hold at most one staff or tabler pass per show.
+                existing_claim = tabler_service.held_pass(db, pass_item.show_id, staff_id)
+                if existing_claim and existing_claim.pass_type == "tabler":
+                    tabler_service.ensure_holds_no_tabler_pass(
+                        db, pass_item.show_id, staff_id, "You have"
                     )
-                    .first()
-                )
                 if existing_claim and existing_claim.id != pass_item.id:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
@@ -1732,11 +1729,21 @@ class PassService:
         Returns a dict with:
           - affected_djs: list of DJ names whose preassignment was removed
           - affected_staff: list of dicts with name/phone/email of staff who lost a pass
+            (including tablers)
+
+        Staff passes are removed in this order: unclaimed staff passes, unclaimed
+        tabler passes (lowering ``num_tabler_passes``), +1 guest passes, staff
+        claims (who go to the alternate list), then tabler claims, newest first,
+        whose holders are emailed.
         """
         import random
 
+        from app.pass_giveaway.services import tabler_service
+
         pair_passes = [p for p in show.passes if p.pass_type == "pair"]
         staff_passes = [p for p in show.passes if p.pass_type == "staff"]
+        tabler_passes = [p for p in show.passes if p.pass_type == "tabler"]
+        released_tablers: list[Staff] = []
         now = datetime.now(timezone.utc)
         affected_djs: list[str] = []
         affected_staff: list[dict] = []
@@ -1789,7 +1796,12 @@ class PassService:
             return (_as_utc(p.claimed_at), p.id)
 
         cut_staff_ids: list[int] = []
-        staff_delta = new_num_pairs + (show.staff_pass_adjustment or 0) - len(staff_passes)
+        staff_delta = (
+            new_num_pairs
+            + (show.staff_pass_adjustment or 0)
+            - len(staff_passes)
+            - len(tabler_passes)
+        )
         to_delete_ids: set[int] = set()
         moved_guests: list[Pass] = []
         if staff_delta > 0:
@@ -1816,6 +1828,14 @@ class PassService:
                 if to_remove <= 0:
                     break
                 to_delete_ids.add(p.id)
+                to_remove -= 1
+
+            # Step 1b: unclaimed tabler passes
+            for p in [t for t in tabler_passes if t.status == "available"]:
+                if to_remove <= 0:
+                    break
+                to_delete_ids.add(p.id)
+                show.num_tabler_passes -= 1
                 to_remove -= 1
 
             # Step 2: guest holds (least impact), newest first
@@ -1879,7 +1899,24 @@ class PassService:
                 to_delete_ids.add(p.id)
                 to_remove -= 1
 
-            for p in staff_passes:
+            # Step 4: tabler claims, newest first. Tablers have no alternate list.
+            for p in tabler_service.newest_first(
+                [t for t in tabler_passes if t.status == "claimed"]
+            ):
+                if to_remove <= 0:
+                    break
+                affected_staff.append({
+                    "name": p.staff.name if p.staff else "Unknown",
+                    "phone": p.staff.phone if p.staff else None,
+                    "email": p.staff.email if p.staff else None,
+                })
+                if p.staff:
+                    released_tablers.append(p.staff)
+                to_delete_ids.add(p.id)
+                show.num_tabler_passes -= 1
+                to_remove -= 1
+
+            for p in staff_passes + tabler_passes:
                 if p.id in to_delete_ids:
                     db.delete(p)
 
@@ -1896,6 +1933,7 @@ class PassService:
         db.commit()
         AlternateService.finalize_promotions(db, promotions)
         AlternateService.notify_cut_claims(db, show, cut_staff_ids)
+        tabler_service.email_count_lowered(db, released_tablers, show)
         db.refresh(show)
         return {"affected_djs": affected_djs, "affected_staff": affected_staff}
 
@@ -1910,7 +1948,9 @@ class PassService:
         """
 
         def key(p: Pass):
-            if p.pass_type != "staff":
+            if p.pass_type == "tabler":
+                rank = 4
+            elif p.pass_type != "staff":
                 rank = 0
             elif p.status != "claimed":
                 rank = 3

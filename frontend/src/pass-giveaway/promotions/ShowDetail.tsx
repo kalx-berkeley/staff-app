@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { showsAPI, passesAPI, autocompleteAPI, specialtyShowsAPI, lotteryAPI, alternatesAPI } from '../api';
-import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, WaitingGuestsList } from '../components';
+import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, WaitingGuestsList, TablerPassesSection } from '../components';
 import MarkdownContent from '../../common/components/MarkdownContent';
 import { formatPhone, formatLeave, isOnLeave, formatDateValue } from '../../common/utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import type { ShowResponse, PreAssignmentData, LotteryStatus, PassResponse, DjSuggestion, DjLeave, AlternateEntry, WaitingGuest } from '../types';
 import type { APIError, PromotionsStaffProfile } from '../../common/types';
-import { WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow, seatedFallbackNote, waitingFallbackNote } from '../utils';
+import { KALX_TABLE_NAME, WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow, seatedFallbackNote, waitingFallbackNote } from '../utils';
 
 type SuggestMode = 'choose' | 'date' | 'genre' | null;
 
@@ -738,6 +738,12 @@ const ShowDetail = () => {
       .filter((p) => p.status === 'given_away' && p.recipient_name)
       .map((p) => `1 pair of passes for ${p.recipient_name} and a guest${buildExtras(p.recipient_phone, includeOnAirEmail ? p.recipient_email : null)}`),
     ...primaryStaffPasses.flatMap((p) => buildStaffPassLines(p)),
+    ...(show?.passes ?? [])
+      .filter((p) => p.pass_type === 'tabler' && p.status === 'claimed' && p.staff_name)
+      .map(
+        (p) =>
+          `1 pass for ${p.staff_name} (${KALX_TABLE_NAME})${buildExtras(p.staff_phone, includeStaffEmail ? p.staff_email : null)}`
+      ),
   ];
 
   const introLine = show
@@ -1021,6 +1027,8 @@ const ShowDetail = () => {
               <dl key={contact.email}>
                 <dt>Name:</dt>
                 <dd>{contact.name}</dd>
+                <dt>Email:</dt>
+                <dd><a href={`mailto:${contact.email}`}>{contact.email}</a></dd>
                 <dt>Phone:</dt>
                 <dd>{contact.phone}</dd>
               </dl>
@@ -1513,7 +1521,7 @@ const ShowDetail = () => {
 
       <div className="passes-section">
         <h3>
-          Staff Passes ({show.available_staff_count}/{show.num_staff_passes} available)
+          Staff Passes ({show.available_staff_count}/{staffPasses.length} available)
           <Tooltip text="Staff passes allow KALX staff to attend the show. These are separate from the on-air giveaway pairs and claimed directly by staff members." />
         </h3>
         <div className="passes-list">
@@ -1651,6 +1659,13 @@ const ShowDetail = () => {
           />
         )}
       </div>
+
+      <TablerPassesSection
+        show={show}
+        mode="promotions"
+        myEmail={user?.email ?? null}
+        onChanged={() => loadShow(true)}
+      />
 
       {guestToRemove && (
         <div className="modal-overlay" onClick={() => setGuestToRemove(null)}>

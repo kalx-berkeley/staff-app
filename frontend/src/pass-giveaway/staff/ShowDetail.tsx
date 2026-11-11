@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { showsAPI, passesAPI, lotteryAPI, specialtyShowsAPI, alternatesAPI } from '../api';
-import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, AlternateGuestForm, WaitingGuestsList, GuestFallbackOptions, ClaimGuestActions } from '../components';
+import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, AlternateGuestForm, WaitingGuestsList, GuestFallbackOptions, ClaimGuestActions, TablerPassesSection } from '../components';
 import MarkdownContent from '../../common/components/MarkdownContent';
 import { formatPhone, formatLeave, isOnLeave, leaveCoversShow, formatDateValue } from '../../common/utils';
 import { useAuth } from '../../common/contexts/authHooks';
@@ -576,18 +576,30 @@ const ShowDetail = () => {
   const myEmail = user?.email?.toLowerCase() ?? null;
   // A staff member may hold at most one staff pass per show (enforced
   // server-side too) — used to disable claiming a second one from the UI.
-  const alreadyHasStaffPass = myEmail
+  const holdsStaffPass = myEmail
     ? staffPasses.some(
         (p) => p.status === 'claimed' && p.staff_email?.toLowerCase() === myEmail
       )
     : false;
+  // One pass per person per show, so a tabler pass rules out a staff pass too
+  const holdsTablerPass = myEmail
+    ? show.passes.some(
+        (p) =>
+          p.pass_type === 'tabler' &&
+          p.status === 'claimed' &&
+          p.staff_email?.toLowerCase() === myEmail
+      )
+    : false;
+  const alreadyHasStaffPass = holdsStaffPass || holdsTablerPass;
   const notYetActive = staffPassesNotYetActive(user);
   // Why the claim buttons are disabled, if they are
   const claimBlockedTitle = notYetActive
     ? STAFF_PASSES_NOT_YET_ACTIVE
-    : alreadyHasStaffPass
-      ? 'You already have a staff pass for this show.'
-      : undefined;
+    : holdsTablerPass
+      ? 'You have a tabler pass for this show.'
+      : alreadyHasStaffPass
+        ? 'You already have a staff pass for this show.'
+        : undefined;
   const myName = user?.profile?.name ?? null;
   const mySpecialtyShowIds = new Set(myDJSpecialtyShows.map((s) => s.id));
   const myPreassignedPasses = myName
@@ -1215,13 +1227,36 @@ const ShowDetail = () => {
           </div>
         )}
 
+        <TablerPassesSection
+          show={show}
+          mode="staff"
+          myEmail={myEmail}
+          canClaim={user?.can_claim_tabler_passes ?? false}
+          blockedReason={
+            holdsStaffPass
+              ? 'You have a staff pass for this show. Release it to claim a tabler pass instead.'
+              : myStaffEntry
+                ? "You've entered the staff pass lottery for this show. Withdraw to claim a tabler pass instead."
+                : myAlternateEntry
+                  ? "You're on the alternate list for this show. Leave it to claim a tabler pass instead."
+                  : leaveBlocksPasses
+                    ? leaveBlockMessage
+                    : null
+          }
+          onChanged={() => loadShow(true)}
+        />
+
         <div className="pass-claim-section">
           <h3>
             Staff Passes ({displayAvailableCount} of {staffPasses.length} available)
             <Tooltip text="Claim a staff pass to attend this show. Each pass admits 1 person. You can also reserve a +1 guest slot if two passes are available. You can release your claim if your plans change (while the show is still open)." />
           </h3>
 
-          {alreadyHasStaffPass && (
+          {holdsTablerPass ? (
+            <p className="field-hint">
+              You have a tabler pass for this show — release it before claiming a staff pass.
+            </p>
+          ) : alreadyHasStaffPass && (
             <p className="field-hint">
               You already have a staff pass for this show — release it before claiming another.
             </p>
@@ -1339,8 +1374,8 @@ const ShowDetail = () => {
               <button
                 onClick={() => setShowStaffLotteryForm(true)}
                 className="btn-small btn-primary"
-                disabled={notYetActive}
-                title={notYetActive ? STAFF_PASSES_NOT_YET_ACTIVE : 'Enter the lottery for a staff pass to attend this show.'}
+                disabled={notYetActive || holdsTablerPass}
+                title={claimBlockedTitle ?? 'Enter the lottery for a staff pass to attend this show.'}
               >
                 Enter Lottery
               </button>

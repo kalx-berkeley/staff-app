@@ -59,6 +59,9 @@ class UserInfo(BaseModel):
     # Whether the user can claim staff passes, enter the staff pass lottery and
     # join the alternate queue: Active staff can, "🆕" staff can't
     can_claim_staff_passes: bool = False
+    # Whether the user can claim tabler passes for the KALX Co-Announce Table:
+    # current staff in the Publicity department
+    can_claim_tabler_passes: bool = False
     # Whether the signed-in user, not anyone they're impersonating, is a site
     # admin (all of KALX Staff Admin) or a promotions admin (part of it). Either
     # can use the pass giveaway's admin tools.

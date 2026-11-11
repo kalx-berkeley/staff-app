@@ -6,6 +6,10 @@ from sqlalchemy.orm import relationship
 from app.models.guest_fallback import GuestFallback
 from app.database import Base
 
+# Pass types a staff member claims for themselves. A person holds at most one
+# of these per show.
+STAFF_CLAIM_PASS_TYPES = ("staff", "tabler")
+
 
 class Pass(Base):
     """Pass model representing pass pairs for giveaway and staff passes."""
@@ -14,7 +18,9 @@ class Pass(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     show_id = Column(Integer, ForeignKey("shows.id"), nullable=False)
-    pass_type = Column(String, nullable=False)  # "pair" or "staff"
+    # "pair", "staff" or "tabler" (a staff pass set aside for the KALX
+    # Co-Announce Table, which never has a guest or alternates)
+    pass_type = Column(String, nullable=False)
     status = Column(
         String, nullable=False, default="available"
     )  # "available", "given_away", "claimed"

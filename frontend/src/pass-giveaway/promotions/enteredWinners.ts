@@ -50,14 +50,17 @@ export const freePassesAfterAdjustment = (
   passes: PassResponse[],
   numPassPairs: number,
   totalStaffPasses: number,
+  tablerPasses?: number,
 ): FreePasses => {
   const pairs = passes.filter((p) => p.pass_type === 'pair');
   const staff = passes.filter((p) => p.pass_type === 'staff');
+  // Tabler passes come out of the staff passes and never go to winners
+  const tablers = tablerPasses ?? passes.filter((p) => p.pass_type === 'tabler').length;
   const freePairs = pairs.filter((p) => p.status === 'available' && !p.preassigned_dj).length;
   const freeStaff = staff.filter((p) => p.status === 'available').length;
   return {
     pairs: Math.max(0, freePairs + numPassPairs - pairs.length),
-    staff: Math.max(0, freeStaff + totalStaffPasses - staff.length),
+    staff: Math.max(0, freeStaff + totalStaffPasses - tablers - staff.length),
   };
 };
 

@@ -86,6 +86,9 @@ class LotteryService:
         staff = db.query(Staff).filter(Staff.id == staff_id).first()
         if staff:
             ensure_not_on_leave_for_show(staff, show)
+        from app.pass_giveaway.services import tabler_service
+
+        tabler_service.ensure_holds_no_tabler_pass(db, show.id, staff_id, "You have")
         if has_guest:
             from app.pass_giveaway.services.pass_service import PassService
 

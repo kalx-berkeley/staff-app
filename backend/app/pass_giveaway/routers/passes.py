@@ -18,10 +18,12 @@ from app.pass_giveaway.schemas.pass_schema import (
     PreassignmentData,
     SelfPreassignmentData,
     PassResponse,
+    TablerAssignData,
     WinnerReleaseData,
     WinnerUpdateData,
 )
 from app.pass_giveaway.services.alternate_service import AlternateService
+from app.pass_giveaway.services import tabler_service
 from app.pass_giveaway.services.pass_service import (
     PassService,
     normalize_phone,
@@ -42,6 +44,7 @@ from app.auth import (
     check_station_office_access,
     is_ip_in_network,
     is_current_staff,
+    can_claim_tabler_passes,
     _is_promotions_staff,
 )
 from app.config import settings
@@ -419,6 +422,7 @@ def release_claim(
             detail="You can only release your own staff pass",
         )
 
+    prior_staff = pre_pass.staff if pre_pass else None
     pass_item = PassService.release_claim(db, pass_id, actor_email=user.email)
 
     audit_service.log_event(
@@ -429,9 +433,97 @@ def release_claim(
         actor_role=role,
         entity_type="pass",
         entity_id=pass_item.id,
-        details={"released_staff_id": prior_staff_id, "show_id": pass_item.show_id},
+        details={
+            "released_staff_id": prior_staff_id,
+            "show_id": pass_item.show_id,
+            "pass_type": pass_item.pass_type,
+        },
     )
+    # A tabler hears about it when someone else releases their pass.
+    if (
+        pass_item.pass_type == "tabler"
+        and prior_staff is not None
+        and prior_staff.id != user.id
+    ):
+        tabler_service.email_released_by_promotions(db, prior_staff, pass_item.show)
 
+    return PassResponse.model_validate(pass_item)
+
+
+def _get_show_or_404(db: Session, show_id: int) -> Show:
+    show = db.query(Show).filter(Show.id == show_id).first()
+    if not show or show.status == "deleted":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Show {show_id} not found"
+        )
+    return show
+
+
+@router.post("/shows/{show_id}/tabler-passes/claim", response_model=PassResponse)
+def claim_tabler_pass(
+    show_id: int,
+    user_info: tuple = Depends(require_promotions_or_staff),
+    db: Session = Depends(get_db),
+):
+    """
+    Claim one of a co-announce show's tabler passes for the KALX Co-Announce Table.
+
+    Only current staff (Active or 🆕) in the Publicity department can. First
+    come, first served, even on lottery shows, and never with a +1 guest.
+    """
+    role, user = user_info
+    if not can_claim_tabler_passes(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Publicity members can claim tabler passes",
+        )
+    show = _get_show_or_404(db, show_id)
+    pass_item = tabler_service.claim(db, show, user, by_self=True)
+    audit_service.log_event(
+        db,
+        event_type="pass_claimed",
+        area=PASS_GIVEAWAY_AREA,
+        actor_email=user.email,
+        actor_role=role,
+        entity_type="pass",
+        entity_id=pass_item.id,
+        details={"staff_id": user.id, "show_id": show.id, "pass_type": "tabler"},
+    )
+    return PassResponse.model_validate(pass_item)
+
+
+@router.post("/shows/{show_id}/tabler-passes/assign", response_model=PassResponse)
+def assign_tabler_pass(
+    show_id: int,
+    data: TablerAssignData,
+    promotions: Staff = Depends(get_promotions_staff),
+    db: Session = Depends(get_db),
+):
+    """
+    Give any current staff member (Active or 🆕) one of a show's tabler passes.
+
+    Promotions staff only. The staff member is emailed.
+    """
+    show = _get_show_or_404(db, show_id)
+    staff = db.query(Staff).filter(Staff.id == data.staff_id).first()
+    if not staff:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Staff member {data.staff_id} not found",
+        )
+    pass_item = tabler_service.claim(db, show, staff, by_self=staff.id == promotions.id)
+    audit_service.log_event(
+        db,
+        event_type="tabler_pass_assigned_by_promotions",
+        area=PASS_GIVEAWAY_AREA,
+        actor_email=promotions.email,
+        actor_role="promotions",
+        entity_type="pass",
+        entity_id=pass_item.id,
+        details={"staff_id": staff.id, "show_id": show.id, "pass_type": "tabler"},
+    )
+    if staff.id != promotions.id:
+        tabler_service.email_assigned(db, staff, show)
     return PassResponse.model_validate(pass_item)
 
 

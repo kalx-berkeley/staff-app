@@ -30,6 +30,7 @@ from app.pass_giveaway.services.tracking import (
     record_visit_outcome,
 )
 from app.pass_giveaway.services.pass_service import PassService
+from app.pass_giveaway.services import tabler_service
 from app.pass_giveaway.services import entered_winners_service
 from app.common.services.leave_service import today_pt
 from app.pass_giveaway.services.lottery_service import LotteryService
@@ -40,6 +41,7 @@ from app.pass_giveaway.services.feature_bin_service import (
 from app.pass_giveaway.services.kalx_live_service import KalxLiveService, KalxLiveIndex
 from app.auth import (
     ACTIVE_STATUS,
+    current_staff_filter,
     get_site_or_promotions_admin,
     get_user_role,
     get_user_role_or_dj,
@@ -181,14 +183,14 @@ def run_close_side_effects(db, show, digest: CloseDigest | None = None) -> None:
 
 def _notify_claimers_of_cancellation(db, show) -> None:
     """Tell staff who hold a pass for a deleted show that it has been cancelled."""
-    from app.models.pass_model import Pass
+    from app.models.pass_model import STAFF_CLAIM_PASS_TYPES, Pass
     from app.pass_giveaway.services.alternate_service import AlternateService
 
     claims = (
         db.query(Pass)
         .filter(
             Pass.show_id == show.id,
-            Pass.pass_type == "staff",
+            Pass.pass_type.in_(STAFF_CLAIM_PASS_TYPES),
             Pass.status == "claimed",
             Pass.guest_of_pass_id.is_(None),
             Pass.staff_id.isnot(None),
@@ -196,10 +198,11 @@ def _notify_claimers_of_cancellation(db, show) -> None:
         .all()
     )
     for pass_item in claims:
+        kind = "tabler pass" if pass_item.pass_type == "tabler" else "staff pass"
         lines = [
             (
-                f"{AlternateService._show_desc(show)} has been cancelled, so your staff"
-                " pass is no longer valid."
+                f"{AlternateService._show_desc(show)} has been cancelled, so your {kind}"
+                " is no longer valid."
             ),
         ]
         if pass_item.has_guest:
@@ -302,6 +305,19 @@ def _build_show_response(
     available_staff_count = sum(
         1 for t in show.passes if t.pass_type == "staff" and t.status == "available"
     )
+    available_tabler_count = sum(
+        1 for t in show.passes if t.pass_type == "tabler" and t.status == "available"
+    )
+    tablers = [
+        {
+            "pass_id": t.id,
+            "staff_id": t.staff_id,
+            "staff_name": t.staff.name if t.staff else None,
+            "claimed_at": t.claimed_at,
+        }
+        for t in PassService.display_order(show.passes)
+        if t.pass_type == "tabler" and t.status == "claimed"
+    ]
 
     passes = []
     for pass_item in PassService.display_order(show.passes):
@@ -391,6 +407,9 @@ def _build_show_response(
         "num_pass_pairs": show.num_pass_pairs,
         "staff_pass_adjustment": show.staff_pass_adjustment,
         "num_staff_passes": show.num_staff_passes,
+        "num_tabler_passes": show.num_tabler_passes,
+        "available_tabler_count": available_tabler_count,
+        "tablers": tablers,
         "promotions_contacts": _build_promotions_contacts(show),
         "guest_list_requirements": {
             "requires_phone_number": show.promoted_by.requires_phone_number,
@@ -530,6 +549,7 @@ def _build_show_summary(
         "num_pass_pairs": show.num_pass_pairs,
         "staff_pass_adjustment": show.staff_pass_adjustment,
         "num_staff_passes": show.num_staff_passes,
+        "num_tabler_passes": show.num_tabler_passes,
         "available_pair_count": pair_count,
         "available_staff_count": staff_count,
         "guest_hold_staff_count": guest_hold_count,
@@ -752,19 +772,21 @@ def analyze_on_air_description(
 
 @router.get("/staff-pass-claimants")
 def list_staff_pass_claimants(
+    include_new: bool = False,
     _: Staff = Depends(get_promotions_staff),
     db: Session = Depends(get_db),
 ):
     """List the staff who can get a staff pass, for the show form's staff winner picker.
 
+    With ``include_new``, also lists "🆕" staff, who can be given a tabler pass.
     Declared before `/{show_id}` so it isn't swallowed by that route.
     """
-    staff_members = (
-        db.query(Staff)
-        .filter(Staff.statuses.any(StaffStatus.status == ACTIVE_STATUS))
-        .order_by(Staff.name)
-        .all()
+    status_filter = (
+        current_staff_filter()
+        if include_new
+        else Staff.statuses.any(StaffStatus.status == ACTIVE_STATUS)
     )
+    staff_members = db.query(Staff).filter(status_filter).order_by(Staff.name).all()
     return [{"id": s.id, "name": s.name, "email": s.email} for s in staff_members]
 
 
@@ -999,6 +1021,20 @@ def get_show(show_id: int, db: Session = Depends(get_db)):
     return _build_show_response(show)
 
 
+def _apply_tabler_count(db: Session, show: Show, target: int) -> None:
+    """Set the show's tabler passes, fill freed staff passes, and email released tablers."""
+    from app.pass_giveaway.services.alternate_service import AlternateService
+
+    released = tabler_service.apply_count(db, show, target)
+    db.flush()
+    db.expire(show, ["passes"])
+    promotions = AlternateService.fill_open_passes(db, show, trigger="capacity_change")
+    db.commit()
+    AlternateService.finalize_promotions(db, promotions)
+    tabler_service.email_count_lowered(db, released, show)
+    db.refresh(show)
+
+
 @router.put("/{show_id}", response_model=ShowResponse)
 def update_show(
     show_id: int,
@@ -1072,6 +1108,29 @@ def update_show(
             detail="A show can't have fewer than 0 staff passes",
         )
 
+    merged_co_announce = (
+        show_data.co_announce if show_data.co_announce is not None else existing.co_announce
+    )
+    if show_data.num_tabler_passes and not merged_co_announce:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Only co-announce shows have tabler passes",
+        )
+    tabler_target = tabler_service.target_count(
+        co_announce=merged_co_announce,
+        requested=show_data.num_tabler_passes,
+        current=existing.num_tabler_passes,
+        was_co_announce=existing.co_announce,
+    )
+    # The default of 2 never exceeds the staff passes
+    if show_data.num_tabler_passes is None and tabler_target:
+        tabler_target = min(tabler_target, max(0, merged_pairs + merged_adjustment))
+    tabler_plan = tabler_service.plan(
+        existing, merged_pairs + merged_adjustment, tabler_target
+    )
+    if tabler_plan.lost and not show_data.confirm_release_tablers:
+        raise tabler_service.lost_tablers_conflict(tabler_plan.lost)
+
     claimants: list[Staff] = []
     if show_data.on_air_winners or show_data.staff_winners:
         claimants = entered_winners_service.validate(
@@ -1088,7 +1147,7 @@ def update_show(
             first_day=merged_show_start_date or merged_show_date,
             last_day=merged_show_date,
             free=entered_winners_service.free_passes_after_adjustment(
-                existing, merged_pairs, merged_adjustment
+                existing, merged_pairs, merged_adjustment, tabler_target
             ),
             on_air_winners=show_data.on_air_winners,
             staff_winners=show_data.staff_winners,
@@ -1119,6 +1178,8 @@ def update_show(
         "planned_close_date",
         "planned_close_time",
         "auto_close",
+        "co_announce",
+        "num_tabler_passes",
     ]
     before = {f: str(getattr(existing, f)) for f in _tracked_fields}
 
@@ -1146,6 +1207,12 @@ def update_show(
                 result["affected_djs"],
                 result["affected_staff"],
             )
+
+    if tabler_target is not None and (
+        show.num_tabler_passes != tabler_target
+        or tabler_target != sum(1 for p in show.passes if p.pass_type == "tabler")
+    ):
+        _apply_tabler_count(db, show, tabler_target)
 
     entered_winners_service.enter(
         db,

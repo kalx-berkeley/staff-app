@@ -24,3 +24,4 @@ export { default as ClaimGuestActions } from './ClaimGuestActions';
 export { default as DescriptionCheckFeedback } from './DescriptionCheckFeedback';
 export { useDescriptionCheck } from './useDescriptionCheck';
 export type { DescriptionCheck } from './useDescriptionCheck';
+export { default as TablerPassesSection } from './TablerPassesSection';

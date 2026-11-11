@@ -130,9 +130,15 @@ export const showsAPI = {
    * List the Active staff who can get a staff pass, for the show form's staff
    * winner picker (promotions staff only).
    */
-  listStaffPassClaimants: async (): Promise<StaffPassClaimant[]> => {
+  /**
+   * List the staff who can get a staff pass. With `includeNew`, also lists
+   * "🆕" staff, who can be given a tabler pass.
+   */
+  listStaffPassClaimants: async (includeNew = false): Promise<StaffPassClaimant[]> => {
     try {
-      const response = await apiClient.get<StaffPassClaimant[]>('/shows/staff-pass-claimants');
+      const response = await apiClient.get<StaffPassClaimant[]>('/shows/staff-pass-claimants', {
+        params: includeNew ? { include_new: true } : undefined,
+      });
       return response.data;
     } catch (error) {
       return handleAPIError(error);
@@ -856,6 +862,42 @@ export const passesAPI = {
   releaseClaim: async (passId: number): Promise<PassResponse> => {
     try {
       const response = await apiClient.delete<PassResponse>(`/passes/${passId}/claim`);
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * Claim one of a co-announce show's tabler passes (Publicity members only).
+   *
+   * @param showId - Show ID
+   * @returns Promise resolving to the claimed tabler pass
+   */
+  claimTablerPass: async (showId: number): Promise<PassResponse> => {
+    try {
+      const response = await apiClient.post<PassResponse>(
+        `/shows/${showId}/tabler-passes/claim`
+      );
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * Give a staff member one of a show's tabler passes (promotions only).
+   *
+   * @param showId - Show ID
+   * @param staffId - Staff member ID
+   * @returns Promise resolving to the assigned tabler pass
+   */
+  assignTablerPass: async (showId: number, staffId: number): Promise<PassResponse> => {
+    try {
+      const response = await apiClient.post<PassResponse>(
+        `/shows/${showId}/tabler-passes/assign`,
+        { staff_id: staffId }
+      );
       return response.data;
     } catch (error) {
       return handleAPIError(error);

@@ -24,7 +24,7 @@ from app.common.services.leave_service import format_leave, on_leave
 from app.models.guest_fallback import GuestFallback
 from app.models.lottery_entry import LotteryEntry
 from app.models.on_air_winner import OnAirWinner
-from app.models.pass_model import Pass
+from app.models.pass_model import STAFF_CLAIM_PASS_TYPES, Pass
 from app.models.promoter import Promoter
 from app.models.show import Show
 from app.models.staff import Staff
@@ -81,21 +81,29 @@ def guest_list_rules_owner(
 
 
 def free_passes_after_adjustment(
-    show: Show, num_pass_pairs: int, staff_pass_adjustment: int
+    show: Show,
+    num_pass_pairs: int,
+    staff_pass_adjustment: int,
+    num_tabler_passes: int | None = None,
 ) -> FreePasses:
     """
     Count the passes winners can go on once the show's pass counts change.
 
     Mirrors ``PassService.adjust_passes_for_show``, which adds free passes when
     a count goes up and removes free ones first when it goes down. Pass pairs
-    reserved for a DJ never count.
+    reserved for a DJ never count, and nor do tabler passes.
+
+    :param num_tabler_passes: The show's tabler pass count after the change
+        (defaults to its current count).
     """
     pairs = [p for p in show.passes if p.pass_type == "pair"]
     staff = [p for p in show.passes if p.pass_type == "staff"]
+    if num_tabler_passes is None:
+        num_tabler_passes = sum(1 for p in show.passes if p.pass_type == "tabler")
     free_pairs = sum(1 for p in pairs if p.status == "available" and not p.preassigned_dj)
     free_staff = sum(1 for p in staff if p.status == "available")
     pair_delta = num_pass_pairs - len(pairs)
-    staff_delta = num_pass_pairs + staff_pass_adjustment - len(staff)
+    staff_delta = num_pass_pairs + staff_pass_adjustment - num_tabler_passes - len(staff)
     return FreePasses(
         pairs=max(0, free_pairs + pair_delta),
         staff=max(0, free_staff + staff_delta),
@@ -158,7 +166,7 @@ def validate(
                 " staff pass for this show"
             )
         if show is not None and any(
-            p.pass_type == "staff"
+            p.pass_type in STAFF_CLAIM_PASS_TYPES
             and p.status == "claimed"
             and p.staff_id == staff.id
             and p.guest_of_pass_id is None

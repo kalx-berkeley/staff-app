@@ -20,6 +20,7 @@ from app.auth import (
     _is_promotions_staff,
     _staff_statuses,
     can_claim_staff_passes,
+    can_claim_tabler_passes,
     is_current_staff,
     is_promotions_admin,
     is_site_admin,
@@ -211,9 +212,11 @@ def get_current_user(
 
     is_department_head = False
     claims_staff_passes = False
+    claims_tabler_passes = False
     if role in ("promotions", "staff"):
         effective_staff = db.query(Staff).filter(Staff.email == effective_email).first()
         claims_staff_passes = can_claim_staff_passes(effective_staff)
+        claims_tabler_passes = can_claim_tabler_passes(effective_staff)
         record_id = effective_staff.airtable_record_id if effective_staff else None
         is_department_head = bool(record_id) and (
             db.query(DepartmentHead)
@@ -237,6 +240,7 @@ def get_current_user(
         is_impersonating_station_office_network=is_impersonating_station_office_network,
         is_department_head=is_department_head,
         can_claim_staff_passes=claims_staff_passes,
+        can_claim_tabler_passes=claims_tabler_passes,
         **admin_flags,
         profile=profile,
     )

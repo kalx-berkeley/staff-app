@@ -19,6 +19,8 @@ from app.pass_giveaway.schemas.show import ShowCreate, ShowUpdate
 from app.pass_giveaway.services.close_digest import CloseDigest
 from app.pass_giveaway.services.lottery_service import LotteryService
 from app.pass_giveaway.services.pass_service import PassService, format_phone
+from app.pass_giveaway.services import tabler_service
+from app.pass_giveaway.services.tabler_service import TABLE_NAME
 from app.common.services import notification_service
 from app.config import settings
 
@@ -117,6 +119,18 @@ class ShowService:
             PassService.create_passes_for_show(
                 db, show.id, show.num_pass_pairs, show.staff_pass_adjustment
             )
+            tablers = tabler_service.target_count(
+                co_announce=show.co_announce,
+                requested=show_data.num_tabler_passes,
+                current=0,
+                was_co_announce=False,
+            )
+            if tablers:
+                db.refresh(show)
+                tabler_service.plan(show, show.num_staff_passes, tablers)
+                tabler_service.apply_count(db, show, tablers)
+                db.commit()
+                db.refresh(show)
 
             return show
         except HTTPException:
@@ -551,7 +565,9 @@ class ShowService:
                 p for p in show.passes if p.pass_type == "pair" and p.status == "given_away"
             ]
             claimed = [
-                p for p in show.passes if p.pass_type == "staff" and p.status == "claimed"
+                p
+                for p in show.passes
+                if p.pass_type in ("staff", "tabler") and p.status == "claimed"
             ]
             attempts = list(show.attempts or [])
 
@@ -909,6 +925,9 @@ class ShowService:
                     w.recipient_email if rules.requires_email_address else None,
                 )
             )
+        tablers = [
+            p for p in show.passes if p.pass_type == "tabler" and p.status == "claimed"
+        ]
         for p in claimed:
             staff_email = p.staff_email if rules.includes_staff_email_address else None
             if p.has_guest and rules.staff_guest_requires_name and p.guest_name:
@@ -929,7 +948,15 @@ class ShowService:
                     with_extras(f"1 pass for {p.staff_name}", p.staff_phone, staff_email)
                 )
 
-        if not given_away and not claimed:
+        for p in tablers:
+            staff_email = p.staff_email if rules.includes_staff_email_address else None
+            lines.append(
+                with_extras(
+                    f"1 pass for {p.staff_name} ({TABLE_NAME})", p.staff_phone, staff_email
+                )
+            )
+
+        if not given_away and not claimed and not tablers:
             lines.append("No passes were given away for this show.")
 
         failed = list(show.attempts or [])

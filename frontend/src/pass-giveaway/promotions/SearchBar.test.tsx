@@ -48,6 +48,7 @@ const makeShow = (overrides: Partial<ShowSummary> = {}): ShowSummary => ({
   num_pass_pairs: 2,
   staff_pass_adjustment: 0,
   num_staff_passes: 2,
+  num_tabler_passes: 0,
   status: 'published',
   available_pair_count: 2,
   available_staff_count: 2,

@@ -332,6 +332,8 @@ export interface ShowCreate {
   planned_close_time?: string | null;
   auto_close?: boolean;
   co_announce?: boolean;
+  /** Staff passes set aside for Publicity at the KALX Co-Announce Table. */
+  num_tabler_passes?: number;
   lottery_enabled?: boolean;
   lottery_window_hours?: number;
   dj_preassign_prohibition_days?: number | null;
@@ -359,6 +361,9 @@ export interface ShowUpdate {
   planned_close_time?: string | null;
   auto_close?: boolean;
   co_announce?: boolean;
+  num_tabler_passes?: number;
+  /** Confirms a save that releases claimed tabler passes. */
+  confirm_release_tablers?: boolean;
   lottery_enabled?: boolean;
   lottery_window_hours?: number;
   dj_preassign_prohibition_days?: number | null;
@@ -533,6 +538,14 @@ export interface PassAdjustmentResult {
   affected_staff: AffectedStaffMember[];
 }
 
+/** Someone holding a tabler pass for the KALX Co-Announce Table. */
+export interface Tabler {
+  pass_id: number;
+  staff_id: number | null;
+  staff_name: string | null;
+  claimed_at: string | null;
+}
+
 export interface ShowResponse {
   id: number;
   event_name: string;
@@ -549,7 +562,12 @@ export interface ShowResponse {
   wheelchair_accessible: WheelchairAccessible;
   num_pass_pairs: number;
   staff_pass_adjustment: number;
+  /** All staff passes, including the tabler passes. */
   num_staff_passes: number;
+  /** How many of the staff passes are tabler passes for the KALX Co-Announce Table. */
+  num_tabler_passes: number;
+  available_tabler_count: number;
+  tablers: Tabler[];
   promotions_contacts: PromotionsContact[];
   guest_list_requirements: GuestListRequirements;
   status: ShowStatus;
@@ -600,6 +618,7 @@ export interface ShowSummary {
   num_pass_pairs: number;
   staff_pass_adjustment: number;
   num_staff_passes: number;
+  num_tabler_passes: number;
   available_pair_count: number;
   available_staff_count: number;
   guest_hold_staff_count: number;
@@ -618,7 +637,8 @@ export interface ShowSummary {
 }
 
 // Pass types
-export type PassType = 'pair' | 'staff';
+/** A tabler pass is a staff pass set aside for the KALX Co-Announce Table. */
+export type PassType = 'pair' | 'staff' | 'tabler';
 export type PassStatus = 'available' | 'given_away' | 'claimed';
 
 export interface GiveawayData {

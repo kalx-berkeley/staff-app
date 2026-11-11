@@ -254,6 +254,9 @@ describe('ShowForm', () => {
         num_pass_pairs: 1,
         staff_pass_adjustment: 0,
         num_staff_passes: 1,
+        num_tabler_passes: 0,
+        available_tabler_count: 0,
+        tablers: [],
         promotions_contacts: [],
         guest_list_requirements: { requires_phone_number: false, email_address_requirement: 'none', requires_email_address: false, staff_guest_requires_name: false },
         attempts: [],
@@ -1033,6 +1036,83 @@ describe('ShowForm', () => {
       expect(
         screen.queryByRole('button', { name: /enter winners from a previous show/i }),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Tabler Passes', () => {
+    const coAnnounceShow = (overrides: Partial<ShowResponse> = {}) =>
+      ({
+        id: 5,
+        event_name: 'Existing Show',
+        genre: [],
+        venue: mockVenues[0],
+        promoter_id: null,
+        show_date: '2099-12-31',
+        show_time: '20:00',
+        show_start_date: null,
+        wheelchair_accessible: 'yes',
+        num_pass_pairs: 3,
+        staff_pass_adjustment: 0,
+        planned_close_date: '2099-12-30',
+        planned_close_time: '18:00',
+        co_announce: true,
+        num_tabler_passes: 2,
+        status: 'published',
+        passes: [
+          { id: 1, pass_type: 'staff', status: 'available' },
+          { id: 2, pass_type: 'tabler', status: 'claimed', staff_name: 'Penny' },
+          { id: 3, pass_type: 'tabler', status: 'available' },
+        ],
+        bands: [],
+        ...overrides,
+      }) as unknown as ShowResponse;
+
+    it('reveals the tabler pass count when Co-Announce is checked', async () => {
+      renderShowForm();
+      await waitFor(() => expect(screen.queryByText('Loading...')).not.toBeInTheDocument());
+      expect(screen.queryByLabelText(/tabler passes/i)).not.toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText(/number of pass pairs/i), { target: { value: '3' } });
+      fireEvent.click(screen.getByRole('checkbox', { name: /co-announce/i }));
+
+      const input = await screen.findByLabelText(/tabler passes/i);
+      expect(input).toHaveValue(2);
+      expect(screen.getByText(/comes out of the 3 staff passes; 1 left for staff/i)).toBeInTheDocument();
+    });
+
+    it('asks before releasing claimed tabler passes, then saves with confirmation', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue(coAnnounceShow());
+      vi.mocked(showsAPI.update)
+        .mockRejectedValueOnce({
+          detail: {
+            code: 'tabler_claims_released',
+            message: 'This save releases tabler passes that people have claimed: Penny',
+            tablers: ['Penny'],
+          },
+        })
+        .mockResolvedValueOnce(coAnnounceShow({ num_tabler_passes: 0 }));
+      renderShowForm('/promotions/shows/5/edit');
+      await waitFor(() => expect(screen.queryByText('Loading...')).not.toBeInTheDocument());
+
+      const input = screen.getByLabelText(/tabler passes/i);
+      expect(input).toHaveValue(2);
+      fireEvent.change(input, { target: { value: '0' } });
+      expect(screen.getByText(/1 tabler pass is claimed, so saving releases it/i)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /update show/i }));
+      expect(await screen.findByText('Release Tabler Passes?')).toBeInTheDocument();
+      expect(screen.getByText('Penny')).toBeInTheDocument();
+      expect(showsAPI.update).toHaveBeenLastCalledWith(
+        5,
+        expect.objectContaining({ num_tabler_passes: 0, confirm_release_tablers: false }),
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /release and save/i }));
+      await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/promotions/shows'));
+      expect(showsAPI.update).toHaveBeenLastCalledWith(
+        5,
+        expect.objectContaining({ num_tabler_passes: 0, confirm_release_tablers: true }),
+      );
     });
   });
 });

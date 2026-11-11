@@ -59,6 +59,12 @@ export const seatedFallbackNote = (fallback: GuestFallback): string => {
   return '';
 };
 
+/** The table Publicity staff at co-announce shows, using tabler passes. */
+export const KALX_TABLE_NAME = 'KALX Co-Announce Table';
+
+/** How many tabler passes a show gets when Co-Announce is first checked. */
+export const DEFAULT_TABLER_PASSES = 2;
+
 export const STAFF_PASSES_NOT_YET_ACTIVE = 'Staff passes open to you once your status is Active.';
 
 /**

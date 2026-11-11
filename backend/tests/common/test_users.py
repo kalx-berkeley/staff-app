@@ -1204,6 +1204,23 @@ def test_get_current_user_active_staff_can_claim_staff_passes(
         assert response.json()["can_claim_staff_passes"] is True
 
 
+def test_get_current_user_can_claim_tabler_passes(client: TestClient, db: Session):
+    """Only current staff in the Publicity department can claim tabler passes."""
+    from app.models.staff_department import StaffDepartment
+
+    pub = _make_active_staff(db, "pub@example.com", "Pub", "555-7777")
+    db.add(StaffDepartment(staff_id=pub.id, department="Publicity"))
+    db.commit()
+    _make_active_staff(db, "staff@example.com", "Staff", "555-5555")
+
+    response = client.get("/api/users/me", headers={"X-Forwarded-User": "pub@example.com"})
+    assert response.json()["can_claim_tabler_passes"] is True
+    response = client.get(
+        "/api/users/me", headers={"X-Forwarded-User": "staff@example.com"}
+    )
+    assert response.json()["can_claim_tabler_passes"] is False
+
+
 def test_new_staff_is_not_site_admin_even_as_paid_staff(db: Session):
     """Site admin stays Active-only, whatever else a '🆕' person has."""
     from app.auth import is_site_admin
