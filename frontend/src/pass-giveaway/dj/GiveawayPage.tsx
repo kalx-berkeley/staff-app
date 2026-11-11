@@ -111,6 +111,8 @@ const GiveawayPage = () => {
   const passPairs = show.passes.filter((p) => p.pass_type === 'pair');
   const availablePasses = sortAvailablePasses(passPairs.filter((p) => p.status === 'available'));
   const firstAvailable = availablePasses[0] ?? null;
+  const remainingPasses = availablePasses.slice(1);
+  const remainingPreassigned = remainingPasses.filter((p) => p.preassigned_dj);
   const age = show.age_restriction;
 
   return (
@@ -220,42 +222,51 @@ const GiveawayPage = () => {
               <p className="no-passes">All passes have been given away.</p>
             )}
 
-            {availablePasses.map((pass) => (
-              <div key={pass.id} className="kalx-pass-row">
+            {firstAvailable && (
+              <div className="kalx-pass-row">
                 <div className="kalx-pass-meta">
-                  {pass.preassigned_dj && (
+                  {firstAvailable.preassigned_dj ? (
                     <span className="kalx-pass-preassign-dj">
-                      Pre-assigned to: <strong>{pass.preassigned_dj}</strong>
-                      {pass.preassigned_date && ` (${pass.preassigned_date})`}
+                      Pre-assigned to: <strong>{firstAvailable.preassigned_dj}</strong>
+                      {firstAvailable.preassigned_date && ` (${firstAvailable.preassigned_date})`}
                     </span>
-                  )}
-                  {!pass.preassigned_dj && (
+                  ) : (
                     <span className="kalx-pass-available-badge">Available — ANY DJ</span>
                   )}
                 </div>
+                <PassGiveawayForm
+                  pass={firstAvailable}
+                  venueId={show.venue.id}
+                  onSuccess={() => navigate(`/dj/shows/${id}`, { state: { justGaveAway: true } })}
+                  djName={djName}
+                  onMissingDjName={() => document.getElementById(DJ_NAME_INPUT_ID)?.focus()}
+                  winFrequencyDays={show.venue.win_frequency_days}
+                  requiresEmail={show.guest_list_requirements.requires_email_address}
+                  readOnly={isPromotionsPreview}
+                  visitId={visitId}
+                />
+              </div>
+            )}
 
-                {pass.id === firstAvailable?.id ? (
-                  <PassGiveawayForm
-                    pass={pass}
-                    venueId={show.venue.id}
-                    onSuccess={() => navigate(`/dj/shows/${id}`, { state: { justGaveAway: true } })}
-                    djName={djName}
-                    onMissingDjName={() => document.getElementById(DJ_NAME_INPUT_ID)?.focus()}
-                    winFrequencyDays={show.venue.win_frequency_days}
-                    requiresEmail={show.guest_list_requirements.requires_email_address}
-                    readOnly={isPromotionsPreview}
-                    visitId={visitId}
-                  />
-                ) : (
-                  <div
-                    className="kalx-pass-pending"
-                    title="Passes must be given away in order. Give away the first available pass before this one becomes active."
-                  >
-                    Waiting for the first available pass to be given away first.
-                  </div>
+            {remainingPasses.length > 0 && (
+              <div className="kalx-pass-remaining">
+                <p>
+                  {remainingPasses.length === 1
+                    ? '1 more pass pair available after this one.'
+                    : `${remainingPasses.length} more pass pairs available after this one.`}
+                </p>
+                {remainingPreassigned.length > 0 && (
+                  <ul>
+                    {remainingPreassigned.map((pass) => (
+                      <li key={pass.id}>
+                        Pre-assigned to <strong>{pass.preassigned_dj}</strong>
+                        {pass.preassigned_date && ` (${pass.preassigned_date})`}
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
