@@ -148,6 +148,105 @@ def test_backup_database_copies_the_data(home):
         assert connection.execute("select name from shows").fetchall() == [("Rhye",)]
 
 
+def make_backups(data: Path, *names: str) -> None:
+    data.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        (data / name).write_text("")
+
+
+NOW = datetime.datetime(2026, 11, 11, 4, 0, 0)
+
+
+def test_prune_backups_keeps_recent_backups_and_deletes_old_ones(tmp_path):
+    data = tmp_path / "data"
+    make_backups(
+        data,
+        "backup_20261110_035100.db",
+        "backup_20261105_035100.db",
+        "backup_20261001_035100.db",
+        "backup_20260901_035100.db",
+    )
+    deleted = install.prune_backups(data, install.BackupRetention(days=7, minimum=1), NOW)
+    assert sorted(p.name for p in deleted) == [
+        "backup_20260901_035100.db",
+        "backup_20261001_035100.db",
+    ]
+    assert sorted(p.name for p in data.iterdir()) == [
+        "backup_20261105_035100.db",
+        "backup_20261110_035100.db",
+    ]
+
+
+def test_prune_backups_keeps_the_newest_however_old(tmp_path):
+    data = tmp_path / "data"
+    make_backups(
+        data,
+        "backup_20260101_035100.db",
+        "backup_20260201_035100.db",
+        "backup_20260301_035100.db",
+    )
+    install.prune_backups(data, install.BackupRetention(days=7, minimum=2), NOW)
+    assert sorted(p.name for p in data.iterdir()) == [
+        "backup_20260201_035100.db",
+        "backup_20260301_035100.db",
+    ]
+
+
+def test_prune_backups_leaves_other_files_alone(tmp_path):
+    data = tmp_path / "data"
+    make_backups(
+        data,
+        "staff-app.db",
+        "staff-app.db-wal",
+        "backup_20200101_000000.db.gz",
+        "backup_old.db",
+        "backup_20201301_000000.db",
+        "backup_20200101_000000.db",
+    )
+    deleted = install.prune_backups(data, install.BackupRetention(days=7, minimum=0), NOW)
+    assert [p.name for p in deleted] == ["backup_20200101_000000.db"]
+    assert (data / "staff-app.db").exists()
+    assert (data / "backup_20201301_000000.db").exists()
+
+
+def test_prune_backups_uses_the_name_not_the_file_time(tmp_path):
+    data = tmp_path / "data"
+    # Copying the folder gives every file a new modification time
+    make_backups(data, "backup_20200101_000000.db")
+    install.prune_backups(data, install.BackupRetention(days=7, minimum=0), NOW)
+    assert list(data.iterdir()) == []
+
+
+def test_backup_database_deletes_old_backups_but_keeps_the_new_one(home):
+    data = home / "staff-app-staging" / "backend" / "data"
+    make_backups(data, *(f"backup_2020010{day}_000000.db" for day in range(1, 8)))
+    with sqlite3.connect(data / "staff-app.db") as connection:
+        connection.execute("create table shows (name text)")
+    backup = install.backup_database(get_environment("staging"))
+    backups = sorted(p.name for p in data.glob("backup_*.db"))
+    minimum = install.BACKUP_RETENTION["staging"].minimum
+    assert len(backups) == minimum
+    assert backup.name in backups
+
+
+def test_backup_database_carries_on_when_pruning_fails(home, monkeypatch):
+    data = home / "staff-app-production" / "backend" / "data"
+    data.mkdir(parents=True)
+    sqlite3.connect(data / "staff-app.db").close()
+
+    def broken(*args):
+        raise PermissionError("read-only")
+
+    monkeypatch.setattr(install, "prune_backups", broken)
+    assert install.backup_database(get_environment("production")).exists()
+
+
+def test_every_environment_has_a_backup_retention():
+    assert set(install.BACKUP_RETENTION) == {"staging", "production"}
+    for retention in install.BACKUP_RETENTION.values():
+        assert retention.minimum >= 1  # a rollback needs the newest
+
+
 def test_production_installs_its_own_units_and_the_shared_templates():
     assert install.units_for(get_environment("production")) == [
         "staff-app-backend-production.service",

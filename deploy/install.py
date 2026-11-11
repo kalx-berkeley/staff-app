@@ -6,7 +6,7 @@ Install the code this file came with into an environment.
 install change takes effect on the deploy that ships it. It:
 
 1. makes sure Node is current, and builds the frontend;
-2. backs up the database;
+2. backs up the database, and deletes old backups;
 3. copies the backend and frontend into place, installs the backend's
    dependencies and runs the migrations;
 4. sets ``APP_VERSION``, updates the systemd units and restarts the backend;
@@ -63,6 +63,25 @@ NODE_VERSIONS_KEPT = 2
 # Files copied to ~/staff-app-deploy/<environment>/ for systemd to run
 STABLE_FILES = ("fetch.py", "notify.py", "deploy_common.py")
 HEALTH_WAIT_SECONDS = 60
+BACKUP_NAME = re.compile(r"^backup_(\d{8}_\d{6})\.db$")
+BACKUP_TIME_FORMAT = "%Y%m%d_%H%M%S"
+
+
+@dataclass(frozen=True)
+class BackupRetention:
+    """How long an environment keeps its pre-deploy database backups."""
+
+    # Backups newer than this are kept
+    days: int
+    # The newest this many are kept however old they are, so a long gap
+    # between deploys never leaves no backups at all
+    minimum: int
+
+
+BACKUP_RETENTION = {
+    "staging": BackupRetention(days=7, minimum=5),
+    "production": BackupRetention(days=30, minimum=10),
+}
 
 
 @dataclass
@@ -275,6 +294,9 @@ def backup_database(environment: Environment) -> Path | None:
     """
     Copy the database, consistently, before anything changes it.
 
+    Then delete the backups older than the environment keeps (see
+    ``prune_backups``).
+
     :param environment: The environment
     :type environment: Environment
     :returns: The backup, or None when there's no database yet
@@ -284,7 +306,7 @@ def backup_database(environment: Environment) -> Path | None:
     database = data / "staff-app.db"
     if not database.exists():
         return None
-    backup = data / f"backup_{datetime.datetime.now():%Y%m%d_%H%M%S}.db"
+    backup = data / f"backup_{datetime.datetime.now():{BACKUP_TIME_FORMAT}}.db"
     live = sqlite3.connect(database)
     copy = sqlite3.connect(backup)
     try:
@@ -293,7 +315,55 @@ def backup_database(environment: Environment) -> Path | None:
         copy.close()
         live.close()
     logger.info("Backed up the database to %s", backup)
+    try:
+        prune_backups(data, BACKUP_RETENTION[environment.name])
+    except OSError:
+        # A full disk of old backups shouldn't also stop the deploy
+        logger.warning("Deleting old database backups failed", exc_info=True)
     return backup
+
+
+def prune_backups(
+    data: Path, retention: BackupRetention, now: datetime.datetime | None = None
+) -> list[Path]:
+    """
+    Delete the database backups an environment no longer keeps.
+
+    A backup is kept if it's newer than ``retention.days`` or among the newest
+    ``retention.minimum``, so the one just taken, which a rollback needs, is
+    always kept. Its age comes from the time in its name, not the file's
+    modification time. Only files named like ``backup_20261111_035100.db`` are
+    touched.
+
+    :param data: The folder holding the database and its backups
+    :type data: Path
+    :param retention: How many backups to keep, and for how long
+    :type retention: BackupRetention
+    :param now: The current time, or None for now
+    :type now: datetime.datetime | None
+    :returns: The backups deleted
+    :rtype: list[Path]
+    """
+    backups = []
+    for path in data.iterdir():
+        match = BACKUP_NAME.match(path.name)
+        if not match or not path.is_file():
+            continue
+        try:
+            taken = datetime.datetime.strptime(match.group(1), BACKUP_TIME_FORMAT)
+        except ValueError:  # such as month 13
+            continue
+        backups.append((taken, path))
+    backups.sort(reverse=True)
+    cutoff = (now or datetime.datetime.now()) - datetime.timedelta(days=retention.days)
+    deleted = []
+    for taken, path in backups[retention.minimum :]:
+        if taken < cutoff:
+            path.unlink()
+            deleted.append(path)
+    if deleted:
+        logger.info("Deleted %d old database backups from %s", len(deleted), data)
+    return deleted
 
 
 def units_for(environment: Environment) -> list[str]:

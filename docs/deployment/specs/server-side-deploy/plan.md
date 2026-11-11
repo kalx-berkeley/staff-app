@@ -92,7 +92,10 @@ holds what both share, and `deploy/notify.py` sends the failure email.
    `VITE_RELEASE_VERSION=<tag>`. Staging sets `VITE_COMMIT_SHA=<sha>` and adds
    `--mode staging`. TypeScript checking is skipped because CI already ran it.
 6. **Back up the database**, as the workflow does today, and remember the
-   backup's name for rollback.
+   backup's name for rollback. Then delete old backups: each environment keeps
+   every backup newer than a set number of days, and always its newest few
+   however old they are (`BACKUP_RETENTION` in `install.py`: staging 7 days and
+   at least 5, production 30 days and at least 10).
 7. **Install the new code.**
    - Copy the backend (with today's excludes) and `frontend/dist` into
      `~/staff-app-<environment>` with `rsync --delete`. This keeps the current
