@@ -36,16 +36,19 @@ REQUIRED_CHECKS = ("Run Backend Tests", "Run Frontend Tests")
 # problem that repeats doesn't send an email on every run
 FAILURE_EMAIL_REPEAT_AFTER = datetime.timedelta(hours=12)
 DEFAULT_FROM_ADDRESS = "noreply@kalx.berkeley.edu"
-# Files the backend rsync never deletes or overwrites in the deploy directory
-BACKEND_RSYNC_EXCLUDES = (
-    "venv",
-    "__pycache__",
-    ".pytest_cache",
-    "*.pyc",
-    ".coverage",
-    "test*.db",
-    "data",
-    ".env",
+# rsync filter rules for the backend: files the deploy never deletes or
+# overwrites in the deploy directory, then caches it doesn't copy. The caches
+# are "perishable" (-p), so a folder holding nothing but caches, such as one
+# left over after the code moved, is deleted rather than kept for them.
+BACKEND_RSYNC_FILTERS = (
+    "- venv",
+    "- data",
+    "- .env",
+    "- test*.db",
+    "-p __pycache__/",
+    "-p .pytest_cache/",
+    "-p *.pyc",
+    "-p .coverage",
 )
 
 

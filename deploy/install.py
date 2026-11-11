@@ -41,7 +41,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from deploy_common import (
-    BACKEND_RSYNC_EXCLUDES,
+    BACKEND_RSYNC_FILTERS,
     Environment,
     config_home,
     env_file,
@@ -261,7 +261,13 @@ def build_frontend(source: Path, environment: Environment, version: str) -> None
     else:
         build_env["VITE_COMMIT_SHA"] = version
         vite += ["--mode", "staging"]
-    run(["npm", "ci", "--no-audit", "--no-fund"], cwd=frontend, env=build_env)
+    # npm comes with Node, and is updated with it, so its notice to update
+    # npm on its own is just noise in the log
+    run(
+        ["npm", "ci", "--no-audit", "--no-fund", "--no-update-notifier"],
+        cwd=frontend,
+        env=build_env,
+    )
     run(vite, cwd=frontend, env=build_env)
 
 
@@ -312,7 +318,7 @@ def units_for(environment: Environment) -> list[str]:
     return units
 
 
-def rsync(source: Path, destination: Path, excludes: Sequence[str] = ()) -> None:
+def rsync(source: Path, destination: Path, filters: Sequence[str] = ()) -> None:
     """
     Make a directory match another, deleting what isn't in the source.
 
@@ -320,8 +326,9 @@ def rsync(source: Path, destination: Path, excludes: Sequence[str] = ()) -> None
     :type source: Path
     :param destination: The directory to make match it
     :type destination: Path
-    :param excludes: Patterns to leave alone in both
-    :type excludes: Sequence[str]
+    :param filters: rsync filter rules, such as ``- venv`` for files to leave
+        alone in both
+    :type filters: Sequence[str]
     :returns: None
     :rtype: None
     """
@@ -334,7 +341,7 @@ def rsync(source: Path, destination: Path, excludes: Sequence[str] = ()) -> None
             "--perms",
             "--times",
             "--delete",
-            *(f"--exclude={pattern}" for pattern in excludes),
+            *(f"--filter={rule}" for rule in filters),
             f"{source}/",
             f"{destination}/",
         ]
@@ -351,16 +358,16 @@ def take_snapshot(environment: Environment) -> Snapshot:
     :rtype: Snapshot
     """
     snapshot = Snapshot(environment.snapshot_dir)
-    for live, copy, excludes in (
+    for live, copy, filters in (
         (
             environment.deploy_dir / "backend",
             snapshot.directory / "backend",
-            BACKEND_RSYNC_EXCLUDES,
+            BACKEND_RSYNC_FILTERS,
         ),
         (environment.deploy_dir / "frontend" / "dist", snapshot.directory / "dist", ()),
     ):
         if live.exists():
-            rsync(live, copy, excludes)
+            rsync(live, copy, filters)
         else:
             # Nothing is live there yet, so rolling back means putting back nothing
             shutil.rmtree(copy, ignore_errors=True)
@@ -476,7 +483,7 @@ def install(source: Path, environment: Environment, version: str) -> None:
     :rtype: None
     """
     backend = environment.deploy_dir / "backend"
-    rsync(source / "backend", backend, BACKEND_RSYNC_EXCLUDES)
+    rsync(source / "backend", backend, BACKEND_RSYNC_FILTERS)
     (backend / "data").mkdir(exist_ok=True)
     rsync(source / "frontend" / "dist", environment.deploy_dir / "frontend" / "dist")
     install_python_packages(environment)
@@ -520,7 +527,7 @@ def rollback(
                 database.with_name(database.name + leftover).unlink(missing_ok=True)
             shutil.copy2(backup, database)
         backend = environment.deploy_dir / "backend"
-        rsync(snapshot.directory / "backend", backend, BACKEND_RSYNC_EXCLUDES)
+        rsync(snapshot.directory / "backend", backend, BACKEND_RSYNC_FILTERS)
         rsync(snapshot.directory / "dist", environment.deploy_dir / "frontend" / "dist")
         install_python_packages(environment)
         set_app_version(environment, previous)

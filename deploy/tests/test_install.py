@@ -260,3 +260,23 @@ def test_a_snapshot_of_a_new_environment_is_empty(home):
     assert list((snapshot.directory / "backend").iterdir()) == []
     assert list((snapshot.directory / "dist").iterdir()) == []
     assert snapshot.units == []
+
+
+def test_rsync_removes_folders_left_holding_only_caches(tmp_path):
+    source = tmp_path / "source"
+    (source / "app" / "common").mkdir(parents=True)
+    (source / "app" / "common" / "users.py").write_text("")
+    live = tmp_path / "live"
+    for path in (
+        "app/routers/__pycache__/old.cpython-312.pyc",
+        "app/common/__pycache__/users.cpython-312.pyc",
+        "venv/bin/python",
+        "data/staff-app.db",
+        ".env",
+    ):
+        (live / path).parent.mkdir(parents=True, exist_ok=True)
+        (live / path).write_text("keep?")
+    install.rsync(source, live, install.BACKEND_RSYNC_FILTERS)
+    assert not (live / "app" / "routers").exists()
+    for kept in ("venv/bin/python", "data/staff-app.db", ".env", "app/common/users.py"):
+        assert (live / kept).exists(), kept
