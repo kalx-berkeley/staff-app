@@ -6,6 +6,7 @@ import type { APIError } from '../../common/types';
 import SearchBar from './SearchBar';
 import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker } from '../components';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
+import { compareVenueNames } from '../utils';
 
 type SortBy = 'date' | 'band' | 'venue' | 'published';
 
@@ -135,7 +136,7 @@ const ShowList = () => {
       if (!b.published_at) return -1;
       return b.published_at.localeCompare(a.published_at);
     }
-    return a.venue.name.localeCompare(b.venue.name);
+    return compareVenueNames(a.venue.name, b.venue.name);
   });
 
   return (

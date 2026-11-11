@@ -6,7 +6,7 @@ import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker }
 import type { ShowSummary } from '../types';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow } from '../utils';
+import { WHEELCHAIR_ACCESSIBLE_LABELS, compareVenueNames, formatShowRating, isMovieShow } from '../utils';
 
 const VIEW_MODE_KEY = 'kalx_staff_view_mode';
 
@@ -119,7 +119,7 @@ const ShowBrowser = () => {
       if (!b.published_at) return -1;
       return b.published_at.localeCompare(a.published_at);
     }
-    return a.venue.name.localeCompare(b.venue.name);
+    return compareVenueNames(a.venue.name, b.venue.name);
   });
 
   return (

@@ -2,12 +2,14 @@ import { describe, it, expect } from 'vitest';
 import {
   addressHasStateOrZip,
   canDjEditWinner,
+  compareVenueNames,
   canUsePassGiveawayAdmin,
   findRecentDjGiveaway,
   formatShowRating,
   isRecentShow,
   isStagingSublistDjStaff,
   showsPassGiveawayAdminLink,
+  venueSortName,
 } from './utils';
 import { formatDateValue } from '../common/utils';
 import type { UserResponse } from '../common/types';
@@ -232,5 +234,25 @@ describe('addressHasStateOrZip', () => {
     '123 Sunset Blvd, LA',
   ])('does not flag %j', (address) => {
     expect(addressHasStateOrZip(address)).toBe(false);
+  });
+});
+
+describe('venue name sorting', () => {
+  it('drops a leading "The"', () => {
+    expect(venueSortName('The Fox Theater')).toBe('Fox Theater');
+    expect(venueSortName('the Chapel')).toBe('Chapel');
+    expect(venueSortName('Theater Rhinoceros')).toBe('Theater Rhinoceros');
+    expect(venueSortName('The')).toBe('The');
+  });
+
+  it('sorts "The" venues by the rest of their name', () => {
+    const names = ['The Fox Theater', 'Greek Theatre', 'The Chapel', 'Bottom of the Hill', 'Theater Rhinoceros'];
+    expect([...names].sort(compareVenueNames)).toEqual([
+      'Bottom of the Hill',
+      'The Chapel',
+      'The Fox Theater',
+      'Greek Theatre',
+      'Theater Rhinoceros',
+    ]);
   });
 });

@@ -227,3 +227,14 @@ export function addressHasStateOrZip(address: string): boolean {
   }
   return !isOnlySegment && US_STATE_NAME.test(segments[segments.length - 1]);
 }
+
+// Venue name as it sorts, ignoring a leading "The " so that "The Fox Theater"
+// sorts as "Fox Theater".
+export function venueSortName(name: string): string {
+  return name.trim().replace(/^the\s+/i, '');
+}
+
+// Compares venue names for sorting, ignoring a leading "The " and case.
+export function compareVenueNames(a: string, b: string): number {
+  return venueSortName(a).localeCompare(venueSortName(b), undefined, { sensitivity: 'base' });
+}

@@ -6,7 +6,7 @@ import { Tooltip, DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, K
 import type { ShowSummary, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, WHEELCHAIR_ACCESSIBLE_LABELS, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
+import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, WHEELCHAIR_ACCESSIBLE_LABELS, compareVenueNames, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
 
 const VIEW_MODE_KEY = 'kalx_dj_view_mode';
 
@@ -262,7 +262,7 @@ const ShowBrowser = () => {
       if (!b.published_at) return -1;
       return b.published_at.localeCompare(a.published_at);
     }
-    return a.venue.name.localeCompare(b.venue.name);
+    return compareVenueNames(a.venue.name, b.venue.name);
   });
 
   return (
