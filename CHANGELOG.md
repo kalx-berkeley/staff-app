@@ -6,6 +6,17 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.13.1] - 2026-11-11
+
+### Changed
+
+- Dim a show on the DJ shows page, and offer View instead of Give Away Passes, once the DJ has given away a pass pair for it this DJ shift, since they can't give away another ([0ef0580](https://github.com/kalx-berkeley/staff-app/commit/0ef0580))
+- Warn a DJ before showing a show whose remaining pass pairs are all pre-assigned to other DJs, naming those DJs and their airdates, and offer to pick a different show ([0ef0580](https://github.com/kalx-berkeley/staff-app/commit/0ef0580))
+
+### Fixed
+
+- Fix late-starting scheduled production deploys restarting production during live DJ hours. A scheduled run that starts outside 3:05–5:50am Pacific now deploys nothing, and the release waits for the next night. Manual deploys still deploy right away ([ea2dd32](https://github.com/kalx-berkeley/staff-app/commit/ea2dd32))
+
 ## [1.13.0] - 2026-11-10
 
 ### Added
@@ -341,6 +352,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.13.1]: https://github.com/kalx-berkeley/staff-app/compare/v1.13.0...v1.13.1
 [1.13.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.12.2...v1.13.0
 [1.12.2]: https://github.com/kalx-berkeley/staff-app/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/kalx-berkeley/staff-app/compare/v1.12.0...v1.12.1
