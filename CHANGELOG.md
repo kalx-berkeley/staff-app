@@ -6,6 +6,22 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.13.2] - 2026-11-11
+
+### Changed
+
+- Deploy from the server instead of GitHub Actions, so deploys start on time and GitHub has no access to the server. A systemd timer deploys the newest commit on `main` to staging within about 2 minutes of its tests passing, and the newest release to production at 3:51am Pacific. A failed production deploy rolls back to what was live, and failed deploys and production deploys are emailed to `WEBMASTER_EMAIL`. Each environment's settings now live only in its `.env` on the server ([b36e13a](https://github.com/kalx-berkeley/staff-app/commit/b36e13a))
+- Run the tests on every push to `main`, including docs-only pushes, since a commit is only deployed once its tests have passed ([b36e13a](https://github.com/kalx-berkeley/staff-app/commit/b36e13a))
+
+### Removed
+
+- Remove the GitHub Actions deploy, including its nightly scheduled run, and `scripts/deploy-staging.sh` ([b36e13a](https://github.com/kalx-berkeley/staff-app/commit/b36e13a))
+
+### Fixed
+
+- Fix the nightly deploy waiting forever, without saying so, for a release whose tests never ran. It now emails instead. This happened to v1.13.1, whose commit only changed the changelog, so v1.13.1 was never deployed to production; this release includes its changes ([9ca7008](https://github.com/kalx-berkeley/staff-app/commit/9ca7008))
+- Fix every deploy warning that it couldn't delete leftover backend folders holding only Python caches. Those folders are now removed ([31bf2ad](https://github.com/kalx-berkeley/staff-app/commit/31bf2ad))
+
 ## [1.13.1] - 2026-11-11
 
 ### Changed
@@ -352,6 +368,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.13.2]: https://github.com/kalx-berkeley/staff-app/compare/v1.13.1...v1.13.2
 [1.13.1]: https://github.com/kalx-berkeley/staff-app/compare/v1.13.0...v1.13.1
 [1.13.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.12.2...v1.13.0
 [1.12.2]: https://github.com/kalx-berkeley/staff-app/compare/v1.12.1...v1.12.2
