@@ -1,10 +1,12 @@
 """Feature bin sync and matching service.
 
 The KALX music library "feature bin" (recently added releases) is tracked in a
-public Google Sheet. This service fetches the "Current Active A-Z" worksheet
-nightly, replaces the FeatureBinRelease table with the sheet's current
-snapshot, and matches feature-bin artists against shows so the promotions
-website can flag shows with a performer who has a release in the bin.
+public Google Sheet. This service fetches the worksheet of currently active
+titles (headed "Currently Active Titles by Date", which lists only what's in
+the bin now, not past releases) nightly, replaces the FeatureBinRelease table
+with the sheet's current snapshot, and matches feature-bin artists against
+shows so the promotions website can flag shows with a performer who has a
+release in the bin.
 """
 
 import csv
@@ -124,7 +126,7 @@ class FeatureBinService:
 
     @staticmethod
     def fetch_sheet_csv() -> str:
-        """Fetch the "Current Active A-Z" worksheet as CSV.
+        """Fetch the currently active titles worksheet as CSV.
 
         The sheet is currently public, so this is a plain unauthenticated
         request to its CSV export URL. If the sheet becomes restricted, this

@@ -469,7 +469,7 @@ Client
 | `APP_VERSION` | The deployed build, which open tabs compare with their own to know when to reload. Set by the deploy | — (tabs don't check when unset) |
 | `SITE_ADMIN_EMAILS` | Comma-separated emails of extra site admins, besides department heads and Paid Staff (they must still be Active staff) | — |
 | `FEATURE_BIN_SHEET_ID` | Google Sheet ID for the KALX feature bin (new-arrivals) list | — (feature bin sync is disabled if unset) |
-| `FEATURE_BIN_SHEET_GID` | Worksheet `gid` of the sheet's "Current Active A-Z" tab | — (feature bin sync is disabled if unset) |
+| `FEATURE_BIN_SHEET_GID` | Worksheet `gid` of the sheet's "Currently Active Titles by Date" tab (only releases in the bin now) | — (feature bin sync is disabled if unset) |
 | `KALX_LIVE_CALENDAR_ID` | Google Calendar ID for the KALX Live! performance schedule | — (KALX Live! sync is disabled if unset) |
 
 Note: CORS is same-origin in production (frontend and API are both on `staff.kalx.berkeley.edu`), so `CORS_ORIGINS` only matters for local development.
