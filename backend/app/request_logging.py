@@ -4,24 +4,50 @@ Show who made each request on the backend's log lines.
 Uvicorn's access lines and the app's own log lines both name the signed-in
 user and their IP address, like ``someone@berkeley.edu (203.0.113.5)``. Guests on the
 DJ studio and station office networks reach the backend without a login, so
-they show as ``not-logged-in (203.0.113.5)``. Lines logged outside a request,
-such as the scheduler's, stay as they are.
+they show as ``not-logged-in (203.0.113.5)``, or as ``DJ "Name" (203.0.113.5)``
+when the pass giveaway's DJ Name box has a name in it (the frontend sends it in
+the X-DJ-Name header, URL-encoded). Lines logged outside a request, such as the
+scheduler's, stay as they are.
 
 The user is always the real signed-in user, never anyone they are impersonating,
-because Apache sets X-Forwarded-User from the OIDC login.
+because Apache sets X-Forwarded-User from the OIDC login. The DJ name is only
+what was typed into the box, so it's used only when nobody is signed in, and
+only ever as a label on log lines.
 """
 
 import logging
 from contextvars import ContextVar
 from typing import Any
+from urllib.parse import unquote
 
 from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 NOT_LOGGED_IN = "not-logged-in"
+DJ_NAME_HEADER = "x-dj-name"
+MAX_DJ_NAME_LENGTH = 60
 APP_LOG_FORMAT = "%(levelname)s:%(name)s:%(request_user)s%(message)s"
 
 _request_user: ContextVar[str | None] = ContextVar("request_user", default=None)
+
+
+def guest_label(dj_name_header: str | None) -> str:
+    """
+    Name a request from someone who isn't signed in.
+
+    The header is typed by whoever is at the DJ studio computer, so it's
+    decoded, stripped of quotes and non-printable characters (so it can't fake
+    or break a log line) and shortened.
+
+    :param dj_name_header: The URL-encoded X-DJ-Name header, if sent.
+    :type dj_name_header: str | None
+    :returns: ``DJ "Name"`` when there's a usable name, otherwise ``not-logged-in``.
+    :rtype: str
+    """
+    name = unquote(dj_name_header or "")
+    name = "".join(c for c in name if c.isprintable() and c != '"')
+    name = " ".join(name.split())[:MAX_DJ_NAME_LENGTH].strip()
+    return f'DJ "{name}"' if name else NOT_LOGGED_IN
 
 
 class RequestUserMiddleware:
@@ -51,10 +77,13 @@ class RequestUserMiddleware:
         :type send: Send
         """
         if scope["type"] == "http":
-            email = Headers(scope=scope).get("x-forwarded-user")
+            headers = Headers(scope=scope)
+            user = headers.get("x-forwarded-user") or guest_label(
+                headers.get(DJ_NAME_HEADER)
+            )
             client = scope.get("client")
             ip_address = client[0] if client else "unknown IP"
-            _request_user.set(f"{email or NOT_LOGGED_IN} ({ip_address})")
+            _request_user.set(f"{user} ({ip_address})")
         await self.app(scope, receive, send)
 
 

@@ -46,7 +46,7 @@ def make_app() -> FastAPI:
     return app
 
 
-def run_request(path: str, email: str | None = None) -> None:
+def run_request(path: str, email: str | None = None, dj_name: str | None = None) -> None:
     """
     Run one request the way uvicorn does, logging its access line from send().
 
@@ -54,8 +54,12 @@ def run_request(path: str, email: str | None = None) -> None:
     :type path: str
     :param email: The X-Forwarded-User value, or None for a guest.
     :type email: str | None
+    :param dj_name: The raw X-DJ-Name header value, or None to leave it out.
+    :type dj_name: str | None
     """
     headers = [(b"x-forwarded-user", email.encode())] if email else []
+    if dj_name is not None:
+        headers.append((b"x-dj-name", dj_name.encode()))
     scope = {
         "type": "http",
         "asgi": {"version": "3.0"},
@@ -122,6 +126,32 @@ def test_access_line_shows_email_and_ip(caplog):
 def test_access_line_marks_guest_as_not_logged_in(caplog):
     run_request("/async")
     assert access_line(caplog).startswith(f'not-logged-in ({IP_ADDRESS}) - "GET')
+
+
+def test_access_line_shows_guest_dj_name(caplog):
+    run_request("/async", dj_name="DJ%20Caf%C3%A9")
+    assert access_line(caplog).startswith(f'DJ "DJ Café" ({IP_ADDRESS}) - "GET')
+
+
+def test_signed_in_email_wins_over_dj_name(caplog):
+    run_request("/async", EMAIL, dj_name="Someone%20Else")
+    assert access_line(caplog).startswith(f"{EMAIL} ({IP_ADDRESS})")
+
+
+@pytest.mark.parametrize("header", ["", "%20%20", "%22%0A"])
+def test_blank_dj_name_shows_not_logged_in(caplog, header):
+    run_request("/async", dj_name=header)
+    assert access_line(caplog).startswith(f"not-logged-in ({IP_ADDRESS})")
+
+
+def test_dj_name_cannot_break_the_log_line(caplog):
+    run_request("/async", dj_name="Bad%22%0AINFO%3A%20fake" + "x" * 100)
+    line = access_line(caplog)
+    assert "\n" not in line
+    label = line.split(f" ({IP_ADDRESS})")[0]
+    assert label.startswith('DJ "BadINFO: fake')
+    assert label.count('"') == 2
+    assert len(label) == len('DJ ""') + 60
 
 
 def test_access_line_of_unhandled_error_shows_user(caplog):

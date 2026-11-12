@@ -7,8 +7,7 @@ import { isRecentShow } from '../utils';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { formatCalendarDate, formatPacific } from '../../common/dateTime';
-
-const DJ_NAME_KEY = 'kalx_dj_name';
+import { DJ_NAME_KEY } from '../djName';
 
 const MyPasses = () => {
   usePageTitle('My Passes · DJ');

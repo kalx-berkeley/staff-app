@@ -6,6 +6,7 @@
  */
 
 import apiClient, { handleAPIError } from '../common/api';
+import { addDjNameHeader } from './djName';
 import type {
   AgeRestriction,
   AlternateEntry,
@@ -64,6 +65,9 @@ import type {
   WinnerReleaseData,
   WinnerUpdateData,
 } from './types';
+
+// Name the DJ studio guest on the backend's log lines (see djName.ts).
+apiClient.interceptors.request.use(addDjNameHeader);
 
 /**
  * Shows API methods for managing show records.

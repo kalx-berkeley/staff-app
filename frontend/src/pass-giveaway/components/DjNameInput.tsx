@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { autocompleteAPI, specialtyShowsAPI } from '../api';
 import { useOnAirDj } from './useOnAirDj';
 
-export const DJ_NAME_KEY = 'kalx_dj_name';
+import { DJ_NAME_KEY } from '../djName';
+
+export { DJ_NAME_KEY };
 
 interface DjNameInputProps {
   value: string;
