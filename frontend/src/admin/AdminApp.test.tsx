@@ -10,6 +10,8 @@ import type { AuditLogItem } from './types';
 
 vi.mock('../common/api', () => ({
   AUTH_DIAG_KEY: 'kalx_auth_diag',
+  // pass-giveaway/api.ts adds an interceptor to the client when it's imported
+  default: { interceptors: { request: { use: vi.fn() } } },
   usersAPI: { getMe: vi.fn() },
   impersonationAPI: { end: vi.fn() },
   handleAPIError: vi.fn(),

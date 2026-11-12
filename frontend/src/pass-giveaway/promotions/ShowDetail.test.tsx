@@ -10,6 +10,8 @@ vi.mock('../api', () => ({
   showsAPI: {
     get: vi.fn(),
     sendCloseNotifications: vi.fn(),
+    markPassesCalledIn: vi.fn(),
+    undoPassesCalledIn: vi.fn(),
   },
   passesAPI: {
     setPreassignment: vi.fn(),
@@ -107,7 +109,7 @@ const makeShow = (passes: PassResponse[]): ShowResponse => ({
     requires_phone_number: false,
     email_address_requirement: 'none',
     requires_email_address: false,
-    staff_guest_requires_name: false, hold_close_notifications: false,
+    staff_guest_requires_name: false, hold_close_notifications: false, track_pass_call_in: false,
     default_lottery_enabled: false,
     default_lottery_window_hours: 24,
     default_dj_preassign_prohibition_days: null,
@@ -151,6 +153,9 @@ const makeShow = (passes: PassResponse[]): ShowResponse => ({
   close_notifications_pending: false,
   close_notifications_sent_at: null,
   close_notifications_sent_by: null,
+  track_pass_call_in: false,
+  passes_called_in_at: null,
+  passes_called_in_by: null,
   co_announce: false,
   lottery_enabled: false,
   lottery_window_hours: 24,
@@ -866,6 +871,63 @@ describe('Promotions ShowDetail — alternates', () => {
       expect(
         screen.queryByRole('button', { name: 'Notify Staff and Alternates' })
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Passes called in', () => {
+    const closedShow = (overrides: Partial<ShowResponse> = {}): ShowResponse => ({
+      ...makeShow([]),
+      status: 'closed',
+      track_pass_call_in: true,
+      ...overrides,
+    });
+    const guestListPanel = () =>
+      screen
+        .getByRole('heading', { name: 'Guest List for Venue' })
+        .closest('.guest-list-summary') as HTMLElement;
+
+    it('shows nothing when the venue or promoter does not track call-ins', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue(closedShow({ track_pass_call_in: false }));
+
+      await renderShowDetail();
+
+      await screen.findByRole('heading', { name: 'Guest List for Venue' });
+      expect(screen.queryByRole('button', { name: 'Mark Passes Called In' })).not.toBeInTheDocument();
+      expect(screen.queryByText(/called in/)).not.toBeInTheDocument();
+    });
+
+    it('marks the passes called in and shows who did it', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue(closedShow());
+      vi.mocked(showsAPI.markPassesCalledIn).mockResolvedValue(
+        closedShow({ passes_called_in_at: '2024-01-01T20:00:00Z', passes_called_in_by: 'Pat Promo' })
+      );
+
+      await renderShowDetail();
+
+      const panel = await waitFor(() => guestListPanel());
+      expect(within(panel).getByText("Passes haven't been called in to the venue yet.")).toBeInTheDocument();
+      fireEvent.click(within(panel).getByRole('button', { name: 'Mark Passes Called In' }));
+
+      expect(await within(panel).findByText(/Passes called in .* by Pat Promo/)).toBeInTheDocument();
+      expect(showsAPI.markPassesCalledIn).toHaveBeenCalledWith(1);
+      expect(within(panel).queryByRole('button', { name: 'Mark Passes Called In' })).not.toBeInTheDocument();
+    });
+
+    it('undoes the mark', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue(
+        closedShow({ passes_called_in_at: '2024-01-01T20:00:00Z', passes_called_in_by: 'Pat Promo' })
+      );
+      vi.mocked(showsAPI.undoPassesCalledIn).mockResolvedValue(closedShow());
+
+      await renderShowDetail();
+
+      const panel = await waitFor(() => guestListPanel());
+      fireEvent.click(within(panel).getByRole('button', { name: 'Undo' }));
+
+      expect(
+        await within(panel).findByRole('button', { name: 'Mark Passes Called In' })
+      ).toBeInTheDocument();
+      expect(showsAPI.undoPassesCalledIn).toHaveBeenCalledWith(1);
     });
   });
 });

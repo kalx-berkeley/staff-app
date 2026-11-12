@@ -41,6 +41,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
     useState<EmailAddressRequirement>('none');
   const [staffGuestRequiresName, setStaffGuestRequiresName] = useState(false);
   const [holdCloseNotifications, setHoldCloseNotifications] = useState(false);
+  const [trackPassCallIn, setTrackPassCallIn] = useState(false);
   const [defaultLotteryEnabled, setDefaultLotteryEnabled] = useState(false);
   const [defaultLotteryWindowHours, setDefaultLotteryWindowHours] = useState('24');
   const [defaultDjPreassignProhibitionDays, setDefaultDjPreassignProhibitionDays] = useState('');
@@ -90,6 +91,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
       setEmailAddressRequirement(venue.email_address_requirement ?? 'none');
       setStaffGuestRequiresName(venue.staff_guest_requires_name ?? false);
       setHoldCloseNotifications(venue.hold_close_notifications ?? false);
+      setTrackPassCallIn(venue.track_pass_call_in ?? false);
       setDefaultLotteryEnabled(venue.default_lottery_enabled ?? false);
       setDefaultLotteryWindowHours(String(venue.default_lottery_window_hours ?? 24));
       setDefaultDjPreassignProhibitionDays(
@@ -256,6 +258,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           email_address_requirement: emailAddressRequirement,
           staff_guest_requires_name: staffGuestRequiresName,
           hold_close_notifications: holdCloseNotifications,
+          track_pass_call_in: trackPassCallIn,
           default_lottery_enabled: defaultLotteryEnabled,
           default_lottery_window_hours: defaultLotteryEnabled ? (parseInt(defaultLotteryWindowHours) || 24) : 24,
           default_dj_preassign_prohibition_days: defaultDjPreassignProhibitionDaysValue,
@@ -287,6 +290,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           email_address_requirement: emailAddressRequirement,
           staff_guest_requires_name: staffGuestRequiresName,
           hold_close_notifications: holdCloseNotifications,
+          track_pass_call_in: trackPassCallIn,
           default_lottery_enabled: defaultLotteryEnabled,
           default_lottery_window_hours: defaultLotteryEnabled ? (parseInt(defaultLotteryWindowHours) || 24) : 24,
           default_dj_preassign_prohibition_days: defaultDjPreassignProhibitionDaysValue,
@@ -738,6 +742,21 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
                 {' '}Wait for me to send close notifications
               </label>
               <HoldCloseNotificationsHint />
+            </div>
+            <div className="form-group form-group-checkbox">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={trackPassCallIn}
+                  onChange={(e) => setTrackPassCallIn(e.target.checked)}
+                  disabled={submitting}
+                />
+                {' '}Track when I've called in the passes
+              </label>
+              <span className="field-hint">
+                Closed shows get a Mark Passes Called In button next to the guest list, so you can keep
+                track of which ones you've sent to the venue.
+              </span>
             </div>
           </div>
 

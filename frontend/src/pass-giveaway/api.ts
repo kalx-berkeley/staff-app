@@ -237,6 +237,20 @@ export const showsAPI = {
     } catch (error) {
       return handleAPIError(error);
     }
+  },  markPassesCalledIn: async (id: number): Promise<ShowResponse> => {
+    try {
+      const response = await apiClient.post<ShowResponse>(`/shows/${id}/passes-called-in`);
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },  undoPassesCalledIn: async (id: number): Promise<ShowResponse> => {
+    try {
+      const response = await apiClient.delete<ShowResponse>(`/shows/${id}/passes-called-in`);
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
   },
 
   /**

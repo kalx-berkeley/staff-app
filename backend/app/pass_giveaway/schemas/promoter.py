@@ -38,6 +38,7 @@ class PromoterCreate(BaseModel):
     email_address_requirement: EmailAddressRequirement = "none"
     staff_guest_requires_name: bool = False
     hold_close_notifications: bool = False
+    track_pass_call_in: bool = False
     owner_emails: list[str] = Field(default_factory=list)
     contacts: list[PromoterContactCreate] = Field(default_factory=list)
 
@@ -52,6 +53,7 @@ class PromoterUpdate(BaseModel):
     email_address_requirement: EmailAddressRequirement | None = None
     staff_guest_requires_name: bool | None = None
     hold_close_notifications: bool | None = None
+    track_pass_call_in: bool | None = None
     owner_emails: list[str] | None = None
     contacts: list[PromoterContactCreate] | None = None
 
@@ -71,6 +73,7 @@ class PromoterResponse(BaseModel):
     requires_email_address: bool = False
     staff_guest_requires_name: bool = False
     hold_close_notifications: bool = False
+    track_pass_call_in: bool = False
     deleted: bool = False
     owner_emails: list[str] = Field(default_factory=list)
     contacts: list[PromoterContactResponse] = Field(default_factory=list)
@@ -87,6 +90,7 @@ class PromoterResponse(BaseModel):
             requires_email_address=promoter.requires_email_address,
             staff_guest_requires_name=promoter.staff_guest_requires_name,
             hold_close_notifications=promoter.hold_close_notifications,
+            track_pass_call_in=promoter.track_pass_call_in,
             deleted=promoter.deleted,
             owner_emails=[o.promotions_staff_email for o in promoter.owners],
             contacts=[PromoterContactResponse.model_validate(c) for c in promoter.contacts],

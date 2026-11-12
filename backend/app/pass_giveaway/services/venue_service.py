@@ -150,6 +150,7 @@ class VenueService:
                 email_address_requirement=venue_data.email_address_requirement,
                 staff_guest_requires_name=venue_data.staff_guest_requires_name,
                 hold_close_notifications=venue_data.hold_close_notifications,
+                track_pass_call_in=venue_data.track_pass_call_in,
                 default_lottery_enabled=venue_data.default_lottery_enabled,
                 default_lottery_window_hours=venue_data.default_lottery_window_hours,
                 default_dj_preassign_prohibition_days=venue_data.default_dj_preassign_prohibition_days,
@@ -280,6 +281,8 @@ class VenueService:
                 venue.staff_guest_requires_name = venue_data.staff_guest_requires_name
             if venue_data.hold_close_notifications is not None:
                 venue.hold_close_notifications = venue_data.hold_close_notifications
+            if venue_data.track_pass_call_in is not None:
+                venue.track_pass_call_in = venue_data.track_pass_call_in
             if "default_lottery_enabled" in venue_data.model_fields_set:
                 venue.default_lottery_enabled = venue_data.default_lottery_enabled
             if "default_lottery_window_hours" in venue_data.model_fields_set:

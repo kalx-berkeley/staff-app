@@ -65,6 +65,11 @@ class Venue(Base):
     hold_close_notifications = Column(
         Boolean, nullable=False, default=False, server_default="false"
     )
+    # Closed shows get a button for a promotions rep to record that they've
+    # called in the passes. See Show.passes_called_in_at.
+    track_pass_call_in = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     default_lottery_enabled = Column(
         Boolean, nullable=False, default=False, server_default="false"
     )

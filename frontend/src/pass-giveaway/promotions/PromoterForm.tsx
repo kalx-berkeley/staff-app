@@ -28,6 +28,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
     useState<EmailAddressRequirement>('none');
   const [staffGuestRequiresName, setStaffGuestRequiresName] = useState(false);
   const [holdCloseNotifications, setHoldCloseNotifications] = useState(false);
+  const [trackPassCallIn, setTrackPassCallIn] = useState(false);
   const [ownerEmails, setOwnerEmails] = useState<string[]>([]);
   const [newOwnerInput, setNewOwnerInput] = useState('');
   const [promotionsStaff, setPromotionsStaff] = useState<PromotionsStaffOption[]>([]);
@@ -48,6 +49,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
       setEmailAddressRequirement(promoter.email_address_requirement ?? 'none');
       setStaffGuestRequiresName(promoter.staff_guest_requires_name ?? false);
       setHoldCloseNotifications(promoter.hold_close_notifications ?? false);
+      setTrackPassCallIn(promoter.track_pass_call_in ?? false);
       setOwnerEmails(promoter.owner_emails || []);
       setContacts(
         promoter.contacts.length > 0
@@ -136,6 +138,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
           email_address_requirement: emailAddressRequirement,
           staff_guest_requires_name: staffGuestRequiresName,
           hold_close_notifications: holdCloseNotifications,
+          track_pass_call_in: trackPassCallIn,
           owner_emails: ownerEmails,
           contacts,
         };
@@ -149,6 +152,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
           email_address_requirement: emailAddressRequirement,
           staff_guest_requires_name: staffGuestRequiresName,
           hold_close_notifications: holdCloseNotifications,
+          track_pass_call_in: trackPassCallIn,
           owner_emails: ownerEmails,
           contacts,
         };
@@ -309,6 +313,21 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
             {' '}Wait for me to send close notifications
           </label>
           <HoldCloseNotificationsHint />
+        </div>
+        <div className="form-group form-group-checkbox">
+          <label>
+            <input
+              type="checkbox"
+              checked={trackPassCallIn}
+              onChange={(e) => setTrackPassCallIn(e.target.checked)}
+              disabled={submitting}
+            />
+            {' '}Track when I've called in the passes
+          </label>
+          <span className="field-hint">
+            Closed shows get a Mark Passes Called In button next to the guest list, so you can keep
+            track of which ones you've sent to the venue.
+          </span>
         </div>
       </div>
 

@@ -514,6 +514,9 @@ class ShowResponse(BaseModel):
     close_notifications_pending: bool = False
     close_notifications_sent_at: UtcDatetime | None = None
     close_notifications_sent_by: str | None = None
+    track_pass_call_in: bool = False
+    passes_called_in_at: UtcDatetime | None = None
+    passes_called_in_by: str | None = None
     co_announce: bool
     lottery_enabled: bool = False
     lottery_window_hours: int = 24

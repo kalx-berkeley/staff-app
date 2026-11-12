@@ -536,6 +536,8 @@ class ShowService:
             show.close_notifications_held = False
             show.close_notifications_sent_at = None
             show.close_notifications_sent_by = None
+            show.passes_called_in_at = None
+            show.passes_called_in_by = None
 
             db.commit()
             db.refresh(show)

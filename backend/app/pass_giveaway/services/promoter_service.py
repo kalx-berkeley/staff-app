@@ -60,6 +60,7 @@ class PromoterService:
                 email_address_requirement=promoter_data.email_address_requirement,
                 staff_guest_requires_name=promoter_data.staff_guest_requires_name,
                 hold_close_notifications=promoter_data.hold_close_notifications,
+                track_pass_call_in=promoter_data.track_pass_call_in,
             )
             db.add(promoter)
             db.flush()
@@ -154,6 +155,8 @@ class PromoterService:
                 promoter.staff_guest_requires_name = promoter_data.staff_guest_requires_name
             if promoter_data.hold_close_notifications is not None:
                 promoter.hold_close_notifications = promoter_data.hold_close_notifications
+            if promoter_data.track_pass_call_in is not None:
+                promoter.track_pass_call_in = promoter_data.track_pass_call_in
 
             if promoter_data.owner_emails is not None:
                 for owner in promoter.owners:

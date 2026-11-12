@@ -416,6 +416,29 @@ const ShowDetail = () => {
     }
   };
 
+  const handlePassCallIn = async (calledIn: boolean) => {
+    if (!id) return;
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const updated = calledIn
+        ? await showsAPI.markPassesCalledIn(parseInt(id))
+        : await showsAPI.undoPassesCalledIn(parseInt(id));
+      setShow(updated);
+    } catch (err) {
+      const apiError = err as APIError;
+      setActionError(
+        typeof apiError.detail === 'string'
+          ? apiError.detail
+          : calledIn
+            ? 'Failed to mark the passes called in'
+            : 'Failed to undo the call-in'
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handlePreassignSubmit = async (passId: number) => {
     if (!preassignDj.trim() || !preassignDate) {
       setActionError('DJ name and date are required for pre-assignment');
@@ -868,6 +891,15 @@ const ShowDetail = () => {
                   Notify Staff and Alternates
                 </button>
               )}
+              {show.track_pass_call_in && !show.passes_called_in_at && (
+                <button
+                  onClick={() => handlePassCallIn(true)}
+                  className="btn-primary btn-small"
+                  disabled={actionLoading}
+                >
+                  Mark Passes Called In
+                </button>
+              )}
               {(guestListLines.length > 0 || failedAttempts.length > 0) && (
                 <button onClick={handleCopyGuestList} className="btn-secondary btn-small">
                   {copySuccess ? 'Copied!' : 'Copy'}
@@ -885,6 +917,26 @@ const ShowDetail = () => {
               Notifications sent {formatAttemptDateTime(show.close_notifications_sent_at)}
               {show.close_notifications_sent_by ? ` by ${show.close_notifications_sent_by}` : ''}
             </p>
+          )}
+          {show.track_pass_call_in && (
+            show.passes_called_in_at ? (
+              <p className="field-hint">
+                Passes called in {formatAttemptDateTime(show.passes_called_in_at)}
+                {show.passes_called_in_by ? ` by ${show.passes_called_in_by}` : ''}
+                {' '}(
+                <button
+                  type="button"
+                  onClick={() => handlePassCallIn(false)}
+                  className="inline-link-button"
+                  disabled={actionLoading}
+                >
+                  Undo
+                </button>
+                )
+              </p>
+            ) : (
+              <p className="field-hint">Passes haven't been called in to the venue yet.</p>
+            )
           )}
           <p className="guest-list-greeting">{emailGreeting}</p>
           {guestListLines.length > 0 ? (

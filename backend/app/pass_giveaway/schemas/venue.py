@@ -71,6 +71,7 @@ class VenueCreate(BaseModel):
     email_address_requirement: EmailAddressRequirement = "none"
     staff_guest_requires_name: bool = False
     hold_close_notifications: bool = False
+    track_pass_call_in: bool = False
     default_lottery_enabled: bool = False
     default_lottery_window_hours: int = 24
     default_dj_preassign_prohibition_days: int | None = None
@@ -105,6 +106,7 @@ class VenueUpdate(BaseModel):
     email_address_requirement: EmailAddressRequirement | None = None
     staff_guest_requires_name: bool | None = None
     hold_close_notifications: bool | None = None
+    track_pass_call_in: bool | None = None
     default_lottery_enabled: bool | None = None
     default_lottery_window_hours: int | None = None
     default_dj_preassign_prohibition_days: int | None = None
@@ -150,6 +152,7 @@ class VenueResponse(BaseModel):
     requires_email_address: bool = False
     staff_guest_requires_name: bool = False
     hold_close_notifications: bool = False
+    track_pass_call_in: bool = False
     default_lottery_enabled: bool = False
     default_lottery_window_hours: int = 24
     default_dj_preassign_prohibition_days: int | None = None
@@ -197,6 +200,7 @@ class VenueResponse(BaseModel):
             requires_email_address=venue.requires_email_address,
             staff_guest_requires_name=venue.staff_guest_requires_name,
             hold_close_notifications=venue.hold_close_notifications,
+            track_pass_call_in=venue.track_pass_call_in,
             default_lottery_enabled=venue.default_lottery_enabled,
             default_lottery_window_hours=venue.default_lottery_window_hours,
             default_dj_preassign_prohibition_days=venue.default_dj_preassign_prohibition_days,

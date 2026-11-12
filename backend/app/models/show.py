@@ -66,6 +66,10 @@ class Show(Base):
     )
     close_notifications_sent_at = Column(DateTime(timezone=True), nullable=True)
     close_notifications_sent_by = Column(String, nullable=True)
+    # When and by whom a promotions rep called in the passes to the venue or
+    # promoter. Only used when promoted_by.track_pass_call_in is on.
+    passes_called_in_at = Column(DateTime(timezone=True), nullable=True)
+    passes_called_in_by = Column(String, nullable=True)
     reopened_at = Column(DateTime(timezone=True), nullable=True)
     co_announce = Column(Boolean, nullable=False, default=False, server_default=false())
     # How many of the staff passes are tabler passes (pass_type "tabler") for

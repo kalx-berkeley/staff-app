@@ -82,6 +82,7 @@ export interface PromoterCreate {
   email_address_requirement?: EmailAddressRequirement;
   staff_guest_requires_name?: boolean;
   hold_close_notifications?: boolean;
+  track_pass_call_in?: boolean;
   owner_emails?: string[];
   contacts?: PromoterContactCreate[];
 }
@@ -94,6 +95,7 @@ export interface PromoterUpdate {
   email_address_requirement?: EmailAddressRequirement;
   staff_guest_requires_name?: boolean;
   hold_close_notifications?: boolean;
+  track_pass_call_in?: boolean;
   owner_emails?: string[];
   contacts?: PromoterContactCreate[];
 }
@@ -109,6 +111,7 @@ export interface PromoterResponse {
   requires_email_address: boolean;
   staff_guest_requires_name: boolean;
   hold_close_notifications: boolean;
+  track_pass_call_in: boolean;
   deleted: boolean;
   owner_emails: string[];
   contacts: PromoterContactResponse[];
@@ -154,6 +157,7 @@ export interface VenueCreate {
   email_address_requirement?: EmailAddressRequirement;
   staff_guest_requires_name?: boolean;
   hold_close_notifications?: boolean;
+  track_pass_call_in?: boolean;
   default_lottery_enabled?: boolean;
   default_lottery_window_hours?: number;
   default_dj_preassign_prohibition_days?: number | null;
@@ -185,6 +189,7 @@ export interface VenueUpdate {
   email_address_requirement?: EmailAddressRequirement;
   staff_guest_requires_name?: boolean;
   hold_close_notifications?: boolean;
+  track_pass_call_in?: boolean;
   default_lottery_enabled?: boolean;
   default_lottery_window_hours?: number;
   default_dj_preassign_prohibition_days?: number | null;
@@ -227,6 +232,7 @@ export interface VenueResponse {
   requires_email_address: boolean;
   staff_guest_requires_name: boolean;
   hold_close_notifications: boolean;
+  track_pass_call_in: boolean;
   default_lottery_enabled: boolean;
   default_lottery_window_hours: number;
   default_dj_preassign_prohibition_days: number | null;
@@ -616,6 +622,10 @@ export interface ShowResponse {
   close_notifications_pending: boolean;
   close_notifications_sent_at: string | null;
   close_notifications_sent_by: string | null;
+  /** The show's promoter (or, with none, venue) tracks pass call-ins. */
+  track_pass_call_in: boolean;
+  passes_called_in_at: string | null;
+  passes_called_in_by: string | null;
   co_announce: boolean;
   lottery_enabled: boolean;
   lottery_window_hours: number;

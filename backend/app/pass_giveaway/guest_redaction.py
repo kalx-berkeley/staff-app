@@ -33,6 +33,7 @@ from app.config import settings
 _HIDDEN_VALUES = {
     "close_notifications_sent_by",
     "email",
+    "passes_called_in_by",
     "phone",
     "recipient_email",
     "releasing_email",

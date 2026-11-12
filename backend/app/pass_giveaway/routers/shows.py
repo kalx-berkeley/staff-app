@@ -487,6 +487,9 @@ def _build_show_response(
         "close_notifications_pending": show.close_notifications_pending,
         "close_notifications_sent_at": show.close_notifications_sent_at,
         "close_notifications_sent_by": show.close_notifications_sent_by,
+        "track_pass_call_in": show.promoted_by.track_pass_call_in,
+        "passes_called_in_at": show.passes_called_in_at,
+        "passes_called_in_by": show.passes_called_in_by,
         "co_announce": show.co_announce,
         "lottery_enabled": show.lottery_enabled,
         "lottery_window_hours": show.lottery_window_hours,
@@ -1461,6 +1464,78 @@ def send_close_notifications(
             "event_name": show.event_name,
             **counts,
         },
+    )
+    return _build_show_response(show)
+
+
+def _get_show_tracking_call_in(db: Session, show_id: int) -> Show:
+    """
+    A closed show whose venue or promoter tracks pass call-ins.
+
+    :raises HTTPException: 409 when the show isn't closed or doesn't track them.
+    """
+    show = ShowService.get_show(db, show_id)
+    if show.status != "closed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only closed shows' passes can be called in.",
+        )
+    if not show.promoted_by.track_pass_call_in:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This show's venue or promoter doesn't track pass call-ins.",
+        )
+    return show
+
+
+@router.post("/{show_id}/passes-called-in", response_model=ShowResponse)
+def mark_passes_called_in(
+    show_id: int,
+    promotions: Staff = Depends(get_promotions_staff),
+    db: Session = Depends(get_db),
+):
+    """Record that a closed show's passes were called in (promotions staff only)."""
+    from datetime import datetime, timezone
+
+    show = _get_show_tracking_call_in(db, show_id)
+    show.passes_called_in_at = datetime.now(timezone.utc)
+    show.passes_called_in_by = promotions.name or promotions.email
+    db.commit()
+    db.refresh(show)
+    audit_service.log_event(
+        db,
+        event_type="passes_called_in",
+        area=PASS_GIVEAWAY_AREA,
+        actor_email=promotions.email,
+        actor_role="promotions",
+        entity_type="show",
+        entity_id=show.id,
+        details={"event_name": show.event_name},
+    )
+    return _build_show_response(show)
+
+
+@router.delete("/{show_id}/passes-called-in", response_model=ShowResponse)
+def undo_passes_called_in(
+    show_id: int,
+    promotions: Staff = Depends(get_promotions_staff),
+    db: Session = Depends(get_db),
+):
+    """Clear a closed show's passes-called-in mark (promotions staff only)."""
+    show = _get_show_tracking_call_in(db, show_id)
+    show.passes_called_in_at = None
+    show.passes_called_in_by = None
+    db.commit()
+    db.refresh(show)
+    audit_service.log_event(
+        db,
+        event_type="passes_call_in_undone",
+        area=PASS_GIVEAWAY_AREA,
+        actor_email=promotions.email,
+        actor_role="promotions",
+        entity_type="show",
+        entity_id=show.id,
+        details={"event_name": show.event_name},
     )
     return _build_show_response(show)
 

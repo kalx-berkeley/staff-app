@@ -50,7 +50,7 @@ const makeVenue = (overrides: Partial<VenueResponse> = {}): VenueResponse => ({
   requires_phone_number: false,
   email_address_requirement: 'none',
   requires_email_address: false,
-  staff_guest_requires_name: false, hold_close_notifications: false,
+  staff_guest_requires_name: false, hold_close_notifications: false, track_pass_call_in: false,
   default_lottery_enabled: false,
   default_lottery_window_hours: 24,
   default_dj_preassign_prohibition_days: null,

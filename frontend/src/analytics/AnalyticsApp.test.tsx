@@ -10,7 +10,11 @@ import type { Metric, TabResponse } from './types';
 
 vi.mock('../common/api', () => ({
   AUTH_DIAG_KEY: 'kalx_auth_diag',
-  default: { post: vi.fn(() => Promise.resolve({})) },
+  // pass-giveaway/api.ts adds an interceptor to the client when it's imported
+  default: {
+    post: vi.fn(() => Promise.resolve({})),
+    interceptors: { request: { use: vi.fn() } },
+  },
   usersAPI: { getMe: vi.fn() },
   impersonationAPI: { end: vi.fn() },
   handleAPIError: vi.fn(),

@@ -592,6 +592,26 @@ body.staging-active .dj-layout {
   color: var(--primary-color);
 }
 
+/* A button that looks like a link, inside running text */
+.inline-link-button {
+  background: none;
+  border: none;
+  color: var(--secondary-color);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.inline-link-button:hover {
+  color: var(--primary-color);
+}
+
+.inline-link-button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 
 /* Feedback modal context block */
 .feedback-context {
