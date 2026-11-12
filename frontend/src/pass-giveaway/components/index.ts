@@ -26,3 +26,4 @@ export { useDescriptionCheck } from './useDescriptionCheck';
 export type { DescriptionCheck } from './useDescriptionCheck';
 export { default as TablerPassesSection } from './TablerPassesSection';
 export { default as VenueRepList } from './VenueRepList';
+export { default as ShowInfoCards } from './ShowInfoCards';

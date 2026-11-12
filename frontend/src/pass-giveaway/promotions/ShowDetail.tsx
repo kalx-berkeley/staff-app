@@ -1,14 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { showsAPI, passesAPI, autocompleteAPI, specialtyShowsAPI, lotteryAPI, alternatesAPI } from '../api';
-import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, WaitingGuestsList, TablerPassesSection } from '../components';
-import MarkdownContent from '../../common/components/MarkdownContent';
+import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, WaitingGuestsList, TablerPassesSection, ShowInfoCards } from '../components';
 import { formatPhone, formatLeave, isOnLeave, formatDateValue } from '../../common/utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import type { ShowResponse, PreAssignmentData, LotteryStatus, PassResponse, DjSuggestion, DjLeave, AlternateEntry, WaitingGuest } from '../types';
 import type { APIError, PromotionsStaffProfile } from '../../common/types';
-import { KALX_TABLE_NAME, WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow, seatedFallbackNote, waitingFallbackNote } from '../utils';
+import { KALX_TABLE_NAME, seatedFallbackNote, waitingFallbackNote } from '../utils';
 import { formatCalendarDate, formatCalendarDateRange, formatPacific, formatPacificTime, pacificDateString } from '../../common/dateTime';
 
 type SuggestMode = 'choose' | 'date' | 'genre' | null;
@@ -619,13 +618,6 @@ const ShowDetail = () => {
       minute: '2-digit',
     });
 
-  const formatTime = (timeStr: string): string => {
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    const period = hours >= 12 ? 'pm' : 'am';
-    const hour12 = hours % 12 || 12;
-    return `${hour12}:${String(minutes).padStart(2, '0')}${period}`;
-  };
-
   const formatShowDateTime = (dateStr: string, timeStr: string): string => {
     const [hours, minutes] = timeStr.split(':').map(Number);
     const weekday = formatCalendarDate(dateStr, { weekday: 'long' });
@@ -967,76 +959,7 @@ const ShowDetail = () => {
         </div>
       )}
 
-      <div className="show-info">
-        <div className="info-section">
-          <h3>Event Information</h3>
-          <dl>
-            <dt>Genre:</dt>
-            <dd>{(show.genre ?? []).join(', ')}</dd>
-            <dt>Venue:</dt>
-            <dd>{show.venue.name}</dd>
-            <dt>Address:</dt>
-            <dd>{show.venue.address}</dd>
-            <dt>{show.show_start_date ? 'Dates:' : 'Date & Time:'}</dt>
-            <dd>
-              {show.show_start_date
-                ? formatDateRange(show.show_start_date, show.show_date)
-                : `${formatDate(show.show_date)} at ${formatTime(show.show_time!)}`}
-            </dd>
-            <dt>{isMovieShow(show) ? 'Movie Rating:' : 'Age Restriction:'}</dt>
-            <dd>{formatShowRating(show)}</dd>
-            <dt>Wheelchair Accessible:</dt>
-            <dd>{WHEELCHAIR_ACCESSIBLE_LABELS[show.wheelchair_accessible]}</dd>
-            {show.planned_close_date && show.planned_close_time && (
-              <>
-                <dt>Planned Close:</dt>
-                <dd>
-                  {formatDate(show.planned_close_date)} at {formatTime(show.planned_close_time)}
-                  {show.auto_close && (
-                    <span style={{ marginLeft: '0.5rem', fontSize: '0.85em', color: '#666' }}>
-                      (auto-close enabled)
-                    </span>
-                  )}
-                </dd>
-              </>
-            )}
-            {show.on_air_description && (
-              <>
-                <dt>On-Air Description:</dt>
-                <dd><MarkdownContent content={show.on_air_description} /></dd>
-              </>
-            )}
-            {show.caller_special_instructions && (
-              <>
-                <dt>Caller Special Instructions:</dt>
-                <dd><MarkdownContent content={show.caller_special_instructions} /></dd>
-              </>
-            )}
-            {show.staff_instructions && (
-              <>
-                <dt>Staff Instructions (shown only to staff):</dt>
-                <dd><MarkdownContent content={show.staff_instructions} /></dd>
-              </>
-            )}
-          </dl>
-        </div>
-
-        {show.promotions_contacts.length > 0 && (
-          <div className="info-section">
-            <h3>KALX Promotions Rep{show.promotions_contacts.length > 1 ? 's' : ''}</h3>
-            {show.promotions_contacts.map((contact) => (
-              <dl key={contact.email}>
-                <dt>Name:</dt>
-                <dd>{contact.name}</dd>
-                <dt>Email:</dt>
-                <dd><a href={`mailto:${contact.email}`}>{contact.email}</a></dd>
-                <dt>Phone:</dt>
-                <dd>{contact.phone}</dd>
-              </dl>
-            ))}
-          </div>
-        )}
-      </div>
+      <ShowInfoCards show={show} staffInstructionsNote="(shown only to staff)" />
 
       <div className="passes-section">
         <h3>

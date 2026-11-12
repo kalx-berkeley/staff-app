@@ -1,30 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { showsAPI, passesAPI, lotteryAPI, specialtyShowsAPI, alternatesAPI } from '../api';
-import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, AlternateGuestForm, WaitingGuestsList, GuestFallbackOptions, ClaimGuestActions, TablerPassesSection } from '../components';
-import MarkdownContent from '../../common/components/MarkdownContent';
+import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, AlternateGuestForm, WaitingGuestsList, GuestFallbackOptions, ClaimGuestActions, TablerPassesSection, ShowInfoCards } from '../components';
 import { formatPhone, formatLeave, isOnLeave, leaveCoversShow, formatDateValue } from '../../common/utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { STAFF_PASSES_NOT_YET_ACTIVE, WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow, seatedFallbackNote, staffPassesNotYetActive, waitingFallbackNote } from '../utils';
+import { STAFF_PASSES_NOT_YET_ACTIVE, seatedFallbackNote, staffPassesNotYetActive, waitingFallbackNote } from '../utils';
 import type { ShowResponse, ClaimData, LotteryStatus, SpecialtyShowResponse, AlternateQueue, AlternateJoinRequest, GuestFallback } from '../types';
 import type { StaffProfile, APIError } from '../../common/types';
-import { formatCalendarDate, formatCalendarDateRange, formatPacific } from '../../common/dateTime';
-
-const EmailIcon = () => (
-  <svg
-    width="14"
-    height="11"
-    viewBox="0 0 14 11"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    aria-hidden="true"
-    className="email-icon"
-  >
-    <rect x="0.75" y="0.75" width="12.5" height="9.5" rx="1" stroke="currentColor" strokeWidth="1.5" />
-    <path d="M1 1.5l6 4.5 6-4.5" stroke="currentColor" strokeWidth="1.5" />
-  </svg>
-);
+import { formatCalendarDate, formatPacific } from '../../common/dateTime';
 
 const ShowDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -521,16 +505,7 @@ const ShowDetail = () => {
       day: 'numeric',
     });
 
-  const formatTime = (timeStr: string) => {
-    const [hours, minutes] = timeStr.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
 
-  const formatDateRange = (startDateStr: string, endDateStr: string): string =>
-    formatCalendarDateRange(startDateStr, endDateStr);
 
   const formatDateTime = (dateTimeStr: string) =>
     formatPacific(dateTimeStr, {
@@ -775,100 +750,7 @@ const ShowDetail = () => {
       )}
 
       <div className="show-detail-content">
-        <div className="show-info-section">
-          <h3>Show Information</h3>
-
-          <div className="info-grid">
-            <div className="info-item">
-              <span className="info-label">Genre:</span>
-              <span className="info-value">{(show.genre ?? []).join(', ')}</span>
-            </div>
-
-            <div className="info-item">
-              <span className="info-label">Venue:</span>
-              <span className="info-value">{show.venue.name}</span>
-            </div>
-
-            <div className="info-item">
-              <span className="info-label">Address:</span>
-              <span className="info-value">{show.venue.address}</span>
-            </div>
-
-            <div className="info-item">
-              <span className="info-label">{show.show_start_date ? 'Dates:' : 'Date:'}</span>
-              <span className="info-value">{show.show_start_date ? formatDateRange(show.show_start_date, show.show_date) : formatDate(show.show_date)}</span>
-            </div>
-
-            {!show.show_start_date && (
-            <div className="info-item">
-              <span className="info-label">Time:</span>
-              <span className="info-value">{formatTime(show.show_time!)}</span>
-            </div>
-            )}
-
-            <div className="info-item">
-              <span className="info-label">
-                {isMovieShow(show) ? 'Movie Rating:' : 'Age Restriction:'}
-              </span>
-              <span className="info-value">{formatShowRating(show)}</span>
-            </div>
-
-            <div className="info-item">
-              <span className="info-label">Wheelchair Accessible:</span>
-              <span className="info-value">
-                {WHEELCHAIR_ACCESSIBLE_LABELS[show.wheelchair_accessible]}
-              </span>
-            </div>
-
-            {show.on_air_description && (
-              <div className="info-item full-width">
-                <span className="info-label">On-Air Description:</span>
-                <MarkdownContent content={show.on_air_description} />
-              </div>
-            )}
-
-            {show.caller_special_instructions && (
-              <div className="info-item full-width">
-                <span className="info-label">Caller Special Instructions:</span>
-                <MarkdownContent content={show.caller_special_instructions} />
-              </div>
-            )}
-
-            {show.staff_instructions && (
-              <div className="info-item full-width">
-                <span className="info-label">Staff Instructions:</span>
-                <MarkdownContent content={show.staff_instructions} />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {show.promotions_contacts.length > 0 && (
-          <div className="show-info-section">
-            <h3>KALX Promotions Rep{show.promotions_contacts.length > 1 ? 's' : ''}</h3>
-            {show.promotions_contacts.map((contact) => (
-              <div key={contact.email} className="info-grid">
-                <div className="info-item">
-                  <span className="info-label">Name:</span>
-                  <span className="info-value">{contact.name}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Phone:</span>
-                  <span className="info-value">{contact.phone}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Email:</span>
-                  <span className="info-value">
-                    <a href={`mailto:${contact.email}`} className="email-link">
-                      <EmailIcon />
-                      {contact.email}
-                    </a>
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <ShowInfoCards show={show} />
 
         {myPreassignedPasses.length > 0 && (
           <div className="pass-claim-section">

@@ -194,7 +194,7 @@ describe('Staff ShowDetail', () => {
         </BrowserRouter>
       );
 
-      expect(await screen.findByText('Staff Instructions:')).toBeInTheDocument();
+      expect(await screen.findByText('Staff Instructions')).toBeInTheDocument();
       expect(await screen.findByText('will call')).toBeInTheDocument();
     });
 
@@ -208,7 +208,7 @@ describe('Staff ShowDetail', () => {
       );
 
       expect(await screen.findByText('Test Concert')).toBeInTheDocument();
-      expect(screen.queryByText('Staff Instructions:')).not.toBeInTheDocument();
+      expect(screen.queryByText('Staff Instructions')).not.toBeInTheDocument();
     });
 
     it('should display staff pass count in heading', async () => {
