@@ -160,6 +160,7 @@ export interface VenueCreate {
   default_close_hours_before_show?: number | null;
   default_on_air_description?: string | null;
   default_caller_special_instructions?: string | null;
+  default_staff_instructions?: string | null;
   promoter_id?: number | null;
   shows_have_external_promoter?: boolean;
   show_name_with_logo?: boolean;
@@ -190,6 +191,7 @@ export interface VenueUpdate {
   default_close_hours_before_show?: number | null;
   default_on_air_description?: string | null;
   default_caller_special_instructions?: string | null;
+  default_staff_instructions?: string | null;
   promoter_id?: number | null;
   shows_have_external_promoter?: boolean;
   show_name_with_logo?: boolean;
@@ -231,6 +233,7 @@ export interface VenueResponse {
   default_close_hours_before_show: number | null;
   default_on_air_description: string | null;
   default_caller_special_instructions: string | null;
+  default_staff_instructions: string | null;
   has_logo: boolean;
   show_name_with_logo: boolean;
   deleted: boolean;
@@ -350,6 +353,7 @@ export interface ShowCreate {
   show_start_date?: string | null; // ISO date string; set for multi-day shows
   on_air_description?: string | null;
   caller_special_instructions?: string | null;
+  staff_instructions?: string | null;
   age_restriction?: AgeRestriction | null;
   movie_rating?: MovieRating | null;
   wheelchair_accessible: WheelchairAccessible;
@@ -379,6 +383,7 @@ export interface ShowUpdate {
   show_start_date?: string | null;
   on_air_description?: string | null;
   caller_special_instructions?: string | null;
+  staff_instructions?: string | null;
   age_restriction?: AgeRestriction | null;
   movie_rating?: MovieRating | null;
   wheelchair_accessible?: WheelchairAccessible;
@@ -584,6 +589,8 @@ export interface ShowResponse {
   show_start_date: string | null;
   on_air_description: string | null;
   caller_special_instructions: string | null;
+  // Shown only to staff, never in the DJ view.
+  staff_instructions: string | null;
   age_restriction: AgeRestriction | null;
   movie_rating: MovieRating | null;
   wheelchair_accessible: WheelchairAccessible;

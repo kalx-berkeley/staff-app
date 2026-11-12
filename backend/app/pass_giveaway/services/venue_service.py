@@ -156,6 +156,7 @@ class VenueService:
                 default_close_hours_before_show=venue_data.default_close_hours_before_show,
                 default_on_air_description=venue_data.default_on_air_description,
                 default_caller_special_instructions=venue_data.default_caller_special_instructions,
+                default_staff_instructions=venue_data.default_staff_instructions,
                 promoter_id=venue_data.promoter_id,
                 shows_have_external_promoter=venue_data.shows_have_external_promoter,
                 show_name_with_logo=venue_data.show_name_with_logo,
@@ -297,6 +298,8 @@ class VenueService:
                 venue.default_caller_special_instructions = (
                     venue_data.default_caller_special_instructions
                 )
+            if "default_staff_instructions" in venue_data.model_fields_set:
+                venue.default_staff_instructions = venue_data.default_staff_instructions
             if "promoter_id" in venue_data.model_fields_set:
                 venue.promoter_id = venue_data.promoter_id
             if "shows_have_external_promoter" in venue_data.model_fields_set:

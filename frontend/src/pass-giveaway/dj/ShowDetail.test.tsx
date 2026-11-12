@@ -89,6 +89,19 @@ describe('DJ ShowDetail winner editing', () => {
     localStorage.clear();
   });
 
+  it('never shows the staff instructions, which are for staff only', async () => {
+    await renderPage(
+      makeShow([winner()], {
+        on_air_description: 'On-air text',
+        staff_instructions: 'Staff-only pickup details',
+      })
+    );
+
+    expect(screen.getByText('On-air text')).toBeInTheDocument();
+    expect(screen.queryByText(/Staff-only pickup details/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Staff Instructions/)).not.toBeInTheDocument();
+  });
+
   it('offers the DJ who gave the passes away an Edit button', async () => {
     await renderPage(makeShow([winner()]));
 

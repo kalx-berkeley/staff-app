@@ -845,6 +845,13 @@ const ShowDetail = () => {
                 <MarkdownContent content={show.caller_special_instructions} />
               </div>
             )}
+
+            {show.staff_instructions && (
+              <div className="info-item full-width">
+                <span className="info-label">Staff Instructions:</span>
+                <MarkdownContent content={show.staff_instructions} />
+              </div>
+            )}
           </div>
         </div>
 

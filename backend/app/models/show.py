@@ -7,6 +7,7 @@ from sqlalchemy import (
     Column,
     Integer,
     String,
+    Text,
     Date,
     Time,
     Boolean,
@@ -39,6 +40,8 @@ class Show(Base):
     show_start_date = Column(Date, nullable=True)
     on_air_description = Column(String, nullable=True)
     caller_special_instructions = Column(String, nullable=True)
+    # Shown only to staff on the staff show page, never in the DJ view.
+    staff_instructions = Column(Text, nullable=True)
     # Shows at music venues have an age restriction ("all_ages", "18+", "21+")
     # and shows at movie theaters a movie rating ("G", "PG", "PG-13", "R",
     # "NC-17", "NR"); the other is null

@@ -230,6 +230,7 @@ const ShowForm = () => {
   const [isMultiDay, setIsMultiDay] = useState(false);
   const [onAirDescription, setOnAirDescription] = useState('');
   const [callerSpecialInstructions, setCallerSpecialInstructions] = useState('');
+  const [staffInstructions, setStaffInstructions] = useState('');
   // The selected venue's type decides whether the show has an age
   // restriction or a movie rating
   const [venueType, setVenueType] = useState<VenueType>('music');
@@ -304,6 +305,7 @@ const ShowForm = () => {
           }
           setOnAirDescription(only.default_on_air_description ?? '');
           setCallerSpecialInstructions(only.default_caller_special_instructions ?? '');
+          setStaffInstructions(only.default_staff_instructions ?? '');
           setLotteryEnabled(only.default_lottery_enabled ?? false);
           setLotteryWindowHours(String(only.default_lottery_window_hours ?? 24));
           setDjPreassignProhibitionDays(
@@ -332,6 +334,7 @@ const ShowForm = () => {
           setIsMultiDay(!!show.show_start_date);
           setOnAirDescription(show.on_air_description || '');
           setCallerSpecialInstructions(show.caller_special_instructions || '');
+          setStaffInstructions(show.staff_instructions || '');
           setVenueType(show.venue.venue_type ?? 'music');
           setAgeRestriction(show.age_restriction ?? 'all_ages');
           setMovieRating(show.movie_rating ?? 'NR');
@@ -426,8 +429,8 @@ const ShowForm = () => {
     }
   };
 
-  // Fill the on-air description and caller special instructions from the
-  // venue's defaults, but only when the field is empty or still holds the
+  // Fill the on-air description, caller special instructions and staff
+  // instructions from the venue's defaults, but only when the field is empty or still holds the
   // previous venue's default, so text the user wrote is kept.
   const applyVenueTextDefaults = (
     previous: VenueResponse | undefined,
@@ -444,6 +447,9 @@ const ShowForm = () => {
         previous?.default_caller_special_instructions,
         selected?.default_caller_special_instructions
       )
+    );
+    setStaffInstructions((current) =>
+      pick(current, previous?.default_staff_instructions, selected?.default_staff_instructions)
     );
   };
 
@@ -641,6 +647,7 @@ const ShowForm = () => {
           show_start_date: showStartDate || null,
           on_air_description: onAirDescription.trim() || null,
           caller_special_instructions: callerSpecialInstructions.trim() || null,
+          staff_instructions: staffInstructions.trim() || null,
           age_restriction: isMovieTheater ? null : ageRestriction,
           movie_rating: isMovieTheater ? movieRating : null,
           wheelchair_accessible: wheelchairAccessible,
@@ -680,6 +687,7 @@ const ShowForm = () => {
           show_start_date: showStartDate || null,
           on_air_description: onAirDescription.trim() || null,
           caller_special_instructions: callerSpecialInstructions.trim() || null,
+          staff_instructions: staffInstructions.trim() || null,
           age_restriction: isMovieTheater ? null : ageRestriction,
           movie_rating: isMovieTheater ? movieRating : null,
           wheelchair_accessible: wheelchairAccessible,
@@ -1334,6 +1342,22 @@ const ShowForm = () => {
                     : `${Math.abs(staffPassAdjustment)} ${staffPassAdjustment > 0 ? 'more' : 'fewer'} than the standard ${numPassPairs}: this show will have ${totalStaffPasses} staff pass${totalStaffPasses === 1 ? '' : 'es'}.`}
                   {totalStaffPasses === 0 && ' Staff won\'t be able to claim a pass or enter a lottery for this show.'}
                 </span>
+              </div>
+
+              <div className="form-group">
+                <div className="label-with-help">
+                  <label htmlFor="staff_instructions">Staff Instructions</label>
+                  <Tooltip text="Shown only to staff on the staff show page, never to DJs in the DJ view — e.g. where to pick up passes or who to ask for at the door. Supports Markdown formatting: headers, paragraphs, lists, blockquotes, bold/italic, and inline or block code. Links and images are not supported." />
+                </div>
+                <textarea
+                  id="staff_instructions"
+                  value={staffInstructions}
+                  onChange={(e) => setStaffInstructions(e.target.value)}
+                  disabled={submitting}
+                  rows={3}
+                  maxLength={2000}
+                  placeholder="Optional instructions only staff will see..."
+                />
               </div>
 
               {canEnterWinners && (

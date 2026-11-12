@@ -63,6 +63,50 @@ def test_create_show(client: TestClient, test_venue, test_promotions_staff):
     assert data["promotions_contacts"] == []
 
 
+def test_create_show_saves_staff_instructions(
+    client: TestClient, test_venue, test_promotions_staff
+):
+    """A show's staff instructions are saved and returned to staff."""
+    response = client.post(
+        "/api/shows",
+        json={
+            "event_name": "Test Concert",
+            "venue_id": test_venue.id,
+            "show_date": "2024-12-31",
+            "show_time": "20:00:00",
+            "age_restriction": "all_ages",
+            "wheelchair_accessible": "yes",
+            "num_pass_pairs": 1,
+            "staff_instructions": "Pick up at will call; bring ID.",
+        },
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["staff_instructions"] == "Pick up at will call; bring ID."
+
+
+def test_staff_instructions_are_limited_to_2000_characters(
+    client: TestClient, test_venue, test_promotions_staff
+):
+    response = client.post(
+        "/api/shows",
+        json={
+            "event_name": "Test Concert",
+            "venue_id": test_venue.id,
+            "show_date": "2024-12-31",
+            "show_time": "20:00:00",
+            "age_restriction": "all_ages",
+            "wheelchair_accessible": "yes",
+            "num_pass_pairs": 1,
+            "staff_instructions": "x" * 2001,
+        },
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.status_code == 422
+
+
 @pytest.mark.parametrize("value", ["yes", "no", "unknown"])
 def test_create_show_wheelchair_accessible(
     client: TestClient, test_venue, test_promotions_staff, value
@@ -431,7 +475,9 @@ def test_update_show(client: TestClient, test_venue, test_promotions_staff, db: 
     assert data["event_name"] == "Updated Show"
 
 
-@pytest.mark.parametrize("field", ["on_air_description", "caller_special_instructions"])
+@pytest.mark.parametrize(
+    "field", ["on_air_description", "caller_special_instructions", "staff_instructions"]
+)
 def test_update_show_clears_text_field(
     client: TestClient, test_venue, test_promotions_staff, db: Session, field
 ):

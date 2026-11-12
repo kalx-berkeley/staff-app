@@ -336,6 +336,21 @@ def test_show_update_audit(
     assert row.details["changed_fields"]["event_name"]["after"] == "Updated Show Name"
 
 
+def test_show_update_audit_records_staff_instructions(
+    client: TestClient, db: Session, published_show, promotions_staff
+):
+    response = client.put(
+        f"/api/shows/{published_show.id}",
+        json={"staff_instructions": "Pick up at will call."},
+        headers={"X-Forwarded-User": promotions_staff.email},
+    )
+    assert response.status_code == 200
+
+    row = db.query(AuditLog).filter(AuditLog.event_type == "show_updated").first()
+    change = row.details["changed_fields"]["staff_instructions"]
+    assert change == {"before": "None", "after": "Pick up at will call."}
+
+
 # ---------------------------------------------------------------------------
 # Integration: preassignment removal creates audit entry
 # ---------------------------------------------------------------------------

@@ -223,6 +223,11 @@ def test_directory_is_never_allowlisted_for_guests():
     assert not {r for r in allowlisted if " /api/directory" in r}
 
 
+# Staff instructions seeded by the contact_details fixture: written for staff
+# only, so no guest may receive them.
+SHOW_STAFF_INSTRUCTIONS = "Show staff instructions for staff only"
+VENUE_STAFF_INSTRUCTIONS = "Venue default staff instructions for staff only"
+
 # Contact details seeded by the contact_details fixture.
 STAFF_CONTACTS = [
     "claimer@example.com",
@@ -231,6 +236,8 @@ STAFF_CONTACTS = [
     "5105550133",
     "venue.contact@example.com",
     "5105550144",
+    SHOW_STAFF_INSTRUCTIONS,
+    VENUE_STAFF_INSTRUCTIONS,
 ]
 WINNER_EMAIL = "winner@example.com"
 WINNER_PHONE = "5105550122"
@@ -261,6 +268,8 @@ def contact_details(db: Session, seeded):
         ),
         Pass(show_id=1, pass_type="staff", status="claimed", staff_id=claimer.id),
     ])
+    db.get(Show, 1).staff_instructions = SHOW_STAFF_INSTRUCTIONS
+    db.get(Venue, 1).default_staff_instructions = VENUE_STAFF_INSTRUCTIONS
     db.commit()
     PassService.give_away_pass_pair(
         db,
@@ -336,6 +345,21 @@ def test_signed_in_users_still_see_contact_details(
 
     assert "claimer@example.com" in response.text
     assert WINNER_EMAIL in response.text
+
+
+def test_signed_in_users_still_see_staff_instructions(
+    client: TestClient, contact_details, no_outbound_requests
+):
+    show = client.get(
+        "/api/shows/1", headers={"X-Forwarded-User": "claimer@example.com"}
+    ).json()
+
+    venue = client.get(
+        "/api/venues/1", headers={"X-Forwarded-User": "owner@example.com"}
+    ).json()
+
+    assert show["staff_instructions"] == SHOW_STAFF_INSTRUCTIONS
+    assert venue["default_staff_instructions"] == VENUE_STAFF_INSTRUCTIONS
 
 
 def test_dj_guests_see_the_winner_email_only_when_correcting_their_winner(

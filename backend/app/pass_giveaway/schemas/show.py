@@ -94,6 +94,11 @@ class ShowCreate(BaseModel):
     caller_special_instructions: str | None = Field(
         None, max_length=1000, description="Caller special instructions for the show"
     )
+    staff_instructions: str | None = Field(
+        None,
+        max_length=2000,
+        description="Instructions shown only to staff, never in the DJ view",
+    )
     age_restriction: AgeRestriction | None = Field(
         None, description="Age restriction (required for shows at music venues)"
     )
@@ -255,6 +260,11 @@ class ShowUpdate(BaseModel):
     )
     caller_special_instructions: str | None = Field(
         None, max_length=1000, description="Caller special instructions for the show"
+    )
+    staff_instructions: str | None = Field(
+        None,
+        max_length=2000,
+        description="Instructions shown only to staff, never in the DJ view",
     )
     age_restriction: AgeRestriction | None = Field(
         None, description="Age restriction (for shows at music venues)"
@@ -462,6 +472,7 @@ class ShowResponse(BaseModel):
     show_start_date: date | None
     on_air_description: str | None
     caller_special_instructions: str | None
+    staff_instructions: str | None = None
     age_restriction: str | None
     movie_rating: str | None = None
     wheelchair_accessible: str

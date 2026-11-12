@@ -7,7 +7,8 @@ SECURITY.md). The responses they get are shared with signed-in users, so this
 removes the contact details guests don't need:
 
 - Every guest: staff phones and emails, winner emails, and the promotions,
-  venue and specialty-show owner contacts.
+  venue and specialty-show owner contacts, plus staff instructions (written
+  for staff only, never for DJs).
 - Station office guests: winner phone numbers too, except from endpoints marked
   with :func:`keeps_winner_contact` (winner search). DJ studio guests keep
   winner names and phones, which the DJ view shows.
@@ -37,6 +38,9 @@ _HIDDEN_VALUES = {
     "releasing_email",
     "staff_email",
     "staff_phone",
+    # Written for staff only; DJ studio and station office guests never see it.
+    "default_staff_instructions",
+    "staff_instructions",
 }
 # Keys whose list is emptied in every guest response.
 _HIDDEN_LISTS = {"contacts", "owner_details", "owner_emails", "promotions_contacts"}

@@ -1027,6 +1027,12 @@ const ShowDetail = () => {
                 <dd><MarkdownContent content={show.caller_special_instructions} /></dd>
               </>
             )}
+            {show.staff_instructions && (
+              <>
+                <dt>Staff Instructions (shown only to staff):</dt>
+                <dd><MarkdownContent content={show.staff_instructions} /></dd>
+              </>
+            )}
           </dl>
         </div>
 

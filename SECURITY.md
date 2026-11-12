@@ -179,7 +179,8 @@ to guests by accident. Opening a route to guests means updating that allowlist a
 `backend/app/pass_giveaway/guest_redaction.py` removes the contact details guests don't need
 before a response goes out:
 - Every guest: staff phones and emails, winner emails, and the promotions, venue and
-  specialty-show owner contacts.
+  specialty-show owner contacts. Also each show's staff instructions and each venue's default
+  staff instructions, which promotions reps write for staff only, never for DJs.
 - Station office guests: winner phone numbers too, except in winner search results.
 - DJ studio guests keep winner names and phone numbers, which the DJ view shows for each show's
   previous winners and the DJ's own giveaways.

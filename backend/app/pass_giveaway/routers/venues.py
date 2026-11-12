@@ -291,6 +291,7 @@ def update_venue(
             "default_caller_special_instructions": (
                 existing.default_caller_special_instructions
             ),
+            "default_staff_instructions": existing.default_staff_instructions,
             "win_frequency_days": existing.win_frequency_days,
             "parent_venue_id": existing.parent_venue_id,
         }
@@ -304,6 +305,7 @@ def update_venue(
         "pass_call_instructions": venue.pass_call_instructions,
         "default_on_air_description": venue.default_on_air_description,
         "default_caller_special_instructions": venue.default_caller_special_instructions,
+        "default_staff_instructions": venue.default_staff_instructions,
         "win_frequency_days": venue.win_frequency_days,
         "parent_venue_id": venue.parent_venue_id,
     }

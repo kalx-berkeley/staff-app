@@ -38,8 +38,8 @@ vi.mock('react-router-dom', async () => {
 
 describe('ShowForm', () => {
   const mockVenues: VenueResponse[] = [
-    { id: 1, name: 'Venue A', address: '123 Main St', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, venue_type: 'music', default_age_restriction: null, default_movie_rating: null, default_num_pass_pairs: null, requires_phone_number: false, email_address_requirement: 'none', requires_email_address: false, staff_guest_requires_name: false, hold_close_notifications: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, default_on_air_description: null, default_caller_special_instructions: null, has_logo: false, show_name_with_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], owner_details: [], contacts: [] },
-    { id: 2, name: 'Venue B', address: '456 Oak Ave', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, venue_type: 'music', default_age_restriction: null, default_movie_rating: null, default_num_pass_pairs: null, requires_phone_number: false, email_address_requirement: 'none', requires_email_address: false, staff_guest_requires_name: false, hold_close_notifications: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, default_on_air_description: null, default_caller_special_instructions: null, has_logo: false, show_name_with_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], owner_details: [], contacts: [] },
+    { id: 1, name: 'Venue A', address: '123 Main St', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, venue_type: 'music', default_age_restriction: null, default_movie_rating: null, default_num_pass_pairs: null, requires_phone_number: false, email_address_requirement: 'none', requires_email_address: false, staff_guest_requires_name: false, hold_close_notifications: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, default_on_air_description: null, default_caller_special_instructions: null, default_staff_instructions: null, has_logo: false, show_name_with_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], owner_details: [], contacts: [] },
+    { id: 2, name: 'Venue B', address: '456 Oak Ave', show_sourcing_instructions: null, pass_call_instructions: null, win_frequency_days: null, default_wheelchair_accessible: null, venue_type: 'music', default_age_restriction: null, default_movie_rating: null, default_num_pass_pairs: null, requires_phone_number: false, email_address_requirement: 'none', requires_email_address: false, staff_guest_requires_name: false, hold_close_notifications: false, default_lottery_enabled: false, default_lottery_window_hours: 24, default_dj_preassign_prohibition_days: null, default_close_hours_before_show: null, default_on_air_description: null, default_caller_special_instructions: null, default_staff_instructions: null, has_logo: false, show_name_with_logo: false, deleted: false, shows_have_external_promoter: false, owner_emails: [], owner_details: [], contacts: [] },
   ];
 
   beforeEach(() => {
@@ -248,6 +248,7 @@ describe('ShowForm', () => {
         show_start_date: null,
         on_air_description: null,
         caller_special_instructions: null,
+        staff_instructions: null,
         age_restriction: 'all_ages',
         movie_rating: null,
         wheelchair_accessible: 'yes',
@@ -686,11 +687,13 @@ describe('ShowForm', () => {
         ...mockVenues[0],
         default_on_air_description: 'Venue A description',
         default_caller_special_instructions: 'Venue A instructions',
+        default_staff_instructions: 'Venue A staff instructions',
       },
       {
         ...mockVenues[1],
         default_on_air_description: 'Venue B description',
         default_caller_special_instructions: null,
+        default_staff_instructions: 'Venue B staff instructions',
       },
     ];
 
@@ -741,6 +744,22 @@ describe('ShowForm', () => {
         'Venue B description'
       );
       expect(screen.getByLabelText(/caller special instructions/i)).toHaveValue('Bring ID');
+    });
+
+    it('fills the staff instructions in Advanced from the venue', async () => {
+      await renderAndSelectVenue('1');
+      fireEvent.click(screen.getByRole('button', { name: /Advanced/ }));
+
+      expect(await screen.findByLabelText(/^staff instructions/i)).toHaveValue(
+        'Venue A staff instructions'
+      );
+
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), {
+        target: { value: '2' },
+      });
+      expect(await screen.findByLabelText(/^staff instructions/i)).toHaveValue(
+        'Venue B staff instructions'
+      );
     });
   });
 

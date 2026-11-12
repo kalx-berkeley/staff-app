@@ -47,6 +47,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   const [defaultCloseHoursBeforeShow, setDefaultCloseHoursBeforeShow] = useState('');
   const [defaultOnAirDescription, setDefaultOnAirDescription] = useState('');
   const [defaultCallerSpecialInstructions, setDefaultCallerSpecialInstructions] = useState('');
+  const [defaultStaffInstructions, setDefaultStaffInstructions] = useState('');
   const descriptionCheck = useDescriptionCheck();
   const [promoterId, setPromoterId] = useState<number | null>(null);
   const [showsHaveExternalPromoter, setShowsHaveExternalPromoter] = useState(false);
@@ -77,6 +78,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
       setPassCallInstructions(venue.pass_call_instructions || '');
       setDefaultOnAirDescription(venue.default_on_air_description || '');
       setDefaultCallerSpecialInstructions(venue.default_caller_special_instructions || '');
+      setDefaultStaffInstructions(venue.default_staff_instructions || '');
       setWinFrequencyDays(venue.win_frequency_days != null ? String(venue.win_frequency_days) : '');
       setParentVenueId(venue.parent_venue_id ?? null);
       setDefaultWheelchair(venue.default_wheelchair_accessible ?? '');
@@ -260,6 +262,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           default_close_hours_before_show: defaultCloseHoursBeforeShowValue,
           default_on_air_description: defaultOnAirDescription.trim() || null,
           default_caller_special_instructions: defaultCallerSpecialInstructions.trim() || null,
+          default_staff_instructions: defaultStaffInstructions.trim() || null,
           promoter_id: promoterId,
           shows_have_external_promoter: showsHaveExternalPromoter,
           show_name_with_logo: showNameWithLogo,
@@ -290,6 +293,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           default_close_hours_before_show: defaultCloseHoursBeforeShowValue,
           default_on_air_description: defaultOnAirDescription.trim() || null,
           default_caller_special_instructions: defaultCallerSpecialInstructions.trim() || null,
+          default_staff_instructions: defaultStaffInstructions.trim() || null,
           promoter_id: promoterId,
           shows_have_external_promoter: showsHaveExternalPromoter,
           owner_emails: ownerEmails,
@@ -664,6 +668,22 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
               disabled={submitting}
               rows={3}
               placeholder="Optional instructions for DJs when recording the winner..."
+            />
+          </div>
+
+          <div className="form-group">
+            <div className="label-with-help">
+              <label htmlFor="venue-default-staff-instructions">Default Staff Instructions</label>
+              <Tooltip text="Pre-filled as the Staff Instructions when creating a new show at this venue. Shown only to staff on the staff show page, never to DJs in the DJ view — e.g. where to pick up passes or who to ask for at the door. Supports Markdown formatting: headers, paragraphs, lists, blockquotes, bold/italic, and inline or block code. Links and images are not supported." />
+            </div>
+            <textarea
+              id="venue-default-staff-instructions"
+              value={defaultStaffInstructions}
+              onChange={(e) => setDefaultStaffInstructions(e.target.value)}
+              disabled={submitting}
+              rows={3}
+              maxLength={2000}
+              placeholder="Optional instructions only staff will see..."
             />
           </div>
 

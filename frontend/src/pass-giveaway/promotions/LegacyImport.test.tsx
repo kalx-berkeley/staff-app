@@ -57,6 +57,7 @@ const makeVenue = (overrides: Partial<VenueResponse> = {}): VenueResponse => ({
   default_close_hours_before_show: null,
   default_on_air_description: null,
   default_caller_special_instructions: null,
+  default_staff_instructions: null,
   has_logo: false,
   show_name_with_logo: false,
   deleted: false,

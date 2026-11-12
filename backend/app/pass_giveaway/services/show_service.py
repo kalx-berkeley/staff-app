@@ -98,6 +98,7 @@ class ShowService:
                 show_start_date=show_data.show_start_date,
                 on_air_description=show_data.on_air_description,
                 caller_special_instructions=show_data.caller_special_instructions,
+                staff_instructions=show_data.staff_instructions,
                 age_restriction=show_data.age_restriction,
                 movie_rating=show_data.movie_rating,
                 wheelchair_accessible=show_data.wheelchair_accessible,
@@ -236,6 +237,8 @@ class ShowService:
                 show.on_air_description = show_data.on_air_description
             if "caller_special_instructions" in show_data.model_fields_set:
                 show.caller_special_instructions = show_data.caller_special_instructions
+            if "staff_instructions" in show_data.model_fields_set:
+                show.staff_instructions = show_data.staff_instructions
             if show_data.age_restriction is not None:
                 show.age_restriction = show_data.age_restriction
             if show_data.movie_rating is not None:

@@ -335,6 +335,33 @@ describe('VenueForm', () => {
     });
   });
 
+  describe('Default Staff Instructions', () => {
+    it('loads and saves the default, trimming it', async () => {
+      vi.mocked(venuesAPI.update).mockResolvedValue(makeVenue());
+
+      render(
+        <VenueForm
+          venue={makeVenue({ default_staff_instructions: 'Ask for Sam.' })}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+
+      const field = screen.getByLabelText(/default staff instructions/i);
+      expect(field).toHaveValue('Ask for Sam.');
+      fireEvent.change(field, { target: { value: '  Will call, bring ID.  ' } });
+      fireEvent.click(screen.getByRole('button', { name: /update/i }));
+
+      await waitFor(() => {
+        expect(venuesAPI.update).toHaveBeenCalledWith(1, expect.objectContaining({
+          default_staff_instructions: 'Will call, bring ID.',
+        }));
+      });
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalled());
+    });
+  });
+
   describe('Default Wheelchair Accessible', () => {
     it('should load and save Unknown, and clear it with No default', async () => {
       vi.mocked(venuesAPI.update).mockResolvedValue(makeVenue());

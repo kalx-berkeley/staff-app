@@ -76,6 +76,7 @@ class VenueCreate(BaseModel):
     default_close_hours_before_show: int | None = None
     default_on_air_description: str | None = Field(None, max_length=2000)
     default_caller_special_instructions: str | None = Field(None, max_length=1000)
+    default_staff_instructions: str | None = Field(None, max_length=2000)
     promoter_id: int | None = Field(
         None, description="Default promoter for shows at this venue"
     )
@@ -109,6 +110,7 @@ class VenueUpdate(BaseModel):
     default_close_hours_before_show: int | None = None
     default_on_air_description: str | None = Field(None, max_length=2000)
     default_caller_special_instructions: str | None = Field(None, max_length=1000)
+    default_staff_instructions: str | None = Field(None, max_length=2000)
     promoter_id: int | None = None
     shows_have_external_promoter: bool | None = None
     show_name_with_logo: bool | None = None
@@ -153,6 +155,7 @@ class VenueResponse(BaseModel):
     default_close_hours_before_show: int | None = None
     default_on_air_description: str | None = None
     default_caller_special_instructions: str | None = None
+    default_staff_instructions: str | None = None
     has_logo: bool = False
     show_name_with_logo: bool = False
     deleted: bool = False
@@ -196,6 +199,7 @@ class VenueResponse(BaseModel):
             default_close_hours_before_show=venue.default_close_hours_before_show,
             default_on_air_description=venue.default_on_air_description,
             default_caller_special_instructions=venue.default_caller_special_instructions,
+            default_staff_instructions=venue.default_staff_instructions,
             has_logo=bool(venue.logo_filename),
             show_name_with_logo=venue.show_name_with_logo,
             promoter_id=venue.promoter_id,

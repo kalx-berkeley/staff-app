@@ -118,6 +118,7 @@ def test_update_venue(client: TestClient, test_promotions_staff):
         "pass_call_instructions",
         "default_on_air_description",
         "default_caller_special_instructions",
+        "default_staff_instructions",
     ],
 )
 def test_text_fields_can_be_set_and_cleared(
