@@ -394,9 +394,15 @@ describe('VenueForm', () => {
         .getByText('Rarely used: staff passes for a different date')
         .closest('details')!;
       expect(details).toHaveAttribute('open');
-      const field = screen.getByLabelText('Days from the on-air show to the staff show');
+      const field = screen.getByLabelText("Staff show's date, in days after the on-air show");
       expect(field).toHaveValue(1);
+      expect(
+        screen.getByText("Staff passes will be for the show 1 day after the on-air pass pairs' show.")
+      ).toBeInTheDocument();
       fireEvent.change(field, { target: { value: '-2' } });
+      expect(
+        screen.getByText("Staff passes will be for the show 2 days before the on-air pass pairs' show.")
+      ).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: /update/i }));
 
       await waitFor(() => {
@@ -417,7 +423,7 @@ describe('VenueForm', () => {
       );
       await act(async () => {});
 
-      const field = screen.getByLabelText('Days from the on-air show to the staff show');
+      const field = screen.getByLabelText("Staff show's date, in days after the on-air show");
       fireEvent.change(field, { target: { value: '45' } });
       fireEvent.click(screen.getByRole('button', { name: /update/i }));
       await act(async () => {});

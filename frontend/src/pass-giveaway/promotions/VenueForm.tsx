@@ -4,6 +4,7 @@ import { Tooltip, PersonAutocomplete, extractPersonEmail, EmailAddressRequiremen
 import type { EmailAddressRequirement, VenueResponse, VenueCreate, VenueUpdate, VenueContactCreate, AgeRestriction, MovieRating, PromoterResponse, PromotionsStaffOption, VenueType, WheelchairAccessible } from '../types';
 import { MOVIE_RATING_LABELS, VENUE_TYPE_LABELS, addressHasStateOrZip } from '../utils';
 import type { APIError, ValidationError } from '../../common/types';
+import { describeDayOffset } from './splitShow';
 
 const venueLogoUrl = (id: number) => `/api/venues/${id}/logo`;
 
@@ -49,6 +50,13 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   // Rare: days from the on-air show to the staff show
   const [staffPassDayOffset, setStaffPassDayOffset] = useState('');
   const [rarelyUsedOpen, setRarelyUsedOpen] = useState(false);
+  const staffPassDayOffsetNumber = Number(staffPassDayOffset.trim());
+  const staffPassDayOffsetDescription =
+    Number.isInteger(staffPassDayOffsetNumber) &&
+    staffPassDayOffsetNumber !== 0 &&
+    Math.abs(staffPassDayOffsetNumber) <= 30
+      ? `Staff passes will be for the show ${describeDayOffset(staffPassDayOffsetNumber)} the on-air pass pairs' show.`
+      : null;
   const [defaultOnAirDescription, setDefaultOnAirDescription] = useState('');
   const [defaultCallerSpecialInstructions, setDefaultCallerSpecialInstructions] = useState('');
   const [defaultStaffInstructions, setDefaultStaffInstructions] = useState('');
@@ -881,7 +889,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
               </p>
               <div className="form-group">
                 <label htmlFor="venue-staff-pass-day-offset">
-                  Days from the on-air show to the staff show
+                  Staff show's date, in days after the on-air show
                 </label>
                 <input
                   type="number"
@@ -899,11 +907,18 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
                 {errors.staff_pass_day_offset && (
                   <span className="field-error">{errors.staff_pass_day_offset}</span>
                 )}
+                {staffPassDayOffsetDescription && (
+                  <span className="field-hint" style={{ display: 'block', marginTop: '0.25rem' }}>
+                    <strong>{staffPassDayOffsetDescription}</strong>
+                  </span>
+                )}
                 <span className="field-hint" style={{ display: 'block', marginTop: '0.25rem' }}>
-                  When set, each new single-day show at this venue is created as two shows: an
-                  on-air show with the pass pairs on the date you enter, and a staff show with the
-                  staff passes this many days later (use a negative number for earlier). The show
-                  form says which dates before you save, and you can change the staff show's date.
+                  Enter 1 if the staff passes are for the night after the on-air pass pairs' show
+                  (pairs Friday, staff passes Saturday), or -1 if they're for the night before
+                  (staff passes Friday, pairs Saturday). Each new single-day show at this venue is
+                  then created as two shows: an on-air show with the pass pairs on the date you
+                  enter, and a staff show with the staff passes on the other date. The show form
+                  shows both dates before you save, and you can change the staff show's date there.
                 </span>
               </div>
             </details>
