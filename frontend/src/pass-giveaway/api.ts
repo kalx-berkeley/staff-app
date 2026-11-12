@@ -46,6 +46,8 @@ import type {
   ShowBand,
   ShowBandCreate,
   ShowCreate,
+  ShowSplitCreate,
+  SplitShowsResponse,
   StaffPassClaimant,
   ShowListParams,
   ShowResponse,
@@ -153,6 +155,20 @@ export const showsAPI = {
   create: async (data: ShowCreate): Promise<ShowResponse> => {
     try {
       const response = await apiClient.post<ShowResponse>('/shows', data);
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * Create a show at a venue that gives staff passes for a different date, as
+   * two shows: the on-air show with the pass pairs and the staff show with the
+   * staff passes (promotions staff only).
+   */
+  createSplit: async (data: ShowSplitCreate): Promise<SplitShowsResponse> => {
+    try {
+      const response = await apiClient.post<SplitShowsResponse>('/shows/split', data);
       return response.data;
     } catch (error) {
       return handleAPIError(error);

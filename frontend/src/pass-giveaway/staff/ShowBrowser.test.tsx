@@ -84,6 +84,16 @@ describe('Staff ShowBrowser status filter', () => {
     expect(screen.queryByText('Closed Show')).not.toBeInTheDocument();
   });
 
+  it("hides shows with no staff passes (such as a split show's on-air show)", async () => {
+    vi.mocked(showsAPI.list).mockResolvedValue([
+      ...shows,
+      show({ id: 6, event_name: 'Pairs Only', num_staff_passes: 0, available_staff_count: 0 }),
+    ]);
+    await renderBrowser();
+
+    expect(screen.queryByText('Pairs Only')).not.toBeInTheDocument();
+  });
+
   it('shows only shows with staff passes left to claim', async () => {
     await renderBrowser();
 

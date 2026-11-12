@@ -18,9 +18,11 @@ from app.pass_giveaway.schemas.show import (
     ShowBandResponse,
     ShowCreate,
     ShowResponse,
+    ShowSplitCreate,
     ShowSummary,
     ShowUpdate,
     ShowAttemptResponse,
+    check_pass_counts,
 )
 from app.pass_giveaway.services.language_analysis_service import analyze_description
 from app.pass_giveaway.services.show_service import ShowService
@@ -762,31 +764,39 @@ def search_shows(
     ]
 
 
-@router.post("", response_model=ShowResponse, status_code=status.HTTP_201_CREATED)
-def create_show(
-    show_data: ShowCreate,
-    background_tasks: BackgroundTasks,
-    promotions: Staff = Depends(get_promotions_staff),
-    db: Session = Depends(get_db),
-):
-    """Create a new show (promotions staff only)."""
-    claimants: list[Staff] = []
-    if show_data.on_air_winners or show_data.staff_winners:
-        claimants = entered_winners_service.validate(
-            db,
-            rules_owner=entered_winners_service.guest_list_rules_owner(
-                db, show_data.venue_id, show_data.promoter_id
-            ),
-            first_day=show_data.show_start_date or show_data.show_date,
-            last_day=show_data.show_date,
-            free=entered_winners_service.FreePasses(
-                pairs=show_data.num_pass_pairs,
-                staff=show_data.num_pass_pairs + show_data.staff_pass_adjustment,
-            ),
-            on_air_winners=show_data.on_air_winners,
-            staff_winners=show_data.staff_winners,
-        )
+def _check_entered_winners(db: Session, show_data: ShowCreate) -> list[Staff]:
+    """Check a new show's entered winners, returning the staff winners."""
+    if not (show_data.on_air_winners or show_data.staff_winners):
+        return []
+    return entered_winners_service.validate(
+        db,
+        rules_owner=entered_winners_service.guest_list_rules_owner(
+            db, show_data.venue_id, show_data.promoter_id
+        ),
+        first_day=show_data.show_start_date or show_data.show_date,
+        last_day=show_data.show_date,
+        free=entered_winners_service.FreePasses(
+            pairs=show_data.num_pass_pairs,
+            staff=show_data.num_pass_pairs + show_data.staff_pass_adjustment,
+        ),
+        on_air_winners=show_data.on_air_winners,
+        staff_winners=show_data.staff_winners,
+    )
 
+
+def _create_one_show(
+    db: Session,
+    show_data: ShowCreate,
+    claimants: list[Staff],
+    background_tasks: BackgroundTasks,
+    promotions: Staff,
+    split_from_show_id: int | None = None,
+) -> Show:
+    """Create a show whose entered winners have been checked.
+
+    :param split_from_show_id: For the staff show of a split show, the on-air
+        show's ID, recorded in the audit log.
+    """
     show = ShowService.create_show(db, show_data)
 
     if show_data.bands:
@@ -798,6 +808,13 @@ def create_show(
 
     # New shows are always created in draft status, so there is nothing to
     # schedule yet — the auto-close job is scheduled when the show is published.
+    details = {
+        "event_name": show.event_name,
+        "venue_id": show.venue_id,
+        "show_date": str(show.show_date),
+    }
+    if split_from_show_id is not None:
+        details["split_from_show_id"] = split_from_show_id
     audit_service.log_event(
         db,
         event_type="show_created",
@@ -806,11 +823,7 @@ def create_show(
         actor_role="promotions",
         entity_type="show",
         entity_id=show.id,
-        details={
-            "event_name": show.event_name,
-            "venue_id": show.venue_id,
-            "show_date": str(show.show_date),
-        },
+        details=details,
     )
     entered_winners_service.enter(
         db,
@@ -820,7 +833,64 @@ def create_show(
         claimants,
         actor_email=promotions.email,
     )
+    return show
+
+
+@router.post("", response_model=ShowResponse, status_code=status.HTTP_201_CREATED)
+def create_show(
+    show_data: ShowCreate,
+    background_tasks: BackgroundTasks,
+    promotions: Staff = Depends(get_promotions_staff),
+    db: Session = Depends(get_db),
+):
+    """Create a new show (promotions staff only)."""
+    claimants = _check_entered_winners(db, show_data)
+    show = _create_one_show(db, show_data, claimants, background_tasks, promotions)
     return _build_show_response(show)
+
+
+class SplitShowsResponse(BaseModel):
+    """The two shows created for a venue that gives staff passes for another date."""
+
+    on_air_show: ShowResponse
+    staff_show: ShowResponse
+
+
+@router.post(
+    "/split", response_model=SplitShowsResponse, status_code=status.HTTP_201_CREATED
+)
+def create_split_show(
+    split_data: ShowSplitCreate,
+    background_tasks: BackgroundTasks,
+    promotions: Staff = Depends(get_promotions_staff),
+    db: Session = Depends(get_db),
+):
+    """Create a show as two shows: one with the pass pairs, one with the staff passes.
+
+    For the few venues that give staff passes for a different date than the
+    on-air pass pairs. Both shows and their entered winners are checked before
+    either is created.
+    """
+    on_air_data = split_data.on_air_show()
+    staff_data = split_data.staff_show()
+    on_air_claimants = _check_entered_winners(db, on_air_data)
+    staff_claimants = _check_entered_winners(db, staff_data)
+
+    on_air_show = _create_one_show(
+        db, on_air_data, on_air_claimants, background_tasks, promotions
+    )
+    staff_show = _create_one_show(
+        db,
+        staff_data,
+        staff_claimants,
+        background_tasks,
+        promotions,
+        split_from_show_id=on_air_show.id,
+    )
+    return SplitShowsResponse(
+        on_air_show=_build_show_response(on_air_show),
+        staff_show=_build_show_response(staff_show),
+    )
 
 
 @router.post("/analyze-description", response_model=DescriptionAnalysisResponse)
@@ -1093,10 +1163,11 @@ def update_show(
         if show_data.staff_pass_adjustment is None
         else show_data.staff_pass_adjustment
     )
-    if merged_pairs + merged_adjustment < 0:
+    try:
+        check_pass_counts(merged_pairs, merged_adjustment)
+    except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="A show can't have fewer than 0 staff passes",
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e)
         )
 
     merged_co_announce = (

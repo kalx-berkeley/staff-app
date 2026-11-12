@@ -705,8 +705,9 @@ def test_create_show_with_fewer_staff_passes_than_pairs(
     assert _pass_counts(db, data["id"]) == (3, 0)
 
 
-# The test show has 2 pass pairs, so -3 would leave it with -1 staff passes.
-@pytest.mark.parametrize("adjustment", [-6, -3, 11])
+# The test show has 2 pass pairs, so -3 would leave it with -1 staff passes and
+# 14 with 16, one more than a show can have.
+@pytest.mark.parametrize("adjustment", [-6, -3, 14, 16])
 def test_staff_pass_adjustment_validation(
     client: TestClient, test_venue, test_promotions_staff, adjustment: int
 ):

@@ -77,6 +77,9 @@ export const KALX_TABLE_NAME = 'KALX Co-Announce Table';
 /** How many tabler passes a show gets when Co-Announce is first checked. */
 export const DEFAULT_TABLER_PASSES = 2;
 
+/** The most staff passes a show can have (matches the backend). */
+export const MAX_STAFF_PASSES = 15;
+
 export const STAFF_PASSES_NOT_YET_ACTIVE = 'Staff passes open to you once your status is Active.';
 
 /**

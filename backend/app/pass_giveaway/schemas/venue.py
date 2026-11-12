@@ -1,8 +1,8 @@
 """Pydantic schemas for Venue API."""
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import AfterValidator, BaseModel, Field, ConfigDict
 from app.models.venue import venue_sort_key
 from app.pass_giveaway.schemas.promoter import EmailAddressRequirement, PromoterResponse
 
@@ -15,6 +15,13 @@ VenueType = Literal["music", "movie_theater"]
 AgeRestriction = Literal["all_ages", "18+", "21+"]
 # "NR" is Not Rated
 MovieRating = Literal["G", "PG", "PG-13", "R", "NC-17", "NR"]
+
+# Rare: days from the on-air show to the staff show, for venues that give staff
+# passes for a different night. 0 means the same night, which is the same as
+# no offset, so it's stored as None.
+StaffPassDayOffset = Annotated[
+    int | None, Field(ge=-30, le=30), AfterValidator(lambda v: v or None)
+]
 
 
 class VenueContactCreate(BaseModel):
@@ -76,6 +83,7 @@ class VenueCreate(BaseModel):
     default_lottery_window_hours: int = 24
     default_dj_preassign_prohibition_days: int | None = None
     default_close_hours_before_show: int | None = None
+    staff_pass_day_offset: StaffPassDayOffset = None
     default_on_air_description: str | None = Field(None, max_length=2000)
     default_caller_special_instructions: str | None = Field(None, max_length=1000)
     default_staff_instructions: str | None = Field(None, max_length=2000)
@@ -111,6 +119,7 @@ class VenueUpdate(BaseModel):
     default_lottery_window_hours: int | None = None
     default_dj_preassign_prohibition_days: int | None = None
     default_close_hours_before_show: int | None = None
+    staff_pass_day_offset: StaffPassDayOffset = None
     default_on_air_description: str | None = Field(None, max_length=2000)
     default_caller_special_instructions: str | None = Field(None, max_length=1000)
     default_staff_instructions: str | None = Field(None, max_length=2000)
@@ -157,6 +166,7 @@ class VenueResponse(BaseModel):
     default_lottery_window_hours: int = 24
     default_dj_preassign_prohibition_days: int | None = None
     default_close_hours_before_show: int | None = None
+    staff_pass_day_offset: int | None = None
     default_on_air_description: str | None = None
     default_caller_special_instructions: str | None = None
     default_staff_instructions: str | None = None
@@ -205,6 +215,7 @@ class VenueResponse(BaseModel):
             default_lottery_window_hours=venue.default_lottery_window_hours,
             default_dj_preassign_prohibition_days=venue.default_dj_preassign_prohibition_days,
             default_close_hours_before_show=venue.default_close_hours_before_show,
+            staff_pass_day_offset=venue.staff_pass_day_offset,
             default_on_air_description=venue.default_on_air_description,
             default_caller_special_instructions=venue.default_caller_special_instructions,
             default_staff_instructions=venue.default_staff_instructions,

@@ -53,7 +53,11 @@ const ShowBrowser = () => {
         date_to: dateTo || undefined,
       };
       const data = await showsAPI.list(params);
-      const nonDraft = data.filter((show) => show.status !== 'draft');
+      // Staff only see shows with staff passes, so not the on-air half of a
+      // split show (see docs/pass-giveaway/specs/staff-passes-another-date/plan.md)
+      const nonDraft = data.filter(
+        (show) => show.status !== 'draft' && show.num_staff_passes > 0
+      );
       setRawShows(nonDraft);
     } catch (err) {
       const apiError = err as APIError;

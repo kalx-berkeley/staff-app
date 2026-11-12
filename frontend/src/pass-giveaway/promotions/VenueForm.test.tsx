@@ -356,6 +356,78 @@ describe('VenueForm', () => {
     });
   });
 
+  describe('Staff passes for a different date', () => {
+    it('is tucked away under "Rarely used" and blank by default', async () => {
+      vi.mocked(venuesAPI.update).mockResolvedValue(makeVenue());
+
+      render(<VenueForm venue={makeVenue()} onClose={mockOnClose} onSuccess={mockOnSuccess} />);
+      await act(async () => {});
+
+      const details = screen
+        .getByText('Rarely used: staff passes for a different date')
+        .closest('details')!;
+      expect(details).not.toHaveAttribute('open');
+      expect(details).toHaveTextContent('Leave this blank for almost every venue.');
+      fireEvent.click(screen.getByRole('button', { name: /update/i }));
+
+      await waitFor(() => {
+        expect(venuesAPI.update).toHaveBeenCalledWith(1, expect.objectContaining({
+          staff_pass_day_offset: null,
+        }));
+      });
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalled());
+    });
+
+    it('opens when set and saves a change', async () => {
+      vi.mocked(venuesAPI.update).mockResolvedValue(makeVenue());
+
+      render(
+        <VenueForm
+          venue={makeVenue({ staff_pass_day_offset: 1 })}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+
+      const details = screen
+        .getByText('Rarely used: staff passes for a different date')
+        .closest('details')!;
+      expect(details).toHaveAttribute('open');
+      const field = screen.getByLabelText('Days from the on-air show to the staff show');
+      expect(field).toHaveValue(1);
+      fireEvent.change(field, { target: { value: '-2' } });
+      fireEvent.click(screen.getByRole('button', { name: /update/i }));
+
+      await waitFor(() => {
+        expect(venuesAPI.update).toHaveBeenCalledWith(1, expect.objectContaining({
+          staff_pass_day_offset: -2,
+        }));
+      });
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalled());
+    });
+
+    it('rejects an offset over 30 days', async () => {
+      render(
+        <VenueForm
+          venue={makeVenue({ staff_pass_day_offset: 1 })}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+
+      const field = screen.getByLabelText('Days from the on-air show to the staff show');
+      fireEvent.change(field, { target: { value: '45' } });
+      fireEvent.click(screen.getByRole('button', { name: /update/i }));
+      await act(async () => {});
+
+      // The browser's own range check stops the save
+      expect(field).toBeInvalid();
+      expect(venuesAPI.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Default Staff Instructions', () => {
     it('loads and saves the default, trimming it', async () => {
       vi.mocked(venuesAPI.update).mockResolvedValue(makeVenue());

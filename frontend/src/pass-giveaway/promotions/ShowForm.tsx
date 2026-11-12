@@ -5,7 +5,7 @@ import { Tooltip, BandAnnotator, DatePicker, DescriptionCheckFeedback, useDescri
 import { formatPhone } from '../../common/utils';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import type { ShowCreate, ShowUpdate, ShowBand, MusicBrainzArtist, VenueResponse, AgeRestriction, MovieRating, PassResponse, PromoterResponse, PassAdjustmentResult, VenueType, WheelchairAccessible } from '../types';
-import { DEFAULT_TABLER_PASSES, KALX_TABLE_NAME, MOVIE_RATING_LABELS } from '../utils';
+import { DEFAULT_TABLER_PASSES, KALX_TABLE_NAME, MAX_STAFF_PASSES, MOVIE_RATING_LABELS } from '../utils';
 import type { APIError, ValidationError } from '../../common/types';
 import EnteredWinnersSection from './EnteredWinnersSection';
 import {
@@ -15,6 +15,8 @@ import {
   toStaffPayload,
 } from './enteredWinners';
 import type { OnAirWinnerRow, StaffWinnerRow } from './enteredWinners';
+import { addDays, daysBetween, describeDayOffset, formatClockTime } from './splitShow';
+import { formatCalendarDate } from '../../common/dateTime';
 
 interface DeleteConfirmModalProps {
   eventName: string;
@@ -238,10 +240,19 @@ const ShowForm = () => {
   const [movieRating, setMovieRating] = useState<MovieRating>('NR');
   const [wheelchairAccessible, setWheelchairAccessible] = useState<WheelchairAccessible>('yes');
   const [numPassPairs, setNumPassPairs] = useState<number>(1);
-  const [storedStaffPassAdjustment, setStaffPassAdjustment] = useState<number>(0);
+  const [storedStaffPassAdjustment, setStoredStaffPassAdjustment] = useState<number>(0);
+  // A show loaded with no staff passes (such as the on-air half of a split
+  // show) keeps none when its pair count changes, until the adjustment is changed.
+  const [keepNoStaffPasses, setKeepNoStaffPasses] = useState(false);
+  const setStaffPassAdjustment = (n: number) => {
+    setStoredStaffPassAdjustment(n);
+    setKeepNoStaffPasses(false);
+  };
   // The adjustment is kept when the pass pair count changes, so the total follows
   // the pairs, but it can't drop below 0 when pairs are reduced.
-  const staffPassAdjustment = Math.max(storedStaffPassAdjustment, -numPassPairs);
+  const staffPassAdjustment = keepNoStaffPasses
+    ? -numPassPairs
+    : Math.max(storedStaffPassAdjustment, -numPassPairs);
   const totalStaffPasses = numPassPairs + staffPassAdjustment;
   const [plannedCloseDate, setPlannedCloseDate] = useState('');
   const [plannedCloseTime, setPlannedCloseTime] = useState('');
@@ -268,6 +279,33 @@ const ShowForm = () => {
   const [enteredStaff, setEnteredStaff] = useState<StaffWinnerRow[]>([]);
   // Winners can be entered on draft and published shows, not closed ones
   const canEnterWinners = showStatus === 'draft' || showStatus === 'published';
+
+  // A few venues give staff passes for a different date, so a new single-day
+  // show there is created as two shows: the on-air show with the pass pairs
+  // and the staff show with the staff passes. The staff show's date, time and
+  // close follow the on-air show's until the rep changes them.
+  const selectedVenue = venueId !== '' ? venues.find((v) => v.id === venueId) : undefined;
+  const venueDayOffset = isEditing ? null : (selectedVenue?.staff_pass_day_offset ?? null);
+  const splitting = !!venueDayOffset && !isMultiDay;
+  const [staffShowDateOverride, setStaffShowDateOverride] = useState<string | null>(null);
+  const [staffShowTimeOverride, setStaffShowTimeOverride] = useState<string | null>(null);
+  const [staffCloseDateOverride, setStaffCloseDateOverride] = useState<string | null>(null);
+  const [staffCloseTimeOverride, setStaffCloseTimeOverride] = useState<string | null>(null);
+  const staffShowDate =
+    staffShowDateOverride ?? (showDate && venueDayOffset ? addDays(showDate, venueDayOffset) : '');
+  const staffShowTime = staffShowTimeOverride ?? showTime;
+  const staffCloseDate =
+    staffCloseDateOverride ??
+    (plannedCloseDate && showDate && staffShowDate
+      ? addDays(plannedCloseDate, daysBetween(showDate, staffShowDate))
+      : '');
+  const staffCloseTime = staffCloseTimeOverride ?? plannedCloseTime;
+  const resetStaffShowOverrides = () => {
+    setStaffShowDateOverride(null);
+    setStaffShowTimeOverride(null);
+    setStaffCloseDateOverride(null);
+    setStaffCloseTimeOverride(null);
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -341,6 +379,9 @@ const ShowForm = () => {
           setWheelchairAccessible(show.wheelchair_accessible);
           setNumPassPairs(show.num_pass_pairs);
           setStaffPassAdjustment(show.staff_pass_adjustment);
+          setKeepNoStaffPasses(
+            show.num_pass_pairs > 0 && show.num_pass_pairs + show.staff_pass_adjustment === 0
+          );
           setPlannedCloseDate(show.planned_close_date ?? '');
           setPlannedCloseTime(show.planned_close_time ?? '');
           setAutoClose(show.auto_close ?? false);
@@ -457,6 +498,7 @@ const ShowForm = () => {
     const newId = e.target.value ? parseInt(e.target.value) : '';
     const previous = venueId !== '' ? venues.find((v) => v.id === venueId) : undefined;
     setVenueId(newId);
+    resetStaffShowOverrides();
     if (newId !== '') {
       const selected = venues.find((v) => v.id === newId);
       applyVenueTextDefaults(previous, selected);
@@ -576,8 +618,27 @@ const ShowForm = () => {
       newErrors.show_date = 'End date must be on or after the start date';
     }
 
-    if (numPassPairs < 1 || numPassPairs > 5) {
-      newErrors.num_pass_pairs = 'Number of pass pairs must be between 1 and 5';
+    if (numPassPairs < 0 || numPassPairs > 5) {
+      newErrors.num_pass_pairs = 'Number of pass pairs must be between 0 and 5';
+    } else if (splitting && numPassPairs < 1) {
+      newErrors.num_pass_pairs = 'The on-air show needs at least one pass pair';
+    } else if (numPassPairs === 0 && totalStaffPasses === 0) {
+      newErrors.num_pass_pairs = 'A show needs at least one pass pair or staff pass';
+    }
+
+    if (splitting) {
+      if (totalStaffPasses < 1) {
+        newErrors.staff_show = 'The staff show needs at least one staff pass';
+      } else if (!staffShowDate || !staffShowTime) {
+        newErrors.staff_show = 'The staff show needs a date and time';
+      } else if (!staffCloseDate || !staffCloseTime) {
+        newErrors.staff_show = 'The staff show needs a planned close date and time';
+      } else if (
+        staffCloseDate > staffShowDate ||
+        (staffCloseDate === staffShowDate && staffCloseTime >= staffShowTime)
+      ) {
+        newErrors.staff_show = "The staff show's planned close must be before the staff show";
+      }
     }
 
     if (!plannedCloseDate || !plannedCloseTime) {
@@ -708,11 +769,27 @@ const ShowForm = () => {
           })),
           ...enteredWinners,
         };
-        const newShow = await showsAPI.create(createData);
-        if (publish) {
-          await showsAPI.publish(newShow.id);
-          navigate(`/promotions/shows/${newShow.id}`);
-          return;
+        if (splitting) {
+          const { on_air_show, staff_show } = await showsAPI.createSplit({
+            ...createData,
+            staff_show_date: staffShowDate,
+            staff_show_time: staffShowTime,
+            staff_planned_close_date: staffCloseDate || null,
+            staff_planned_close_time: staffCloseTime || null,
+          });
+          if (publish) {
+            await showsAPI.publish(on_air_show.id);
+            await showsAPI.publish(staff_show.id);
+            navigate(`/promotions/shows/${on_air_show.id}`);
+            return;
+          }
+        } else {
+          const newShow = await showsAPI.create(createData);
+          if (publish) {
+            await showsAPI.publish(newShow.id);
+            navigate(`/promotions/shows/${newShow.id}`);
+            return;
+          }
         }
       }
       navigate('/promotions/shows');
@@ -724,10 +801,17 @@ const ShowForm = () => {
         setApiError(error.detail);
       } else if (Array.isArray(error.detail)) {
         const fieldErrors: Record<string, string> = {};
+        const formErrors: string[] = [];
         error.detail.forEach((validationError: ValidationError) => {
+          // An error about the whole show (loc ["body"]) has no field to go on
+          if (validationError.loc.length < 2) {
+            formErrors.push(validationError.msg.replace(/^Value error, /, ''));
+            return;
+          }
           const field = validationError.loc[validationError.loc.length - 1];
           fieldErrors[field.toString()] = validationError.msg;
         });
+        if (formErrors.length > 0) setApiError(formErrors.join(' '));
         setErrors(fieldErrors);
       } else {
         setApiError('Failed to save show');
@@ -984,7 +1068,7 @@ const ShowForm = () => {
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="show_date">
-                  Show Date <span className="required">*</span>
+                  {splitting ? 'On-Air Show Date' : 'Show Date'} <span className="required">*</span>
                 </label>
                 <DatePicker
                   id="show_date"
@@ -1000,7 +1084,7 @@ const ShowForm = () => {
 
               <div className="form-group">
                 <label htmlFor="show_time">
-                  Show Time <span className="required">*</span>
+                  {splitting ? 'On-Air Show Time' : 'Show Time'} <span className="required">*</span>
                 </label>
                 <input
                   type="time"
@@ -1014,6 +1098,19 @@ const ShowForm = () => {
                   <span className="field-error">{errors.show_time}</span>
                 )}
               </div>
+            </div>
+          )}
+          {splitting && (
+            <span className="field-hint" style={{ display: 'block', marginTop: '-0.5rem', marginBottom: '1rem' }}>
+              This is the on-air show, with the pass pairs. {selectedVenue?.name} gives staff passes
+              for a different night, so the staff show is set up under "Saving creates two shows"
+              below.
+            </span>
+          )}
+          {!!venueDayOffset && isMultiDay && (
+            <div className="info-message">
+              {selectedVenue?.name} usually gives staff passes for a different night, but multi-day
+              shows aren't split. This creates one show with both the pass pairs and the staff passes.
             </div>
           )}
         </div>
@@ -1096,8 +1193,11 @@ const ShowForm = () => {
               type="number"
               id="num_pass_pairs"
               value={numPassPairs}
-              onChange={(e) => setNumPassPairs(parseInt(e.target.value) || 1)}
-              min={1}
+              onChange={(e) => {
+                const n = parseInt(e.target.value);
+                setNumPassPairs(Number.isNaN(n) ? 0 : Math.max(0, Math.min(n, 5)));
+              }}
+              min={splitting ? 1 : 0}
               max={5}
               className={errors.num_pass_pairs ? 'input-error' : ''}
               disabled={submitting}
@@ -1181,7 +1281,8 @@ const ShowForm = () => {
 
         <div className="form-group">
           <div style={{ fontWeight: 500, fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-            Planned Close Date / Time (Pacific) <span className="required">*</span>
+            {splitting ? 'On-Air Show ' : ''}Planned Close Date / Time (Pacific){' '}
+            <span className="required">*</span>
           </div>
           <div className="form-row">
             <div className="form-group">
@@ -1226,6 +1327,95 @@ const ShowForm = () => {
             <span className="field-error">{errors.planned_close_date}</span>
           )}
         </div>
+
+        {splitting && (
+          <section className="info-message split-show-box" aria-labelledby="split-show-heading">
+            <h3 id="split-show-heading" style={{ margin: '0 0 0.5rem', fontSize: '1rem' }}>
+              Saving creates two shows
+            </h3>
+            <p style={{ margin: '0 0 0.5rem' }}>
+              {selectedVenue?.name} gives us staff passes for a different night than the on-air
+              pass pairs (usually {describeDayOffset(venueDayOffset!)}), so this is saved as two
+              shows with the same details:
+            </p>
+            <ol style={{ margin: '0 0 0.5rem', paddingLeft: '1.25rem' }}>
+              <li style={{ marginBottom: '0.5rem' }}>
+                <strong>On-air show</strong>
+                {showDate ? `, ${formatCalendarDate(showDate)}` : ''}
+                {showTime ? ` at ${formatClockTime(showTime)}` : ''}: {numPassPairs} pass pair
+                {numPassPairs === 1 ? '' : 's'} for on-air giveaways and no staff passes.
+                {plannedCloseDate && plannedCloseTime
+                  ? ` Closes ${formatCalendarDate(plannedCloseDate)} at ${formatClockTime(plannedCloseTime)}.`
+                  : ''}
+              </li>
+              <li>
+                <strong>Staff show</strong>
+                {staffShowDate ? `, ${formatCalendarDate(staffShowDate)}` : ''}
+                {staffShowTime ? ` at ${formatClockTime(staffShowTime)}` : ''}: {totalStaffPasses}{' '}
+                staff pass{totalStaffPasses === 1 ? '' : 'es'}
+                {tablerPasses > 0
+                  ? ` (${tablerPasses} of them tabler pass${tablerPasses === 1 ? '' : 'es'})`
+                  : ''}{' '}
+                and no pass pairs.
+                {staffCloseDate && staffCloseTime
+                  ? ` Closes ${formatCalendarDate(staffCloseDate)} at ${formatClockTime(staffCloseTime)}.`
+                  : ''}
+                <div className="form-row" style={{ marginTop: '0.5rem' }}>
+                  <div className="form-group">
+                    <label htmlFor="staff_show_date">Staff Show Date</label>
+                    <DatePicker
+                      id="staff_show_date"
+                      value={staffShowDate}
+                      onChange={setStaffShowDateOverride}
+                      disabled={submitting}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="staff_show_time">Staff Show Time</label>
+                    <input
+                      type="time"
+                      id="staff_show_time"
+                      value={staffShowTime}
+                      onChange={(e) => setStaffShowTimeOverride(e.target.value)}
+                      disabled={submitting}
+                    />
+                  </div>
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="staff_planned_close_date">Staff Show Close Date</label>
+                    <DatePicker
+                      id="staff_planned_close_date"
+                      value={staffCloseDate}
+                      max={staffShowDate || undefined}
+                      onChange={setStaffCloseDateOverride}
+                      disabled={submitting}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="staff_planned_close_time">Staff Show Close Time</label>
+                    <input
+                      type="time"
+                      id="staff_planned_close_time"
+                      value={staffCloseTime}
+                      onChange={(e) => setStaffCloseTimeOverride(e.target.value)}
+                      disabled={submitting}
+                    />
+                  </div>
+                </div>
+              </li>
+            </ol>
+            <p style={{ margin: 0 }}>
+              The staff show's date and close follow the on-air show's until you change them here.
+              After saving, they're two separate shows: edit, close or delete each one on its own.
+            </p>
+            {errors.staff_show && (
+              <span className="field-error" style={{ display: 'block', marginTop: '0.5rem' }}>
+                {errors.staff_show}
+              </span>
+            )}
+          </section>
+        )}
 
         <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '0.5rem', paddingTop: '0.5rem' }}>
           <button
@@ -1331,7 +1521,7 @@ const ShowForm = () => {
                     className="btn-small btn-secondary"
                     aria-label="One more staff pass"
                     onClick={() => setStaffPassAdjustment(staffPassAdjustment + 1)}
-                    disabled={submitting || staffPassAdjustment >= 10}
+                    disabled={submitting || totalStaffPasses >= MAX_STAFF_PASSES}
                   >
                     +
                   </button>
@@ -1414,7 +1604,7 @@ const ShowForm = () => {
                 disabled={submitting}
                 onClick={() => handleSave(false)}
               >
-                {submitting ? 'Saving...' : 'Save Draft'}
+                {submitting ? 'Saving...' : splitting ? 'Save 2 Drafts' : 'Save Draft'}
               </button>
               <button
                 type="button"
@@ -1422,7 +1612,7 @@ const ShowForm = () => {
                 disabled={submitting}
                 onClick={() => handleSave(true)}
               >
-                {submitting ? 'Publishing...' : 'Publish Show'}
+                {submitting ? 'Publishing...' : splitting ? 'Publish 2 Shows' : 'Publish Show'}
               </button>
             </>
           )}

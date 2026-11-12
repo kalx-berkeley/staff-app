@@ -162,6 +162,8 @@ export interface VenueCreate {
   default_lottery_window_hours?: number;
   default_dj_preassign_prohibition_days?: number | null;
   default_close_hours_before_show?: number | null;
+  /** Rare: days from the on-air show to the staff show. Null for almost every venue. */
+  staff_pass_day_offset?: number | null;
   default_on_air_description?: string | null;
   default_caller_special_instructions?: string | null;
   default_staff_instructions?: string | null;
@@ -194,6 +196,8 @@ export interface VenueUpdate {
   default_lottery_window_hours?: number;
   default_dj_preassign_prohibition_days?: number | null;
   default_close_hours_before_show?: number | null;
+  /** Rare: days from the on-air show to the staff show. Null for almost every venue. */
+  staff_pass_day_offset?: number | null;
   default_on_air_description?: string | null;
   default_caller_special_instructions?: string | null;
   default_staff_instructions?: string | null;
@@ -237,6 +241,12 @@ export interface VenueResponse {
   default_lottery_window_hours: number;
   default_dj_preassign_prohibition_days: number | null;
   default_close_hours_before_show: number | null;
+  /**
+   * Rare: the venue gives staff passes for a show this many days after
+   * (negative: before) the on-air pass pairs' show, so new shows are created
+   * as two shows. Null for almost every venue.
+   */
+  staff_pass_day_offset?: number | null;
   default_on_air_description: string | null;
   default_caller_special_instructions: string | null;
   default_staff_instructions: string | null;
@@ -363,8 +373,8 @@ export interface ShowCreate {
   age_restriction?: AgeRestriction | null;
   movie_rating?: MovieRating | null;
   wheelchair_accessible: WheelchairAccessible;
-  num_pass_pairs: number; // 1-5
-  staff_pass_adjustment?: number; // -5 to 10, staff passes above or below one per pair; defaults to 0
+  num_pass_pairs: number; // 0-5; 0 only for a show with staff passes
+  staff_pass_adjustment?: number; // staff passes above or below one per pair, for 0 to 15 staff passes; defaults to 0
   planned_close_date?: string | null;
   planned_close_time?: string | null;
   auto_close?: boolean;
@@ -377,6 +387,23 @@ export interface ShowCreate {
   bands?: ShowBandCreate[];
   on_air_winners?: EnteredOnAirWinner[];
   staff_winners?: EnteredStaffWinner[];
+}
+
+/**
+ * A new show at a venue that gives staff passes for a different date. It's
+ * the show as entered, with all its passes, plus the staff show's date, time
+ * and close. The backend creates it as two shows.
+ */
+export interface ShowSplitCreate extends ShowCreate {
+  staff_show_date: string;
+  staff_show_time: string;
+  staff_planned_close_date: string | null;
+  staff_planned_close_time: string | null;
+}
+
+export interface SplitShowsResponse {
+  on_air_show: ShowResponse;
+  staff_show: ShowResponse;
 }
 
 export interface ShowUpdate {

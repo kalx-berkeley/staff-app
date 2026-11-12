@@ -201,6 +201,29 @@ describe('ShowBrowser', () => {
       expect(screen.queryByText('Closed Show')).not.toBeInTheDocument();
     });
 
+    it("hides shows with no pass pairs (a split show's staff show)", async () => {
+      vi.mocked(showsAPI.list).mockResolvedValue([
+        mockShows[0],
+        {
+          ...mockShows[0],
+          id: 99,
+          event_name: 'Staff Passes Only',
+          num_pass_pairs: 0,
+          available_pair_count: 0,
+          unassigned_pair_count: 0,
+        },
+      ]);
+
+      await renderAndSettle(
+        <BrowserRouter>
+          <ShowBrowser />
+        </BrowserRouter>
+      );
+
+      expect(await screen.findByText('Rock Concert')).toBeInTheDocument();
+      expect(screen.queryByText('Staff Passes Only')).not.toBeInTheDocument();
+    });
+
     it('should display message when no shows are available', async () => {
       vi.mocked(showsAPI.list).mockResolvedValue([]);
 

@@ -46,6 +46,9 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   const [defaultLotteryWindowHours, setDefaultLotteryWindowHours] = useState('24');
   const [defaultDjPreassignProhibitionDays, setDefaultDjPreassignProhibitionDays] = useState('');
   const [defaultCloseHoursBeforeShow, setDefaultCloseHoursBeforeShow] = useState('');
+  // Rare: days from the on-air show to the staff show
+  const [staffPassDayOffset, setStaffPassDayOffset] = useState('');
+  const [rarelyUsedOpen, setRarelyUsedOpen] = useState(false);
   const [defaultOnAirDescription, setDefaultOnAirDescription] = useState('');
   const [defaultCallerSpecialInstructions, setDefaultCallerSpecialInstructions] = useState('');
   const [defaultStaffInstructions, setDefaultStaffInstructions] = useState('');
@@ -104,6 +107,8 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           ? String(venue.default_close_hours_before_show)
           : ''
       );
+      setStaffPassDayOffset(venue.staff_pass_day_offset ? String(venue.staff_pass_day_offset) : '');
+      setRarelyUsedOpen(!!venue.staff_pass_day_offset);
       setOwnerEmails(venue.owner_emails || []);
       setContacts(
         venue.contacts.length > 0
@@ -152,6 +157,13 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
     }
     if (defaultNumPassPairs.trim() && (isNaN(Number(defaultNumPassPairs)) || Number(defaultNumPassPairs) < 1 || Number(defaultNumPassPairs) > 5)) {
       newErrors.defaultNumPassPairs = 'Must be between 1 and 5';
+    }
+    if (
+      staffPassDayOffset.trim() &&
+      (!Number.isInteger(Number(staffPassDayOffset)) || Math.abs(Number(staffPassDayOffset)) > 30)
+    ) {
+      newErrors.staff_pass_day_offset = 'Must be a whole number of days between -30 and 30';
+      setRarelyUsedOpen(true);
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -238,6 +250,8 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
     const defaultCloseHoursBeforeShowValue = defaultCloseHoursBeforeShow.trim()
       ? Number(defaultCloseHoursBeforeShow)
       : null;
+    // 0 is the same night, the same as no offset
+    const staffPassDayOffsetValue = Number(staffPassDayOffset.trim()) || null;
 
     try {
       let savedVenue: VenueResponse;
@@ -263,6 +277,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           default_lottery_window_hours: defaultLotteryEnabled ? (parseInt(defaultLotteryWindowHours) || 24) : 24,
           default_dj_preassign_prohibition_days: defaultDjPreassignProhibitionDaysValue,
           default_close_hours_before_show: defaultCloseHoursBeforeShowValue,
+          staff_pass_day_offset: staffPassDayOffsetValue,
           default_on_air_description: defaultOnAirDescription.trim() || null,
           default_caller_special_instructions: defaultCallerSpecialInstructions.trim() || null,
           default_staff_instructions: defaultStaffInstructions.trim() || null,
@@ -295,6 +310,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           default_lottery_window_hours: defaultLotteryEnabled ? (parseInt(defaultLotteryWindowHours) || 24) : 24,
           default_dj_preassign_prohibition_days: defaultDjPreassignProhibitionDaysValue,
           default_close_hours_before_show: defaultCloseHoursBeforeShowValue,
+          staff_pass_day_offset: staffPassDayOffsetValue,
           default_on_air_description: defaultOnAirDescription.trim() || null,
           default_caller_special_instructions: defaultCallerSpecialInstructions.trim() || null,
           default_staff_instructions: defaultStaffInstructions.trim() || null,
@@ -847,6 +863,50 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
                 when creating a new show. Leave blank for no default.
               </span>
             </div>
+          </div>
+
+          <div className="form-section">
+            <details
+              open={rarelyUsedOpen}
+              onToggle={(e) => setRarelyUsedOpen(e.currentTarget.open)}
+            >
+              <summary style={{ cursor: 'pointer', fontWeight: 500 }}>
+                Rarely used: staff passes for a different date
+              </summary>
+              <p className="field-hint" style={{ marginTop: '0.5rem' }}>
+                <strong>Leave this blank for almost every venue.</strong> Most venues give us the
+                staff passes for the same show as the on-air pass pairs. Only fill it in for a venue
+                that always gives staff passes for a different night, for example pass pairs for
+                Friday's show and staff passes for Saturday's.
+              </p>
+              <div className="form-group">
+                <label htmlFor="venue-staff-pass-day-offset">
+                  Days from the on-air show to the staff show
+                </label>
+                <input
+                  type="number"
+                  id="venue-staff-pass-day-offset"
+                  value={staffPassDayOffset}
+                  onChange={(e) => setStaffPassDayOffset(e.target.value)}
+                  disabled={submitting}
+                  min="-30"
+                  max="30"
+                  step="1"
+                  placeholder="Leave blank"
+                  className={errors.staff_pass_day_offset ? 'input-error' : ''}
+                  style={{ maxWidth: '10rem' }}
+                />
+                {errors.staff_pass_day_offset && (
+                  <span className="field-error">{errors.staff_pass_day_offset}</span>
+                )}
+                <span className="field-hint" style={{ display: 'block', marginTop: '0.25rem' }}>
+                  When set, each new single-day show at this venue is created as two shows: an
+                  on-air show with the pass pairs on the date you enter, and a staff show with the
+                  staff passes this many days later (use a negative number for earlier). The show
+                  form says which dates before you save, and you can change the staff show's date.
+                </span>
+              </div>
+            </details>
           </div>
 
           {venue && (

@@ -69,7 +69,11 @@ const ShowBrowser = () => {
         date_to: dateTo || undefined,
       };
       const data = await showsAPI.list(params);
-      const publishedOnly = data.filter((show) => show.status === 'published');
+      // A show with no pass pairs is the staff half of a split show
+      // (see docs/pass-giveaway/specs/staff-passes-another-date/plan.md)
+      const publishedOnly = data.filter(
+        (show) => show.status === 'published' && show.num_pass_pairs > 0
+      );
       setRawShows(publishedOnly);
     } catch (err) {
       if (silent) return;

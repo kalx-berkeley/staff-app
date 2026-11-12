@@ -3,7 +3,14 @@
 from datetime import date, time
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from app.common.schemas.types import UtcDatetime
 from app.pass_giveaway.schemas.lottery import LotteryEntryResponse
@@ -14,6 +21,25 @@ from app.pass_giveaway.schemas.venue import (
     VenueType,
     WheelchairAccessible,
 )
+
+# The most staff passes a show can have
+MAX_STAFF_PASSES = 15
+
+
+def check_pass_counts(num_pass_pairs: int, staff_pass_adjustment: int) -> None:
+    """Raise ValueError unless a show's pass counts are allowed.
+
+    A show needs at least one pass, of either kind. A show with no pass pairs
+    is the staff half of a show whose venue gives staff passes for another
+    date (see ShowSplitCreate).
+    """
+    staff_total = num_pass_pairs + staff_pass_adjustment
+    if staff_total < 0:
+        raise ValueError("A show can't have fewer than 0 staff passes")
+    if staff_total > MAX_STAFF_PASSES:
+        raise ValueError(f"A show can't have more than {MAX_STAFF_PASSES} staff passes")
+    if num_pass_pairs == 0 and staff_total == 0:
+        raise ValueError("A show needs at least one pass pair or staff pass")
 
 
 class ShowBandCreate(BaseModel):
@@ -108,12 +134,20 @@ class ShowCreate(BaseModel):
     wheelchair_accessible: WheelchairAccessible = Field(
         ..., description="Whether the venue is wheelchair accessible: yes, no or unknown"
     )
-    num_pass_pairs: int = Field(..., ge=1, le=5, description="Number of pass pairs (1-5)")
+    num_pass_pairs: int = Field(
+        ...,
+        ge=0,
+        le=5,
+        description="Number of pass pairs (0-5; 0 only for a show with staff passes)",
+    )
     staff_pass_adjustment: int = Field(
         0,
         ge=-5,
-        le=10,
-        description="Staff passes above or below one per pass pair (-5 to 10)",
+        le=MAX_STAFF_PASSES,
+        description=(
+            "Staff passes above or below one per pass pair (-5 to 15), for a show"
+            f" with 0 to {MAX_STAFF_PASSES} staff passes"
+        ),
     )
     planned_close_date: date | None = Field(None, description="Date to close the show")
     planned_close_time: time | None = Field(
@@ -169,8 +203,7 @@ class ShowCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_staff_pass_total(self) -> "ShowCreate":
-        if self.num_pass_pairs + self.staff_pass_adjustment < 0:
-            raise ValueError("A show can't have fewer than 0 staff passes")
+        check_pass_counts(self.num_pass_pairs, self.staff_pass_adjustment)
         return self
 
     @model_validator(mode="after")
@@ -237,6 +270,83 @@ class ShowCreate(BaseModel):
         return self
 
 
+# The ShowSplitCreate fields that only the staff show has
+_STAFF_SHOW_FIELDS = {
+    "staff_show_date",
+    "staff_show_time",
+    "staff_planned_close_date",
+    "staff_planned_close_time",
+}
+
+
+class ShowSplitCreate(ShowCreate):
+    """A new show at a venue that gives staff passes for a different date.
+
+    The fields are the show as the rep entered it, with all its passes, plus
+    the staff show's date, time and planned close. It's created as two shows:
+    the on-air show with the pass pairs and the staff show with the staff
+    passes. See docs/pass-giveaway/specs/staff-passes-another-date/plan.md.
+    """
+
+    staff_show_date: date = Field(..., description="Date of the staff show")
+    staff_show_time: time = Field(..., description="Time of the staff show")
+    staff_planned_close_date: date | None = Field(
+        None, description="Date to close the staff show"
+    )
+    staff_planned_close_time: time | None = Field(
+        None, description="Time to close the staff show (Pacific)"
+    )
+
+    def _shared_fields(self) -> dict:
+        return self.model_dump(exclude=_STAFF_SHOW_FIELDS)
+
+    def on_air_show(self) -> ShowCreate:
+        """The show with the pass pairs and no staff passes."""
+        return ShowCreate.model_validate(
+            self._shared_fields()
+            | {
+                "staff_pass_adjustment": -self.num_pass_pairs,
+                "num_tabler_passes": 0,
+                "staff_winners": [],
+            }
+        )
+
+    def staff_show(self) -> ShowCreate:
+        """The show with the staff passes (and tabler passes) and no pass pairs."""
+        return ShowCreate.model_validate(
+            self._shared_fields()
+            | {
+                "show_date": self.staff_show_date,
+                "show_time": self.staff_show_time,
+                "planned_close_date": self.staff_planned_close_date,
+                "planned_close_time": self.staff_planned_close_time,
+                "num_pass_pairs": 0,
+                "staff_pass_adjustment": self.num_pass_pairs + self.staff_pass_adjustment,
+                "on_air_winners": [],
+                "dj_preassign_prohibition_days": None,
+            }
+        )
+
+    @model_validator(mode="after")
+    def validate_split(self) -> "ShowSplitCreate":
+        if self.show_start_date is not None:
+            raise ValueError("Multi-day shows can't be split into two shows")
+        if self.num_pass_pairs < 1:
+            raise ValueError("The on-air show needs at least one pass pair")
+        if self.num_pass_pairs + self.staff_pass_adjustment < 1:
+            raise ValueError("The staff show needs at least one staff pass")
+        for label, build in (
+            ("On-air show", self.on_air_show),
+            ("Staff show", self.staff_show),
+        ):
+            try:
+                build()
+            except ValidationError as e:
+                message = e.errors()[0]["msg"].removeprefix("Value error, ")
+                raise ValueError(f"{label}: {message}") from None
+        return self
+
+
 class ShowUpdate(BaseModel):
     """Schema for updating an existing show."""
 
@@ -276,13 +386,19 @@ class ShowUpdate(BaseModel):
         None, description="Whether the venue is wheelchair accessible: yes, no or unknown"
     )
     num_pass_pairs: int | None = Field(
-        None, ge=1, le=5, description="Number of pass pairs (1-5)"
+        None,
+        ge=0,
+        le=5,
+        description="Number of pass pairs (0-5; 0 only for a show with staff passes)",
     )
     staff_pass_adjustment: int | None = Field(
         None,
         ge=-5,
-        le=10,
-        description="Staff passes above or below one per pass pair (-5 to 10)",
+        le=MAX_STAFF_PASSES,
+        description=(
+            "Staff passes above or below one per pass pair (-5 to 15), for a show"
+            f" with 0 to {MAX_STAFF_PASSES} staff passes"
+        ),
     )
     planned_close_date: date | None = Field(None, description="Date to close the show")
     planned_close_time: time | None = Field(

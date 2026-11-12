@@ -78,6 +78,10 @@ class Venue(Base):
     )
     default_dj_preassign_prohibition_days = Column(Integer, nullable=True)
     default_close_hours_before_show = Column(Integer, nullable=True)
+    # Rare: the venue gives staff passes for a show this many days after (or,
+    # negative, before) the on-air pass pairs' show, so new shows are created
+    # as two shows. Null for almost every venue.
+    staff_pass_day_offset = Column(Integer, nullable=True)
     default_on_air_description = Column(Text, nullable=True)
     default_caller_special_instructions = Column(Text, nullable=True)
     default_staff_instructions = Column(Text, nullable=True)

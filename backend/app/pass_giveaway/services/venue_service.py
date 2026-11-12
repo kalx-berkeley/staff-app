@@ -155,6 +155,7 @@ class VenueService:
                 default_lottery_window_hours=venue_data.default_lottery_window_hours,
                 default_dj_preassign_prohibition_days=venue_data.default_dj_preassign_prohibition_days,
                 default_close_hours_before_show=venue_data.default_close_hours_before_show,
+                staff_pass_day_offset=venue_data.staff_pass_day_offset,
                 default_on_air_description=venue_data.default_on_air_description,
                 default_caller_special_instructions=venue_data.default_caller_special_instructions,
                 default_staff_instructions=venue_data.default_staff_instructions,
@@ -295,6 +296,8 @@ class VenueService:
                 venue.default_close_hours_before_show = (
                     venue_data.default_close_hours_before_show
                 )
+            if "staff_pass_day_offset" in venue_data.model_fields_set:
+                venue.staff_pass_day_offset = venue_data.staff_pass_day_offset
             if "default_on_air_description" in venue_data.model_fields_set:
                 venue.default_on_air_description = venue_data.default_on_air_description
             if "default_caller_special_instructions" in venue_data.model_fields_set:
