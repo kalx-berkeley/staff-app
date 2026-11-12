@@ -1,9 +1,11 @@
 """KALX Workforms request and response schemas."""
 
-from datetime import date, datetime
+from datetime import date
 from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
+
+from app.common.schemas.types import UtcDatetime
 
 
 class EntryRequest(BaseModel):
@@ -51,13 +53,13 @@ class WorkformResponse(BaseModel):
     month: str
     is_open: bool
     is_current_month: bool
-    deadline: datetime
+    deadline: UtcDatetime
     # "not_started": nothing saved or submitted; "draft": entries saved, not
     # submitted; "submitted": submitted, can still be changed and resubmitted;
     # "locked": a department has decided, so it can't be changed
     status: Literal["not_started", "draft", "submitted", "locked"]
     has_unsent_changes: bool
-    submitted_at: Optional[datetime] = None
+    submitted_at: Optional[UtcDatetime] = None
     is_late: bool
     # True if submitting now would be after the deadline
     would_be_late: bool
@@ -114,7 +116,7 @@ class ReviewItem(BaseModel):
     decision: Optional[Literal["Approved", "Denied"]] = None
     entries: List[ReviewEntry]
     edited_in_airtable: bool
-    submitted_at: Optional[datetime] = None
+    submitted_at: Optional[UtcDatetime] = None
     is_late: bool
     loa_start: Optional[date] = None
     loa_end: Optional[date] = None

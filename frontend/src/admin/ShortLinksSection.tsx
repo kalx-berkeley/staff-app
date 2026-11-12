@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { APIError } from '../common/types';
 import { adminAPI } from './api';
 import type { ShortLink, ShortLinkRequest } from './types';
+import { formatPacific } from '../common/dateTime';
 
 const EMPTY_FORM: ShortLinkRequest = { slug: '', target_url: '', note: '' };
 
@@ -13,8 +14,7 @@ const errorDetail = (err: unknown, fallback: string): string => {
 const shortUrl = (slug: string) => `${window.location.origin}/go/${slug}`;
 
 const formatUpdated = (iso: string) =>
-  new Date(iso).toLocaleString('en-US', {
-    timeZone: 'America/Los_Angeles',
+  formatPacific(iso, {
     dateStyle: 'medium',
     timeStyle: 'short',
   });

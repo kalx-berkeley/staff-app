@@ -1,5 +1,7 @@
 // Formatting for the profile page.
 
+import { formatCalendarDate, formatPacific } from '../common/dateTime';
+
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -13,23 +15,12 @@ export function formatMonthKey(month: string): string {
 
 /** "2026-09-30" → "Sep 30, 2026". */
 export function formatDate(value: string): string {
-  const [year, month, day] = value.split('-').map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  return formatCalendarDate(value, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-/** An ISO timestamp as "Sep 30, 2026, 3:30 AM" in the viewer's time zone. */
+/** An ISO timestamp as "Sep 30, 2026, 3:30 AM" in Pacific time. */
 export function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  return formatPacific(value);
 }
 
 /** 135 → "2 h 15 min", 60 → "1 h", 45 → "45 min". */

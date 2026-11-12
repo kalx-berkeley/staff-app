@@ -5,6 +5,7 @@ import type { APIError } from '../../common/types';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { subsiteForPath } from '../../subsites';
+import { formatPacific } from '../../common/dateTime';
 
 const Admin = () => {
   usePageTitle('Admin · Promotions');
@@ -285,8 +286,7 @@ const Admin = () => {
                   </td>
                   <td>{item.venue_name}</td>
                   <td className="audit-log-time">
-                    {new Date(item.lottery_deadline).toLocaleString('en-US', {
-                      timeZone: 'America/Los_Angeles',
+                    {formatPacific(item.lottery_deadline, {
                       month: 'short',
                       day: 'numeric',
                       hour: 'numeric',

@@ -1,15 +1,12 @@
 import type { MetricFormat } from './types';
+import { formatCalendarDate, formatPacific } from '../common/dateTime';
 
 const number = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
 
 const formatDate = (iso: string) => {
-  const [y, m, d] = iso.split('-').map(Number);
+  const [y, m] = iso.split('-').map(Number);
   if (!y || !m) return iso;
-  return new Date(y, m - 1, d || 1).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  return formatCalendarDate(iso, { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
 const formatPhone = (digits: string) =>
@@ -36,9 +33,7 @@ export function formatValue(value: unknown, format: MetricFormat): string {
     case 'date':
       return formatDate(String(value));
     case 'datetime':
-      return new Date(String(value)).toLocaleString('en-US', {
-        timeZone: 'America/Los_Angeles',
-      });
+      return formatPacific(String(value));
     case 'phone':
       return formatPhone(String(value));
     default:

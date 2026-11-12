@@ -1,6 +1,8 @@
 """Shared test configuration and fixtures."""
 
 import os
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -28,6 +30,26 @@ engine = create_engine(
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base.metadata.create_all(bind=engine)
+
+
+# An ISO datetime with no "Z" or UTC offset. The frontend would read it as the
+# viewer's local time, so every datetime the API sends must say it's UTC.
+_NAIVE_DATETIME = re.compile(r'"(\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d(?:\.\d+)?)?)"')
+
+
+def _fail_on_naive_datetimes(response) -> None:
+    """Fail the test if a JSON response holds a datetime without a time zone."""
+    if "application/json" not in response.headers.get("content-type", ""):
+        return
+    response.read()
+    match = _NAIVE_DATETIME.search(response.text)
+    if match:
+        raise AssertionError(
+            f"{response.request.method} {response.request.url.path} returned the"
+            f" datetime {match.group(1)} with no time zone. Type the field as"
+            " app.common.schemas.types.UtcDatetime (or make the value aware) so"
+            " the frontend doesn't read it as local time."
+        )
 
 
 class _BlockedSMTP:
@@ -95,6 +117,7 @@ def client(db: Session) -> TestClient:
     app.dependency_overrides[get_db] = override_get_db
 
     with TestClient(app) as test_client:
+        test_client.event_hooks["response"].append(_fail_on_naive_datetimes)
         yield test_client
 
     # Clean up the override after the test

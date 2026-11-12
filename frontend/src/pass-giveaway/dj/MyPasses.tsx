@@ -6,6 +6,7 @@ import type { PassResponse } from '../types';
 import { isRecentShow } from '../utils';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
+import { formatCalendarDate, formatPacific } from '../../common/dateTime';
 
 const DJ_NAME_KEY = 'kalx_dj_name';
 
@@ -111,10 +112,8 @@ const MyPasses = () => {
     return map[status] ?? status;
   };
 
-  const formatDateTime = (dateTimeStr: string) => {
-    const date = new Date(dateTimeStr);
-    return date.toLocaleString('en-US', {
-      timeZone: 'America/Los_Angeles',
+  const formatDateTime = (dateTimeStr: string) =>
+    formatPacific(dateTimeStr, {
       weekday: 'short',
       year: 'numeric',
       month: 'short',
@@ -123,18 +122,14 @@ const MyPasses = () => {
       minute: '2-digit',
       hour12: true,
     });
-  };
 
-  const formatDate = (dateStr: string) => {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    return date.toLocaleDateString('en-US', {
+  const formatDate = (dateStr: string) =>
+    formatCalendarDate(dateStr, {
       weekday: 'short',
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
-  };
 
   const recentPasses = passes.filter((p) => isRecentShow(p.show_date));
   const givenAwayPasses = recentPasses.filter((p) => p.status === 'given_away');

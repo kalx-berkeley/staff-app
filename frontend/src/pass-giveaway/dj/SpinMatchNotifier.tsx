@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { onAirAPI } from '../api';
 import type { SpinMatch } from '../types';
+import { formatCalendarDate } from '../../common/dateTime';
 
 // How often to ask the backend for new spin matches. The backend itself
 // throttles its own Spinitron calls independently (see spin_match_service.py),
@@ -9,14 +10,8 @@ import type { SpinMatch } from '../types';
 // sitting in the backend's cache.
 const POLL_INTERVAL_MS = 30000;
 
-const formatShowDate = (dateStr: string) => {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
-};
+const formatShowDate = (dateStr: string) =>
+  formatCalendarDate(dateStr, { weekday: 'short', month: 'short', day: 'numeric' });
 
 /** Identifies one notification card — a spin can match more than one show. */
 const matchKey = (match: SpinMatch) => `${match.spin_id}:${match.show.id}`;

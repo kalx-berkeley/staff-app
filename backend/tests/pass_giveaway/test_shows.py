@@ -1356,6 +1356,43 @@ def test_show_detail_completeness(
     assert data["attempts"][0]["attempted_at"] is not None
 
 
+def test_guest_list_email_shows_failed_attempts_in_pacific_time(db: Session, test_venue):
+    """The auto-close email gives each failed attempt's time in Pacific, to the minute."""
+    from datetime import datetime
+
+    from app.models.show import Show
+    from app.models.show_attempt import ShowAttempt
+    from app.pass_giveaway.services.show_service import ShowService
+
+    show = Show(
+        event_name="Attempt Time Test",
+        genre=["Rock"],
+        venue_id=test_venue.id,
+        show_date=date(2026, 11, 14),
+        show_time=time(20, 0),
+        age_restriction="all_ages",
+        wheelchair_accessible="yes",
+        num_pass_pairs=1,
+        status="published",
+    )
+    db.add(show)
+    db.flush()
+    # Stored as naive UTC: 03:15 UTC on Nov 13 is 7:15pm Pacific on Nov 12
+    db.add(
+        ShowAttempt(
+            show_id=show.id,
+            dj_name="DJ Retry",
+            attempted_at=datetime(2026, 11, 13, 3, 15, 42, 123456),
+        )
+    )
+    db.commit()
+    db.refresh(show)
+
+    text = ShowService._build_guest_list_text(show)
+
+    assert "DJ DJ Retry announced the show on Thu, Nov 12, 2026 at 7:15pm" in text
+
+
 @pytest.fixture
 def auto_close_calls(monkeypatch):
     """Record auto-close job (un)scheduling done by the show update route."""

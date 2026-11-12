@@ -1,4 +1,5 @@
 import type { Entry, ReviewItem, WorkformStatus, WorkformSummary } from './types';
+import { formatCalendarDate } from '../common/dateTime';
 
 const STATUS_LABELS: Record<WorkformStatus, string> = {
   not_started: 'Not started',
@@ -20,8 +21,7 @@ export function statusLabel(workform: Pick<WorkformSummary, 'status' | 'results'
 
 /** "2026-10" → "October 2026". */
 export function formatMonth(month: string): string {
-  const [year, m] = month.split('-').map(Number);
-  return new Date(year, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  return formatCalendarDate(month, { month: 'long', year: 'numeric' });
 }
 
 /** The first and last days of a "YYYY-MM" month, as "YYYY-MM-DD", for a date input's min and max. */
@@ -48,8 +48,7 @@ export function hoursProblem(value: string): string | null {
 
 /** "2026-10-03" → "Oct 3". */
 export function formatDay(value: string): string {
-  const [year, m, d] = value.split('-').map(Number);
-  return new Date(year, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return formatCalendarDate(value, { month: 'short', day: 'numeric' });
 }
 
 /** Entries grouped by department, each group's dated entries first by date, as the backend combines them. */

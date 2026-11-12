@@ -9,6 +9,7 @@ import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { STAFF_PASSES_NOT_YET_ACTIVE, WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow, seatedFallbackNote, staffPassesNotYetActive, waitingFallbackNote } from '../utils';
 import type { ShowResponse, ClaimData, LotteryStatus, SpecialtyShowResponse, AlternateQueue, AlternateJoinRequest, GuestFallback } from '../types';
 import type { StaffProfile, APIError } from '../../common/types';
+import { formatCalendarDate, formatCalendarDateRange, formatPacific } from '../../common/dateTime';
 
 const EmailIcon = () => (
   <svg
@@ -512,16 +513,13 @@ const ShowDetail = () => {
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    return date.toLocaleDateString('en-US', {
+  const formatDate = (dateStr: string) =>
+    formatCalendarDate(dateStr, {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
-  };
 
   const formatTime = (timeStr: string) => {
     const [hours, minutes] = timeStr.split(':');
@@ -531,26 +529,16 @@ const ShowDetail = () => {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
-  const formatDateRange = (startDateStr: string, endDateStr: string): string => {
-    const [sy, sm, sd] = startDateStr.split('-').map(Number);
-    const [ey, em, ed] = endDateStr.split('-').map(Number);
-    const start = new Date(sy, sm - 1, sd);
-    const end = new Date(ey, em - 1, ed);
-    const startFmt = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const endFmt = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return `${startFmt} – ${endFmt}`;
-  };
+  const formatDateRange = (startDateStr: string, endDateStr: string): string =>
+    formatCalendarDateRange(startDateStr, endDateStr);
 
-  const formatDateTime = (dateTimeStr: string) => {
-    const date = new Date(dateTimeStr);
-    return date.toLocaleString('en-US', {
-      timeZone: 'America/Los_Angeles',
+  const formatDateTime = (dateTimeStr: string) =>
+    formatPacific(dateTimeStr, {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
     });
-  };
 
   if (loading) {
     return <div className="loading">Loading show details...</div>;
@@ -721,7 +709,7 @@ const ShowDetail = () => {
   );
 
   const formatLotteryDeadline = (d: Date) =>
-    d.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    formatPacific(d, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   // First date on or after which DJ pass-pair reservations are prohibited
   // (within `dj_preassign_prohibition_days` of the planned close date).
@@ -940,7 +928,7 @@ const ShowDetail = () => {
               <div className="field-hint" style={{ marginBottom: '0.5rem' }}>
                 Reservations are not allowed for shifts on or after{' '}
                 <strong>
-                  {prohibitedFromDate.toLocaleDateString('en-US', {
+                  {formatCalendarDate(toDateInputValue(prohibitedFromDate), {
                     month: 'short', day: 'numeric', year: 'numeric',
                   })}
                 </strong>{' '}

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import type { KalxLiveAppearance } from '../types';
+import { formatCalendarDate } from '../../common/dateTime';
 
 interface KalxLiveBadgeProps {
   appearances: KalxLiveAppearance[];
@@ -10,7 +11,7 @@ function formatAppearance(appearance: KalxLiveAppearance): string {
   // the calendar day the band played, regardless of the viewer's timezone.
   const [year, month, day] = appearance.event_date.split('-').map(Number);
   const eventDate = new Date(year, month - 1, day);
-  const formatted = eventDate.toLocaleDateString('en-US', {
+  const formatted = formatCalendarDate(appearance.event_date, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',

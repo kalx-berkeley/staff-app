@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 import apiClient from '../api';
 import type { UserResponse } from '../types';
+import { pacificDateString } from '../dateTime';
 
 const STORAGE_PREFIX = 'kalx_active_day:';
 
 /** Today's date in Pacific time, as YYYY-MM-DD. */
-export const pacificToday = (): string =>
-  new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+export const pacificToday = (): string => pacificDateString();
 
 /**
  * Tell KALX Staff Analytics that the signed-in user used *subsite* today. Sent

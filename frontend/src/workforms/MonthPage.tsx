@@ -18,14 +18,10 @@ import {
   totalHours,
 } from './utils';
 import { WORKFORMS_TITLE } from './WorkformsLayout';
+import { formatPacific } from '../common/dateTime';
 
 function formatDeadline(value: string): string {
-  return new Date(value).toLocaleString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    timeZone: 'America/Los_Angeles',
-  });
+  return formatPacific(value, { weekday: 'long', month: 'long', day: 'numeric' });
 }
 
 function LoaNote({ entry }: { entry: Pick<Entry, 'loa_flag'> }) {

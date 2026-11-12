@@ -25,6 +25,7 @@ from app.config import settings
 from app.scheduler import scheduler, schedule_auto_close_job
 from app.pass_giveaway.guest_redaction import GuestRedactingRoute
 from app.common.schemas.admin import JobRunResult
+from app.common.schemas.types import UtcDatetime
 
 router = APIRouter(
     prefix="/api/pass-giveaway/admin",
@@ -57,7 +58,7 @@ class LotteryScheduleItem(BaseModel):
     show_id: int
     event_name: str
     venue_name: str
-    lottery_deadline: datetime
+    lottery_deadline: UtcDatetime
     staff_entry_count: int
     dj_entry_count: int
     show_status: str

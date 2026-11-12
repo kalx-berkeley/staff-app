@@ -8,6 +8,7 @@ import {
   formatMonthKey,
   workformMonthUrl,
 } from './profileFormat';
+import { formatPacific } from '../common/dateTime';
 
 interface EligibilityChecklistProps {
   eligibility: Eligibility;
@@ -51,7 +52,7 @@ const Requirement = ({ title, check, children }: { title: string; check: Check; 
 );
 
 const playlistDate = (start: string) =>
-  new Date(start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
+  formatPacific(start, { month: 'short', day: 'numeric', weekday: 'short' });
 
 const PlaylistTable = ({ playlists }: { playlists: PlaylistCheck[] }) =>
   playlists.length === 0 ? (

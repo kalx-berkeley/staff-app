@@ -9,6 +9,7 @@ import { usePageTitle } from '../../common/hooks/usePageTitle';
 import type { ShowResponse, PreAssignmentData, LotteryStatus, PassResponse, DjSuggestion, DjLeave, AlternateEntry, WaitingGuest } from '../types';
 import type { APIError, PromotionsStaffProfile } from '../../common/types';
 import { KALX_TABLE_NAME, WHEELCHAIR_ACCESSIBLE_LABELS, formatShowRating, isMovieShow, seatedFallbackNote, waitingFallbackNote } from '../utils';
+import { formatCalendarDate, formatCalendarDateRange, formatPacific, formatPacificTime, pacificDateString } from '../../common/dateTime';
 
 type SuggestMode = 'choose' | 'date' | 'genre' | null;
 
@@ -602,26 +603,21 @@ const ShowDetail = () => {
     }
   };
 
-  const formatDate = (dateStr: string): string => {
-    const [_y, _m, _d] = dateStr.split('-').map(Number); const date = new Date(_y, _m - 1, _d);
-    return date.toLocaleDateString('en-US', {
+  const formatDate = (dateStr: string): string =>
+    formatCalendarDate(dateStr, {
       weekday: 'short',
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
-  };
 
-  const formatDateTime = (dateTimeStr: string): string => {
-    const date = new Date(dateTimeStr);
-    return date.toLocaleString('en-US', {
-      timeZone: 'America/Los_Angeles',
+  const formatDateTime = (dateTimeStr: string): string =>
+    formatPacific(dateTimeStr, {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
     });
-  };
 
   const formatTime = (timeStr: string): string => {
     const [hours, minutes] = timeStr.split(':').map(Number);
@@ -632,32 +628,21 @@ const ShowDetail = () => {
 
   const formatShowDateTime = (dateStr: string, timeStr: string): string => {
     const [hours, minutes] = timeStr.split(':').map(Number);
-    const [_y, _m, _d] = dateStr.split('-').map(Number); const date = new Date(_y, _m - 1, _d);
-    const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
-    const monthDayYear = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const weekday = formatCalendarDate(dateStr, { weekday: 'long' });
+    const monthDayYear = formatCalendarDate(dateStr, { month: 'long', day: 'numeric', year: 'numeric' });
     const period = hours >= 12 ? 'pm' : 'am';
     const hour12 = hours % 12 || 12;
     const time = `${hour12}:${String(minutes).padStart(2, '0')}${period}`;
     return `${weekday}, ${monthDayYear} at ${time}`;
   };
 
-  const formatDateRange = (startDateStr: string, endDateStr: string): string => {
-    const [sy, sm, sd] = startDateStr.split('-').map(Number);
-    const [ey, em, ed] = endDateStr.split('-').map(Number);
-    const start = new Date(sy, sm - 1, sd);
-    const end = new Date(ey, em - 1, ed);
-    const startFmt = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const endFmt = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return `${startFmt} – ${endFmt}`;
-  };
+  const formatDateRange = (startDateStr: string, endDateStr: string): string =>
+    formatCalendarDateRange(startDateStr, endDateStr);
 
   const formatAttemptDateTime = (dateTimeStr: string): string => {
-    const date = new Date(dateTimeStr);
-    const weekday = date.toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'long' });
-    const monthDayYear = date.toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'long', day: 'numeric', year: 'numeric' });
-    const time = date.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true })
-      .toLowerCase().replace(' ', '');
-    return `${weekday} ${monthDayYear} at ${time}`;
+    const weekday = formatPacific(dateTimeStr, { weekday: 'long' });
+    const monthDayYear = formatPacific(dateTimeStr, { month: 'long', day: 'numeric', year: 'numeric' });
+    return `${weekday} ${monthDayYear} at ${formatPacificTime(dateTimeStr)}`;
   };
 
   const getStatusBadgeClass = (status: string): string => {
@@ -848,7 +833,7 @@ const ShowDetail = () => {
               </button>
             </>
           )}
-          {show.status === 'closed' && show.show_date >= new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) && (
+          {show.status === 'closed' && show.show_date >= pacificDateString() && (
             <button
               onClick={() => setConfirmAction('reopen')}
               className="btn-primary"
@@ -1472,8 +1457,7 @@ const ShowDetail = () => {
             <div className="lottery-banner">
               Lottery is open. Closes:{' '}
               {lotteryStatus.deadline
-                ? new Date(lotteryStatus.deadline).toLocaleString('en-US', {
-                    timeZone: 'America/Los_Angeles',
+                ? formatPacific(lotteryStatus.deadline, {
                     month: 'short',
                     day: 'numeric',
                     hour: 'numeric',

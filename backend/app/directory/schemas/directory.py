@@ -1,9 +1,11 @@
 """Pydantic schemas for the Staff Directory API."""
 
-from datetime import date, datetime
+from datetime import date
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
+
+from app.common.schemas.types import UtcDatetime
 
 
 class DjPersona(BaseModel):
@@ -56,8 +58,8 @@ class LeaveCheck(Check):
 
 class PlaylistCheckResponse(BaseModel):
     id: int
-    start: datetime
-    end: datetime
+    start: UtcDatetime
+    end: UtcDatetime
     title: Optional[str] = None
     minutes: int
     # The length of the back-to-back block it's part of, if any
@@ -73,7 +75,7 @@ class ShiftCheck(Check):
     current_quarter: str
     min_minutes: int
     playlists: List[PlaylistCheckResponse] = []
-    shifts_as_of: Optional[datetime] = None
+    shifts_as_of: Optional[UtcDatetime] = None
 
 
 class DepartmentCheckResponse(BaseModel):

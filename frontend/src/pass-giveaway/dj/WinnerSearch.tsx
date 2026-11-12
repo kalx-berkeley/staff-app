@@ -7,6 +7,7 @@ import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import type { PassResponse, WinnerReleaseData } from '../types';
 import type { APIError } from '../../common/types';
+import { formatPacific } from '../../common/dateTime';
 
 interface ReleaseFormState {
   reason: string;
@@ -204,7 +205,7 @@ const PassResult = ({ pass, isAuthenticated, onReleased }: PassResultProps) => {
         <dt>Given Away By</dt>
         <dd>{pass.given_away_by_dj ?? '—'}</dd>
         <dt>Given Away At</dt>
-        <dd>{pass.given_away_at ? new Date(pass.given_away_at).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }) : '—'}</dd>
+        <dd>{pass.given_away_at ? formatPacific(pass.given_away_at) : '—'}</dd>
       </dl>
 
       {released ? (

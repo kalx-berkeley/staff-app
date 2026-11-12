@@ -1,6 +1,6 @@
 """Pydantic schemas for Lottery API."""
 
-from datetime import date, datetime
+from datetime import date
 from pydantic import BaseModel, ConfigDict, Field
 from app.common.schemas.types import UtcDatetime
 from app.models.guest_fallback import GuestFallback
@@ -66,7 +66,7 @@ class LotteryStatusResponse(BaseModel):
     """Response schema for the lottery status of a show."""
 
     is_active: bool
-    deadline: datetime | None
+    deadline: UtcDatetime | None
     staff_entry_count: int
     dj_entry_count: int
     my_staff_entry: LotteryEntryResponse | None = None

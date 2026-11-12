@@ -6,11 +6,10 @@ import type { APIError } from '../../common/types';
 import { KALX_TABLE_NAME, isRecentShow, waitingFallbackNote } from '../utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
+import { formatCalendarDate, formatPacific } from '../../common/dateTime';
 
-const formatDateTime = (dateTimeStr: string) => {
-  const date = new Date(dateTimeStr);
-  return date.toLocaleString('en-US', {
-    timeZone: 'America/Los_Angeles',
+const formatDateTime = (dateTimeStr: string) =>
+  formatPacific(dateTimeStr, {
     weekday: 'short',
     year: 'numeric',
     month: 'short',
@@ -19,18 +18,14 @@ const formatDateTime = (dateTimeStr: string) => {
     minute: '2-digit',
     hour12: true,
   });
-};
 
-const formatDate = (dateStr: string) => {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  return date.toLocaleDateString('en-US', {
+const formatDate = (dateStr: string) =>
+  formatCalendarDate(dateStr, {
     weekday: 'short',
     year: 'numeric',
     month: 'short',
     day: 'numeric',
   });
-};
 
 const MyPasses = () => {
   usePageTitle('My Passes · Staff');

@@ -10,6 +10,7 @@ import WinnerEditForm from './WinnerEditForm';
 import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
 import type { ShowResponse, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
+import { formatCalendarDate, formatCalendarDateRange, formatPacific } from '../../common/dateTime';
 
 const ShowDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -62,15 +63,13 @@ const ShowDetail = () => {
     loadShow();
   }, [loadShow]);
 
-  const formatDate = (dateStr: string) => {
-    const [_y, _m, _d] = dateStr.split('-').map(Number); const date = new Date(_y, _m - 1, _d);
-    return date.toLocaleDateString('en-US', {
+  const formatDate = (dateStr: string) =>
+    formatCalendarDate(dateStr, {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
-  };
 
   const formatTime = (timeStr: string) => {
     const [hours, minutes] = timeStr.split(':');
@@ -80,26 +79,16 @@ const ShowDetail = () => {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
-  const formatDateRange = (startDateStr: string, endDateStr: string): string => {
-    const [sy, sm, sd] = startDateStr.split('-').map(Number);
-    const [ey, em, ed] = endDateStr.split('-').map(Number);
-    const start = new Date(sy, sm - 1, sd);
-    const end = new Date(ey, em - 1, ed);
-    const startFmt = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const endFmt = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return `${startFmt} – ${endFmt}`;
-  };
+  const formatDateRange = (startDateStr: string, endDateStr: string): string =>
+    formatCalendarDateRange(startDateStr, endDateStr);
 
-  const formatDateTime = (dateTimeStr: string) => {
-    const date = new Date(dateTimeStr);
-    return date.toLocaleString('en-US', {
-      timeZone: 'America/Los_Angeles',
+  const formatDateTime = (dateTimeStr: string) =>
+    formatPacific(dateTimeStr, {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
     });
-  };
 
   const sortAvailablePasses = (passes: PassResponse[]): PassResponse[] => {
     const name = djName.trim().toLowerCase();

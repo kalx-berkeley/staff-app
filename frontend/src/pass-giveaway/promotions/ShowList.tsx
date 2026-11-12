@@ -7,6 +7,7 @@ import SearchBar from './SearchBar';
 import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker } from '../components';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { compareVenueNames } from '../utils';
+import { formatCalendarDate, formatCalendarDateRange, pacificDateString } from '../../common/dateTime';
 
 type SortBy = 'date' | 'band' | 'venue' | 'published';
 
@@ -15,7 +16,7 @@ const VIEW_MODE_KEY = 'kalx_promo_view_mode';
 const getDefaultDateFrom = (): string => {
   const d = new Date();
   d.setDate(d.getDate() - 30);
-  return d.toISOString().split('T')[0];
+  return pacificDateString(d);
 };
 
 const ShowList = () => {
@@ -90,24 +91,20 @@ const ShowList = () => {
     }
   };
 
-  const formatDate = (dateStr: string): string => {
-    const [_y, _m, _d] = dateStr.split('-').map(Number); const date = new Date(_y, _m - 1, _d);
-    return date.toLocaleDateString('en-US', {
+  const formatDate = (dateStr: string): string =>
+    formatCalendarDate(dateStr, {
       weekday: 'short',
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
-  };
 
-  const formatDateShort = (dateStr: string): string => {
-    const [_y, _m, _d] = dateStr.split('-').map(Number); const date = new Date(_y, _m - 1, _d);
-    return date.toLocaleDateString('en-US', {
+  const formatDateShort = (dateStr: string): string =>
+    formatCalendarDate(dateStr, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
     });
-  };
 
   const formatTime = (timeStr: string): string => {
     const [hours, minutes] = timeStr.split(':');
@@ -117,15 +114,8 @@ const ShowList = () => {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
-  const formatDateRange = (startDateStr: string, endDateStr: string): string => {
-    const [sy, sm, sd] = startDateStr.split('-').map(Number);
-    const [ey, em, ed] = endDateStr.split('-').map(Number);
-    const start = new Date(sy, sm - 1, sd);
-    const end = new Date(ey, em - 1, ed);
-    const startFmt = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const endFmt = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return `${startFmt} – ${endFmt}`;
-  };
+  const formatDateRange = (startDateStr: string, endDateStr: string): string =>
+    formatCalendarDateRange(startDateStr, endDateStr);
 
   const sortedShows = [...filteredShows].sort((a, b) => {
     if (sortBy === 'date') return a.show_date.localeCompare(b.show_date);

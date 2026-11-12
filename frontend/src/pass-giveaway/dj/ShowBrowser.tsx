@@ -7,6 +7,7 @@ import type { ShowSummary, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, WHEELCHAIR_ACCESSIBLE_LABELS, compareVenueNames, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
+import { formatCalendarDate, formatCalendarDateRange, pacificDateString } from '../../common/dateTime';
 
 const VIEW_MODE_KEY = 'kalx_dj_view_mode';
 
@@ -15,7 +16,7 @@ type StatusFilter = 'published' | 'can-give-away';
 const getDefaultDateFrom = (): string => {
   const d = new Date();
   d.setDate(d.getDate() - 30);
-  return d.toISOString().split('T')[0];
+  return pacificDateString(d);
 };
 
 const getLocalTodayStr = (): string => {
@@ -233,24 +234,20 @@ const ShowBrowser = () => {
     </button>
   );
 
-  const formatDate = (dateStr: string) => {
-    const [_y, _m, _d] = dateStr.split('-').map(Number); const date = new Date(_y, _m - 1, _d);
-    return date.toLocaleDateString('en-US', {
+  const formatDate = (dateStr: string) =>
+    formatCalendarDate(dateStr, {
       weekday: 'short',
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
-  };
 
-  const formatDateShort = (dateStr: string) => {
-    const [_y, _m, _d] = dateStr.split('-').map(Number); const date = new Date(_y, _m - 1, _d);
-    return date.toLocaleDateString('en-US', {
+  const formatDateShort = (dateStr: string) =>
+    formatCalendarDate(dateStr, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
     });
-  };
 
   const formatTime = (timeStr: string) => {
     const [hours, minutes] = timeStr.split(':');
@@ -260,15 +257,8 @@ const ShowBrowser = () => {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
-  const formatDateRange = (startDateStr: string, endDateStr: string): string => {
-    const [sy, sm, sd] = startDateStr.split('-').map(Number);
-    const [ey, em, ed] = endDateStr.split('-').map(Number);
-    const start = new Date(sy, sm - 1, sd);
-    const end = new Date(ey, em - 1, ed);
-    const startFmt = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const endFmt = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return `${startFmt} – ${endFmt}`;
-  };
+  const formatDateRange = (startDateStr: string, endDateStr: string): string =>
+    formatCalendarDateRange(startDateStr, endDateStr);
 
   // Whether this DJ can give away a pass pair for the show right now: the
   // planned close time hasn't passed, a pair is left that isn't pre-assigned

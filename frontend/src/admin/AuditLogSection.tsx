@@ -4,6 +4,7 @@ import type { APIError } from '../common/types';
 import { adminAPI } from './api';
 import { AREAS, type AuditLogItem } from './types';
 import { toPacificDateInputValue } from './utils';
+import { formatPacific } from '../common/dateTime';
 
 const PAGE_SIZE = 50;
 
@@ -124,9 +125,7 @@ export default function AuditLogSection() {
                 {entries.map((entry) => (
                   <tr key={entry.id}>
                     <td className="audit-log-time">
-                      {new Date(entry.occurred_at).toLocaleString('en-US', {
-                        timeZone: 'America/Los_Angeles',
-                      })}
+                      {formatPacific(entry.occurred_at)}
                     </td>
                     {showArea && <td>{entry.area}</td>}
                     <td>

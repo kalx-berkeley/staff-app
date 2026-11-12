@@ -2,13 +2,11 @@ import { useEffect, useState } from 'react';
 import { errorMessage } from '../common/utils';
 import { adminAPI } from './api';
 import type { DjQuizDeadline } from './types';
+import { formatCalendarDate } from '../common/dateTime';
 
 const byYearDesc = (a: DjQuizDeadline, b: DjQuizDeadline) => b.year - a.year;
 
-const formatDeadline = (value: string) => {
-  const [year, month, day] = value.split('-').map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString('en-US', { dateStyle: 'long' });
-};
+const formatDeadline = (value: string) => formatCalendarDate(value, { dateStyle: 'long' });
 
 // Site admins only: when each year's DJ Quiz is due. The Staff Directory's
 // Sublist DJ requirements count last year's quiz until this year's deadline

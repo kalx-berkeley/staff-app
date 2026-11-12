@@ -1,5 +1,7 @@
 // Time formatting helpers for KALX Staff Admin.
 
+import { pacificDateString } from '../common/dateTime';
+
 /** "5 minutes ago", "3 days ago", or "Never" for null. */
 export const formatRelativeTime = (isoString: string | null, now = new Date()): string => {
   if (!isoString) return 'Never';
@@ -25,5 +27,4 @@ export const formatFutureTime = (isoString: string | null, now = new Date()): st
 };
 
 /** A date as YYYY-MM-DD in Pacific time, for date inputs. */
-export const toPacificDateInputValue = (d: Date): string =>
-  d.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+export const toPacificDateInputValue = (d: Date): string => pacificDateString(d);

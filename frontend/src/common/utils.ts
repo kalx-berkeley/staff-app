@@ -1,4 +1,5 @@
 import type { APIError } from './types';
+import { formatCalendarDate } from './dateTime';
 
 export function formatPhone(phone: string | null | undefined): string {
   if (!phone) return '—';
@@ -99,7 +100,7 @@ export function leaveCoversShow(
 }
 
 function formatLeaveDate(value: string): string {
-  return parseDateValue(value)!.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return formatCalendarDate(value, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 /** Describe leave dates the way the backend does, e.g. "Mar 1, 2027 – Jun 1, 2027" or "from Mar 1, 2027". */

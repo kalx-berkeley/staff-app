@@ -5,6 +5,7 @@ import { reviewAPI } from './api';
 import type { DepartmentPeople, DepartmentPerson, ReviewOverview } from './types';
 import { errorMessage, formatHours, formatMonth } from './utils';
 import { WORKFORMS_TITLE } from './WorkformsLayout';
+import { formatCalendarDate } from '../common/dateTime';
 
 const MAX_MONTHS = 12;
 const DEFAULT_MONTHS = 3;
@@ -12,8 +13,7 @@ const DEFAULT_MIN_MONTHS = 2;
 
 /** "2026-09" → "Sep 2026". */
 function formatMonthShort(month: string): string {
-  const [year, m] = month.split('-').map(Number);
-  return new Date(year, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  return formatCalendarDate(month, { month: 'short', year: 'numeric' });
 }
 
 /** A whole number from *value* between 1 and *max*, or *fallback*. */

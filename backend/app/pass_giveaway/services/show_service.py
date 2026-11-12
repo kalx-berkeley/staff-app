@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from fastapi import HTTPException, status
 import logging
 
+from app.common.pacific_time import format_pacific_datetime
 from app.common.areas import PASS_GIVEAWAY_AREA
 from app.models.show import Show
 from app.models.show_attempt import ShowAttempt
@@ -681,7 +682,8 @@ class ShowService:
         if attempts:
             lines.append(f"Failed on-air giveaway attempts ({len(attempts)}):")
             for a in attempts:
-                lines.append(f"  - {a.dj_name} at {a.attempted_at}")
+                when = format_pacific_datetime(a.attempted_at)
+                lines.append(f"  - {a.dj_name} at {when}")
             lines.append("")
 
         lines.append(
@@ -981,7 +983,10 @@ class ShowService:
             lines.append("")
             lines.append("We also announced the show on-air but didn't get any callers:")
             for a in failed:
-                lines.append(f"  DJ {a.dj_name} announced the show on {a.attempted_at}")
+                lines.append(
+                    f"  DJ {a.dj_name} announced the show on"
+                    f" {format_pacific_datetime(a.attempted_at)}"
+                )
 
         return "\n".join(lines)
 

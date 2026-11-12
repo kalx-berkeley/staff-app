@@ -83,10 +83,11 @@ def _notify_venue_owners_of_winner_release(
     reason: str,
 ) -> None:
     from datetime import datetime, timezone
+    from app.common.pacific_time import format_pacific_datetime
     from app.common.services import notification_service
     from app.models.notification_preferences import NotificationPreferences
 
-    released_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    released_at = format_pacific_datetime(datetime.now(timezone.utc))
     body = "\n".join([
         (
             f'Passes for "{show.event_name}" at {show.venue.name} on {show.show_date} have'

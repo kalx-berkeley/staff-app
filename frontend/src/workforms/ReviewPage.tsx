@@ -7,17 +7,10 @@ import DecisionBadge from './DecisionBadge';
 import type { Decision, ReviewItem, ReviewOverview, ReviewQueue } from './types';
 import { errorMessage, formatDay, formatHours, formatMonth, nextPendingIndex } from './utils';
 import { WORKFORMS_TITLE } from './WorkformsLayout';
+import { formatPacific } from '../common/dateTime';
 
-// The API's timestamps are UTC, without a zone when they come from the database.
 function formatSubmitted(value: string): string {
-  const utc = /(Z|[+-]\d\d:\d\d)$/.test(value) ? value : `${value}Z`;
-  return new Date(utc).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: 'America/Los_Angeles',
-  });
+  return formatPacific(value, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
 function ReviewDetail({
