@@ -18,7 +18,11 @@ vi.mock('../components', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../components')>()),
   DjNameInput: () => null,
 }));
-vi.mock('../../common/contexts/authHooks', () => ({ useHasRole: () => false }));
+// A DJ studio computer by default; a test sets user to preview from home.
+const auth = vi.hoisted(() => ({
+  user: { email: null, role: 'dj', is_dj_network: true, is_station_office_network: true } as Record<string, unknown> | null,
+}));
+vi.mock('../../common/contexts/authHooks', () => ({ useAuth: () => ({ user: auth.user }) }));
 vi.mock('../tracking', () => ({ useGiveawayVisit: () => null }));
 
 vi.mock('react-router-dom', async () => {

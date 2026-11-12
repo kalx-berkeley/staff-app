@@ -5,7 +5,9 @@ import { DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, KalxLiveBa
 import MarkdownContent from '../../common/components/MarkdownContent';
 import { formatPhone } from '../../common/utils';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, canDjEditWinner, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
+import { useAuth } from '../../common/contexts/authHooks';
+import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, canDjEditWinner, canRecordDjGiveaways, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
+import { getPreviewGiveaways } from './previewGiveaways';
 import WinnerEditForm from './WinnerEditForm';
 import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
 import type { ShowResponse, PassResponse } from '../types';
@@ -15,6 +17,9 @@ const ShowDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
+  // Away from the DJ studio, giveaways are only pretend (previewGiveaways.ts)
+  const isPreview = !canRecordDjGiveaways(user);
   // Set by GiveawayPage after a successful giveaway. The DJ has just used their
   // one pair for this show, so the "I'm off the mic" button would only
   // confuse them. Read once, then cleared
@@ -38,6 +43,8 @@ const ShowDetail = () => {
   const [editingPassId, setEditingPassId] = useState<number | null>(null);
   // Whether the DJ clicked through the "pre-assigned to another DJ" warning.
   const [acknowledgedOthersPreassigned, setAcknowledgedOthersPreassigned] = useState(false);
+  // Whether the DJ clicked through the "you already gave away a pair" warning.
+  const [acknowledgedRecentGiveaway, setAcknowledgedRecentGiveaway] = useState(false);
 
   const loadShow = useCallback(async () => {
     if (!id) return;
@@ -149,7 +156,11 @@ const ShowDetail = () => {
   const hasPreviousActivity = givenAwayPasses.length > 0 || show.attempts.length > 0;
   // The show list only links here with "View" after a recent giveaway, and
   // the backend refuses a second pair for the show this DJ shift.
-  const recentDjGiveaway = findRecentDjGiveaway(givenAwayPasses, djName);
+  const recentDjGiveaway: Pick<PassResponse, 'given_away_at' | 'recipient_name'> | undefined =
+    findRecentDjGiveaway(givenAwayPasses, djName) ??
+    (isPreview
+      ? findRecentDjGiveaway(getPreviewGiveaways().filter((g) => g.show_id === show.id), djName)
+      : undefined);
   const canGiveAway = availablePasses.length > 0 && !justGaveAway && !recentDjGiveaway;
   // Every pair left is pre-assigned to another DJ, so giving one away on air
   // takes it from them. The DJ must click through a warning first.
@@ -171,6 +182,47 @@ const ShowDetail = () => {
   const onlyOthersPreassigned =
     canGiveAway && othersPreassignedPasses.length === availablePasses.length;
   const age = show.age_restriction;
+
+  // The DJ came here with "View" because they already gave away a pair this
+  // shift, so there's no "I'm off the mic" button. Make sure they know before
+  // they announce these passes and take calls they can't give a pair to.
+  if (recentDjGiveaway && !justGaveAway && !acknowledgedRecentGiveaway) {
+    const givenAt = recentDjGiveaway.given_away_at ? new Date(recentDjGiveaway.given_away_at) : null;
+    const availableAgainAt = givenAt
+      ? new Date(givenAt.getTime() + DJ_SHOW_GIVEAWAY_WINDOW_HOURS * 60 * 60 * 1000)
+      : null;
+    return (
+      <div className="dj-show-document">
+        <DjNameInput value={djName} onChange={setDjName} id="dj-detail-name" />
+        <div className="dj-preassigned-gate" role="alert">
+          <h2>You can&apos;t give away passes to this show right now</h2>
+          <p>
+            You already gave away a pass pair for <strong>{show.event_name}</strong>
+            {recentDjGiveaway.recipient_name && <> to <strong>{recentDjGiveaway.recipient_name}</strong></>}
+            {givenAt && ` at ${formatDateTime(givenAt.toISOString())}`}. DJs can give away 1 pair
+            per show every {DJ_SHOW_GIVEAWAY_WINDOW_HOURS} hours, so this page won&apos;t have
+            an &ldquo;I&apos;m off the mic&rdquo; button and you can&apos;t record a winner.
+          </p>
+          <p>
+            <strong>Please don&apos;t announce these passes on air.</strong> Listeners who call
+            in won&apos;t be able to win them.
+            {availableAgainAt && ` You can give away a pair for this show again after ${formatDateTime(availableAgainAt.toISOString())}.`}
+          </p>
+          <div className="dj-preassigned-gate-actions">
+            <button onClick={() => navigate('/dj/shows')} className="btn-primary">
+              ← Pick a different show
+            </button>
+            <button
+              onClick={() => setAcknowledgedRecentGiveaway(true)}
+              className="btn-secondary"
+            >
+              I understand, show me this show
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (onlyOthersPreassigned && !acknowledgedOthersPreassigned) {
     return (
@@ -300,12 +352,15 @@ const ShowDetail = () => {
         <div className="success-message dj-giveaway-success" role="status">
           Pass pair given away
           {recentDjGiveaway?.recipient_name && <> to <strong>{recentDjGiveaway.recipient_name}</strong></>}. Thanks!
+          {isPreview && ' (Preview only: nothing was recorded.)'}
         </div>
       )}
 
       {justTried && (
         <div className="success-message dj-giveaway-success" role="status">
-          Attempt recorded. No pass was given away, so it&apos;s still available. Thanks for trying!
+          {isPreview
+            ? 'Preview only: no attempt was recorded. On air, the pass would still be available. Thanks for trying!'
+            : <>Attempt recorded. No pass was given away, so it&apos;s still available. Thanks for trying!</>}
         </div>
       )}
 

@@ -3,6 +3,8 @@ import { passesAPI, showsAPI, venuePassesAPI } from '../api';
 import { Tooltip } from '../components';
 import type { PassResponse, GiveawayData, WinnerEligibility } from '../types';
 import type { APIError } from '../../common/types';
+import { findRecentDjGiveaway } from '../utils';
+import { getPreviewGiveaways, recordPreviewGiveaway } from './previewGiveaways';
 
 interface PassGiveawayFormProps {
   pass: PassResponse;
@@ -15,8 +17,12 @@ interface PassGiveawayFormProps {
   onMissingDjName?: () => void;
   winFrequencyDays?: number | null;
   requiresEmail?: boolean;
-  /** Preview mode: renders the form but disables actually recording a giveaway. */
-  readOnly?: boolean;
+  /**
+   * Preview mode, for someone who can't really record a giveaway: the form
+   * works as usual, checks included, but Give Away and Tried only pretend to
+   * save (see previewGiveaways.ts) before calling onSuccess.
+   */
+  preview?: boolean;
   /** The giveaway page visit, sent with the giveaway or attempt for KALX Staff Analytics. */
   visitId?: string | null;
 }
@@ -25,7 +31,7 @@ export type GiveawayOutcome = 'given_away' | 'tried';
 
 type WinnerFields = Omit<GiveawayData, 'given_away_by_dj' | 'visit_id'>;
 
-const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, winFrequencyDays, requiresEmail, readOnly, visitId }: PassGiveawayFormProps) => {
+const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, winFrequencyDays, requiresEmail, preview, visitId }: PassGiveawayFormProps) => {
   const [formData, setFormData] = useState<WinnerFields>({
     recipient_name: '',
     recipient_phone: '',
@@ -75,8 +81,6 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
     e.preventDefault();
     setError(null);
 
-    if (readOnly) return;
-
     if (!formData.recipient_name.trim()) {
       setError('Winner name is required');
       return;
@@ -96,6 +100,23 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
     if (!checkDjName()) return;
     if (isSubmitBlocked) {
       setError('Winner is ineligible. Check the override box to proceed.');
+      return;
+    }
+
+    if (preview) {
+      // The same one-pair-per-shift refusal the backend gives
+      const name = djName.trim();
+      const showPreviews = getPreviewGiveaways().filter((g) => g.show_id === pass.show_id);
+      if (findRecentDjGiveaway(showPreviews, name)) {
+        setError(`DJ '${name}' has already given away a pair of passes for this show within the last 4 hours`);
+        return;
+      }
+      recordPreviewGiveaway({
+        show_id: pass.show_id,
+        given_away_by_dj: name,
+        recipient_name: formData.recipient_name.trim(),
+      });
+      onSuccess('given_away');
       return;
     }
 
@@ -124,9 +145,12 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
   const handleNoWinner = async () => {
     setError(null);
 
-    if (readOnly) return;
-
     if (!checkDjName()) return;
+
+    if (preview) {
+      onSuccess('tried');
+      return;
+    }
 
     try {
       setLoading(true);
@@ -175,7 +199,7 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
               id="recipient_name"
               value={formData.recipient_name}
               onChange={(e) => handleInputChange('recipient_name', e.target.value)}
-              disabled={loading || readOnly}
+              disabled={loading}
               placeholder="Enter winner's name"
               autoComplete="off"
             />
@@ -194,7 +218,7 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
               value={formData.recipient_phone}
               onChange={(e) => handleInputChange('recipient_phone', e.target.value)}
               onBlur={handlePhoneBlur}
-              disabled={loading || readOnly}
+              disabled={loading}
               placeholder="Enter winner's phone number"
               autoComplete="off"
             />
@@ -227,7 +251,7 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
                 id="recipient_email"
                 value={formData.recipient_email ?? ''}
                 onChange={(e) => handleInputChange('recipient_email', e.target.value)}
-                disabled={loading || readOnly}
+                disabled={loading}
                 placeholder="Enter winner's email address"
                 autoComplete="off"
               />
@@ -238,8 +262,7 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
             <button
               type="submit"
               className="btn-primary"
-              disabled={loading || isSubmitBlocked || readOnly}
-              title={readOnly ? 'Preview only — sign in from the DJ studio to record a giveaway' : undefined}
+              disabled={loading || isSubmitBlocked}
             >
               {loading ? 'Saving...' : 'Give Away'}
             </button>
@@ -252,8 +275,7 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
             type="button"
             className="btn-secondary"
             onClick={handleNoWinner}
-            disabled={loading || readOnly}
-            title={readOnly ? 'Preview only — sign in from the DJ studio to record a giveaway' : undefined}
+            disabled={loading}
           >
             Tried
           </button>

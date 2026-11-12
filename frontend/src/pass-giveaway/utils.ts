@@ -16,6 +16,18 @@ export function isStagingSublistDjStaff(user: Pick<UserResponse, 'role' | 'is_st
   return !!user?.is_staging && user.role === 'staff' && !!user.profile?.is_sublist_dj;
 }
 
+// Whether the backend lets this user really record a pass giveaway or a Tried
+// attempt (`check_dj_giveaway_access`): a request from the DJ studio network,
+// or, in staging, Sublist DJ staff. Everyone else on the DJ view (promotions
+// staff at home, or someone impersonating the DJ studio network) gets a
+// preview that runs the same flow without recording anything.
+export function canRecordDjGiveaways(
+  user: Pick<UserResponse, 'role' | 'is_staging' | 'profile' | 'is_dj_network' | 'is_impersonating_dj_network'> | null | undefined,
+): boolean {
+  if (!user) return false;
+  return (user.is_dj_network && !user.is_impersonating_dj_network) || isStagingSublistDjStaff(user);
+}
+
 // Whether the signed-in user can use the Promotions → Admin page: site admins
 // and promotions admins. Like the backend's check, this describes the real
 // user, not anyone they're impersonating.

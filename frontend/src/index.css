@@ -2296,6 +2296,71 @@ fieldset.radio-group legend {
   }
 }
 
+/* The DJ shows page's "View" button with a tooltip icon saying why the show
+   has no "Give Away" (a title attribute doesn't work on phones). The tooltip
+   opens below the icon, toward the middle of the page: to the right in a card,
+   where the button is on the left, and to the left in the list view, where it
+   is in the last column. That keeps it on screen on a phone. */
+.show-view-with-reason {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.show-view-with-reason .tooltip-wrapper {
+  margin-left: 0;
+}
+
+.show-view-with-reason .tooltip-box {
+  bottom: auto;
+  top: calc(100% + 6px);
+  left: -0.5rem;
+  transform: none;
+}
+
+.show-view-with-reason .tooltip-box::after {
+  top: auto;
+  bottom: 100%;
+  left: calc(0.5rem + 0.55rem - 5px);
+  transform: none;
+  border-top-color: transparent;
+  border-bottom-color: #333;
+}
+
+.show-row-actions .show-view-with-reason .tooltip-box {
+  left: auto;
+  right: -0.5rem;
+}
+
+.show-row-actions .show-view-with-reason .tooltip-box::after {
+  left: auto;
+  right: calc(0.5rem + 0.55rem - 5px);
+}
+
+/* A dimmed card or row with that tooltip dims everything but the tooltip, so
+   it stays readable: opacity on the whole card would fade it too. */
+.show-card-dimmed:has(.show-view-with-reason),
+.show-card-assigned-inactive:has(.show-view-with-reason),
+.shows-list-table tr.show-dimmed:has(.show-view-with-reason) {
+  opacity: 1;
+}
+
+.show-card-dimmed:has(.show-view-with-reason) > :not(.show-card-footer),
+.show-card-dimmed:has(.show-view-with-reason) .show-card-footer > :not(.show-view-with-reason),
+.show-card-dimmed:has(.show-view-with-reason) .show-view-with-reason > a {
+  opacity: 0.45;
+}
+
+.show-card-assigned-inactive:has(.show-view-with-reason) > :not(.show-card-footer),
+.show-card-assigned-inactive:has(.show-view-with-reason) .show-card-footer > :not(.show-view-with-reason),
+.show-card-assigned-inactive:has(.show-view-with-reason) .show-view-with-reason > a,
+.shows-list-table tr.show-dimmed:has(.show-view-with-reason) > td:not(:last-child),
+.shows-list-table tr.show-dimmed:has(.show-view-with-reason) .show-row-actions > :not(.show-view-with-reason),
+.shows-list-table tr.show-dimmed:has(.show-view-with-reason) .show-view-with-reason > a {
+  opacity: 0.5;
+}
+
 .show-genre {
   font-size: 0.8rem;
   color: #6c757d;

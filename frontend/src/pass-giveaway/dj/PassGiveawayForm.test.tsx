@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import PassGiveawayForm from './PassGiveawayForm';
 import { passesAPI, showsAPI } from '../api';
 import type { PassResponse } from '../types';
+import { getPreviewGiveaways } from './previewGiveaways';
 
 // Mock the API
 vi.mock('../api', () => ({
@@ -50,6 +51,57 @@ describe('PassGiveawayForm', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe('preview away from the DJ studio', () => {
+    beforeEach(() => sessionStorage.clear());
+
+    const fillWinner = () => {
+      fireEvent.change(screen.getByLabelText(/winner name/i), { target: { value: 'Pat Caller' } });
+      fireEvent.change(screen.getByLabelText(/winner phone/i), { target: { value: '5105550100' } });
+    };
+
+    it('keeps the form usable and its checks working', async () => {
+      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" preview />);
+
+      expect(screen.getByLabelText(/winner name/i)).toBeEnabled();
+      fireEvent.click(screen.getByRole('button', { name: /give away/i }));
+
+      expect(await screen.findByText('Winner name is required')).toBeInTheDocument();
+      expect(mockOnSuccess).not.toHaveBeenCalled();
+    });
+
+    it('pretends to give the pass away without calling the backend', async () => {
+      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" preview />);
+      fillWinner();
+      fireEvent.click(screen.getByRole('button', { name: /give away/i }));
+
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalledWith('given_away'));
+      expect(passesAPI.giveaway).not.toHaveBeenCalled();
+      expect(getPreviewGiveaways()).toEqual([
+        expect.objectContaining({ show_id: 1, given_away_by_dj: 'DJ Mike', recipient_name: 'Pat Caller' }),
+      ]);
+    });
+
+    it('refuses a second preview pair for the show this shift, as the backend would', async () => {
+      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" preview />);
+      fillWinner();
+      fireEvent.click(screen.getByRole('button', { name: /give away/i }));
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalledTimes(1));
+
+      fireEvent.click(screen.getByRole('button', { name: /give away/i }));
+
+      expect(await screen.findByText(/has already given away a pair of passes for this show/)).toBeInTheDocument();
+      expect(mockOnSuccess).toHaveBeenCalledTimes(1);
+    });
+
+    it('pretends to record Tried without calling the backend', async () => {
+      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" preview />);
+      fireEvent.click(screen.getByRole('button', { name: 'Tried' }));
+
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalledWith('tried'));
+      expect(showsAPI.recordAttempt).not.toHaveBeenCalled();
+    });
   });
 
   describe('Giveaway Form Validation', () => {

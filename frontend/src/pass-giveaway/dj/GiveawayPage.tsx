@@ -5,11 +5,11 @@ import PassGiveawayForm from './PassGiveawayForm';
 import { DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, KalxLiveBadge } from '../components';
 import MarkdownContent from '../../common/components/MarkdownContent';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { useHasRole } from '../../common/contexts/authHooks';
+import { useAuth } from '../../common/contexts/authHooks';
 import type { ShowResponse, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
-import { formatShowRating, isMovieShow } from '../utils';
+import { canRecordDjGiveaways, formatShowRating, isMovieShow } from '../utils';
 import { useGiveawayVisit } from '../tracking';
 
 const DJ_NAME_INPUT_ID = 'dj-giveaway-name';
@@ -17,14 +17,16 @@ const DJ_NAME_INPUT_ID = 'dj-giveaway-name';
 const GiveawayPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const isPromotionsPreview = useHasRole('promotions');
+  const { user } = useAuth();
+  // Away from the DJ studio, the page runs as a preview that records nothing
+  const isPreview = !canRecordDjGiveaways(user);
   const [show, setShow] = useState<ShowResponse | null>(null);
   usePageTitle(`Pass Giveaway${show ? `: ${show.event_name}` : ''} · DJ`);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [djName, setDjName] = useState(localStorage.getItem(DJ_NAME_KEY) || '');
   // KALX Staff Analytics counts each visit to this page and what came of it
-  const visitId = useGiveawayVisit(id ? parseInt(id) : null, djName, !isPromotionsPreview);
+  const visitId = useGiveawayVisit(id ? parseInt(id) : null, djName, !isPreview);
 
   const loadShow = useCallback(async () => {
     if (!id) return;
@@ -117,12 +119,12 @@ const GiveawayPage = () => {
 
   return (
     <div className="dj-show-document">
-      {isPromotionsPreview && (
+      {isPreview && (
         <div className="kalx-doc-instructions">
           <p>
-            <strong>Preview only.</strong> You're viewing this as promotions staff, not from
-            the DJ studio, so passes can't actually be given away from here. This is exactly
-            what the on-air DJ will see.
+            <strong>Preview only.</strong> You're not in the DJ studio, so nothing you do
+            here is recorded. Give Away and Tried work just as they do for the on-air DJ,
+            but no pass is given away and no attempt is saved.
           </p>
         </div>
       )}
@@ -246,7 +248,7 @@ const GiveawayPage = () => {
                   onMissingDjName={() => document.getElementById(DJ_NAME_INPUT_ID)?.focus()}
                   winFrequencyDays={show.venue.win_frequency_days}
                   requiresEmail={show.guest_list_requirements.requires_email_address}
-                  readOnly={isPromotionsPreview}
+                  preview={isPreview}
                   visitId={visitId}
                 />
               </div>

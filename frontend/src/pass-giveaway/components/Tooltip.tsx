@@ -25,7 +25,11 @@ const Tooltip = ({ text }: TooltipProps) => {
         type="button"
         className="tooltip-trigger"
         aria-label="More information"
-        onFocus={() => setPinned(true)}
+        // Only keyboard focus opens it: a tap on Android focuses the button
+        // just before the click, which would toggle it straight back closed.
+        onFocus={(e) => {
+          if (e.currentTarget.matches(':focus-visible')) setPinned(true);
+        }}
         onBlur={() => setPinned(false)}
         onClick={(e) => {
           e.stopPropagation();

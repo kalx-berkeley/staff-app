@@ -245,6 +245,76 @@ def test_get_dj_history(client, show, promotions_staff, db):
     assert passes[0]["given_away_by_dj"] == "DJ Test"
 
 
+@pytest.mark.parametrize("second_name", ["DJ Test", "dj test", " DJ TEST "])
+def test_giveaway_refuses_a_second_pair_for_the_show_this_shift_in_any_case(
+    client, show, db, second_name
+):
+    """A DJ can't give away a second pair for a show within 4 hours, in any case."""
+    first, second = (
+        db.query(Pass)
+        .filter(
+            Pass.show_id == show.id,
+            Pass.pass_type == "pair",
+            Pass.status == "available",
+        )
+        .limit(2)
+        .all()
+    )
+
+    def give_away(pass_item, dj_name):
+        return client.post(
+            f"/api/passes/{pass_item.id}/giveaway",
+            json={
+                "recipient_name": "John Doe",
+                "recipient_phone": "555-1234",
+                "given_away_by_dj": dj_name,
+            },
+            headers={"X-Forwarded-For": DJ_STUDIO_IP},
+        )
+
+    assert give_away(first, "DJ Test").status_code == 200
+    response = give_away(second, second_name)
+    assert response.status_code == 400
+    assert "within the last 4 hours" in response.json()["detail"]
+
+
+@pytest.mark.parametrize("typed_name", ["dj test", "DJ TEST", "  DJ Test  "])
+def test_get_dj_history_ignores_case_and_spaces(
+    client, show, promotions_staff, db, typed_name
+):
+    """The DJ's typed name finds their giveaways and pre-assignments in any case."""
+    given, preassigned = (
+        db.query(Pass)
+        .filter(
+            Pass.show_id == show.id,
+            Pass.pass_type == "pair",
+            Pass.status == "available",
+        )
+        .limit(2)
+        .all()
+    )
+    client.post(
+        f"/api/passes/{given.id}/giveaway",
+        json={
+            "recipient_name": "John Doe",
+            "recipient_phone": "555-1234",
+            "given_away_by_dj": "DJ Test",
+        },
+        headers={"X-Forwarded-For": DJ_STUDIO_IP},
+    )
+    preassigned.preassigned_dj = "DJ Test"
+    preassigned.preassigned_date = show.show_date
+    db.commit()
+
+    response = client.get(
+        "/api/passes/my-giveaways",
+        params={"dj_name": typed_name},
+        headers={"X-Forwarded-User": promotions_staff.email},
+    )
+    assert response.status_code == 200
+    assert sorted(p["id"] for p in response.json()) == sorted([given.id, preassigned.id])
+
+
 @pytest.mark.parametrize("show_status", ["closed", "draft", "deleted"])
 def test_get_dj_history_omits_preassigned_passes_on_unpublished_shows(
     client, show, promotions_staff, db, show_status

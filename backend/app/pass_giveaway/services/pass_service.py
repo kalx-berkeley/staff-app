@@ -2,6 +2,7 @@
 
 from datetime import datetime, date, timedelta, timezone
 from zoneinfo import ZoneInfo
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from fastapi import HTTPException, status
@@ -189,13 +190,15 @@ class PassService:
                         ),
                     )
 
-            # Enforce one giveaway per DJ per show within a 4-hour shift window
+            # Enforce one giveaway per DJ per show within a 4-hour shift window,
+            # comparing DJ names ignoring case and surrounding spaces
             four_hours_ago = datetime.now(timezone.utc) - DJ_SHOW_GIVEAWAY_WINDOW
             recent_dj_giveaway = (
                 db.query(OnAirWinner)
                 .filter(
                     OnAirWinner.show_id == pass_item.show_id,
-                    OnAirWinner.given_away_by_dj == giveaway_data.given_away_by_dj,
+                    func.lower(func.trim(OnAirWinner.given_away_by_dj))
+                    == giveaway_data.given_away_by_dj.strip().lower(),
                     OnAirWinner.created_at >= four_hours_ago,
                 )
                 .first()
@@ -446,18 +449,21 @@ class PassService:
         Returns:
             List of passes given away by or pre-assigned to the DJ
         """
-        from sqlalchemy import func, or_
+        from sqlalchemy import or_
 
+        # Names are compared ignoring case and surrounding spaces, as the DJ
+        # view does: the name a DJ types may differ in case from the one
+        # saved with a giveaway, and Clothespin saves the name's official
+        # spelling, which may differ in case from what the DJ typed.
+        name = dj_name.strip().lower()
         return (
             db.query(Pass)
             .join(Show, Pass.show_id == Show.id)
             .filter(
                 or_(
-                    (Pass.given_away_by_dj == dj_name) & (Pass.status == "given_away"),
-                    # Ignoring case, like removing a pre-assignment from the DJ
-                    # studio: Clothespin saves the name's official spelling,
-                    # which may differ in case from what the DJ typed.
-                    (func.lower(Pass.preassigned_dj) == dj_name.lower())
+                    (func.lower(func.trim(Pass.given_away_by_dj)) == name)
+                    & (Pass.status == "given_away"),
+                    (func.lower(func.trim(Pass.preassigned_dj)) == name)
                     & (Pass.status == "available")
                     & (Show.status == "published"),
                 )
