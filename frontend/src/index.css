@@ -30,6 +30,14 @@
   box-sizing: border-box;
 }
 
+/* Browsers give form controls their own font (monospace for textareas). */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
 body {
   margin: 0;
   min-width: 320px;
@@ -1251,14 +1259,20 @@ fieldset.radio-group legend {
   gap: 1rem 1.5rem;
 }
 
-.info-section .detail-fields dt {
-  margin-top: 0;
+.detail-fields dt {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6c757d;
 }
 
-.info-section .detail-fields dd {
-  margin-top: 0.25rem;
+.detail-fields dd {
+  margin: 0.25rem 0 0;
   font-size: 0.95rem;
   font-weight: 500;
+  color: #212529;
 }
 
 .detail-field--wide {
@@ -1816,8 +1830,135 @@ fieldset.radio-group legend {
 .add-item-form {
   display: flex;
   gap: 0.5rem;
-  align-items: flex-start;
+  align-items: center;
   margin-top: 0.5rem;
+}
+
+.add-item-form > .input-text,
+.add-item-form > .autocomplete-wrapper {
+  flex: 1;
+  max-width: 28rem;
+}
+
+/* Text inputs that sit outside a .form-group: same look as form fields. */
+.input-text,
+.add-item-form .autocomplete-wrapper input,
+.tag-input-row .autocomplete-wrapper input,
+.contact-fields input {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background-color: #fff;
+  color: #333;
+}
+
+.input-text:focus,
+.add-item-form .autocomplete-wrapper input:focus,
+.tag-input-row .autocomplete-wrapper input:focus,
+.contact-fields input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+}
+
+/* Specialty show page: one card per section (Spinitron, Owners, DJs). */
+.specialty-show-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 760px;
+}
+
+.info-section > .field-hint:first-of-type {
+  margin-top: 0;
+}
+
+.info-section .item-list-row {
+  justify-content: space-between;
+}
+
+/* Profile page: name and phone from Airtable. */
+.profile-info {
+  max-width: 32rem;
+  margin: 1rem 0 1.5rem;
+}
+
+/* Sub-sections of the venue and promoter forms (reps, contacts). */
+.form-section,
+.form-fieldset {
+  margin: 1.5rem 0 0;
+  padding: 1rem 0 0;
+  border: none;
+  border-top: 1px solid var(--border-color);
+  min-width: 0;
+}
+
+.form-section h4,
+.form-fieldset legend {
+  margin: 0 0 0.35rem;
+  padding: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* fieldset legends sit on the border; float them so they start below it. */
+.form-fieldset legend {
+  float: left;
+  width: 100%;
+}
+
+.form-fieldset legend + * {
+  clear: both;
+}
+
+.contact-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.contact-row:last-of-type {
+  margin-bottom: 0.75rem;
+}
+
+.contact-fields {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+@media (max-width: 600px) {
+  .contact-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Add / rename / remove guest form on a claimed staff pass. */
+.guest-claim-form {
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.75rem;
+  background: var(--light-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.guest-claim-info {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.guest-claim-form .form-group {
+  margin-bottom: 0.5rem;
+}
+
+.guest-claim-form .form-actions {
+  margin-top: 0.75rem;
 }
 
 /* DJ show document (KALX-style pass sheet) */
@@ -2668,12 +2809,15 @@ fieldset.radio-group legend {
   flex-wrap: wrap;
 }
 
-.audit-log-filters input {
+.audit-log-filters input,
+.audit-log-filters select {
   padding: 0.4rem 0.5rem;
   border: 1px solid var(--border-color);
   border-radius: 4px;
   font-size: 0.875rem;
   min-width: 180px;
+  background-color: #fff;
+  color: #333;
 }
 
 .audit-log-table-wrapper {

@@ -269,9 +269,9 @@ const SpecialtyShowDetail = () => {
       {successMessage && <div className="success-message">{successMessage}</div>}
       {formError && <div className="error-message">{formError}</div>}
 
-      <div className="show-detail-content">
+      <div className="specialty-show-sections">
         {/* Spinitron section */}
-        <div className="show-info-section">
+        <section className="info-section">
           <h3>Spinitron</h3>
           <p className="field-hint">
             The show's page in Spinitron, so the Staff Directory can tell this specialty show apart
@@ -324,10 +324,10 @@ const SpecialtyShowDetail = () => {
               </button>
             </div>
           )}
-        </div>
+        </section>
 
         {/* Owners section */}
-        <div className="show-info-section">
+        <section className="info-section">
           <h3>Owners</h3>
           <p className="field-hint">
             Owners can rename this show and manage its owners and DJs.
@@ -367,10 +367,10 @@ const SpecialtyShowDetail = () => {
               </button>
             </div>
           )}
-        </div>
+        </section>
 
         {/* DJs section */}
-        <div className="show-info-section">
+        <section className="info-section">
           <h3>DJs</h3>
           <p className="field-hint">
             DJs listed here can reserve on-air pass pairs for this specialty show.
@@ -460,7 +460,7 @@ const SpecialtyShowDetail = () => {
               </button>
             </div>
           )}
-        </div>
+        </section>
       </div>
     </div>
   );

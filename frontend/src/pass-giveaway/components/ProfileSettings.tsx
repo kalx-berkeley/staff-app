@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { usersAPI } from '../../common/api';
+import { formatPhone } from '../../common/utils';
 import { preferencesAPI, showsAPI, specialtyShowsAPI } from '../api';
 import GenreTagInput from './GenreTagInput';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
@@ -179,16 +180,16 @@ const ProfileSettings = ({ section }: { section: 'Promotions' | 'Staff' }) => {
         Your profile information is managed in Airtable. To update your name or
         phone number, please edit your record there.
       </p>
-      <div className="profile-info">
-        <div className="info-item">
-          <span className="info-label">Name</span>
-          <span className="info-value">{profile.name || '—'}</span>
+      <dl className="detail-fields profile-info">
+        <div className="detail-field">
+          <dt>Name</dt>
+          <dd>{profile.name || '—'}</dd>
         </div>
-        <div className="info-item">
-          <span className="info-label">Phone</span>
-          <span className="info-value">{profile.phone || '—'}</span>
+        <div className="detail-field">
+          <dt>Phone</dt>
+          <dd>{formatPhone(profile.phone)}</dd>
         </div>
-      </div>
+      </dl>
 
       <h3>Notification Settings</h3>
       {notifLoading ? (

@@ -70,7 +70,7 @@ describe('ProfileSettings', () => {
     });
 
     expect(screen.getByText('John Doe')).toBeInTheDocument();
-    expect(screen.getByText('555-123-4567')).toBeInTheDocument();
+    expect(screen.getByText('(555) 123-4567')).toBeInTheDocument();
   });
 
   it('should display profile name and phone for a staff profile', async () => {
@@ -83,7 +83,7 @@ describe('ProfileSettings', () => {
     });
 
     expect(screen.getByText('Jane Smith')).toBeInTheDocument();
-    expect(screen.getByText('555-987-6543')).toBeInTheDocument();
+    expect(screen.getByText('(555) 987-6543')).toBeInTheDocument();
   });
 
   it('warns that turning off email hides a released pass', async () => {
