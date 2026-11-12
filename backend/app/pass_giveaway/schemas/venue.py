@@ -3,6 +3,7 @@
 from typing import Literal
 
 from pydantic import BaseModel, Field, ConfigDict
+from app.models.venue import venue_sort_key
 from app.pass_giveaway.schemas.promoter import EmailAddressRequirement, PromoterResponse
 
 # Whether a show's venue is wheelchair accessible, "unknown" when nobody has
@@ -178,7 +179,10 @@ class VenueResponse(BaseModel):
             win_frequency_days=venue.win_frequency_days,
             parent_venue_id=venue.parent_venue_id,
             parent_venue_name=venue.parent.name if venue.parent else None,
-            children=[VenueRef(id=c.id, name=c.name) for c in venue.children],
+            children=[
+                VenueRef(id=c.id, name=c.name)
+                for c in sorted(venue.children, key=lambda c: venue_sort_key(c.name))
+            ],
             effective_win_frequency_days=venue.effective_win_frequency_days,
             win_frequency_shared_with=(
                 venue.sister_venue_names if venue.effective_win_frequency_days else []

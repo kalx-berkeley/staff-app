@@ -1,9 +1,22 @@
 """Venue model."""
 
+import re
 from datetime import datetime, timezone
 from sqlalchemy import Boolean, Column, Integer, String, Text, DateTime, ForeignKey, text
 from sqlalchemy.orm import relationship
 from app.database import Base
+
+_LEADING_THE = re.compile(r"^the\s+", re.IGNORECASE)
+
+
+def venue_sort_key(name: str) -> tuple[str, str]:
+    """Sort key for a venue name, ignoring case and a leading "The ".
+
+    "The Fox Theater" sorts as "fox theater". The name itself breaks ties so
+    the order is stable.
+    """
+    stripped = name.strip()
+    return (_LEADING_THE.sub("", stripped).casefold(), stripped)
 
 
 class Venue(Base):
@@ -111,7 +124,10 @@ class Venue(Base):
     def sister_venue_names(self) -> list[str]:
         """The names of the other venues sharing this venue's limit, sorted."""
         root = self.limit_venue
-        return sorted(v.name for v in [root, *root.children] if v.id != self.id)
+        return sorted(
+            (v.name for v in [root, *root.children] if v.id != self.id),
+            key=venue_sort_key,
+        )
 
     @property
     def requires_email_address(self) -> bool:

@@ -57,7 +57,7 @@ from app.models.promoter import Promoter
 from app.models.show import Show
 from app.models.show_attempt import ShowAttempt
 from app.models.staff import Staff
-from app.models.venue import Venue
+from app.models.venue import Venue, venue_sort_key
 from app.pass_giveaway.services.tracking import (
     GIVEAWAY_VISIT,
     GUEST_SESSION,
@@ -1278,8 +1278,8 @@ def build_venues(db: Session, window: Window, params: Params) -> list[dict]:
             "warnings": win_limits[venue_id]["warnings"],
             "overrides": win_limits[venue_id]["overrides"],
         })
-    main_rows.sort(key=lambda r: r["venue"].lower())
-    detail_rows.sort(key=lambda r: r["venue"].lower())
+    main_rows.sort(key=lambda r: venue_sort_key(r["venue"]))
+    detail_rows.sort(key=lambda r: venue_sort_key(r["venue"]))
     venue_link = "/venues/{venue_id}"
     return [
         table(

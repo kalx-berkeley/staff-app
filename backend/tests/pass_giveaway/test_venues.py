@@ -60,6 +60,27 @@ def test_list_venues(client: TestClient, test_promotions_staff):
     assert data[1]["name"] == "Venue B"
 
 
+def test_venue_lists_sort_ignoring_case_and_leading_the(
+    client: TestClient, test_promotions_staff
+):
+    """Venue lists ignore a leading "The " and case when sorting."""
+    headers = {"X-Forwarded-User": test_promotions_staff.email}
+    names = ["the Warfield", "Bottom of the Hill", "The Fillmore", "amoeba", "Theater X"]
+    for name in names:
+        client.post(
+            "/api/venues", json={"name": name, "address": "Address"}, headers=headers
+        )
+
+    expected = ["amoeba", "Bottom of the Hill", "The Fillmore", "Theater X", "the Warfield"]
+    response = client.get("/api/venues", headers=headers)
+    assert [v["name"] for v in response.json()] == expected
+
+    for v in response.json():
+        assert client.delete(f"/api/venues/{v['id']}", headers=headers).status_code == 204
+    response = client.get("/api/venues/deleted", headers=headers)
+    assert [v["name"] for v in response.json()] == expected
+
+
 def test_get_venue(client: TestClient, test_promotions_staff):
     """Test getting a specific venue."""
     # Create a venue

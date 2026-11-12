@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from fastapi import HTTPException, status
 import logging
 
-from app.models.venue import Venue
+from app.models.venue import Venue, venue_sort_key
 from app.models.venue_owner import VenueOwner
 from app.models.venue_contact import VenueContact
 from app.auth import current_staff_filter
@@ -357,12 +357,10 @@ class VenueService:
     @staticmethod
     def list_venues(db: Session, owner_staff_id: int | None = None) -> list[Venue]:
         try:
-            query = (
-                db.query(Venue).filter(Venue.deleted == False).order_by(Venue.name)
-            )  # noqa: E712
+            query = db.query(Venue).filter(Venue.deleted == False)  # noqa: E712
             if owner_staff_id is not None:
                 query = query.join(VenueOwner).filter(VenueOwner.staff_id == owner_staff_id)
-            return query.all()
+            return sorted(query.all(), key=lambda v: venue_sort_key(v.name))
         except SQLAlchemyError as e:
             logger.error(f"Database error listing venues: {str(e)}")
             raise HTTPException(
@@ -436,12 +434,8 @@ class VenueService:
     @staticmethod
     def list_deleted_venues(db: Session) -> list[Venue]:
         try:
-            return (
-                db.query(Venue)
-                .filter(Venue.deleted == True)  # noqa: E712
-                .order_by(Venue.name)
-                .all()
-            )
+            venues = db.query(Venue).filter(Venue.deleted == True).all()  # noqa: E712
+            return sorted(venues, key=lambda v: venue_sort_key(v.name))
         except SQLAlchemyError as e:
             logger.error(f"Database error listing deleted venues: {str(e)}")
             raise HTTPException(
