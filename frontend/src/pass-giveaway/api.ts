@@ -6,6 +6,7 @@
  */
 
 import apiClient, { handleAPIError } from '../common/api';
+import { pageContextQuery } from '../common/pageTime';
 import { addDjNameHeader } from './djName';
 import type {
   AgeRestriction,
@@ -1080,12 +1081,13 @@ export const onAirAPI = {
    *
    * Returns every current match on every call, including ones already
    * returned by a previous poll or to another open tab — see dismissSpinMatch.
+   * The query arguments are only for the access logs (see pageTime).
    *
    * @returns Promise resolving to the list of current matches (usually empty)
    */
   getSpinMatches: async (): Promise<SpinMatch[]> => {
     try {
-      const response = await apiClient.get<SpinMatch[]>('/dj/spin-matches');
+      const response = await apiClient.get<SpinMatch[]>(`/dj/spin-matches?${pageContextQuery()}`);
       return response.data;
     } catch (error) {
       return handleAPIError(error);

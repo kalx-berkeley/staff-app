@@ -160,7 +160,9 @@ describe('NewVersionBanner', () => {
       document.dispatchEvent(new Event('visibilitychange'));
     });
 
-    expect(fetch).toHaveBeenCalledWith('/api/version', { cache: 'no-store' });
+    expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/^\/api\/version\?page=/), {
+      cache: 'no-store',
+    });
     expect(screen.getByRole('status')).toHaveTextContent('new version');
   });
 });

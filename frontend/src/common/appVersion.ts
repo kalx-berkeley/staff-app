@@ -5,6 +5,8 @@
  * @module appVersion
  */
 
+import { pageContextQuery } from './pageTime';
+
 const RELOADED_FOR_VERSION_KEY = 'kalx_reloaded_for_version';
 const CHUNK_RELOAD_AT_KEY = 'kalx_chunk_reload_at';
 // A chunk still failing this soon after a reload isn't fixed by reloading again
@@ -18,11 +20,12 @@ export const builtVersion = (): string | undefined =>
  * The deployed version, or null when it can't be told, which is normal while
  * the backend restarts. This uses fetch, not the shared API client, because that
  * client answers a 401 by leaving the page, and a background check mustn't send
- * someone whose session expired off the page they're on.
+ * someone whose session expired off the page they're on. The query arguments
+ * are only for the access logs (see pageTime).
  */
 export const fetchDeployedVersion = async (): Promise<string | null> => {
   try {
-    const response = await fetch('/api/version', { cache: 'no-store' });
+    const response = await fetch(`/api/version?${pageContextQuery()}`, { cache: 'no-store' });
     if (!response.ok) return null;
     const { version } = await response.json();
     return typeof version === 'string' && version ? version : null;

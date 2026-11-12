@@ -4,6 +4,7 @@ import App from './App.tsx'
 import './index.css'
 import { AuthProvider } from './common/contexts/AuthContext.tsx'
 import { reloadAfterChunkLoadError } from './common/appVersion'
+import { trackPageChanges } from './common/pageTime'
 import { isSignInPath, signInTarget } from './common/signIn'
 
 // Apache has already signed the user in by the time /sign-in loads, so send
@@ -13,6 +14,8 @@ if (isSignInPath(window.location.pathname)) {
 } else {
   // A tab from before a deploy asking for a page's code that the deploy removed
   window.addEventListener('vite:preloadError', reloadAfterChunkLoadError)
+  // For the page and time on it that background polls send for the logs
+  trackPageChanges()
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <AuthProvider>
