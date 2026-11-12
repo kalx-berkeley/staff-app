@@ -1602,5 +1602,14 @@ def record_show_attempt(
     DJ giveaway page view only and cannot record a real attempt.
     """
     attempt = ShowService.record_attempt(db, show_id, body.dj_name)
+    audit_service.log_event(
+        db,
+        event_type="giveaway_attempted",
+        area=PASS_GIVEAWAY_AREA,
+        actor_role="dj",
+        entity_type="show",
+        entity_id=show_id,
+        details={"dj": body.dj_name, "event_name": attempt.show.event_name},
+    )
     record_visit_outcome(db, dj, body.visit_id, show_id, "tried", body.dj_name)
     return ShowAttemptResponse.model_validate(attempt)

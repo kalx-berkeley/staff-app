@@ -142,6 +142,22 @@ def test_pass_giveaway_audit(client: TestClient, db: Session, published_show):
     assert row.details["recipient_name"] == "Alice"
 
 
+def test_giveaway_attempt_audit(client: TestClient, db: Session, published_show):
+    response = client.post(
+        f"/api/shows/{published_show.id}/attempt",
+        json={"dj_name": "DJ Test"},
+        headers={"X-Forwarded-For": "192.168.1.100"},  # within default dj_studio_network
+    )
+    assert response.status_code == 200
+
+    row = db.query(AuditLog).filter(AuditLog.event_type == "giveaway_attempted").one()
+    assert row.area == PASS_GIVEAWAY_AREA
+    assert row.actor_role == "dj"
+    assert row.entity_type == "show"
+    assert row.entity_id == published_show.id
+    assert row.details == {"dj": "DJ Test", "event_name": published_show.event_name}
+
+
 # ---------------------------------------------------------------------------
 # Integration: scheduler expiry creates audit entry
 # ---------------------------------------------------------------------------
