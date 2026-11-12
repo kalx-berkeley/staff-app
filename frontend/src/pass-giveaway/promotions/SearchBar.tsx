@@ -1,39 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
 import { venuesAPI } from '../api';
 import type { ShowSummary, VenueResponse } from '../types';
+import type { ShowSearchFilters } from '../showListUrlState';
 
 interface SearchBarProps {
   shows: ShowSummary[];
   onSearch: (results: ShowSummary[]) => void;
-  externalGenre?: string;
-  onGenreChange?: (genre: string) => void;
+  /** The search, venue and genre filters, which the page keeps (in the URL). */
+  filters: ShowSearchFilters;
+  onFiltersChange: (changes: Partial<ShowSearchFilters>) => void;
 }
 
-const SearchBar = ({ shows, onSearch, externalGenre, onGenreChange }: SearchBarProps) => {
-  const [query, setQuery] = useState('');
-  const [venueId, setVenueId] = useState<number | ''>('');
-  const [genre, setGenre] = useState(externalGenre || '');
+const SearchBar = ({ shows, onSearch, filters, onFiltersChange }: SearchBarProps) => {
+  const { query, venueId, genre } = filters;
   const [venues, setVenues] = useState<VenueResponse[]>([]);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   const onSearchRef = useRef(onSearch);
   onSearchRef.current = onSearch;
-
-  const onGenreChangeRef = useRef(onGenreChange);
-  onGenreChangeRef.current = onGenreChange;
-
-  const prevExternalGenreRef = useRef(externalGenre);
-
-  useEffect(() => {
-    if (externalGenre !== prevExternalGenreRef.current) {
-      prevExternalGenreRef.current = externalGenre;
-      setGenre(externalGenre || '');
-    }
-  }, [externalGenre]);
-
-  useEffect(() => {
-    onGenreChangeRef.current?.(genre);
-  }, [genre]);
 
   useEffect(() => {
     venuesAPI.list().then(setVenues).catch(() => {});
@@ -65,9 +49,7 @@ const SearchBar = ({ shows, onSearch, externalGenre, onGenreChange }: SearchBarP
   }, [shows, query, genre, venueId]);
 
   const handleClear = () => {
-    setQuery('');
-    setVenueId('');
-    setGenre('');
+    onFiltersChange({ query: '', venueId: '', genre: '' });
   };
 
   const hasFilters = query.trim() || venueId !== '' || genre.trim();
@@ -84,7 +66,7 @@ const SearchBar = ({ shows, onSearch, externalGenre, onGenreChange }: SearchBarP
             id="search-query"
             placeholder="Search by event name, genre, or venue..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => onFiltersChange({ query: e.target.value })}
           />
           <button
             type="button"
@@ -102,7 +84,7 @@ const SearchBar = ({ shows, onSearch, externalGenre, onGenreChange }: SearchBarP
           <select
             id="search-venue"
             value={venueId}
-            onChange={(e) => setVenueId(e.target.value ? parseInt(e.target.value) : '')}
+            onChange={(e) => onFiltersChange({ venueId: e.target.value ? parseInt(e.target.value) : '' })}
           >
             <option value="">All Venues</option>
             {venues.map((venue) => (
@@ -120,7 +102,7 @@ const SearchBar = ({ shows, onSearch, externalGenre, onGenreChange }: SearchBarP
             id="search-genre"
             placeholder="Filter by genre..."
             value={genre}
-            onChange={(e) => setGenre(e.target.value)}
+            onChange={(e) => onFiltersChange({ genre: e.target.value })}
           />
         </div>
       </div>

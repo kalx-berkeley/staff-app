@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, cleanup } from '@testing-library/react';
 import { renderAndSettle } from '../../test/render';
 import { BrowserRouter } from 'react-router-dom';
 import ShowBrowser from './ShowBrowser';
@@ -169,6 +169,8 @@ describe('ShowBrowser', () => {
   ];
 
   beforeEach(() => {
+    // The filters live in the URL, which BrowserRouter shares between tests.
+    window.history.replaceState(null, '', '/');
     vi.clearAllMocks();
     vi.mocked(venuesAPI.list).mockResolvedValue([]);
     vi.mocked(autocompleteAPI.getDJNames).mockResolvedValue([]);
@@ -590,6 +592,25 @@ describe('ShowBrowser', () => {
         expect(screen.queryByText('Your Pre-assigned Shows')).not.toBeInTheDocument()
       );
       confirmSpy.mockRestore();
+    });
+
+    it('keeps the section hidden after leaving the page and coming back', async () => {
+      await renderWithDj();
+      const releaseButton = 'Release reservation for Jazz Night';
+      expect(screen.getByRole('button', { name: releaseButton })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Hide' }));
+
+      expect(await screen.findByRole('button', { name: 'Show' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: releaseButton })).not.toBeInTheDocument();
+      expect(window.location.search).toBe('?assigned=hidden');
+
+      // Coming back (for example with Back) renders the page again from the same URL.
+      cleanup();
+      await renderWithDj();
+
+      expect(screen.getByRole('button', { name: 'Show' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: releaseButton })).not.toBeInTheDocument();
     });
 
     it('keeps the reservation when the DJ cancels the confirmation', async () => {

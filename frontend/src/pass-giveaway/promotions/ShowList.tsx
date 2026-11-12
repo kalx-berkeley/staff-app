@@ -7,16 +7,14 @@ import SearchBar from './SearchBar';
 import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker } from '../components';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { compareVenueNames } from '../utils';
-import { formatCalendarDate, formatCalendarDateRange, pacificDateString } from '../../common/dateTime';
-
-type SortBy = 'date' | 'band' | 'venue' | 'published';
+import { formatCalendarDate, formatCalendarDateRange } from '../../common/dateTime';
+import { useShowListFilters, type ShowListFilterOptions, type ShowSort } from '../showListUrlState';
 
 const VIEW_MODE_KEY = 'kalx_promo_view_mode';
 
-const getDefaultDateFrom = (): string => {
-  const d = new Date();
-  d.setDate(d.getDate() - 30);
-  return pacificDateString(d);
+const FILTER_OPTIONS: ShowListFilterOptions<ShowStatus | 'all'> = {
+  statuses: ['all', 'draft', 'published', 'closed'],
+  defaultStatus: 'published',
 };
 
 const ShowList = () => {
@@ -24,18 +22,15 @@ const ShowList = () => {
 
   const [allShows, setAllShows] = useState<ShowSummary[]>([]);
   const [searchResults, setSearchResults] = useState<ShowSummary[]>([]);
-  const [showMineOnly, setShowMineOnly] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<ShowStatus | 'all'>('published');
-  const [selectedGenre, setSelectedGenre] = useState('');
-  const [currentGenre, setCurrentGenre] = useState('');
-  const [sortBy, setSortBy] = useState<SortBy>('date');
+  const [filters, updateFilters] = useShowListFilters(FILTER_OPTIONS);
+  const { mineOnly: showMineOnly, status: statusFilter, sort: sortBy, dateFrom, dateTo } = filters;
+  const addGenre = (g: string) =>
+    updateFilters({ genre: filters.genre ? filters.genre + ', ' + g : g });
   const [viewMode, setViewMode] = useState<'card' | 'compact'>(
     (localStorage.getItem(VIEW_MODE_KEY) as 'card' | 'compact') || 'card'
   );
-  const [dateFrom, setDateFrom] = useState(getDefaultDateFrom());
-  const [dateTo, setDateTo] = useState('');
 
   const baseShows = useMemo(
     () => showMineOnly ? allShows.filter((s) => s.is_mine) : allShows,
@@ -136,14 +131,14 @@ const ShowList = () => {
         <div className="mine-toggle">
           <button
             className={showMineOnly ? 'btn-primary' : 'btn-secondary'}
-            onClick={() => setShowMineOnly(true)}
+            onClick={() => updateFilters({ mineOnly: true })}
             title="Show only shows at venues where you are listed as a KALX promotions rep"
           >
             My Shows
           </button>
           <button
             className={!showMineOnly ? 'btn-primary' : 'btn-secondary'}
-            onClick={() => setShowMineOnly(false)}
+            onClick={() => updateFilters({ mineOnly: false })}
             title="Show all shows in the system"
           >
             All Shows
@@ -154,7 +149,7 @@ const ShowList = () => {
         </Link>
       </div>
 
-      <SearchBar shows={baseShows} onSearch={setSearchResults} externalGenre={selectedGenre} onGenreChange={setCurrentGenre} />
+      <SearchBar shows={baseShows} onSearch={setSearchResults} filters={filters} onFiltersChange={updateFilters} />
 
       <div className="status-filter">
         <span className="label-with-help" style={{ display: 'inline-flex' }}>
@@ -163,7 +158,7 @@ const ShowList = () => {
         </span>
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as ShowStatus | 'all')}
+          onChange={(e) => updateFilters({ status: e.target.value as ShowStatus | 'all' })}
         >
           <option value="all">All Shows</option>
           <option value="draft">Draft</option>
@@ -175,7 +170,7 @@ const ShowList = () => {
         <select
           id="promo-sort-by"
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as SortBy)}
+          onChange={(e) => updateFilters({ sort: e.target.value as ShowSort })}
         >
           <option value="date">Date (soonest first)</option>
           <option value="band">Band name</option>
@@ -188,7 +183,7 @@ const ShowList = () => {
           <DatePicker
             id="promo-date-from"
             value={dateFrom}
-            onChange={setDateFrom}
+            onChange={(value) => updateFilters({ dateFrom: value })}
             style={{ fontSize: '0.9rem' }}
           />
         </span>
@@ -197,7 +192,7 @@ const ShowList = () => {
           <DatePicker
             id="promo-date-to"
             value={dateTo}
-            onChange={setDateTo}
+            onChange={(value) => updateFilters({ dateTo: value })}
             style={{ fontSize: '0.9rem' }}
           />
         </span>
@@ -254,7 +249,7 @@ const ShowList = () => {
                     <span className={getStatusBadgeClass(show.status)}>{show.status}</span>
                   </td>
                   <td>
-                    <EnrichedShowName eventName={show.event_name} bands={show.bands ?? []} onGenreClick={(g) => setSelectedGenre(currentGenre ? currentGenre + ', ' + g : g)} />
+                    <EnrichedShowName eventName={show.event_name} bands={show.bands ?? []} onGenreClick={addGenre} />
                     {show.co_announce && (
                       <span className="co-announce-badge" style={{ marginLeft: '0.5rem' }}>📢 Co-Announce</span>
                     )}
@@ -310,7 +305,7 @@ const ShowList = () => {
                     <span
                       key={g}
                       className="show-genre show-genre-clickable"
-                      onClick={() => setSelectedGenre(g)}
+                      onClick={() => updateFilters({ genre: g })}
                       title="Click to filter by this genre"
                     >
                       {g}

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { renderAndSettle } from '../../test/render';
 import ShowBrowser from './ShowBrowser';
 import { showsAPI } from '../api';
@@ -68,6 +68,8 @@ const chooseFilter = (value: string) =>
 
 describe('Staff ShowBrowser status filter', () => {
   beforeEach(() => {
+    // The filters live in the URL, which BrowserRouter shares between tests.
+    window.history.replaceState(null, '', '/');
     vi.clearAllMocks();
     localStorage.clear();
     vi.mocked(showsAPI.list).mockResolvedValue(shows);
@@ -106,5 +108,48 @@ describe('Staff ShowBrowser status filter', () => {
     chooseFilter('available');
 
     expect(await screen.findByText('No shows have staff passes available at this time.')).toBeInTheDocument();
+  });
+});
+
+describe('Staff ShowBrowser filters in the URL', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.mocked(showsAPI.list).mockResolvedValue(shows);
+  });
+
+  it('keeps every filter after opening a show and going back', async () => {
+    const ShowPage = () => {
+      const navigate = useNavigate();
+      return <button onClick={() => navigate(-1)}>Back</button>;
+    };
+    await renderAndSettle(
+      <MemoryRouter initialEntries={['/staff/shows']}>
+        <Routes>
+          <Route path="/staff/shows" element={<ShowBrowser />} />
+          <Route path="/staff/shows/:id" element={<ShowPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    await screen.findByText('Has Passes');
+
+    chooseFilter('all');
+    fireEvent.change(screen.getByLabelText('Sort by:'), { target: { value: 'venue' } });
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'Closed' } });
+    fireEvent.change(screen.getByLabelText('Genre'), { target: { value: 'Rock' } });
+    fireEvent.change(screen.getByLabelText('To:'), { target: { value: '12/31/2031' } });
+    expect(await screen.findByText('Closed Show')).toBeInTheDocument();
+    expect(screen.queryByText('Has Passes')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('link', { name: 'View' })[0]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Back' }));
+
+    expect(await screen.findByText('Closed Show')).toBeInTheDocument();
+    expect(screen.queryByText('Has Passes')).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Filter by status' })).toHaveValue('all');
+    expect(screen.getByLabelText('Sort by:')).toHaveValue('venue');
+    expect(screen.getByLabelText('Search')).toHaveValue('Closed');
+    expect(screen.getByLabelText('Genre')).toHaveValue('Rock');
+    expect(screen.getByLabelText('To:')).toHaveValue('12/31/2031');
   });
 });

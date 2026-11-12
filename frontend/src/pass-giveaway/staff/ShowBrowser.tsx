@@ -7,7 +7,8 @@ import type { ShowSummary } from '../types';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { WHEELCHAIR_ACCESSIBLE_LABELS, compareVenueNames, formatShowRating, isMovieShow } from '../utils';
-import { formatCalendarDate, formatCalendarDateRange, pacificDateString } from '../../common/dateTime';
+import { formatCalendarDate, formatCalendarDateRange } from '../../common/dateTime';
+import { useShowListFilters, type ShowListFilterOptions, type ShowSort } from '../showListUrlState';
 
 const VIEW_MODE_KEY = 'kalx_staff_view_mode';
 
@@ -23,10 +24,9 @@ const claimableStaffCount = (show: ShowSummary): number =>
 const hasAvailableStaffPasses = (show: ShowSummary): boolean =>
   show.status === 'published' && !show.planned_close_passed && claimableStaffCount(show) > 0;
 
-const getDefaultDateFrom = (): string => {
-  const d = new Date();
-  d.setDate(d.getDate() - 30);
-  return pacificDateString(d);
+const FILTER_OPTIONS: ShowListFilterOptions<StatusFilter> = {
+  statuses: ['available', 'published', 'all'],
+  defaultStatus: 'published',
 };
 
 const ShowBrowser = () => {
@@ -36,15 +36,13 @@ const ShowBrowser = () => {
   const [filteredShows, setFilteredShows] = useState<ShowSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedGenre, setSelectedGenre] = useState('');
-  const [currentGenre, setCurrentGenre] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('published');
-  const [sortBy, setSortBy] = useState<'date' | 'band' | 'venue' | 'published'>('date');
+  const [filters, updateFilters] = useShowListFilters(FILTER_OPTIONS);
+  const { status: statusFilter, sort: sortBy, dateFrom, dateTo } = filters;
+  const addGenre = (g: string) =>
+    updateFilters({ genre: filters.genre ? filters.genre + ', ' + g : g });
   const [viewMode, setViewMode] = useState<'card' | 'compact'>(
     (localStorage.getItem(VIEW_MODE_KEY) as 'card' | 'compact') || 'card'
   );
-  const [dateFrom, setDateFrom] = useState(getDefaultDateFrom());
-  const [dateTo, setDateTo] = useState('');
 
   const loadShows = async () => {
     try {
@@ -135,7 +133,7 @@ const ShowBrowser = () => {
         </p>
       </div>
 
-      <SearchBar shows={allShows} onSearch={setFilteredShows} externalGenre={selectedGenre} onGenreChange={setCurrentGenre} />
+      <SearchBar shows={allShows} onSearch={setFilteredShows} filters={filters} onFiltersChange={updateFilters} />
 
       <div className="sort-controls">
         <span className="label-with-help" style={{ display: 'inline-flex' }}>
@@ -145,7 +143,7 @@ const ShowBrowser = () => {
         <select
           aria-label="Filter by status"
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          onChange={(e) => updateFilters({ status: e.target.value as StatusFilter })}
         >
           <option value="available">Shows With Staff Passes Available</option>
           <option value="published">Published Shows</option>
@@ -156,7 +154,7 @@ const ShowBrowser = () => {
         <select
           id="staff-sort-by"
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as 'date' | 'band' | 'venue' | 'published')}
+          onChange={(e) => updateFilters({ sort: e.target.value as ShowSort })}
         >
           <option value="date">Date (soonest first)</option>
           <option value="band">Band name</option>
@@ -169,7 +167,7 @@ const ShowBrowser = () => {
           <DatePicker
             id="staff-date-from"
             value={dateFrom}
-            onChange={setDateFrom}
+            onChange={(value) => updateFilters({ dateFrom: value })}
             style={{ fontSize: '0.9rem' }}
           />
         </span>
@@ -178,7 +176,7 @@ const ShowBrowser = () => {
           <DatePicker
             id="staff-date-to"
             value={dateTo}
-            onChange={setDateTo}
+            onChange={(value) => updateFilters({ dateTo: value })}
             style={{ fontSize: '0.9rem' }}
           />
         </span>
@@ -247,7 +245,7 @@ const ShowBrowser = () => {
                 return (
                   <tr key={show.id} className={[rowClass, show.co_announce ? 'show-row-co-announce' : ''].filter(Boolean).join(' ') || undefined}>
                     <td>
-                      <EnrichedShowName eventName={show.event_name} bands={show.bands ?? []} onGenreClick={(g) => setSelectedGenre(currentGenre ? currentGenre + ', ' + g : g)} />
+                      <EnrichedShowName eventName={show.event_name} bands={show.bands ?? []} onGenreClick={addGenre} />
                       {isClosed && <span className="status-badge status-closed" style={{ marginLeft: '0.5rem', fontSize: '0.7rem', verticalAlign: 'middle' }}>Closed</span>}
                       {show.co_announce && (
                         <span className="co-announce-badge" style={{ marginLeft: '0.5rem' }}>📢 Co-Announce</span>
@@ -296,7 +294,7 @@ const ShowBrowser = () => {
               >
                 <div className="show-card-header">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <h3 style={{ margin: 0 }}><EnrichedShowName eventName={show.event_name} bands={show.bands ?? []} onGenreClick={(g) => setSelectedGenre(currentGenre ? currentGenre + ', ' + g : g)} /></h3>
+                    <h3 style={{ margin: 0 }}><EnrichedShowName eventName={show.event_name} bands={show.bands ?? []} onGenreClick={addGenre} /></h3>
                     {isClosed && <span className="status-badge status-closed">Closed</span>}
                     {show.co_announce && <span className="co-announce-badge">📢 Co-Announce</span>}
                     {show.in_feature_bin && <FeatureBinBadge releases={show.feature_bin_releases} />}
@@ -307,7 +305,7 @@ const ShowBrowser = () => {
                       <span
                         key={g}
                         className="show-genre show-genre-clickable"
-                        onClick={() => setSelectedGenre(g)}
+                        onClick={() => updateFilters({ genre: g })}
                         title="Click to filter by this genre"
                       >
                         {g}

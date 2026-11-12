@@ -7,16 +7,16 @@ import type { ShowSummary, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, WHEELCHAIR_ACCESSIBLE_LABELS, compareVenueNames, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
-import { formatCalendarDate, formatCalendarDateRange, pacificDateString } from '../../common/dateTime';
+import { formatCalendarDate, formatCalendarDateRange } from '../../common/dateTime';
+import { useShowListFilters, type ShowListFilterOptions, type ShowSort } from '../showListUrlState';
 
 const VIEW_MODE_KEY = 'kalx_dj_view_mode';
 
 type StatusFilter = 'published' | 'can-give-away';
 
-const getDefaultDateFrom = (): string => {
-  const d = new Date();
-  d.setDate(d.getDate() - 30);
-  return pacificDateString(d);
+const FILTER_OPTIONS: ShowListFilterOptions<StatusFilter> = {
+  statuses: ['published', 'can-give-away'],
+  defaultStatus: 'published',
 };
 
 const getLocalTodayStr = (): string => {
@@ -34,19 +34,17 @@ const ShowBrowser = () => {
   const [filteredShows, setFilteredShows] = useState<ShowSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedGenre, setSelectedGenre] = useState('');
-  const [currentGenre, setCurrentGenre] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('published');
-  const [sortBy, setSortBy] = useState<'date' | 'band' | 'venue' | 'published'>('date');
+  const [filters, updateFilters] = useShowListFilters(FILTER_OPTIONS);
+  const { status: statusFilter, sort: sortBy, dateFrom, dateTo } = filters;
+  const showAssigned = !filters.hideAssigned;
+  const addGenre = (g: string) =>
+    updateFilters({ genre: filters.genre ? filters.genre + ', ' + g : g });
   const [djName, setDjName] = useState(localStorage.getItem(DJ_NAME_KEY) || '');
   // Every pass this DJ gave away, plus the available ones pre-assigned to them.
   const [myPasses, setMyPasses] = useState<PassResponse[]>([]);
-  const [showAssigned, setShowAssigned] = useState(true);
   const [viewMode, setViewMode] = useState<'card' | 'compact'>(
     (localStorage.getItem(VIEW_MODE_KEY) as 'card' | 'compact') || 'card'
   );
-  const [dateFrom, setDateFrom] = useState(getDefaultDateFrom());
-  const [dateTo, setDateTo] = useState('');
   // Bumped to re-fetch the DJ's pre-assigned passes after Clothespin or a release.
   const [assignedRefresh, setAssignedRefresh] = useState(0);
   const [clothespinShowId, setClothespinShowId] = useState<number | null>(null);
@@ -301,7 +299,7 @@ const ShowBrowser = () => {
         </div>
       )}
 
-      <SearchBar shows={allShows} onSearch={setFilteredShows} externalGenre={selectedGenre} onGenreChange={setCurrentGenre} />
+      <SearchBar shows={allShows} onSearch={setFilteredShows} filters={filters} onFiltersChange={updateFilters} />
 
       <div className="sort-controls">
         <span className="label-with-help" style={{ display: 'inline-flex' }}>
@@ -311,7 +309,7 @@ const ShowBrowser = () => {
         <select
           id="dj-status-filter"
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          onChange={(e) => updateFilters({ status: e.target.value as StatusFilter })}
         >
           <option value="published">Published Shows</option>
           <option value="can-give-away">Shows You Can Give Away Now</option>
@@ -321,7 +319,7 @@ const ShowBrowser = () => {
         <select
           id="dj-sort-by"
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as 'date' | 'band' | 'venue' | 'published')}
+          onChange={(e) => updateFilters({ sort: e.target.value as ShowSort })}
         >
           <option value="date">Date (soonest first)</option>
           <option value="band">Band name</option>
@@ -334,7 +332,7 @@ const ShowBrowser = () => {
           <DatePicker
             id="dj-date-from"
             value={dateFrom}
-            onChange={setDateFrom}
+            onChange={(value) => updateFilters({ dateFrom: value })}
             style={{ fontSize: '0.9rem' }}
           />
         </span>
@@ -343,7 +341,7 @@ const ShowBrowser = () => {
           <DatePicker
             id="dj-date-to"
             value={dateTo}
-            onChange={setDateTo}
+            onChange={(value) => updateFilters({ dateTo: value })}
             style={{ fontSize: '0.9rem' }}
           />
         </span>
@@ -373,7 +371,7 @@ const ShowBrowser = () => {
             <button
               className="btn-secondary"
               style={{ fontSize: '0.8rem', padding: '0.2rem 0.6rem' }}
-              onClick={() => setShowAssigned((v) => !v)}
+              onClick={() => updateFilters({ hideAssigned: showAssigned })}
             >
               {showAssigned ? 'Hide' : 'Show'}
             </button>
@@ -527,7 +525,7 @@ const ShowBrowser = () => {
                     className={[noPairs ? 'show-dimmed' : '', hasAssignment ? 'has-assignment' : '', show.co_announce ? 'show-row-co-announce' : ''].filter(Boolean).join(' ') || undefined}
                   >
                     <td>
-                      <EnrichedShowName eventName={show.event_name} bands={show.bands ?? []} onGenreClick={(g) => setSelectedGenre(currentGenre ? currentGenre + ', ' + g : g)} />
+                      <EnrichedShowName eventName={show.event_name} bands={show.bands ?? []} onGenreClick={addGenre} />
                       {hasAssignment && (
                         <span className="assignment-indicator" title="You have passes pre-assigned for this show"> ★</span>
                       )}
@@ -591,7 +589,7 @@ const ShowBrowser = () => {
               >
                 <div className="show-card-header">
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', flexWrap: 'wrap', flex: 1 }}>
-                    <h3 style={{ margin: 0 }}><EnrichedShowName eventName={show.event_name} bands={show.bands ?? []} onGenreClick={(g) => setSelectedGenre(currentGenre ? currentGenre + ', ' + g : g)} /></h3>
+                    <h3 style={{ margin: 0 }}><EnrichedShowName eventName={show.event_name} bands={show.bands ?? []} onGenreClick={addGenre} /></h3>
                     {show.co_announce && (
                       <span className="co-announce-badge">📢 Co-Announce</span>
                     )}
@@ -603,7 +601,7 @@ const ShowBrowser = () => {
                       <span
                         key={g}
                         className="show-genre show-genre-clickable"
-                        onClick={() => setSelectedGenre(g)}
+                        onClick={() => updateFilters({ genre: g })}
                         title="Click to filter by this genre"
                       >
                         {g}

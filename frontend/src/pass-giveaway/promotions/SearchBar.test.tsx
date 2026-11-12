@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { useState } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import SearchBar from './SearchBar';
+import type { ShowSearchFilters } from '../showListUrlState';
 import { venuesAPI } from '../api';
 import type { VenueResponse, ShowSummary } from '../types';
 
@@ -70,6 +72,29 @@ const makeShow = (overrides: Partial<ShowSummary> = {}): ShowSummary => ({
 const rockShow = makeShow({ id: 1, event_name: 'Rock Concert', genre: ['Rock'], venue: venueA });
 const jazzShow = makeShow({ id: 2, event_name: 'Jazz Night', genre: ['Jazz'], venue: venueB });
 
+const NO_FILTERS: ShowSearchFilters = { query: '', venueId: '', genre: '' };
+
+// The page keeps the filters; this stands in for it.
+const Harness = ({
+  shows,
+  onSearch,
+  initial = NO_FILTERS,
+}: {
+  shows: ShowSummary[];
+  onSearch: (results: ShowSummary[]) => void;
+  initial?: ShowSearchFilters;
+}) => {
+  const [filters, setFilters] = useState(initial);
+  return (
+    <SearchBar
+      shows={shows}
+      onSearch={onSearch}
+      filters={filters}
+      onFiltersChange={(changes) => setFilters((f) => ({ ...f, ...changes }))}
+    />
+  );
+};
+
 describe('SearchBar', () => {
   const mockOnSearch = vi.fn();
 
@@ -81,7 +106,7 @@ describe('SearchBar', () => {
   describe('Client-Side Filtering', () => {
     it('should call onSearch with all shows when no filters are applied', async () => {
       const shows = [rockShow, jazzShow];
-      render(<SearchBar shows={shows} onSearch={mockOnSearch} />);
+      render(<Harness shows={shows} onSearch={mockOnSearch} />);
 
       await waitFor(() => {
         expect(mockOnSearch).toHaveBeenCalledWith(shows);
@@ -90,7 +115,7 @@ describe('SearchBar', () => {
 
     it('should filter shows by freetext search', async () => {
       const shows = [rockShow, jazzShow];
-      render(<SearchBar shows={shows} onSearch={mockOnSearch} />);
+      render(<Harness shows={shows} onSearch={mockOnSearch} />);
 
       await waitFor(() => expect(screen.getByLabelText(/search/i)).toBeInTheDocument());
 
@@ -105,7 +130,7 @@ describe('SearchBar', () => {
 
     it('should filter shows by genre', async () => {
       const shows = [rockShow, jazzShow];
-      render(<SearchBar shows={shows} onSearch={mockOnSearch} />);
+      render(<Harness shows={shows} onSearch={mockOnSearch} />);
 
       await waitFor(() => expect(screen.getByLabelText(/genre/i)).toBeInTheDocument());
 
@@ -120,7 +145,7 @@ describe('SearchBar', () => {
 
     it('should filter shows by venue', async () => {
       const shows = [rockShow, jazzShow];
-      render(<SearchBar shows={shows} onSearch={mockOnSearch} />);
+      render(<Harness shows={shows} onSearch={mockOnSearch} />);
 
       await waitFor(() => expect(screen.getByLabelText(/venue/i)).toBeInTheDocument());
 
@@ -135,7 +160,7 @@ describe('SearchBar', () => {
 
     it('should return empty array when no shows match', async () => {
       const shows = [rockShow];
-      render(<SearchBar shows={shows} onSearch={mockOnSearch} />);
+      render(<Harness shows={shows} onSearch={mockOnSearch} />);
 
       await waitFor(() => expect(screen.getByLabelText(/search/i)).toBeInTheDocument());
 
@@ -150,7 +175,7 @@ describe('SearchBar', () => {
 
   describe('Clear Filters', () => {
     it('should show clear button when filters are applied', async () => {
-      render(<SearchBar shows={[rockShow]} onSearch={mockOnSearch} />);
+      render(<Harness shows={[rockShow]} onSearch={mockOnSearch} />);
 
       await waitFor(() => expect(screen.getByLabelText(/search/i)).toBeInTheDocument());
 
@@ -162,7 +187,7 @@ describe('SearchBar', () => {
     });
 
     it('should not show clear button when no filters are applied', async () => {
-      render(<SearchBar shows={[rockShow]} onSearch={mockOnSearch} />);
+      render(<Harness shows={[rockShow]} onSearch={mockOnSearch} />);
 
       await waitFor(() => expect(screen.getByLabelText(/search/i)).toBeInTheDocument());
 
@@ -171,7 +196,7 @@ describe('SearchBar', () => {
 
     it('should clear all filters when clear button is clicked', async () => {
       const shows = [rockShow, jazzShow];
-      render(<SearchBar shows={shows} onSearch={mockOnSearch} />);
+      render(<Harness shows={shows} onSearch={mockOnSearch} />);
 
       await waitFor(() => expect(screen.getByLabelText(/search/i)).toBeInTheDocument());
 
@@ -190,7 +215,7 @@ describe('SearchBar', () => {
 
   describe('Venue Dropdown', () => {
     it('should populate venue dropdown from API', async () => {
-      render(<SearchBar shows={[rockShow]} onSearch={mockOnSearch} />);
+      render(<Harness shows={[rockShow]} onSearch={mockOnSearch} />);
 
       await waitFor(() => {
         expect(screen.getByRole('option', { name: 'Venue A' })).toBeInTheDocument();
@@ -199,10 +224,10 @@ describe('SearchBar', () => {
     });
   });
 
-  describe('External Genre Prop', () => {
-    it('should apply external genre filter when provided', async () => {
+  describe('Initial Filters', () => {
+    it('should apply a genre filter the page passes in', async () => {
       const shows = [rockShow, jazzShow];
-      render(<SearchBar shows={shows} onSearch={mockOnSearch} externalGenre="Jazz" />);
+      render(<Harness shows={shows} onSearch={mockOnSearch} initial={{ ...NO_FILTERS, genre: 'Jazz' }} />);
 
       await waitFor(() => {
         const lastCall = mockOnSearch.mock.calls[mockOnSearch.mock.calls.length - 1][0] as ShowSummary[];
