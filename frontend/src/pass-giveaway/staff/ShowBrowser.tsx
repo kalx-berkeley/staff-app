@@ -10,6 +10,18 @@ import { WHEELCHAIR_ACCESSIBLE_LABELS, compareVenueNames, formatShowRating, isMo
 
 const VIEW_MODE_KEY = 'kalx_staff_view_mode';
 
+type StatusFilter = 'available' | 'published' | 'all';
+
+// Staff passes left to claim, counting ones only held for another staff
+// member's +1 guest (a claim takes those over).
+const claimableStaffCount = (show: ShowSummary): number =>
+  show.available_staff_count + show.guest_hold_staff_count;
+
+// A show whose staff passes can still be claimed: published, before its
+// planned close time, with at least one staff pass left.
+const hasAvailableStaffPasses = (show: ShowSummary): boolean =>
+  show.status === 'published' && !show.planned_close_passed && claimableStaffCount(show) > 0;
+
 const getDefaultDateFrom = (): string => {
   const d = new Date();
   d.setDate(d.getDate() - 30);
@@ -25,7 +37,7 @@ const ShowBrowser = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedGenre, setSelectedGenre] = useState('');
   const [currentGenre, setCurrentGenre] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'published'>('published');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('published');
   const [sortBy, setSortBy] = useState<'date' | 'band' | 'venue' | 'published'>('date');
   const [viewMode, setViewMode] = useState<'card' | 'compact'>(
     (localStorage.getItem(VIEW_MODE_KEY) as 'card' | 'compact') || 'card'
@@ -108,7 +120,9 @@ const ShowBrowser = () => {
   const statusFiltered =
     statusFilter === 'all'
       ? filteredShows
-      : filteredShows.filter((show) => show.status === 'published');
+      : statusFilter === 'available'
+        ? filteredShows.filter(hasAvailableStaffPasses)
+        : filteredShows.filter((show) => show.status === 'published');
 
   const sortedShows = [...statusFiltered].sort((a, b) => {
     if (sortBy === 'date') return a.show_date.localeCompare(b.show_date);
@@ -136,12 +150,14 @@ const ShowBrowser = () => {
       <div className="sort-controls">
         <span className="label-with-help" style={{ display: 'inline-flex' }}>
           <span>Filter by status:</span>
-          <Tooltip text="Published Shows: only active shows where staff passes can still be claimed. All Shows: includes closed shows where passes are no longer available." />
+          <Tooltip text="Shows With Staff Passes Available: only open shows with staff passes left to claim. Published Shows: every active show, including ones whose staff passes are all claimed. All Shows: also includes closed shows where passes are no longer available." />
         </span>
         <select
+          aria-label="Filter by status"
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as 'all' | 'published')}
+          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
         >
+          <option value="available">Shows With Staff Passes Available</option>
           <option value="published">Published Shows</option>
           <option value="all">All Shows</option>
         </select>
@@ -206,7 +222,13 @@ const ShowBrowser = () => {
         <div className="loading">Loading shows...</div>
       ) : sortedShows.length === 0 ? (
         <div className="no-shows">
-          <p>{statusFilter === 'published' ? 'No published shows available at this time.' : 'No shows available at this time.'}</p>
+          <p>
+            {statusFilter === 'available'
+              ? 'No shows have staff passes available at this time.'
+              : statusFilter === 'published'
+                ? 'No published shows available at this time.'
+                : 'No shows available at this time.'}
+          </p>
         </div>
       ) : viewMode === 'compact' ? (
         <div className="shows-list">
@@ -226,8 +248,7 @@ const ShowBrowser = () => {
             </thead>
             <tbody>
               {sortedShows.map((show) => {
-                const guestHoldCount = show.guest_hold_staff_count;
-                const adjustedAvailableCount = show.available_staff_count + guestHoldCount;
+                const adjustedAvailableCount = claimableStaffCount(show);
                 const hasClaimable = adjustedAvailableCount > 0;
                 const noPasses = !hasClaimable;
                 const isClosed = show.status === 'closed';
@@ -270,8 +291,7 @@ const ShowBrowser = () => {
       ) : (
         <div className="shows-grid">
           {sortedShows.map((show) => {
-            const guestHoldCount = show.guest_hold_staff_count;
-            const adjustedAvailableCount = show.available_staff_count + guestHoldCount;
+            const adjustedAvailableCount = claimableStaffCount(show);
             const hasClaimable = adjustedAvailableCount > 0;
             const noPasses = !hasClaimable;
             const isClosed = show.status === 'closed';

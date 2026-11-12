@@ -577,6 +577,13 @@ class ShowSummary(BaseModel):
             " unclaimed pair is left and the show's rules allow it"
         ),
     )
+    planned_close_passed: bool = Field(
+        default=False,
+        description=(
+            "Whether the show's planned close time has passed, after which passes"
+            " can't be claimed or given away even before the show is closed"
+        ),
+    )
     co_announce: bool
     published_at: UtcDatetime | None = None
     bands: list[ShowBandResponse] = Field(default_factory=list)

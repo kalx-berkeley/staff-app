@@ -65,6 +65,20 @@ class PassService:
     """Service for managing pass_item operations."""
 
     @staticmethod
+    def planned_close_passed(show: Show) -> bool:
+        """Whether *show* has a planned close time and it has passed (Pacific time).
+
+        After it, the backend refuses claims, giveaways and winner edits even if
+        the show hasn't been closed yet.
+        """
+        if not (show.planned_close_date and show.planned_close_time):
+            return False
+        planned_dt = datetime.combine(
+            show.planned_close_date, show.planned_close_time, tzinfo=_LA
+        )
+        return datetime.now(_LA) >= planned_dt
+
+    @staticmethod
     def create_passes_for_show(
         db: Session, show_id: int, num_pairs: int, staff_adjustment: int = 0
     ) -> list[Pass]:
@@ -177,18 +191,14 @@ class PassService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Cannot give away passes for closed shows",
                 )
-            if show and show.planned_close_date and show.planned_close_time:
-                planned_dt = datetime.combine(
-                    show.planned_close_date, show.planned_close_time, tzinfo=_LA
+            if show and PassService.planned_close_passed(show):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Cannot give away passes: the planned close time for this show"
+                        " has passed"
+                    ),
                 )
-                if datetime.now(_LA) >= planned_dt:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=(
-                            "Cannot give away passes: the planned close time for this show"
-                            " has passed"
-                        ),
-                    )
 
             # Enforce one giveaway per DJ per show within a 4-hour shift window,
             # comparing DJ names ignoring case and surrounding spaces
@@ -359,18 +369,14 @@ class PassService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot edit the winner for a closed show",
             )
-        if show.planned_close_date and show.planned_close_time:
-            planned_dt = datetime.combine(
-                show.planned_close_date, show.planned_close_time, tzinfo=_LA
+        if PassService.planned_close_passed(show):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Cannot edit the winner: the planned close time for this show"
+                    " has passed"
+                ),
             )
-            if datetime.now(_LA) >= planned_dt:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=(
-                        "Cannot edit the winner: the planned close time for this show"
-                        " has passed"
-                    ),
-                )
         return pass_item
 
     @staticmethod
@@ -808,18 +814,13 @@ class PassService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot claim passes for closed shows",
             )
-        if show and show.planned_close_date and show.planned_close_time:
-            planned_dt = datetime.combine(
-                show.planned_close_date, show.planned_close_time, tzinfo=_LA
+        if show and PassService.planned_close_passed(show):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Cannot claim passes: the planned close time for this show has passed"
+                ),
             )
-            if datetime.now(_LA) >= planned_dt:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=(
-                        "Cannot claim passes: the planned close time for this show has"
-                        " passed"
-                    ),
-                )
 
     @staticmethod
     def _assign_claim(pass_item: Pass, staff_id: int | None, now: datetime) -> None:

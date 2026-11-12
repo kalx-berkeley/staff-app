@@ -67,6 +67,7 @@ describe('ShowBrowser', () => {
       guest_hold_staff_count: 0,
       unassigned_pair_count: 3,
       clothespin_available: true,
+      planned_close_passed: false,
       co_announce: false,
       published_at: null,
       bands: [],
@@ -98,6 +99,7 @@ describe('ShowBrowser', () => {
       guest_hold_staff_count: 0,
       unassigned_pair_count: 2,
       clothespin_available: true,
+      planned_close_passed: false,
       co_announce: false,
       published_at: null,
       bands: [],
@@ -129,6 +131,7 @@ describe('ShowBrowser', () => {
       guest_hold_staff_count: 0,
       unassigned_pair_count: 1,
       clothespin_available: true,
+      planned_close_passed: false,
       co_announce: false,
       published_at: null,
       bands: [],
@@ -160,6 +163,7 @@ describe('ShowBrowser', () => {
       guest_hold_staff_count: 0,
       unassigned_pair_count: 0,
       clothespin_available: true,
+      planned_close_passed: false,
       co_announce: false,
       published_at: null,
       bands: [],
@@ -739,6 +743,91 @@ describe('ShowBrowser', () => {
         expect(within(row).queryByRole('link', { name: 'Give Away' })).not.toBeInTheDocument();
         expect(within(row).getByRole('link', { name: 'View' })).toBeInTheDocument();
         expect(within(row).getByText('(2 pre-assigned)')).toHaveAttribute('title', '2 pre-assigned to other DJs');
+      });
+    });
+
+    describe('the "Shows You Can Give Away Now" filter', () => {
+      const othersOnly: ShowSummary = {
+        ...mockShows[0],
+        id: 6,
+        event_name: 'Sold Out Sounds',
+        available_pair_count: 2,
+        unassigned_pair_count: 0,
+        clothespin_available: false,
+      };
+      const pastClose: ShowSummary = {
+        ...mockShows[0],
+        id: 7,
+        event_name: 'Too Late Tour',
+        clothespin_available: false,
+        planned_close_passed: true,
+      };
+      const noPairsLeft: ShowSummary = {
+        ...mockShows[0],
+        id: 8,
+        event_name: 'All Gone',
+        available_pair_count: 0,
+        unassigned_pair_count: 0,
+        clothespin_available: false,
+      };
+      // Rock Concert was given away by this DJ an hour ago.
+      const givenAwayRockConcert: PassResponse = {
+        ...reservedPass(),
+        id: 30,
+        show_id: 1,
+        status: 'given_away',
+        preassigned_dj: null,
+        preassigned_date: null,
+        given_away_by_dj: 'DJ Wolfman',
+        given_away_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      };
+
+      beforeEach(() => {
+        vi.mocked(showsAPI.list).mockResolvedValue([mockShows[0], mockShows[1], othersOnly, pastClose, noPairsLeft]);
+        vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([reservedPass(), givenAwayRockConcert]);
+      });
+
+      // The main show list, not "Your Pre-assigned Shows".
+      const mainList = () => document.querySelector('.show-browser > .shows-grid') as HTMLElement;
+
+      it('shows every published show until it is chosen', async () => {
+        await renderWithDj();
+
+        expect(screen.getByLabelText('Filter by status:')).toHaveValue('published');
+        for (const name of ['Rock Concert', 'Sold Out Sounds', 'Too Late Tour', 'All Gone']) {
+          expect(within(mainList()).getByText(name)).toBeInTheDocument();
+        }
+      });
+
+      it('hides shows the DJ gave away this shift, ones pre-assigned to others, past their planned close, or out of pairs', async () => {
+        await renderWithDj();
+
+        fireEvent.change(screen.getByLabelText('Filter by status:'), { target: { value: 'can-give-away' } });
+
+        await waitFor(() => expect(within(mainList()).queryByText('Rock Concert')).not.toBeInTheDocument());
+        expect(within(mainList()).getByText('Jazz Night')).toBeInTheDocument();
+        expect(within(mainList()).queryByText('Sold Out Sounds')).not.toBeInTheDocument();
+        expect(within(mainList()).queryByText('Too Late Tour')).not.toBeInTheDocument();
+        expect(within(mainList()).queryByText('All Gone')).not.toBeInTheDocument();
+      });
+
+      it('says so when no show is left', async () => {
+        vi.mocked(showsAPI.list).mockResolvedValue([mockShows[0], othersOnly, pastClose]);
+        vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([reservedPass(), givenAwayRockConcert]);
+        await renderWithDj();
+
+        fireEvent.change(screen.getByLabelText('Filter by status:'), { target: { value: 'can-give-away' } });
+
+        expect(await screen.findByText('No shows have pass pairs you can give away right now.')).toBeInTheDocument();
+      });
+
+      it('offers View Show for a show past its planned close time', async () => {
+        await renderWithDj();
+
+        const card = within(mainList()).getByText('Too Late Tour').closest('.show-card') as HTMLElement;
+        expect(within(card).queryByRole('link', { name: 'Give Away Passes' })).not.toBeInTheDocument();
+        expect(card).toHaveClass('show-card-dimmed');
+        expect(within(card.querySelector('.show-view-with-reason') as HTMLElement).getByRole('tooltip')).toHaveTextContent(/planned close time has passed/);
       });
     });
   });

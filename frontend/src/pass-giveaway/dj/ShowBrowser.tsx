@@ -12,6 +12,8 @@ import { getPreviewGiveaways } from './previewGiveaways';
 
 const VIEW_MODE_KEY = 'kalx_dj_view_mode';
 
+type StatusFilter = 'published' | 'can-give-away';
+
 const getDefaultDateFrom = (): string => {
   const d = new Date();
   d.setDate(d.getDate() - 30);
@@ -38,6 +40,7 @@ const ShowBrowser = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedGenre, setSelectedGenre] = useState('');
   const [currentGenre, setCurrentGenre] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('published');
   const [sortBy, setSortBy] = useState<'date' | 'band' | 'venue' | 'published'>('date');
   const [djName, setDjName] = useState(localStorage.getItem(DJ_NAME_KEY) || '');
   // Every pass this DJ gave away, plus the available ones pre-assigned to them.
@@ -144,8 +147,10 @@ const ShowBrowser = () => {
     `You already gave away a pass pair for this show this DJ shift. DJs can give away 1 pair per show every ${DJ_SHOW_GIVEAWAY_WINDOW_HOURS} hours.`;
   // Why a show has "View" instead of "Give Away", shown in the tooltip icon
   // beside the button (a title attribute doesn't work on phones).
-  const viewReason = (gaveAwayRecently: boolean, reservedForOthers: number) =>
-    gaveAwayRecently
+  const viewReason = (show: ShowSummary, gaveAwayRecently: boolean, reservedForOthers: number) =>
+    show.planned_close_passed
+      ? "This show's planned close time has passed, so its passes can't be given away."
+      : gaveAwayRecently
       ? recentGiveawayTitle
       : reservedForOthers > 0
         ? `Every pass pair left for this show is pre-assigned to ${djName.trim() ? 'other DJs' : 'DJs'}. Enter your DJ name above if one of them is yours.`
@@ -275,7 +280,18 @@ const ShowBrowser = () => {
     return `${startFmt} – ${endFmt}`;
   };
 
-  const sortedShows = [...filteredShows].sort((a, b) => {
+  // Whether this DJ can give away a pass pair for the show right now: the
+  // planned close time hasn't passed, a pair is left that isn't pre-assigned
+  // to another DJ, and they haven't given one away for it this DJ shift.
+  const canGiveAwayNow = (show: ShowSummary) =>
+    !show.planned_close_passed &&
+    pairCounts(show).yours > 0 &&
+    !recentGiveawayShowIds.has(show.id);
+
+  const statusFiltered =
+    statusFilter === 'can-give-away' ? filteredShows.filter(canGiveAwayNow) : filteredShows;
+
+  const sortedShows = [...statusFiltered].sort((a, b) => {
     if (sortBy === 'date') return a.show_date.localeCompare(b.show_date);
     if (sortBy === 'band') return a.event_name.localeCompare(b.event_name);
     if (sortBy === 'published') {
@@ -308,7 +324,20 @@ const ShowBrowser = () => {
       <SearchBar shows={allShows} onSearch={setFilteredShows} externalGenre={selectedGenre} onGenreChange={setCurrentGenre} />
 
       <div className="sort-controls">
-        <label htmlFor="dj-sort-by">Sort by:</label>
+        <span className="label-with-help" style={{ display: 'inline-flex' }}>
+          <label htmlFor="dj-status-filter">Filter by status:</label>
+          <Tooltip text="Shows You Can Give Away Now: only shows with a pass pair you can give away on air right now. Pairs pre-assigned to other DJs don't count, and neither do shows you already gave a pair away for this DJ shift. Enter your DJ name above so your own pre-assigned pairs and giveaways count. Published Shows: every active show." />
+        </span>
+        <select
+          id="dj-status-filter"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+        >
+          <option value="published">Published Shows</option>
+          <option value="can-give-away">Shows You Can Give Away Now</option>
+        </select>
+
+        <label htmlFor="dj-sort-by" style={{ marginLeft: '1rem' }}>Sort by:</label>
         <select
           id="dj-sort-by"
           value={sortBy}
@@ -484,7 +513,11 @@ const ShowBrowser = () => {
         <div className="loading">Loading shows...</div>
       ) : sortedShows.length === 0 ? (
         <div className="no-shows">
-          <p>No shows available at this time.</p>
+          <p>
+            {statusFilter === 'can-give-away'
+              ? 'No shows have pass pairs you can give away right now.'
+              : 'No shows available at this time.'}
+          </p>
         </div>
       ) : viewMode === 'compact' ? (
         <div className="shows-list">
@@ -506,7 +539,7 @@ const ShowBrowser = () => {
               {sortedShows.map((show) => {
                 const { yours, reservedForOthers } = pairCounts(show);
                 const gaveAwayRecently = recentGiveawayShowIds.has(show.id);
-                const noPairs = yours === 0 || gaveAwayRecently;
+                const noPairs = !canGiveAwayNow(show);
                 const hasAssignment = assignedShowIds.has(show.id);
                 return (
                   <tr
@@ -548,7 +581,7 @@ const ShowBrowser = () => {
                             <Link to={`/dj/shows/${show.id}`} className="btn-secondary btn-small">
                               View
                             </Link>
-                            <Tooltip text={viewReason(gaveAwayRecently, reservedForOthers)} />
+                            <Tooltip text={viewReason(show, gaveAwayRecently, reservedForOthers)} />
                           </span>
                         ) : (
                           <Link to={`/dj/shows/${show.id}`} className="btn-primary btn-small">
@@ -569,7 +602,7 @@ const ShowBrowser = () => {
           {sortedShows.map((show) => {
             const { yours, reservedForOthers } = pairCounts(show);
             const gaveAwayRecently = recentGiveawayShowIds.has(show.id);
-            const noPairs = yours === 0 || gaveAwayRecently;
+            const noPairs = !canGiveAwayNow(show);
             const hasAssignment = assignedShowIds.has(show.id);
             return (
               <div
@@ -653,7 +686,7 @@ const ShowBrowser = () => {
                       <Link to={`/dj/shows/${show.id}`} className="btn-secondary">
                         View Show
                       </Link>
-                      <Tooltip text={viewReason(gaveAwayRecently, reservedForOthers)} />
+                      <Tooltip text={viewReason(show, gaveAwayRecently, reservedForOthers)} />
                     </span>
                   ) : (
                     <Link to={`/dj/shows/${show.id}`} className="btn-primary">
