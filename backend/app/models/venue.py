@@ -17,6 +17,10 @@ class Venue(Base):
     show_sourcing_instructions = Column(Text, nullable=True)
     pass_call_instructions = Column(Text, nullable=True)
     win_frequency_days = Column(Integer, nullable=True)
+    # A venue that shares another venue's win frequency limit (for venues owned
+    # by the same company). The parent's limit applies to the parent and all
+    # its children; a child has no limit of its own. One level only.
+    parent_venue_id = Column(Integer, ForeignKey("venues.id"), nullable=True)
     # "music" or "movie_theater". Shows at a movie theater have a movie rating
     # instead of an age restriction.
     venue_type = Column(String, nullable=False, default="music", server_default="music")
@@ -83,6 +87,30 @@ class Venue(Base):
         "VenueContact", back_populates="venue", cascade="all, delete-orphan"
     )
     on_air_winners = relationship("OnAirWinner", back_populates="venue")
+    parent = relationship("Venue", remote_side=[id], back_populates="children")
+    children = relationship("Venue", back_populates="parent", order_by="Venue.name")
+
+    @property
+    def limit_venue(self) -> "Venue":
+        """The venue whose win frequency limit applies: the parent, or itself."""
+        return self.parent if self.parent is not None else self
+
+    @property
+    def effective_win_frequency_days(self) -> int | None:
+        """The win frequency limit that applies to this venue's shows."""
+        return self.limit_venue.win_frequency_days
+
+    @property
+    def family_venue_ids(self) -> list[int]:
+        """The IDs of the venues sharing this venue's win frequency limit."""
+        root = self.limit_venue
+        return [root.id, *(c.id for c in root.children)]
+
+    @property
+    def sister_venue_names(self) -> list[str]:
+        """The names of the other venues sharing this venue's limit, sorted."""
+        root = self.limit_venue
+        return sorted(v.name for v in [root, *root.children] if v.id != self.id)
 
     @property
     def requires_email_address(self) -> bool:

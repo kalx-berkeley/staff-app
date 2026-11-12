@@ -132,12 +132,19 @@ export interface VenueContactResponse extends VenueContactCreate {
   id: number;
 }
 
+export interface VenueRef {
+  id: number;
+  name: string;
+}
+
 export interface VenueCreate {
   name: string;
   address: string;
   show_sourcing_instructions?: string | null;
   pass_call_instructions?: string | null;
   win_frequency_days?: number | null;
+  // Share this venue's win frequency limit with (be a child of) another venue
+  parent_venue_id?: number | null;
   venue_type?: VenueType;
   default_wheelchair_accessible?: WheelchairAccessible | null;
   default_age_restriction?: AgeRestriction | null;
@@ -166,6 +173,8 @@ export interface VenueUpdate {
   show_sourcing_instructions?: string | null;
   pass_call_instructions?: string | null;
   win_frequency_days?: number | null;
+  // Share this venue's win frequency limit with (be a child of) another venue
+  parent_venue_id?: number | null;
   venue_type?: VenueType;
   default_wheelchair_accessible?: WheelchairAccessible | null;
   default_age_restriction?: AgeRestriction | null;
@@ -195,6 +204,16 @@ export interface VenueResponse {
   show_sourcing_instructions: string | null;
   pass_call_instructions: string | null;
   win_frequency_days: number | null;
+  // The venue whose win frequency limit this venue shares, if any
+  parent_venue_id?: number | null;
+  parent_venue_name?: string | null;
+  // The venues that share this venue's limit
+  children?: VenueRef[];
+  // The limit that applies to this venue's shows: the parent's, or its own.
+  // In a show's venue, win_frequency_days is this limit too.
+  effective_win_frequency_days?: number | null;
+  // The other venues that limit applies to, when there is one
+  win_frequency_shared_with?: string[];
   venue_type: VenueType;
   default_wheelchair_accessible: WheelchairAccessible | null;
   default_age_restriction: AgeRestriction | null;
@@ -780,6 +799,8 @@ export interface WinnerEligibility {
   eligible: boolean;
   last_win_show?: string;
   last_win_date?: string;
+  // The venue of the earlier win, which may be a venue sharing this one's limit
+  last_win_venue?: string | null;
   days_since?: number;
   required_days?: number;
   reason?: string | null;

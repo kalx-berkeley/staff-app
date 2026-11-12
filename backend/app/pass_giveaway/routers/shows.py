@@ -366,7 +366,14 @@ def _build_show_response(
             "name": show.venue.name,
             "address": show.venue.address,
             "pass_call_instructions": show.venue.pass_call_instructions,
-            "win_frequency_days": show.venue.win_frequency_days,
+            # The limit that applies, which may be shared with sister venues
+            "win_frequency_days": show.venue.effective_win_frequency_days,
+            "effective_win_frequency_days": show.venue.effective_win_frequency_days,
+            "win_frequency_shared_with": (
+                show.venue.sister_venue_names
+                if show.venue.effective_win_frequency_days
+                else []
+            ),
             "default_wheelchair_accessible": show.venue.default_wheelchair_accessible,
             "venue_type": show.venue.venue_type,
             "default_age_restriction": show.venue.default_age_restriction,

@@ -28,6 +28,9 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   const [showSourcingInstructions, setShowSourcingInstructions] = useState('');
   const [passCallInstructions, setPassCallInstructions] = useState('');
   const [winFrequencyDays, setWinFrequencyDays] = useState('');
+  // The venue whose win frequency limit this one shares, if any
+  const [parentVenueId, setParentVenueId] = useState<number | null>(null);
+  const [allVenues, setAllVenues] = useState<VenueResponse[]>([]);
   const [defaultWheelchair, setDefaultWheelchair] = useState<'' | WheelchairAccessible>('');
   const [venueType, setVenueType] = useState<VenueType>('music');
   const [defaultAgeRestriction, setDefaultAgeRestriction] = useState<'' | AgeRestriction>('');
@@ -75,6 +78,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
       setDefaultOnAirDescription(venue.default_on_air_description || '');
       setDefaultCallerSpecialInstructions(venue.default_caller_special_instructions || '');
       setWinFrequencyDays(venue.win_frequency_days != null ? String(venue.win_frequency_days) : '');
+      setParentVenueId(venue.parent_venue_id ?? null);
       setDefaultWheelchair(venue.default_wheelchair_accessible ?? '');
       setVenueType(venue.venue_type ?? 'music');
       setDefaultAgeRestriction((venue.default_age_restriction ?? '') as '' | AgeRestriction);
@@ -126,13 +130,20 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
       setEmailToName(map);
     }).catch(() => {});
     promotersAPI.list().then(setPromotersList).catch(() => {});
+    venuesAPI.list().then(setAllVenues).catch(() => {});
   }, []);
+
+  // A venue can share the limit of a venue that doesn't share another's
+  const parentOptions = allVenues.filter((v) => !v.parent_venue_id && v.id !== venue?.id);
+  const parentVenue = allVenues.find((v) => v.id === parentVenueId);
+  const parentVenueName = parentVenue?.name ?? venue?.parent_venue_name ?? 'The other venue';
+  const childVenues = venue?.children ?? [];
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
     if (!name.trim()) newErrors.name = 'Venue name is required';
     if (!address.trim()) newErrors.address = 'Address is required';
-    if (winFrequencyDays.trim() && (isNaN(Number(winFrequencyDays)) || Number(winFrequencyDays) < 1)) {
+    if (parentVenueId == null && winFrequencyDays.trim() && (isNaN(Number(winFrequencyDays)) || Number(winFrequencyDays) < 1)) {
       newErrors.winFrequencyDays = 'Must be a positive number';
     }
     if (defaultNumPassPairs.trim() && (isNaN(Number(defaultNumPassPairs)) || Number(defaultNumPassPairs) < 1 || Number(defaultNumPassPairs) > 5)) {
@@ -206,7 +217,9 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
     if (!validateForm()) return;
     setSubmitting(true);
 
-    const winDays = winFrequencyDays.trim() ? Number(winFrequencyDays) : null;
+    // A venue sharing another's limit has no limit of its own
+    const winDays =
+      parentVenueId == null && winFrequencyDays.trim() ? Number(winFrequencyDays) : null;
     const sourcingInstructions = showSourcingInstructions.trim() || null;
     const instructions = passCallInstructions.trim() || null;
     const defaultWheelchairValue = defaultWheelchair || null;
@@ -231,6 +244,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           show_sourcing_instructions: sourcingInstructions,
           pass_call_instructions: instructions,
           win_frequency_days: winDays,
+          parent_venue_id: parentVenueId,
           venue_type: venueType,
           default_wheelchair_accessible: defaultWheelchairValue,
           default_age_restriction: defaultAgeValue,
@@ -260,6 +274,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           show_sourcing_instructions: sourcingInstructions,
           pass_call_instructions: instructions,
           win_frequency_days: winDays,
+          parent_venue_id: parentVenueId,
           venue_type: venueType,
           default_wheelchair_accessible: defaultWheelchairValue,
           default_age_restriction: defaultAgeValue,
@@ -476,25 +491,75 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
 
           <div className="form-group">
             <div className="label-with-help">
-              <label htmlFor="venue-win-frequency">Win Frequency Limit (days)</label>
-              <Tooltip text="Stops the same listener from winning on-air passes to this venue too often. When a DJ records a winner, the caller's phone number is checked against earlier on-air winners at this venue. If their last win was for a show fewer than this many days from this show's date, the DJ sees a warning with the earlier show and its date. The DJ can still override the warning and give the passes away, and each override is recorded in the audit log. The days count between show dates, not the days the passes were won. Staff passes don't count. Leave blank for no limit." />
+              <label htmlFor="venue-win-limit-parent">Shares a win frequency limit with</label>
+              <Tooltip text="For venues owned by the same company, which don't want the same listener winning at one of their venues and then another. Choose the venue whose Win Frequency Limit this venue shares: a caller's earlier on-air wins at either venue, or at any other venue sharing that limit, count against it. This venue then has no limit of its own." />
             </div>
-            <input
-              type="number"
-              id="venue-win-frequency"
-              value={winFrequencyDays}
-              onChange={(e) => setWinFrequencyDays(e.target.value)}
-              className={errors.winFrequencyDays ? 'input-error' : ''}
-              disabled={submitting}
-              min="1"
-              placeholder="e.g. 30 (leave blank for no limit)"
-            />
-            {errors.winFrequencyDays && (
-              <span className="field-error">{errors.winFrequencyDays}</span>
+            <select
+              id="venue-win-limit-parent"
+              value={parentVenueId ?? ''}
+              onChange={(e) => setParentVenueId(e.target.value ? Number(e.target.value) : null)}
+              disabled={submitting || childVenues.length > 0}
+            >
+              <option value="">None</option>
+              {parentOptions.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+              {parentVenueId != null && !parentOptions.some((v) => v.id === parentVenueId) && (
+                <option value={parentVenueId}>{parentVenueName}</option>
+              )}
+            </select>
+            {childVenues.length > 0 && (
+              <span className="field-hint">
+                Other venues share this venue&apos;s limit, so it can&apos;t share another
+                venue&apos;s.
+              </span>
             )}
-            <span className="field-hint">
-              Minimum days between wins for the same phone number at this venue.
-            </span>
+          </div>
+
+          <div className="form-group">
+            <div className="label-with-help">
+              <label htmlFor="venue-win-frequency">Win Frequency Limit (days)</label>
+              <Tooltip text="Stops the same listener from winning on-air passes to this venue too often. When a DJ records a winner, the caller's phone number is checked against earlier on-air winners at this venue and any venues sharing its limit. If their last win was for a show fewer than this many days from this show's date, the DJ sees a warning with the earlier show, its venue and its date. The DJ can still override the warning and give the passes away, and each override is recorded in the audit log. The days count between show dates, not the days the passes were won. Staff passes don't count. Leave blank for no limit." />
+            </div>
+            {parentVenueId != null ? (
+              <p className="field-hint" id="venue-win-frequency">
+                {parentVenue?.win_frequency_days
+                  ? `Uses ${parentVenueName}'s limit: ${parentVenue.win_frequency_days} days`
+                  : `${parentVenueName} has no win frequency limit`}
+              </p>
+            ) : (
+              <>
+                <input
+                  type="number"
+                  id="venue-win-frequency"
+                  value={winFrequencyDays}
+                  onChange={(e) => setWinFrequencyDays(e.target.value)}
+                  className={errors.winFrequencyDays ? 'input-error' : ''}
+                  disabled={submitting}
+                  min="1"
+                  placeholder="e.g. 30 (leave blank for no limit)"
+                />
+                {errors.winFrequencyDays && (
+                  <span className="field-error">{errors.winFrequencyDays}</span>
+                )}
+                <span className="field-hint">
+                  Minimum days between wins for the same phone number at this venue.
+                </span>
+              </>
+            )}
+            {childVenues.length > 0 && (
+              <p className="field-hint">
+                Also applies to:{' '}
+                {childVenues.map((c, i) => (
+                  <span key={c.id}>
+                    {i > 0 && ', '}
+                    <a href={`/pass-giveaway/promotions/venues/${c.id}/edit`}>{c.name}</a>
+                  </span>
+                ))}
+              </p>
+            )}
           </div>
 
           <div className="form-row">

@@ -1174,81 +1174,51 @@ def check_winner_eligibility(
     """
     Check if a phone number is eligible to win passes at this venue.
 
-    Returns eligibility status and, if ineligible, details about when the person
-    last won at this venue. ``exclude_pass_id`` ignores that pass's own winner,
-    for checking a corrected phone number.
+    Returns eligibility status and, if ineligible, details about when and where
+    the person last won at this venue or a venue sharing its win frequency
+    limit. ``exclude_pass_id`` ignores that pass's own winner, for checking a
+    corrected phone number.
     """
     venue = db.query(Venue).filter(Venue.id == venue_id).first()
     if not venue:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Venue not found")
 
-    if not venue.win_frequency_days:
-        return {"eligible": True, "reason": None}
-
-    # Get the show date for comparison
     current_show = db.query(Show).filter(Show.id == show_id).first()
     if not current_show:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Show not found")
 
-    # Look for a previous win at this venue by this phone number
-    previous = (
-        db.query(OnAirWinner)
-        .join(Show, Show.id == OnAirWinner.show_id)
-        .filter(
-            OnAirWinner.venue_id == venue_id,
-            OnAirWinner.recipient_phone == normalize_phone(phone),
-            *([OnAirWinner.pass_id != exclude_pass_id] if exclude_pass_id else []),
-        )
-        .order_by(Show.show_date.desc())
-        .first()
+    conflict = PassService.find_win_frequency_conflict(
+        db, current_show, phone, exclude_pass_id=exclude_pass_id
     )
-
-    if not previous:
+    if not conflict:
         return {"eligible": True, "reason": None}
 
-    prev_show = db.query(Show).filter(Show.id == previous.show_id).first()
-    if not prev_show:
-        return {"eligible": True, "reason": None}
-
-    current_show_date = current_show.show_date
-    prev_show_date = prev_show.show_date
-
-    # Handle both date and datetime objects
-    if hasattr(current_show_date, "date"):
-        current_show_date = current_show_date.date()
-    if hasattr(prev_show_date, "date"):
-        prev_show_date = prev_show_date.date()
-
-    days_between = (current_show_date - prev_show_date).days
-    if days_between < 0:
-        days_between = -days_between
-
-    if days_between < venue.win_frequency_days:
-        audit_service.log_event(
-            db,
-            event_type="winner_frequency_warning",
-            area=PASS_GIVEAWAY_AREA,
-            actor_role="dj",
-            entity_type="venue",
-            entity_id=venue_id,
-            details={
-                "recipient_phone": phone,
-                "show_id": show_id,
-                "days_since_last_win": days_between,
-                "required_days": venue.win_frequency_days,
-                "last_win_show": prev_show.event_name,
-                "last_win_date": str(prev_show_date),
-            },
-        )
-        return {
-            "eligible": False,
-            "last_win_show": prev_show.event_name,
-            "last_win_date": str(prev_show_date),
-            "days_since": days_between,
-            "required_days": venue.win_frequency_days,
-        }
-
-    return {"eligible": True, "reason": None}
+    audit_service.log_event(
+        db,
+        event_type="winner_frequency_warning",
+        area=PASS_GIVEAWAY_AREA,
+        actor_role="dj",
+        entity_type="venue",
+        entity_id=venue_id,
+        details={
+            "recipient_phone": phone,
+            "show_id": show_id,
+            "days_since_last_win": conflict["days_since_last_win"],
+            "required_days": conflict["required_days"],
+            "last_win_show": conflict["last_win_show"],
+            "last_win_date": conflict["last_win_date"],
+            "last_win_venue_id": conflict["last_win_venue_id"],
+            "last_win_venue": conflict["last_win_venue"],
+        },
+    )
+    return {
+        "eligible": False,
+        "last_win_show": conflict["last_win_show"],
+        "last_win_date": conflict["last_win_date"],
+        "last_win_venue": conflict["last_win_venue"],
+        "days_since": conflict["days_since_last_win"],
+        "required_days": conflict["required_days"],
+    }
 
 
 @router.delete("/passes/{pass_id}/preassign", response_model=PassResponse)

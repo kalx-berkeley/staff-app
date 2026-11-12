@@ -250,3 +250,9 @@ export function venueSortName(name: string): string {
 export function compareVenueNames(a: string, b: string): number {
   return venueSortName(a).localeCompare(venueSortName(b), undefined, { sensitivity: 'base' });
 }
+
+/** Join names as "A", "A and B" or "A, B and C". */
+export const joinNames = (names: string[]): string =>
+  names.length <= 1
+    ? names.join('')
+    : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;

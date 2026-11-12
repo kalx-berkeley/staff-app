@@ -513,7 +513,7 @@ def _repeat_winners_table(wins: list[_Win], window: Window, metric_id: str) -> d
 def _same_name_table(
     wins: list[_Win],
     window: Window,
-    frequency_days: dict[int, Optional[int]],
+    win_limits: dict[int, tuple[int, Optional[int]]],
     metric_id: str,
 ) -> dict:
     by_name: dict[str, list[_Win]] = defaultdict(list)
@@ -527,7 +527,7 @@ def _same_name_table(
         if len(phones) < 2 or not any(window.contains(w.won_at) for w in ws):
             continue
         ws.sort(key=lambda w: w.won_at)
-        flagged = _bypasses_win_limit(ws, frequency_days)
+        flagged = _bypasses_win_limit(ws, win_limits)
         emails_by_phone: dict[str, set[str]] = defaultdict(set)
         for w in ws:
             if w.email:
@@ -572,17 +572,17 @@ def _same_name_table(
             column("name", "Name"),
             column("phones", "Phone numbers", "number"),
             column("wins", "Wins", "number"),
-            column("same_venue_in_limit", "Same venue within its win limit"),
+            column("same_venue_in_limit", "Same venue or sister venue within limit"),
             column("same_email", "Same email on different numbers"),
         ],
         rows,
         explanation(
             "On-air winners whose name has two or more different phone numbers. A name is"
             " listed when it has a win in the window, and is compared with its wins at"
-            " any time. It's highlighted when two of its numbers won at the same venue"
-            " within that venue's win limit (days between show dates), which is how"
-            " someone could get around the limit. The same email on different numbers"
-            " is stronger evidence that it's one person.",
+            " any time. It's highlighted when two of its numbers won at the same venue,"
+            " or at venues sharing a win limit, within that limit (days between show"
+            " dates), which is how someone could get around the limit. The same email"
+            " on different numbers is stronger evidence that it's one person.",
             "When the pass pair was given away (for the window); all wins for comparison",
             includes=(
                 "Names match ignoring case, spacing and punctuation, with no fuzzy"
@@ -594,13 +594,25 @@ def _same_name_table(
     )
 
 
-def _bypasses_win_limit(ws: list[_Win], frequency_days: dict[int, Optional[int]]) -> bool:
-    """Whether two different phones won at one venue within its win limit."""
-    by_venue: dict[int, list[_Win]] = defaultdict(list)
+def _bypasses_win_limit(
+    ws: list[_Win], win_limits: dict[int, tuple[int, Optional[int]]]
+) -> bool:
+    """
+    Whether two different phones won within one win limit.
+
+    Args:
+        ws: One name's wins
+        win_limits: Venue ID → (the ID of the venue whose limit applies, that
+            limit). Venues sharing a limit are compared as one venue.
+    """
+    by_family: dict[int, list[_Win]] = defaultdict(list)
+    limits: dict[int, Optional[int]] = {}
     for w in ws:
-        by_venue[w.venue_id].append(w)
-    for venue_id, vws in by_venue.items():
-        limit = frequency_days.get(venue_id)
+        family_id, limit = win_limits.get(w.venue_id, (w.venue_id, None))
+        by_family[family_id].append(w)
+        limits[family_id] = limit
+    for family_id, vws in by_family.items():
+        limit = limits[family_id]
         if not limit:
             continue
         for i, a in enumerate(vws):
@@ -634,8 +646,14 @@ def _repeat_share(wins: list[_Win], window: Window) -> dict:
     )
 
 
-def _venue_frequency_days(db: Session) -> dict[int, Optional[int]]:
-    return dict(db.query(Venue.id, Venue.win_frequency_days).all())
+def _venue_win_limits(db: Session) -> dict[int, tuple[int, Optional[int]]]:
+    """Venue ID → (the ID of the venue whose win limit applies, that limit)."""
+    rows = db.query(Venue.id, Venue.parent_venue_id, Venue.win_frequency_days).all()
+    own = {venue_id: days for venue_id, _, days in rows}
+    return {
+        venue_id: (parent_id, own.get(parent_id)) if parent_id else (venue_id, days)
+        for venue_id, parent_id, days in rows
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -897,9 +915,7 @@ def build_overview(db: Session, window: Window, params: Params) -> list[dict]:
         ),
         _repeat_winners_table(wins, window, "top_repeat_winners"),
         _repeat_share(wins, window),
-        _same_name_table(
-            wins, window, _venue_frequency_days(db), "same_name_different_phones"
-        ),
+        _same_name_table(wins, window, _venue_win_limits(db), "same_name_different_phones"),
     ]
 
     given_by_dj = Counter(normalize_dj_name(p.given_away_by_dj) for p in giveaways)
@@ -1446,7 +1462,10 @@ def build_venue(db: Session, window: Window, params: Params) -> list[dict]:
         ),
         _repeat_winners_table(wins, window, "venue_repeat_winners"),
         _same_name_table(
-            wins, window, {venue.id: venue.win_frequency_days}, "venue_same_name"
+            wins,
+            window,
+            {venue.id: (venue.id, venue.effective_win_frequency_days)},
+            "venue_same_name",
         ),
         _who_posts_table(db, shows, venue),
         stat(

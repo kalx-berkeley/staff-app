@@ -3,7 +3,7 @@ import { passesAPI, showsAPI, venuePassesAPI } from '../api';
 import { Tooltip } from '../components';
 import type { PassResponse, GiveawayData, WinnerEligibility } from '../types';
 import type { APIError } from '../../common/types';
-import { findRecentDjGiveaway } from '../utils';
+import { findRecentDjGiveaway, joinNames } from '../utils';
 import { getPreviewGiveaways, recordPreviewGiveaway } from './previewGiveaways';
 
 interface PassGiveawayFormProps {
@@ -16,6 +16,8 @@ interface PassGiveawayFormProps {
   /** Called when Give Away or Tried is clicked without a DJ name, so the page can focus its DJ Name box. */
   onMissingDjName?: () => void;
   winFrequencyDays?: number | null;
+  // The other venues that share this venue's win frequency limit
+  winFrequencySharedWith?: string[];
   requiresEmail?: boolean;
   /**
    * Preview mode, for someone who can't really record a giveaway: the form
@@ -31,7 +33,7 @@ export type GiveawayOutcome = 'given_away' | 'tried';
 
 type WinnerFields = Omit<GiveawayData, 'given_away_by_dj' | 'visit_id'>;
 
-const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, winFrequencyDays, requiresEmail, preview, visitId }: PassGiveawayFormProps) => {
+const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, winFrequencyDays, winFrequencySharedWith = [], requiresEmail, preview, visitId }: PassGiveawayFormProps) => {
   const [formData, setFormData] = useState<WinnerFields>({
     recipient_name: '',
     recipient_phone: '',
@@ -181,7 +183,8 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
 
       {winFrequencyDays && (
         <p className="win-frequency-notice">
-          This venue limits winners to once every <strong>{winFrequencyDays} days</strong>. You
+          This venue limits winners to once every <strong>{winFrequencyDays} days</strong>
+          {winFrequencySharedWith.length > 0 && <> (shared with {joinNames(winFrequencySharedWith)})</>}. You
           don&apos;t need to do anything — the system will automatically check the caller&apos;s
           phone number against past winners when you enter it below.
         </p>
@@ -209,7 +212,7 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
             <div className="label-with-help">
               <label htmlFor="recipient_phone">Winner Phone *</label>
               {winFrequencyDays ? (
-                <Tooltip text="The phone number is checked against this venue's win history. If this caller won recently, a warning will appear and you may need to override." />
+                <Tooltip text="The phone number is checked against the win history of this venue and any venues sharing its limit. If this caller won recently, a warning will appear and you may need to override." />
               ) : null}
             </div>
             <input
@@ -225,7 +228,9 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
             {winEligibility?.eligible === false && (
               <div className="win-ineligible-warning">
                 <strong>Warning:</strong> This caller already won passes to{' '}
-                <em>{winEligibility.last_win_show}</em> (show date: {winEligibility.last_win_date}),
+                <em>{winEligibility.last_win_show}</em>
+                {winEligibility.last_win_venue && <> at <strong>{winEligibility.last_win_venue}</strong></>}{' '}
+                (show date: {winEligibility.last_win_date}),
                 which is only {winEligibility.days_since} day{winEligibility.days_since !== 1 ? 's' : ''} before this show.
                 The venue requires at least {winEligibility.required_days} days between show dates.
                 <label className="override-label">

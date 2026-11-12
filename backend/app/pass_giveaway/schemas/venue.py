@@ -40,6 +40,13 @@ class VenueContactResponse(BaseModel):
     phone: str | None = None
 
 
+class VenueRef(BaseModel):
+    """Another venue, by ID and name."""
+
+    id: int
+    name: str
+
+
 class VenueCreate(BaseModel):
     """Schema for creating a new venue."""
 
@@ -52,6 +59,8 @@ class VenueCreate(BaseModel):
     show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     win_frequency_days: int | None = None
+    # Share this venue's win frequency limit with (be a child of) another venue
+    parent_venue_id: int | None = None
     venue_type: VenueType = "music"
     default_wheelchair_accessible: WheelchairAccessible | None = None
     default_age_restriction: str | None = None
@@ -84,6 +93,7 @@ class VenueUpdate(BaseModel):
     show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     win_frequency_days: int | None = None
+    parent_venue_id: int | None = None
     venue_type: VenueType | None = None
     default_wheelchair_accessible: WheelchairAccessible | None = None
     default_age_restriction: str | None = None
@@ -117,6 +127,15 @@ class VenueResponse(BaseModel):
     show_sourcing_instructions: str | None = None
     pass_call_instructions: str | None = None
     win_frequency_days: int | None = None
+    # The venue whose limit this venue shares, if any
+    parent_venue_id: int | None = None
+    parent_venue_name: str | None = None
+    # The venues that share this venue's limit
+    children: list[VenueRef] = Field(default_factory=list)
+    # The limit that applies to this venue's shows: the parent's, or its own
+    effective_win_frequency_days: int | None = None
+    # The other venues that limit applies to, when there is a limit
+    win_frequency_shared_with: list[str] = Field(default_factory=list)
     venue_type: VenueType = "music"
     default_wheelchair_accessible: WheelchairAccessible | None = None
     default_age_restriction: str | None = None
@@ -154,6 +173,13 @@ class VenueResponse(BaseModel):
             show_sourcing_instructions=venue.show_sourcing_instructions,
             pass_call_instructions=venue.pass_call_instructions,
             win_frequency_days=venue.win_frequency_days,
+            parent_venue_id=venue.parent_venue_id,
+            parent_venue_name=venue.parent.name if venue.parent else None,
+            children=[VenueRef(id=c.id, name=c.name) for c in venue.children],
+            effective_win_frequency_days=venue.effective_win_frequency_days,
+            win_frequency_shared_with=(
+                venue.sister_venue_names if venue.effective_win_frequency_days else []
+            ),
             venue_type=venue.venue_type,
             default_wheelchair_accessible=venue.default_wheelchair_accessible,
             default_age_restriction=venue.default_age_restriction,

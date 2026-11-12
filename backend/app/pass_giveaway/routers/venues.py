@@ -119,7 +119,11 @@ def delete_venue(
     """Soft-delete a venue by marking it deleted (promotions staff only)."""
     venue = VenueService.get_venue(db, venue_id)
     venue_name = venue.name
-    VenueService.delete_venue(db, venue_id)
+    former_parent = VenueService.delete_venue(db, venue_id)
+    details: dict = {"name": venue_name}
+    if former_parent is not None:
+        details["unlinked_from_parent_venue_id"] = former_parent.id
+        details["unlinked_from_parent_venue"] = former_parent.name
     audit_service.log_event(
         db,
         event_type="venue_deleted",
@@ -128,7 +132,7 @@ def delete_venue(
         actor_role="promotions",
         entity_type="venue",
         entity_id=venue_id,
-        details={"name": venue_name},
+        details=details,
     )
 
 
@@ -288,6 +292,7 @@ def update_venue(
                 existing.default_caller_special_instructions
             ),
             "win_frequency_days": existing.win_frequency_days,
+            "parent_venue_id": existing.parent_venue_id,
         }
 
     venue = VenueService.update_venue(db, venue_id, venue_data)
@@ -300,6 +305,7 @@ def update_venue(
         "default_on_air_description": venue.default_on_air_description,
         "default_caller_special_instructions": venue.default_caller_special_instructions,
         "win_frequency_days": venue.win_frequency_days,
+        "parent_venue_id": venue.parent_venue_id,
     }
     changed_fields = {
         k: {"before": before[k], "after": after[k]}

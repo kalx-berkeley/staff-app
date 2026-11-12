@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import VenueForm from './VenueForm';
 import { showsAPI, venuesAPI } from '../api';
 import type { VenueResponse } from '../types';
@@ -10,6 +10,7 @@ vi.mock('../api', () => ({
     create: vi.fn(),
     update: vi.fn(),
     listPromotionsStaff: vi.fn().mockResolvedValue([]),
+    list: vi.fn().mockResolvedValue([]),
   },
   promotersAPI: {
     list: vi.fn().mockResolvedValue([]),
@@ -222,6 +223,81 @@ describe('VenueForm', () => {
           address: '456 Old St',
         }));
       });
+    });
+  });
+
+  describe('Shared win frequency limit', () => {
+    const elmwood = makeVenue({ id: 2, name: 'Elmwood', win_frequency_days: 30 });
+    const albany = makeVenue({ id: 3, name: 'Albany', parent_venue_id: 2 });
+
+    beforeEach(() => {
+      vi.mocked(venuesAPI.list).mockResolvedValue([makeVenue(), elmwood, albany]);
+    });
+
+    it('offers venues that do not share another venue\'s limit, minus itself', async () => {
+      render(<VenueForm venue={makeVenue()} onClose={mockOnClose} onSuccess={mockOnSuccess} />);
+      await act(async () => {});
+
+      const select = screen.getByLabelText(/shares a win frequency limit with/i);
+      const options = within(select).getAllByRole('option').map((o) => o.textContent);
+      expect(options).toEqual(['None', 'Elmwood']);
+    });
+
+    it('replaces the limit with the parent\'s and saves the parent', async () => {
+      vi.mocked(venuesAPI.update).mockResolvedValue(makeVenue());
+      render(
+        <VenueForm
+          venue={makeVenue({ win_frequency_days: 20 })}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+
+      fireEvent.change(screen.getByLabelText(/shares a win frequency limit with/i), {
+        target: { value: '2' },
+      });
+      expect(screen.getByText("Uses Elmwood's limit: 30 days")).toBeInTheDocument();
+      expect(screen.queryByRole('spinbutton', { name: /win frequency limit/i })).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /update/i }));
+      await waitFor(() => {
+        expect(venuesAPI.update).toHaveBeenCalledWith(1, expect.objectContaining({
+          parent_venue_id: 2,
+          win_frequency_days: null,
+        }));
+      });
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalled());
+    });
+
+    it('says when the parent has no limit', async () => {
+      vi.mocked(venuesAPI.list).mockResolvedValue([makeVenue({ id: 2, name: 'Elmwood' })]);
+      render(
+        <VenueForm
+          venue={makeVenue({ parent_venue_id: 2, parent_venue_name: 'Elmwood' })}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+      expect(screen.getByText('Elmwood has no win frequency limit')).toBeInTheDocument();
+    });
+
+    it('lists the venues sharing a parent\'s limit and locks its own choice', async () => {
+      render(
+        <VenueForm
+          venue={makeVenue({ id: 2, name: 'Elmwood', children: [{ id: 3, name: 'Albany' }] })}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+
+      expect(screen.getByLabelText(/shares a win frequency limit with/i)).toBeDisabled();
+      expect(screen.getByRole('link', { name: 'Albany' })).toHaveAttribute(
+        'href',
+        '/pass-giveaway/promotions/venues/3/edit'
+      );
     });
   });
 

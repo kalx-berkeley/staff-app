@@ -36,6 +36,68 @@ def _resolve_promotions_staff_id(db: Session, email: str) -> int | None:
     return staff.id if staff else None
 
 
+def _check_win_limit_parent(
+    db: Session,
+    venue: Venue | None,
+    parent_venue_id: int | None,
+    win_frequency_days: int | None,
+) -> None:
+    """
+    Refuse an invalid shared win frequency limit.
+
+    A venue can share the limit of one parent venue, one level deep: the parent
+    must be a live venue other than this one, with no parent of its own, and a
+    venue with children can't become a child. A child has no limit of its own.
+
+    Args:
+        db: Database session
+        venue: The venue being updated, or None when creating one
+        parent_venue_id: The parent the venue will have after the change
+        win_frequency_days: The venue's own limit after the change
+
+    Raises:
+        HTTPException: 400 explaining which rule the change breaks
+    """
+    if parent_venue_id is None:
+        return
+    if win_frequency_days is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "A venue that shares another venue's win frequency limit can't have"
+                " its own limit"
+            ),
+        )
+    if venue is not None and parent_venue_id == venue.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A venue can't share its own win frequency limit",
+        )
+    parent = db.query(Venue).filter(Venue.id == parent_venue_id).first()
+    if parent is None or parent.deleted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The venue to share a win frequency limit with wasn't found",
+        )
+    if parent.parent_venue_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"{parent.name} already shares {parent.parent.name}'s win frequency"
+                f" limit. Choose {parent.parent.name} instead."
+            ),
+        )
+    if venue is not None and venue.children:
+        names = ", ".join(c.name for c in venue.children)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"{venue.name} can't share another venue's win frequency limit"
+                f" because these venues share its limit: {names}"
+            ),
+        )
+
+
 class VenueService:
     """Service for managing venue operations."""
 
@@ -68,12 +130,17 @@ class VenueService:
                     detail=f"Venue with name '{venue_data.name}' already exists",
                 )
 
+            _check_win_limit_parent(
+                db, None, venue_data.parent_venue_id, venue_data.win_frequency_days
+            )
+
             venue = Venue(
                 name=venue_data.name,
                 address=venue_data.address,
                 show_sourcing_instructions=venue_data.show_sourcing_instructions,
                 pass_call_instructions=venue_data.pass_call_instructions,
                 win_frequency_days=venue_data.win_frequency_days,
+                parent_venue_id=venue_data.parent_venue_id,
                 venue_type=venue_data.venue_type,
                 default_wheelchair_accessible=venue_data.default_wheelchair_accessible,
                 default_age_restriction=venue_data.default_age_restriction,
@@ -167,6 +234,23 @@ class VenueService:
                         detail=f"Venue with name '{venue_data.name}' already exists",
                     )
 
+            fields = venue_data.model_fields_set
+            new_parent_id = (
+                venue_data.parent_venue_id
+                if "parent_venue_id" in fields
+                else venue.parent_venue_id
+            )
+            if "win_frequency_days" in fields:
+                new_win_days = venue_data.win_frequency_days
+            elif "parent_venue_id" in fields:
+                # Choosing a parent clears the venue's own limit
+                new_win_days = None
+            else:
+                new_win_days = venue.win_frequency_days
+            _check_win_limit_parent(db, venue, new_parent_id, new_win_days)
+            venue.parent_venue_id = new_parent_id
+            venue.win_frequency_days = new_win_days
+
             if venue_data.name is not None:
                 venue.name = venue_data.name
             if venue_data.address is not None:
@@ -175,8 +259,6 @@ class VenueService:
                 venue.show_sourcing_instructions = venue_data.show_sourcing_instructions
             if "pass_call_instructions" in venue_data.model_fields_set:
                 venue.pass_call_instructions = venue_data.pass_call_instructions
-            if "win_frequency_days" in venue_data.model_fields_set:
-                venue.win_frequency_days = venue_data.win_frequency_days
             if venue_data.venue_type is not None:
                 venue.venue_type = venue_data.venue_type
             if "default_wheelchair_accessible" in venue_data.model_fields_set:
@@ -286,9 +368,33 @@ class VenueService:
             )
 
     @staticmethod
-    def delete_venue(db: Session, venue_id: int) -> None:
+    def delete_venue(db: Session, venue_id: int) -> Venue | None:
+        """
+        Soft-delete a venue.
+
+        A venue that other venues share a win frequency limit with can't be
+        deleted. A venue that shares another venue's limit is unlinked from it,
+        so its past wins stop counting against that venue's limit.
+
+        Args:
+            db: Database session
+            venue_id: Venue ID
+
+        Returns:
+            The venue it was unlinked from, or None
+        """
         try:
             venue = VenueService.get_venue(db, venue_id)
+
+            if venue.children:
+                names = ", ".join(c.name for c in venue.children)
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "Cannot delete venue: these venues share its win frequency"
+                        f" limit and must be changed first: {names}"
+                    ),
+                )
 
             blocking_shows = (
                 db.query(Show)
@@ -308,9 +414,12 @@ class VenueService:
                     ),
                 )
 
+            former_parent = venue.parent
+            venue.parent_venue_id = None
             venue.deleted = True
             venue.updated_at = datetime.now(timezone.utc)
             db.commit()
+            return former_parent
         except HTTPException:
             raise
         except SQLAlchemyError as e:

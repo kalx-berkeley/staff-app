@@ -265,7 +265,10 @@ class PassService:
         db: Session, show: Show, phone: str, exclude_pass_id: int | None = None
     ) -> dict | None:
         """
-        Find a previous win at the show's venue that breaks its win-frequency limit.
+        Find a previous win that breaks the show's venue's win-frequency limit.
+
+        The limit is the venue's own, or the one it shares with its parent
+        venue. Wins at every venue sharing that limit count.
 
         Args:
             db: Database session
@@ -278,13 +281,14 @@ class PassService:
             The override details to audit-log, or None when the phone is eligible
         """
         venue = show.venue
-        if not venue or not venue.win_frequency_days:
+        limit = venue.effective_win_frequency_days if venue else None
+        if not limit:
             return None
         query = (
             db.query(OnAirWinner)
             .join(Show, Show.id == OnAirWinner.show_id)
             .filter(
-                OnAirWinner.venue_id == venue.id,
+                OnAirWinner.venue_id.in_(venue.family_venue_ids),
                 OnAirWinner.recipient_phone == normalize_phone(phone),
             )
         )
@@ -301,13 +305,16 @@ class PassService:
         if hasattr(prev_date, "date"):
             prev_date = prev_date.date()
         days_between = abs((current_date - prev_date).days)
-        if days_between >= venue.win_frequency_days:
+        if days_between >= limit:
             return None
         return {
             "recipient_phone": phone,
             "days_since_last_win": days_between,
-            "required_days": venue.win_frequency_days,
+            "required_days": limit,
             "last_win_show": prev_show.event_name,
+            "last_win_date": str(prev_date),
+            "last_win_venue_id": prev_show.venue_id,
+            "last_win_venue": prev_show.venue.name if prev_show.venue else None,
             "venue_id": venue.id,
         }
 

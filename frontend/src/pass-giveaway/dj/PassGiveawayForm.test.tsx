@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import PassGiveawayForm from './PassGiveawayForm';
-import { passesAPI, showsAPI } from '../api';
+import { passesAPI, showsAPI, venuePassesAPI } from '../api';
 import type { PassResponse } from '../types';
 import { getPreviewGiveaways } from './previewGiveaways';
 
@@ -418,6 +418,51 @@ describe('PassGiveawayForm', () => {
         expect(nameInput).toBeDisabled();
         expect(phoneInput).toBeDisabled();
       });
+    });
+  });
+
+  describe('shared win frequency limits', () => {
+    it('names the sister venues in the limit notice', () => {
+      render(
+        <PassGiveawayForm
+          pass={mockPass}
+          venueId={1}
+          onSuccess={mockOnSuccess}
+          djName="DJ Mike"
+          winFrequencyDays={30}
+          winFrequencySharedWith={['Albany', 'Elmwood']}
+        />
+      );
+      expect(screen.getByText(/limits winners to once every/i)).toHaveTextContent(
+        'This venue limits winners to once every 30 days (shared with Albany and Elmwood).'
+      );
+    });
+
+    it('leaves the notice alone when the limit is the venue\'s own', () => {
+      render(
+        <PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" winFrequencyDays={30} />
+      );
+      expect(screen.getByText(/limits winners to once every/i)).not.toHaveTextContent('shared with');
+    });
+
+    it('names the venue of the earlier win in the warning', async () => {
+      vi.mocked(venuePassesAPI.checkWinner).mockResolvedValue({
+        eligible: false,
+        last_win_show: 'Elmwood Show',
+        last_win_date: '2026-06-01',
+        last_win_venue: 'Elmwood',
+        days_since: 19,
+        required_days: 30,
+      });
+      render(
+        <PassGiveawayForm pass={mockPass} venueId={2} onSuccess={mockOnSuccess} djName="DJ Mike" winFrequencyDays={30} />
+      );
+      const phone = screen.getByLabelText(/winner phone/i);
+      fireEvent.change(phone, { target: { value: '5105550100' } });
+      fireEvent.blur(phone);
+
+      const warning = await screen.findByText(/already won passes to/i);
+      expect(warning).toHaveTextContent('already won passes to Elmwood Show at Elmwood (show date: 2026-06-01)');
     });
   });
 });

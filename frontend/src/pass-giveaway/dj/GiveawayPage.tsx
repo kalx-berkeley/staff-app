@@ -247,6 +247,7 @@ const GiveawayPage = () => {
                   djName={djName}
                   onMissingDjName={() => document.getElementById(DJ_NAME_INPUT_ID)?.focus()}
                   winFrequencyDays={show.venue.win_frequency_days}
+                  winFrequencySharedWith={show.venue.win_frequency_shared_with}
                   requiresEmail={show.guest_list_requirements.requires_email_address}
                   preview={isPreview}
                   visitId={visitId}

@@ -246,6 +246,25 @@ def test_same_name_different_phones(client, db, promo, venue):
     assert len(venue_rows) == 2
 
 
+def test_same_name_flags_wins_at_sister_venues(client, db, promo, venue):
+    sister = Venue(name="The Fox Annex", address="2 Main St", parent_venue_id=venue.id)
+    unrelated = Venue(name="Elsewhere", address="3 Main St", win_frequency_days=30)
+    db.add_all([sister, unrelated])
+    db.commit()
+    _win(db, _show(db, venue, -1, pairs=0, staff=0), "Jane Doe", "5105550100")
+    _win(db, _show(db, sister, -10, pairs=0, staff=0), "Jane Doe", "5105550111")
+    _win(db, _show(db, venue, -1, pairs=0, staff=0), "Bob Smith", "5105550122")
+    _win(db, _show(db, unrelated, -10, pairs=0, staff=0), "Bob Smith", "5105550133")
+
+    rows = {
+        r["name"]: r for r in _tab(client, "overview")["same_name_different_phones"]["rows"]
+    }
+    # 9 days apart at venues sharing a 30-day limit
+    assert rows["Jane Doe"]["_flag"] is True
+    # Different venues with separate limits
+    assert rows["Bob Smith"]["_flag"] is False
+
+
 # ---------------------------------------------------------------------------
 # Promotions reps and creators
 

@@ -152,7 +152,9 @@ const WinnerEditForm = ({
         {winEligibility?.eligible === false && (
           <div className="win-ineligible-warning">
             <strong>Warning:</strong> This caller already won passes to{' '}
-            <em>{winEligibility.last_win_show}</em> (show date: {winEligibility.last_win_date}),
+            <em>{winEligibility.last_win_show}</em>
+            {winEligibility.last_win_venue && <> at <strong>{winEligibility.last_win_venue}</strong></>}{' '}
+            (show date: {winEligibility.last_win_date}),
             which is only {winEligibility.days_since} day
             {winEligibility.days_since !== 1 ? 's' : ''} before this show. The venue requires at
             least {winEligibility.required_days} days between show dates.
