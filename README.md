@@ -5,6 +5,7 @@
   * [Overview](#overview)
   * [Features](#features)
     + [Show & venue management](#show---venue-management)
+    + [Pass allocation](#pass-allocation)
     + [Content safety: non-value-neutral language detection](#content-safety--non-value-neutral-language-detection)
     + [Lottery system](#lottery-system)
     + [Feature bin (new releases) matching](#feature-bin--new-releases--matching)
@@ -12,6 +13,10 @@
     + [DJ on-air tools](#dj-on-air-tools)
     + [Staff experience](#staff-experience)
     + [Admin & operations](#admin---operations)
+    + [KALX Staff Directory](#kalx-staff-directory)
+    + [KALX Workforms](#kalx-workforms)
+    + [KALX Staff Analytics](#kalx-staff-analytics)
+    + [Short Links](#short-links)
     + [Auth & integrations](#auth---integrations)
   * [Technology Stack](#technology-stack)
   * [Local Development](#local-development)
@@ -37,14 +42,22 @@
     + [Database Migrations](#database-migrations)
     + [Troubleshooting Authentication](#troubleshooting-authentication)
 
-The web application behind the KALX staff site. It hosts two sub-sites:
+The web application behind the KALX staff site. It hosts five sub-sites and a home page that
+links to the ones the signed-in user can use:
 
 - **Radio Pass Giveaway** (`/pass-giveaway/`), for managing radio station pass giveaways,
   coordinating between music venues, radio DJs, promotions staff, and station staff members
-- **KALX Staff Directory** (`/directory/`), where active staff look up each other's contact
-  details (name, pronouns, photo, email, phone, DJ name, departments, status, and titles and
-  roles) in a searchable, sortable, filterable table. The data comes from the same nightly
-  Airtable sync that drives staff access, and is read-only here: changes are made in Airtable
+- **KALX Staff Directory** (`/directory/`), where staff look up each other's contact details,
+  and each staff member has a profile page. Under construction, so it's only turned on in
+  staging (`DIRECTORY_ENABLED`)
+- **KALX Workforms** (`/workforms/`), where staff report their monthly work and department heads
+  review it. Under construction, so it's only turned on in staging (`WORKFORMS_ENABLED`)
+- **KALX Staff Admin** (`/admin/`), the scheduled jobs, audit log, short links and staging
+  impersonation for every sub-site
+- **KALX Staff Analytics** (`/analytics/`), metrics about every sub-site for a chosen time window
+
+Short Links (`/go/<slug>`) redirect active staff to links that site admins manage in KALX Staff
+Admin.
 
 ## Before Deploying
 
@@ -76,9 +89,9 @@ home page at `/` is part of this app too: it links to each sub-site the signed-i
 
 ## Features
 
-The core workflow — create a show, allocate pass pairs, give them away on-air or let staff
-claim them — is only part of what the app does. Some of the more notable features, grouped by
-area:
+The pass giveaway's core workflow — create a show, allocate pass pairs, give them away on-air
+or let staff claim them — is only part of what the app does. Some of the more notable features,
+grouped by area (the pass giveaway first, then the other sub-sites):
 
 ### Show & venue management
 
@@ -99,9 +112,21 @@ area:
 - **Auto-close scheduling.** A show can be set to close itself automatically at a planned date and
   time; the app emails the venue's guest list at that moment without anyone having to close it by
   hand. Shows that go unclosed past their date get a daily nag email to the venue owners instead.
-- **Venue logo upload** with server-side validation, resizing, and re-encoding.
-- **Promoters** can own a venue by default or override per show, with their own contacts and
-  notification recipients.
+- **Venue logo upload** with server-side validation, resizing, and re-encoding, optionally with
+  the venue's name shown next to the logo on the DJ pages.
+- **Promoters** can be a venue's default promoter or be set per show, with their own contacts and
+  notification recipients. A show belongs to its promoter's **KALX promotions reps**, or its
+  venue's when it has no promoter, and those reps get its emails. A staff Venues page lists each
+  venue's reps, searchable by venue, rep name or email.
+- **Venue defaults.** A venue's default on-air description, caller special instructions and staff
+  instructions are filled into its new shows. Staff instructions are shown only to staff on the
+  staff show page, never to DJs or guests. Venues and promoters also hold show sourcing
+  instructions: notes for promotions on how to find out which shows they'll give passes for.
+- **Movie theaters.** A venue can be a movie theater, whose shows have a movie rating instead of
+  an age restriction. Wheelchair accessibility can be Unknown.
+- **Win frequency limit.** A venue can limit how often the same caller can win there, checked
+  against the winner's phone number. A venue can share another venue's limit, so wins anywhere in
+  the venue family count against one limit, and the DJ's warning names the sister venues.
 - **DJ pre-assignment blackout window** — a venue (or an individual show) can forbid DJs from
   reserving a pass pair within N days of the show's close date, to keep last-minute reservations
   from crowding out the giveaway.
@@ -114,9 +139,34 @@ area:
   by genre (matching Sublist DJs and their specialty shows against the show's genres, from staff's
   own genre preferences). Accepting a suggestion with a known date auto-saves and advances to the
   next available pass pair.
-- **Legacy paper-form import** — a self-contained, removable feature for backfilling historical
-  shows (with already-decided winners and claimants) during the cutover from the old paper-based
-  process.
+- **Legacy paper-form import** — a self-contained, removable feature (`LEGACY_IMPORT_ENABLED`)
+  for backfilling historical shows during the cutover from the old paper-based process. It creates
+  new shows or adds to existing ones: on-air winners, staff claims and staff pass alternates, with
+  a Release button for each recorded winner and claim.
+
+### Pass allocation
+
+- **Staff pass adjustment.** A show gets one staff pass per pass pair by default; promotions can
+  raise or lower that under Advanced on the show form, down to no staff passes.
+- **Hand-entered winners.** Under Advanced, promotions can enter on-air and staff winners by hand,
+  for carrying winners over from a cancelled, postponed or moved show. They skip the win frequency
+  limit and the lottery, and no one is notified.
+- **Tabler passes** for the Publicity department at co-announce shows. They come out of the
+  show's staff passes (2 by default when Co-Announce is checked), are first come, first served,
+  and never have a +1 guest, an alternate list or a lottery. Tablers appear on the guest list as
+  "KALX Co-Announce Table".
+- **Staff pass alternate list.** Once every staff pass is held, staff can join an ordered
+  alternate list, and freed passes go to the next alternate automatically, with an email. Staff can
+  also put their +1 guest on the alternate list, choosing whether they'll still attend if their
+  guest has no pass when the show closes. Waiting guests get freed passes behind staff alternates.
+- **Leave of absence.** Leave dates synced from Airtable stop staff from claiming a pass, entering
+  the lottery or joining the alternate list for a show their leave covers, and warn promotions
+  when pre-assigning a pass pair to a DJ on leave.
+- **Show close emails.** When a show closes, each person gets one email covering every outcome,
+  and staff pass winners get a reminder that they're on the guest list, with the show's time and
+  staff instructions. A venue or promoter can have the +1 host and alternate emails held until a
+  KALX promotions rep sends them from the show page, giving the rep time to ask the venue for
+  more passes first.
 
 ### Content safety: non-value-neutral language detection
 
@@ -146,6 +196,8 @@ window after the show is published:
   someone else.
 - DJs enter for a specific on-air shift/date (optionally through a recurring "specialty show"),
   and winners get their pass pair pre-assigned automatically.
+- Staff lottery losers join the alternate list in the order they entered, and their result email
+  gives their position.
 - The draw runs itself the moment the window closes (or can be triggered manually from the admin
   panel), and every entrant gets one of eight distinct outcome emails explaining exactly what
   happened to them and their guest.
@@ -169,10 +221,18 @@ two-month lookback, with no limit on future dates), complete with the performanc
 
 ### DJ on-air tools
 
-- **On-air giveaways** with a one-pair-per-DJ-per-4-hours guard so a single shift can't sweep the
-  pool.
-- **Failed-attempt logging** — a DJ can note that they announced a show but got no callers, which
-  shows up in the guest-list email to the venue.
+- **On-air giveaways** limited to one pair per show per DJ in a 4-hour shift window, so a single
+  shift can't sweep a show's pool. The DJ Shows page dims shows the DJ has already given a pair away for this shift, and warns
+  before opening a show whose remaining pairs are all pre-assigned to other DJs. An "available
+  passes" filter shows only the shows the DJ can give away a pair for now.
+- **Failed-attempt logging** — a DJ can press Tried ("I'm off the mic") to note that they
+  announced a show but got no callers, which shows up in the guest-list email to the venue.
+- **Winner corrections** — the DJ who recorded a winner can correct their name, phone and email
+  within 4 hours of the giveaway and before the show closes.
+- **Clothespin** reserves one unclaimed pass pair for today under a current DJ or specialty show
+  name, and Release Reservation gives a pre-assigned pair back.
+- **DJ view preview** — promotions staff away from the DJ studio can use the DJ giveaway form,
+  checks included, but Give Away and Tried only pretend to save.
 - **DJ name autocomplete**, remembered locally and backed by the staff directory plus historical
   on-air winner records.
 - **Spinitron on-air schedule sync** — the app polls Spinitron's schedule API every 6 hours (12-hour
@@ -194,7 +254,10 @@ two-month lookback, with no limit on future dates), complete with the performanc
 ### Staff experience
 
 - Self-service pass claiming with an optional guest, including "only attend with guest" logic and
-  a notification email if another staff member's claim bumps a pending guest.
+  a notification email if another staff member's claim bumps a pending guest. Staff can add a
+  guest after claiming, or remove their guest while keeping their own pass.
+- An "available passes" filter on the staff Shows page that shows only shows with staff passes
+  left to claim.
 - Per-user notification preferences (email on/off), honored by every email the app sends.
 - **Genre preferences** — staff can pick the genres they like from their profile, autocompleting
   from genres already in use on shows; used to power promotions' pre-assignment suggestions above.
@@ -206,10 +269,12 @@ two-month lookback, with no limit on future dates), complete with the performanc
   dashboard, the audit log and user impersonation. Site admins (department heads, Paid Staff and
   anyone in `SITE_ADMIN_EMAILS`) can use all of it. Promotions admins (the Promotions department)
   can see the jobs without running them, and the pass giveaway's audit log entries. Both can use
-  the pass giveaway's own admin page.
+  the pass giveaway's own admin page. Site admins also manage Short Links and the directory's DJ
+  Quiz deadlines there.
 - **Job dashboard** for every scheduled task in every staff site (Airtable sync, feature bin sync,
   KALX Live! calendar sync, Spinitron on-air schedule sync, stale pre-assignment cleanup,
-  unclosed-show notifications, workforms refresh and emails) with manual "run now" buttons. The
+  unclosed-show notifications, workforms refresh and emails, analytics rollup) with manual "run
+  now" buttons. The
   pass giveaway's own admin page has dashboards of every pending auto-close and lottery job with
   live countdowns.
 - **Audit log viewer**, paginated and filterable by event type, area, actor, and date range — every
@@ -221,6 +286,45 @@ two-month lookback, with no limit on future dates), complete with the performanc
   shows.
 - **In-app feedback / bug report tool** that captures the current page and logged-in user and
   emails it straight to the webmaster.
+- **Reload after a deploy.** Open tabs, like the one left open in the DJ studio, notice a new
+  deploy and reload on the next page change or when idle, offering a Reload button until then.
+
+### KALX Staff Directory
+
+- A searchable, sortable, filterable table of current staff: photo, name, pronouns, DJ name,
+  email, phone, departments, status, and titles and roles, all from the nightly Airtable sync.
+  The search and filters are kept in the URL so a view can be shared, and each person has a
+  shareable page at `/directory/<id>`. DJ names link to Spinitron, and staff on leave are set
+  apart.
+- **Profile pages** at `/directory/me` (site admins can open anyone's) show more than the
+  directory does, the Sublist DJ requirements with their evidence, and a year of workforms. The
+  edit form writes back to Airtable once `AIRTABLE_STAFF_EDIT_ENABLED` is on.
+
+### KALX Workforms
+
+- Staff build each month's workform from entries (hours, description and an optional date) per
+  department, choosing from each department's predefined work types, and submit it to the Airtable
+  workforms table. It shows whether the 6-hour monthly minimum is met, except in months a leave of
+  absence overlaps.
+- Department heads approve or deny their department's hours, manage its work types, and see a
+  People tab of who has reported hours there recently. Site admins get read-only views of anyone's
+  workforms.
+- Reminder and review emails, with per-user settings, are sent only when
+  `WORKFORMS_EMAILS_ENABLED` is on.
+
+### KALX Staff Analytics
+
+- Pass giveaway, short link and site usage metrics for site admins and promotions admins, for a
+  chosen time window, each with an explanation of what it measures. Tabs cover an overview,
+  venues, DJs, KALX promotions reps, short links and usage.
+- It tracks signed-in active days, DJ studio and station office sessions, "I'm off the mic" page
+  visits, spin match popups and `/go/` redirects, and rolls old events up to daily counts after 13
+  months.
+
+### Short Links
+
+- Site admins manage `/go/<slug>` links in KALX Staff Admin, and only active staff can follow
+  them.
 
 ### Auth & integrations
 
