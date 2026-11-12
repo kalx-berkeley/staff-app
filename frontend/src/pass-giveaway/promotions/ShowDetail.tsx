@@ -1357,7 +1357,7 @@ const ShowDetail = () => {
 
       {show.attempts.length > 0 && (
         <div className="passes-section">
-          <h3>Failed Giveaway Attempts ({show.attempts.length})</h3>
+          <h3>On-Air Attempts With No Callers ({show.attempts.length})</h3>
           <div className="passes-list">
             {show.attempts.map((attempt) => (
               <div key={attempt.id} className="pass-card">

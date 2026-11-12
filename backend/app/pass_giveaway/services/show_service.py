@@ -680,7 +680,7 @@ class ShowService:
             lines.append("")
 
         if attempts:
-            lines.append(f"Failed on-air giveaway attempts ({len(attempts)}):")
+            lines.append(f"On-air giveaway attempts with no callers ({len(attempts)}):")
             for a in attempts:
                 when = format_pacific_datetime(a.attempted_at)
                 lines.append(f"  - {a.dj_name} at {when}")

@@ -969,7 +969,8 @@ def build_overview(db: Session, window: Window, params: Params) -> list[dict]:
             ),
             explanation(
                 'Pass pairs each DJ gave away plus the times they clicked "tried" (a'
-                " failed on-air giveaway attempt) in the window, most first.",
+                " giveaway announced on-air that got no callers) in the window, most"
+                " first.",
                 "When it happened",
                 includes=_DJ_NAMES,
             ),
@@ -1435,8 +1436,8 @@ def build_venue(db: Session, window: Window, params: Params) -> list[dict]:
             ratio(len(attempts), len(giveaways)),
             "number",
             explanation(
-                'Times a DJ clicked "tried" (a failed on-air giveaway attempt) ÷ pass'
-                " pairs given away, for this venue's shows.",
+                'Times a DJ clicked "tried" (a giveaway announced on-air that got no'
+                " callers) ÷ pass pairs given away, for this venue's shows.",
                 "When it happened",
             ),
             note=f"{len(attempts)} attempts, {len(giveaways)} given away",
@@ -1662,8 +1663,8 @@ def build_dj(db: Session, window: Window, params: Params) -> list[dict]:
             len(attempts),
             "number",
             explanation(
-                'Times this DJ clicked "tried" (a failed on-air giveaway attempt) in the'
-                " window.",
+                'Times this DJ clicked "tried" (a giveaway announced on-air that got no'
+                " callers) in the window.",
                 "When it happened",
                 includes=_DJ_NAMES,
             ),
