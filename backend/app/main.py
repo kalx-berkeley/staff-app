@@ -101,7 +101,7 @@ for group in (
 
 # Configure logging
 configure_request_logging()
-# force=True because importing smtp2go has already called basicConfig
+# force=True in case an imported library has already called basicConfig
 logging.basicConfig(level=logging.INFO, format=APP_LOG_FORMAT, force=True)
 logging.getLogger("musicbrainzngs").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)

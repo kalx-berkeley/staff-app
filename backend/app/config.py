@@ -104,8 +104,7 @@ class Settings(BaseSettings):
     # Contact URL included in User-Agent for external API requests
     api_contact_url: str = "https://cs.cementhorizon.com/contact/"
 
-    # Email notifications via smtp2go (primary) or the OS's local SMTP relay (fallback)
-    smtp2go_api_key: Optional[str] = None
+    # Email notifications via the OS's local SMTP relay
     email_from_address: str = "noreply@kalx.berkeley.edu"
     local_smtp_host: str = "localhost"
     local_smtp_port: int = 25

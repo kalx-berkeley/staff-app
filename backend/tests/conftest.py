@@ -40,29 +40,18 @@ class _BlockedSMTP:
         )
 
 
-class _BlockedSmtp2goClient:
-    """Stands in for the smtp2go client so no test can call the real API."""
-
-    def __init__(self, *args, **kwargs):
-        raise AssertionError(
-            "A test tried to send real email through smtp2go. Patch"
-            " app.common.services.notification_service.send_email in the test."
-        )
-
-
 @pytest.fixture(autouse=True)
 def block_real_email(monkeypatch):
     """
     Fail any test that would deliver real email.
 
-    Without an smtp2go key, send_email falls back to the local mail server, so
-    an unpatched send would land in the developer's postfix queue. Tests that
-    patch smtplib.SMTP or Smtp2goClient themselves still take precedence.
+    send_email delivers through the local mail server, so an unpatched send
+    would land in the developer's postfix queue. Tests that patch smtplib.SMTP
+    themselves still take precedence.
     """
     from app.common.services import notification_service
 
     monkeypatch.setattr(notification_service.smtplib, "SMTP", _BlockedSMTP)
-    monkeypatch.setattr(notification_service, "Smtp2goClient", _BlockedSmtp2goClient)
 
 
 @pytest.fixture(autouse=True)

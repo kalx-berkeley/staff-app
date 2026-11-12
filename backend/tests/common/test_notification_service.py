@@ -1,11 +1,12 @@
 """Tests for the email notification service."""
 
+import email
 import logging
 from unittest.mock import patch, MagicMock
 
 from sqlalchemy.orm import Session
 
-from app.common.areas import COMMON_AREA, PASS_GIVEAWAY_AREA
+from app.common.areas import COMMON_AREA
 from app.models.audit_log import AuditLog
 
 
@@ -22,7 +23,6 @@ def test_send_email_staging_logs_not_sends(caplog):
     """In staging mode, send_email suppresses delivery and logs instead."""
     with patch("app.common.services.notification_service.settings") as mock_settings:
         mock_settings.environment = "staging"
-        mock_settings.smtp2go_api_key = "fake-key"
         mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
         mock_settings.webmaster_email = None
 
@@ -38,22 +38,27 @@ def test_send_email_staging_logs_not_sends(caplog):
     assert any("[STAGING] Test Subject" in r.message for r in caplog.records)
 
 
+def _mock_smtp():
+    mock_smtp_instance = MagicMock()
+    mock_smtp_cls = MagicMock(return_value=mock_smtp_instance)
+    mock_smtp_instance.__enter__ = MagicMock(return_value=mock_smtp_instance)
+    mock_smtp_instance.__exit__ = MagicMock(return_value=False)
+    return mock_smtp_cls, mock_smtp_instance
+
+
 def test_send_email_staging_tags_subject_and_body_for_webmaster():
     """In staging, even a delivered (webmaster) email gets a [STAGING] subject and body notice."""
-    mock_client = MagicMock()
-    mock_client.send.return_value = MagicMock(success=True)
+    mock_smtp_cls, mock_smtp_instance = _mock_smtp()
 
     with (
         patch("app.common.services.notification_service.settings") as mock_settings,
-        patch(
-            "app.common.services.notification_service.Smtp2goClient",
-            return_value=mock_client,
-        ),
+        patch("app.common.services.notification_service.smtplib.SMTP", mock_smtp_cls),
     ):
         mock_settings.environment = "staging"
-        mock_settings.smtp2go_api_key = "fake-key"
         mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
         mock_settings.webmaster_email = "webmaster@kalx.berkeley.edu"
+        mock_settings.local_smtp_host = "localhost"
+        mock_settings.local_smtp_port = 25
 
         from app.common.services.notification_service import send_email
 
@@ -65,15 +70,20 @@ def test_send_email_staging_tags_subject_and_body_for_webmaster():
             area=COMMON_AREA,
         )
 
-    call_kwargs = mock_client.send.call_args.kwargs
-    assert call_kwargs["subject"] == "[STAGING] Test Subject"
-    assert "Test body" in call_kwargs["text"]
-    assert "STAGING environment email" in call_kwargs["text"]
-    assert "STAGING environment email" in call_kwargs["html"]
+    _from, recipients, raw = mock_smtp_instance.sendmail.call_args.args
+    assert recipients == ["webmaster@kalx.berkeley.edu"]
+    message = email.message_from_string(raw)
+    assert message["Subject"] == "[STAGING] Test Subject"
+    text_part, html_part = message.get_payload()
+    text = text_part.get_payload(decode=True).decode()
+    html = html_part.get_payload(decode=True).decode()
+    assert "Test body" in text
+    assert "STAGING environment email" in text
+    assert "STAGING environment email" in html
 
 
-def test_send_email_no_api_key_uses_local_smtp():
-    """When smtp2go_api_key is None, send_email delivers via local SMTP."""
+def test_send_email_uses_local_smtp():
+    """In production, send_email delivers via local SMTP."""
     mock_smtp_instance = MagicMock()
     mock_smtp_cls = MagicMock(return_value=mock_smtp_instance)
     mock_smtp_instance.__enter__ = MagicMock(return_value=mock_smtp_instance)
@@ -84,7 +94,6 @@ def test_send_email_no_api_key_uses_local_smtp():
         patch("app.common.services.notification_service.smtplib.SMTP", mock_smtp_cls),
     ):
         mock_settings.environment = "production"
-        mock_settings.smtp2go_api_key = None
         mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
         mock_settings.webmaster_email = None
         mock_settings.local_smtp_host = "localhost"
@@ -96,103 +105,6 @@ def test_send_email_no_api_key_uses_local_smtp():
 
     mock_smtp_cls.assert_called_once_with("localhost", 25)
     mock_smtp_instance.sendmail.assert_called_once()
-
-
-def test_send_email_production_calls_smtp2go():
-    """In production with an API key, send_email calls smtp2go."""
-    mock_client = MagicMock()
-    mock_client.send.return_value = MagicMock(success=True)
-
-    with (
-        patch("app.common.services.notification_service.settings") as mock_settings,
-        patch(
-            "app.common.services.notification_service.Smtp2goClient",
-            return_value=mock_client,
-        ),
-    ):
-        mock_settings.environment = "production"
-        mock_settings.smtp2go_api_key = "real-key"
-        mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
-
-        from app.common.services.notification_service import send_email
-
-        send_email("user@example.com", "Subject", "Body", area=COMMON_AREA)
-
-    mock_client.send.assert_called_once()
-    call_kwargs = mock_client.send.call_args.kwargs
-    assert call_kwargs["recipients"] == ["user@example.com"]
-    assert call_kwargs["subject"] == "Subject"
-
-
-def test_send_email_smtp2go_success_audits_response_details(db: Session):
-    """A successful smtp2go send records status/request/email id details on the audit row."""
-    mock_client = MagicMock()
-    mock_client.send.return_value = MagicMock(
-        success=True,
-        status_code=200,
-        request_id="req-123",
-        json={"data": {"email_id": ["abc123"]}},
-    )
-
-    with (
-        patch("app.common.services.notification_service.settings") as mock_settings,
-        patch(
-            "app.common.services.notification_service.Smtp2goClient",
-            return_value=mock_client,
-        ),
-    ):
-        mock_settings.environment = "production"
-        mock_settings.smtp2go_api_key = "real-key"
-        mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
-
-        from app.common.services.notification_service import send_email
-
-        send_email("user@example.com", "Subject", "Body", db=db, area=PASS_GIVEAWAY_AREA)
-
-    entry = _last_audit_entry(db)
-    assert entry is not None
-    assert entry.area == PASS_GIVEAWAY_AREA
-    assert entry.details["sent"] is True
-    assert entry.details["response"] == {
-        "status_code": 200,
-        "request_id": "req-123",
-        "email_id": ["abc123"],
-    }
-
-
-def test_send_email_smtp2go_failure_is_audited(db: Session):
-    """A failed smtp2go send still writes an audit row, with error details attached."""
-    mock_client = MagicMock()
-    mock_client.send.return_value = MagicMock(
-        success=False,
-        status_code=400,
-        request_id="req-456",
-        errors=["invalid recipient"],
-    )
-
-    with (
-        patch("app.common.services.notification_service.settings") as mock_settings,
-        patch(
-            "app.common.services.notification_service.Smtp2goClient",
-            return_value=mock_client,
-        ),
-    ):
-        mock_settings.environment = "production"
-        mock_settings.smtp2go_api_key = "real-key"
-        mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
-
-        from app.common.services.notification_service import send_email
-
-        send_email("user@example.com", "Subject", "Body", db=db, area=COMMON_AREA)
-
-    entry = _last_audit_entry(db)
-    assert entry is not None
-    assert entry.details["sent"] is False
-    assert entry.details["response"] == {
-        "status_code": 400,
-        "request_id": "req-456",
-        "errors": ["invalid recipient"],
-    }
 
 
 def test_send_email_local_smtp_success_audits_response_details(db: Session):
@@ -208,7 +120,6 @@ def test_send_email_local_smtp_success_audits_response_details(db: Session):
         patch("app.common.services.notification_service.smtplib.SMTP", mock_smtp_cls),
     ):
         mock_settings.environment = "production"
-        mock_settings.smtp2go_api_key = None
         mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
         mock_settings.webmaster_email = None
         mock_settings.local_smtp_host = "localhost"
@@ -237,7 +148,6 @@ def test_send_email_local_smtp_failure_is_audited(db: Session):
         patch("app.common.services.notification_service.smtplib.SMTP", mock_smtp_cls),
     ):
         mock_settings.environment = "production"
-        mock_settings.smtp2go_api_key = None
         mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
         mock_settings.webmaster_email = None
         mock_settings.local_smtp_host = "localhost"
@@ -261,7 +171,6 @@ def test_send_email_staging_suppressed_is_audited_with_reason(db: Session):
     """Staging suppression writes an audit row explaining why nothing was sent."""
     with patch("app.common.services.notification_service.settings") as mock_settings:
         mock_settings.environment = "staging"
-        mock_settings.smtp2go_api_key = "fake-key"
         mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
         mock_settings.webmaster_email = None
 

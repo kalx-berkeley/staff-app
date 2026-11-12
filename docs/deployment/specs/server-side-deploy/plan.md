@@ -255,7 +255,6 @@ Sent to `WEBMASTER_EMAIL`, read from that environment's `.env`, through the
 server's local SMTP relay (`LOCAL_SMTP_HOST`, default `localhost:25`). The
 sender is a short Python script using the standard library's `smtplib`. It
 doesn't use the app's own email code, because that code may be what broke.
-There's no smtp2go support, since smtp2go is being removed from the app later.
 
 | Event | Email |
 |---|---|

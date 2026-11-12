@@ -1,4 +1,4 @@
-"""Email notification service using smtp2go or local SMTP."""
+"""Email notification service using the local SMTP relay."""
 
 import logging
 import smtplib
@@ -12,11 +12,6 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
-
-try:
-    from smtp2go.core import Smtp2goClient
-except ImportError:
-    Smtp2goClient = None  # type: ignore[assignment,misc]
 
 
 def send_email(
@@ -40,7 +35,7 @@ def send_email(
     :param area: The part of the app sending the email, one of `app.common.areas`,
         recorded in the audit log.
 
-    Uses smtp2go when SMTP2GO_API_KEY is set; falls back to the local mail server otherwise.
+    Sends through the local mail server (LOCAL_SMTP_HOST/LOCAL_SMTP_PORT).
     In staging mode, suppresses delivery to non-webmaster recipients, and tags any email
     that is sent (or logged) with a "[STAGING]" subject prefix and an in-body notice, so
     recipients can't mistake it for a production notification.
@@ -76,79 +71,7 @@ def send_email(
         )
         return
 
-    if settings.smtp2go_api_key:
-        _send_via_smtp2go(to_email, subject, body_text, body_html, db, area)
-    else:
-        _send_via_local_smtp(to_email, subject, body_text, body_html, db, area)
-
-
-def _send_via_smtp2go(
-    to_email: str,
-    subject: str,
-    body_text: str,
-    body_html: str | None,
-    db: "Session | None",
-    area: str,
-) -> None:
-    if Smtp2goClient is None:
-        logger.error("smtp2go package is not installed; cannot send email to %s", to_email)
-        _audit_email(
-            db,
-            to_email,
-            subject,
-            body_text,
-            body_html,
-            sent=False,
-            area=area,
-            response_details={"error": "smtp2go package is not installed"},
-        )
-        return
-
-    client = Smtp2goClient(api_key=settings.smtp2go_api_key)
-    kwargs: dict = {
-        "sender": settings.email_from_address,
-        "recipients": [to_email],
-        "subject": subject,
-        "text": body_text,
-    }
-    if body_html is not None:
-        kwargs["html"] = body_html
-
-    response = client.send(**kwargs)
-    if not response.success:
-        logger.error(
-            "smtp2go send failed to=%s subject=%r: %s", to_email, subject, response
-        )
-        _audit_email(
-            db,
-            to_email,
-            subject,
-            body_text,
-            body_html,
-            sent=False,
-            area=area,
-            response_details={
-                "status_code": response.status_code,
-                "request_id": response.request_id,
-                "errors": response.errors,
-            },
-        )
-    else:
-        logger.info("Email sent via smtp2go to=%s subject=%r", to_email, subject)
-        _audit_email(
-            db,
-            to_email,
-            subject,
-            body_text,
-            body_html,
-            sent=True,
-            area=area,
-            response_details={
-                "status_code": response.status_code,
-                "request_id": response.request_id,
-                "email_id": response.json.get("data", {}).get("email_id"),
-            },
-        )
+    _send_via_local_smtp(to_email, subject, body_text, body_html, db, area)
 
 
 def _send_via_local_smtp(

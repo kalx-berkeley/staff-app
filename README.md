@@ -231,7 +231,7 @@ two-month lookback, with no limit on future dates), complete with the performanc
 - Nightly syncs from **Airtable** (staff directory), **Google Sheets** (feature bin), a **Google
   Calendar** (KALX Live!), and on-demand lookups against **MusicBrainz**, **Wikipedia**, and
   **Spinitron** (on-air DJ personas).
-- Dual-path email delivery (smtp2go or local SMTP relay) that never silently drops a message, with
+- Email delivery through the server's local SMTP relay that never silently drops a message, with
   staging mail suppressed except to the webmaster so feedback still works during testing.
 
 ## Technology Stack
@@ -461,10 +461,9 @@ Client
 | `AIRTABLE_TABLE_NAME` | Staff directory table | `Online Staff App Directory` |
 | `STAFF_PHOTO_DIR` | Where the Airtable sync stores resized staff directory photos (relative to `backend/`) | `data/staff_photos` |
 | `CORS_ORIGINS` | Allowed CORS origins | `http://localhost:3000` (production: `https://staff.kalx.berkeley.edu`) |
-| `SMTP2GO_API_KEY` | smtp2go API key for email notifications | — (falls back to local SMTP relay when unset) |
 | `EMAIL_FROM_ADDRESS` | From address for notification emails | `noreply@kalx.berkeley.edu` |
-| `LOCAL_SMTP_HOST` | Hostname of the local SMTP relay used when `SMTP2GO_API_KEY` is unset | `localhost` |
-| `LOCAL_SMTP_PORT` | Port of the local SMTP relay used when `SMTP2GO_API_KEY` is unset | `25` |
+| `LOCAL_SMTP_HOST` | Hostname of the local SMTP relay that sends notification emails | `localhost` |
+| `LOCAL_SMTP_PORT` | Port of the local SMTP relay that sends notification emails | `25` |
 | `WEBMASTER_EMAIL` | Recipient for in-app feedback and bug reports | — |
 | `APP_VERSION` | The deployed build, which open tabs compare with their own to know when to reload. Set by the deploy | — (tabs don't check when unset) |
 | `SITE_ADMIN_EMAILS` | Comma-separated emails of extra site admins, besides department heads and Paid Staff (they must still be Active staff) | — |
@@ -474,7 +473,7 @@ Client
 
 Note: CORS is same-origin in production (frontend and API are both on `staff.kalx.berkeley.edu`), so `CORS_ORIGINS` only matters for local development.
 
-When `SMTP2GO_API_KEY` is set, emails are sent via smtp2go. When it is not set, emails are sent via the OS's local SMTP relay (`LOCAL_SMTP_HOST`/`LOCAL_SMTP_PORT`, e.g. `sendmail`/Postfix listening on `localhost:25`) instead of failing or silently dropping the message. Separately, when `ENVIRONMENT=staging`, emails are logged rather than sent regardless of which path would otherwise be used. The one exception is `WEBMASTER_EMAIL`: in staging, emails to the webmaster are always delivered so that feedback submitted via the in-app form reaches the webmaster even during testing.
+Emails are sent via the OS's local SMTP relay (`LOCAL_SMTP_HOST`/`LOCAL_SMTP_PORT`, e.g. `sendmail`/Postfix listening on `localhost:25`), and every attempt, successful or not, is recorded in the audit log. When `ENVIRONMENT=staging`, emails are logged rather than sent. The one exception is `WEBMASTER_EMAIL`: in staging, emails to the webmaster are always delivered so that feedback submitted via the in-app form reaches the webmaster even during testing.
 
 ### Airtable Schema
 
