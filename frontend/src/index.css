@@ -2142,6 +2142,14 @@ fieldset.radio-group legend {
   margin-top: 0.5rem;
 }
 
+/* Wraps the whole giveaway form so view only can disable it in one place */
+.giveaway-view-only-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
 /* Give Away's fields and button, kept apart from Tried, which needs none of them */
 .giveaway-winner-fieldset {
   border: 1px solid var(--border-color);

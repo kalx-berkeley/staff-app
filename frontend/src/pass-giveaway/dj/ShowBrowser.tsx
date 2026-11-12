@@ -6,9 +6,7 @@ import { Tooltip, DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, K
 import type { ShowSummary, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { useAuth } from '../../common/contexts/authHooks';
-import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, WHEELCHAIR_ACCESSIBLE_LABELS, canRecordDjGiveaways, compareVenueNames, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
-import { getPreviewGiveaways } from './previewGiveaways';
+import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, WHEELCHAIR_ACCESSIBLE_LABELS, compareVenueNames, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
 
 const VIEW_MODE_KEY = 'kalx_dj_view_mode';
 
@@ -30,9 +28,6 @@ const getLocalTodayStr = (): string => {
 
 const ShowBrowser = () => {
   usePageTitle('Shows · DJ');
-  const { user } = useAuth();
-  // Away from the DJ studio, giveaways are only pretend (previewGiveaways.ts)
-  const isPreview = !canRecordDjGiveaways(user);
   const [rawShows, setRawShows] = useState<ShowSummary[]>([]);
   const [allShows, setAllShows] = useState<ShowSummary[]>([]);
   const [filteredShows, setFilteredShows] = useState<ShowSummary[]>([]);
@@ -124,11 +119,6 @@ const ShowBrowser = () => {
       .filter((p) => p.status === 'given_away' && findRecentDjGiveaway([p], djName))
       .map((p) => p.show_id)
   );
-  if (isPreview) {
-    for (const g of getPreviewGiveaways()) {
-      if (findRecentDjGiveaway([g], djName)) recentGiveawayShowIds.add(g.show_id);
-    }
-  }
   const assignedShowIds = new Set(myAssignedPasses.map((p) => p.show_id));
   const myPairCountByShow = new Map<number, number>();
   for (const p of myAssignedPasses) {

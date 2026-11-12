@@ -12,13 +12,15 @@ vi.mock('../api', () => ({
 
 // The form and DJ name input have their own tests; this page only places them.
 vi.mock('./PassGiveawayForm', () => ({
-  default: ({ pass }: { pass: PassResponse }) => <div>Giveaway form for pass {pass.id}</div>,
+  default: ({ pass, viewOnly }: { pass: PassResponse; viewOnly?: boolean }) => (
+    <div>Giveaway form for pass {pass.id}{viewOnly && ' (view only)'}</div>
+  ),
 }));
 vi.mock('../components', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../components')>()),
   DjNameInput: () => null,
 }));
-// A DJ studio computer by default; a test sets user to preview from home.
+// A DJ studio computer by default; a test sets user to view from home.
 const auth = vi.hoisted(() => ({
   user: { email: null, role: 'dj', is_dj_network: true, is_station_office_network: true } as Record<string, unknown> | null,
 }));
@@ -69,10 +71,43 @@ const renderPage = async (show: ShowResponse) => {
   );
 };
 
+const DJ_STUDIO_USER = { email: null, role: 'dj', is_dj_network: true, is_station_office_network: true };
+
 describe('DJ GiveawayPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    auth.user = DJ_STUDIO_USER;
+  });
+
+  it('lets a DJ studio computer give passes away', async () => {
+    await renderPage(makeShow([pass(1)]));
+
+    expect(await screen.findByText('Giveaway form for pass 1')).toBeInTheDocument();
+    expect(screen.queryByText(/view only/i)).not.toBeInTheDocument();
+  });
+
+  it('is view only for promotions staff away from the DJ studio', async () => {
+    auth.user = { email: 'promo@example.com', role: 'promotions', is_dj_network: false, is_station_office_network: false };
+    await renderPage(makeShow([pass(1)]));
+
+    expect(await screen.findByText('Giveaway form for pass 1 (view only)')).toBeInTheDocument();
+    expect(screen.getByRole('note')).toHaveTextContent('Giveaways can only be recorded from the DJ studio');
+  });
+
+  it('records for real while impersonating the DJ studio network in staging', async () => {
+    auth.user = {
+      email: null,
+      role: 'dj',
+      is_dj_network: true,
+      is_station_office_network: true,
+      is_staging: true,
+      is_impersonating_dj_network: true,
+    };
+    await renderPage(makeShow([pass(1)]));
+
+    expect(await screen.findByText('Giveaway form for pass 1')).toBeInTheDocument();
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
   });
 
   it('shows one giveaway form and counts the remaining pass pairs', async () => {

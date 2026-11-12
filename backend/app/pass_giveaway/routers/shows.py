@@ -1597,9 +1597,9 @@ def record_show_attempt(
     """
     Record a failed giveaway attempt for a show.
 
-    Requires DJ studio network access (or, in staging, Sublist DJ staff).
-    Promotions staff can view the DJ giveaway page as a preview but cannot
-    record a real attempt.
+    Requires DJ studio network access (or, in staging, Sublist DJ staff or
+    impersonating the DJ studio network). Promotions staff elsewhere see the
+    DJ giveaway page view only and cannot record a real attempt.
     """
     attempt = ShowService.record_attempt(db, show_id, body.dj_name)
     record_visit_outcome(db, dj, body.visit_id, show_id, "tried", body.dj_name)

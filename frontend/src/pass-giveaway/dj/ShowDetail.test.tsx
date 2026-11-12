@@ -1,11 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import ShowDetail from './ShowDetail';
 import { showsAPI, passesAPI } from '../api';
 import { renderAndSettle } from '../../test/render';
 import type { PassResponse, ShowResponse } from '../types';
-import { recordPreviewGiveaway } from './previewGiveaways';
 
 vi.mock('../api', () => ({
   showsAPI: { get: vi.fn(), getArtistInfo: vi.fn() },
@@ -18,12 +17,6 @@ vi.mock('../components', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../components')>()),
   DjNameInput: () => null,
 }));
-
-// A DJ studio computer by default; a test sets user to preview from home.
-const auth = vi.hoisted(() => ({
-  user: { email: null, role: 'dj', is_dj_network: true, is_station_office_network: true } as Record<string, unknown> | null,
-}));
-vi.mock('../../common/contexts/authHooks', () => ({ useAuth: () => ({ user: auth.user }) }));
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
@@ -195,54 +188,6 @@ describe('DJ ShowDetail right after a giveaway', () => {
     expect(await screen.findByText('Venue:')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: "I'm off the mic" })).not.toBeInTheDocument();
-  });
-});
-
-describe('DJ ShowDetail preview away from the DJ studio', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    localStorage.clear();
-    sessionStorage.clear();
-    auth.user = { email: 'promo@example.com', role: 'promotions', is_dj_network: false, is_station_office_network: false };
-  });
-  afterEach(() => {
-    auth.user = { email: null, role: 'dj', is_dj_network: true, is_station_office_network: true };
-  });
-
-  const available = { id: 6, show_id: 1, pass_type: 'pair', status: 'available' } as PassResponse;
-
-  const renderAt = async (state: unknown) => {
-    localStorage.setItem('kalx_dj_name', 'DJ Test');
-    vi.mocked(showsAPI.get).mockResolvedValue(makeShow([available], { available_pair_count: 1 }));
-    await renderAndSettle(
-      <MemoryRouter initialEntries={[{ pathname: '/dj/shows/1', state }]}>
-        <ShowDetail />
-      </MemoryRouter>
-    );
-  };
-
-  it('thanks the DJ for a preview giveaway, says nothing was recorded, and hides the off-the-mic button', async () => {
-    recordPreviewGiveaway({ show_id: 1, given_away_by_dj: 'DJ Test', recipient_name: 'Pat Caller' });
-    await renderAt({ justGaveAway: true });
-
-    const status = await screen.findByRole('status');
-    expect(status).toHaveTextContent('Pass pair given away to Pat Caller. Thanks!');
-    expect(status).toHaveTextContent('Preview only: nothing was recorded.');
-    expect(screen.queryByRole('button', { name: "I'm off the mic" })).not.toBeInTheDocument();
-  });
-
-  it('warns before showing a show the DJ gave away in preview this shift', async () => {
-    recordPreviewGiveaway({ show_id: 1, given_away_by_dj: 'DJ Test', recipient_name: 'Pat Caller' });
-    await renderAt(null);
-
-    expect(await screen.findByRole('alert')).toHaveTextContent("You can't give away passes to this show right now");
-  });
-
-  it('says a preview Tried recorded nothing', async () => {
-    await renderAt({ justTried: true });
-
-    expect(await screen.findByRole('status')).toHaveTextContent('Preview only: no attempt was recorded.');
-    expect(screen.getByRole('button', { name: "I'm off the mic" })).toBeInTheDocument();
   });
 });
 

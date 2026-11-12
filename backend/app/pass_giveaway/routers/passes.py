@@ -155,9 +155,9 @@ def give_away_pass(
     """
     Give away a pass pair.
 
-    Requires DJ studio network access (or, in staging, Sublist DJ staff).
-    Promotions staff can view the DJ giveaway page as a preview but cannot
-    record a real giveaway.
+    Requires DJ studio network access (or, in staging, Sublist DJ staff or
+    impersonating the DJ studio network). Promotions staff elsewhere see the
+    DJ giveaway page view only and cannot record a real giveaway.
 
     Args:
         pass_id: Pass ID

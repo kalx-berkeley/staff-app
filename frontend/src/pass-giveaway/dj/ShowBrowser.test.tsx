@@ -6,13 +6,6 @@ import ShowBrowser from './ShowBrowser';
 import { showsAPI, venuesAPI, passesAPI, autocompleteAPI } from '../api';
 import type { ShowSummary, PassResponse } from '../types';
 import { DJ_NAME_KEY } from '../components';
-import { recordPreviewGiveaway } from './previewGiveaways';
-
-// A DJ studio computer by default; a test sets user to preview from home.
-const auth = vi.hoisted(() => ({
-  user: { email: null, role: 'dj', is_dj_network: true, is_station_office_network: true } as Record<string, unknown> | null,
-}));
-vi.mock('../../common/contexts/authHooks', () => ({ useAuth: () => ({ user: auth.user }) }));
 
 // Mock the API
 vi.mock('../api', () => ({
@@ -181,8 +174,6 @@ describe('ShowBrowser', () => {
     vi.mocked(autocompleteAPI.getDJNames).mockResolvedValue([]);
     vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([]);
     localStorage.clear();
-    sessionStorage.clear();
-    auth.user = { email: null, role: 'dj', is_dj_network: true, is_station_office_network: true };
   });
 
   describe('Show Filtering', () => {
@@ -650,25 +641,6 @@ describe('ShowBrowser', () => {
         expect(rockCard).toHaveClass('show-card-dimmed');
         expect(within(rockCard.querySelector('.show-view-with-reason') as HTMLElement).getByRole('tooltip')).toHaveTextContent(/already gave away a pass pair for this show this DJ shift/);
         expect(within(rockCard).queryByRole('button', { name: /Clothespin/ })).not.toBeInTheDocument();
-      });
-
-      it('treats a preview giveaway made away from the studio like a real one', async () => {
-        auth.user = { email: 'promo@example.com', role: 'promotions', is_dj_network: false, is_station_office_network: false };
-        recordPreviewGiveaway({ show_id: 1, given_away_by_dj: 'DJ Wolfman', recipient_name: 'Pat Caller' });
-        vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([reservedPass()]);
-        await renderWithDj();
-
-        const rockCard = mainCard('Rock Concert');
-        expect(await within(rockCard).findByRole('link', { name: 'View Show' })).toBeInTheDocument();
-        expect(within(rockCard.querySelector('.show-view-with-reason') as HTMLElement).getByRole('tooltip')).toHaveTextContent(/already gave away a pass pair/);
-      });
-
-      it('ignores preview giveaways on a DJ studio computer', async () => {
-        recordPreviewGiveaway({ show_id: 1, given_away_by_dj: 'DJ Wolfman', recipient_name: 'Pat Caller' });
-        vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([reservedPass()]);
-        await renderWithDj();
-
-        expect(within(mainCard('Rock Concert')).getByRole('link', { name: 'Give Away Passes' })).toBeInTheDocument();
       });
 
       it('offers Give Away again once the shift is over', async () => {

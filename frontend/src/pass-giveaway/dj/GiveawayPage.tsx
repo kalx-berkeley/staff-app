@@ -18,15 +18,15 @@ const GiveawayPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  // Away from the DJ studio, the page runs as a preview that records nothing
-  const isPreview = !canRecordDjGiveaways(user);
+  // Away from the DJ studio, the page is view only: the form is disabled
+  const isViewOnly = !canRecordDjGiveaways(user);
   const [show, setShow] = useState<ShowResponse | null>(null);
   usePageTitle(`Pass Giveaway${show ? `: ${show.event_name}` : ''} · DJ`);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [djName, setDjName] = useState(localStorage.getItem(DJ_NAME_KEY) || '');
   // KALX Staff Analytics counts each visit to this page and what came of it
-  const visitId = useGiveawayVisit(id ? parseInt(id) : null, djName, !isPreview);
+  const visitId = useGiveawayVisit(id ? parseInt(id) : null, djName, !isViewOnly);
 
   const loadShow = useCallback(async () => {
     if (!id) return;
@@ -119,12 +119,12 @@ const GiveawayPage = () => {
 
   return (
     <div className="dj-show-document">
-      {isPreview && (
-        <div className="kalx-doc-instructions">
+      {isViewOnly && (
+        <div className="kalx-doc-instructions" role="note">
           <p>
-            <strong>Preview only.</strong> You're not in the DJ studio, so nothing you do
-            here is recorded. Give Away and Tried work just as they do for the on-air DJ,
-            but no pass is given away and no attempt is saved.
+            <strong>View only.</strong> Giveaways can only be recorded from the DJ studio,
+            so Give Away and Tried are turned off here. This is how the page looks to the
+            on-air DJ.
           </p>
         </div>
       )}
@@ -249,7 +249,7 @@ const GiveawayPage = () => {
                   winFrequencyDays={show.venue.win_frequency_days}
                   winFrequencySharedWith={show.venue.win_frequency_shared_with}
                   requiresEmail={show.guest_list_requirements.requires_email_address}
-                  preview={isPreview}
+                  viewOnly={isViewOnly}
                   visitId={visitId}
                 />
               </div>

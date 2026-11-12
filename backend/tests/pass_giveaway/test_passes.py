@@ -140,7 +140,7 @@ def test_give_away_pass(client, show, db):
 
 
 def test_give_away_pass_denied_for_promotions_staff(client, show, promotions_staff, db):
-    """Promotions staff can preview the DJ giveaway page but cannot actually
+    """Promotions staff can view the DJ giveaway page but cannot actually
     record a giveaway — they aren't physically in the DJ studio."""
     pass_item = (
         db.query(Pass)
@@ -178,13 +178,101 @@ def test_record_attempt(client, show, db):
 
 
 def test_record_attempt_denied_for_promotions_staff(client, show, promotions_staff, db):
-    """Promotions staff cannot record a giveaway attempt from the preview page."""
+    """Promotions staff cannot record a giveaway attempt from the view-only page."""
     response = client.post(
         f"/api/shows/{show.id}/attempt",
         json={"dj_name": "DJ Test"},
         headers={"X-Forwarded-User": promotions_staff.email},
     )
     assert response.status_code == 401
+
+
+def _giveaway_as(client, pass_item, email):
+    return client.post(
+        f"/api/passes/{pass_item.id}/giveaway",
+        json={
+            "recipient_name": "John Doe",
+            "recipient_phone": "555-1234",
+            "given_away_by_dj": "DJ Test",
+        },
+        headers={"X-Forwarded-User": email},
+    )
+
+
+def _first_available_pair(db, show):
+    return (
+        db.query(Pass)
+        .filter(
+            Pass.show_id == show.id, Pass.pass_type == "pair", Pass.status == "available"
+        )
+        .first()
+    )
+
+
+def test_giveaway_allowed_while_impersonating_dj_studio_in_staging(
+    client, show, promotions_staff, db, monkeypatch
+):
+    """Staging: impersonating the DJ studio network records real giveaways and
+    attempts, so the whole flow (win frequency included) can be tested."""
+    from app import config
+    from app.models.impersonation_session import ImpersonationSession
+
+    monkeypatch.setattr(config.settings, "environment", "staging")
+    db.add(
+        ImpersonationSession(real_email=promotions_staff.email, impersonate_dj_network=True)
+    )
+    db.commit()
+
+    response = _giveaway_as(client, _first_available_pair(db, show), promotions_staff.email)
+    assert response.status_code == 200
+    assert response.json()["status"] == "given_away"
+
+    response = client.post(
+        f"/api/shows/{show.id}/attempt",
+        json={"dj_name": "DJ Other"},
+        headers={"X-Forwarded-User": promotions_staff.email},
+    )
+    assert response.status_code == 200
+
+
+def test_giveaway_denied_while_impersonating_dj_studio_outside_staging(
+    client, show, promotions_staff, db
+):
+    """Outside staging, a leftover DJ studio impersonation session grants nothing."""
+    from app.models.impersonation_session import ImpersonationSession
+
+    db.add(
+        ImpersonationSession(real_email=promotions_staff.email, impersonate_dj_network=True)
+    )
+    db.commit()
+
+    response = _giveaway_as(client, _first_available_pair(db, show), promotions_staff.email)
+    assert response.status_code == 401
+
+
+def test_giveaway_allowed_while_impersonating_sublist_dj_in_staging(
+    client, show, promotions_staff, db, monkeypatch
+):
+    """Staging: impersonating a Sublist DJ records real giveaways, matching the
+    DJ view, which treats the impersonated Sublist DJ as able to record."""
+    from app import config
+    from app.models.impersonation_session import ImpersonationSession
+
+    monkeypatch.setattr(config.settings, "environment", "staging")
+    sublist_dj = Staff(email="sublist-imp@test.com", name="Sublist Imp", phone="555-0009")
+    db.add(sublist_dj)
+    db.flush()
+    db.add(StaffStatus(staff_id=sublist_dj.id, status="Active"))
+    db.add(StaffStatus(staff_id=sublist_dj.id, status="Sublist DJ"))
+    db.add(
+        ImpersonationSession(
+            real_email=promotions_staff.email, impersonated_email=sublist_dj.email
+        )
+    )
+    db.commit()
+
+    response = _giveaway_as(client, _first_available_pair(db, show), promotions_staff.email)
+    assert response.status_code == 200
 
 
 def test_claim_staff_pass(client, show, staff_member, db):

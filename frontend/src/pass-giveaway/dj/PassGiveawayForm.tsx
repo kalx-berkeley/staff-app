@@ -3,8 +3,7 @@ import { passesAPI, showsAPI, venuePassesAPI } from '../api';
 import { Tooltip } from '../components';
 import type { PassResponse, GiveawayData, WinnerEligibility } from '../types';
 import type { APIError } from '../../common/types';
-import { findRecentDjGiveaway, joinNames } from '../utils';
-import { getPreviewGiveaways, recordPreviewGiveaway } from './previewGiveaways';
+import { joinNames } from '../utils';
 
 interface PassGiveawayFormProps {
   pass: PassResponse;
@@ -20,11 +19,11 @@ interface PassGiveawayFormProps {
   winFrequencySharedWith?: string[];
   requiresEmail?: boolean;
   /**
-   * Preview mode, for someone who can't really record a giveaway: the form
-   * works as usual, checks included, but Give Away and Tried only pretend to
-   * save (see previewGiveaways.ts) before calling onSuccess.
+   * View only, for someone who can't record a giveaway (away from the DJ
+   * studio): the form shows as it does on air, but every field and button is
+   * disabled.
    */
-  preview?: boolean;
+  viewOnly?: boolean;
   /** The giveaway page visit, sent with the giveaway or attempt for KALX Staff Analytics. */
   visitId?: string | null;
 }
@@ -33,7 +32,7 @@ export type GiveawayOutcome = 'given_away' | 'tried';
 
 type WinnerFields = Omit<GiveawayData, 'given_away_by_dj' | 'visit_id'>;
 
-const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, winFrequencyDays, winFrequencySharedWith = [], requiresEmail, preview, visitId }: PassGiveawayFormProps) => {
+const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, winFrequencyDays, winFrequencySharedWith = [], requiresEmail, viewOnly, visitId }: PassGiveawayFormProps) => {
   const [formData, setFormData] = useState<WinnerFields>({
     recipient_name: '',
     recipient_phone: '',
@@ -81,6 +80,8 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
 
   const handleGiveaway = async (e: React.FormEvent) => {
     e.preventDefault();
+    // The disabled fieldset stops this in browsers; this guards anything else
+    if (viewOnly) return;
     setError(null);
 
     if (!formData.recipient_name.trim()) {
@@ -102,23 +103,6 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
     if (!checkDjName()) return;
     if (isSubmitBlocked) {
       setError('Winner is ineligible. Check the override box to proceed.');
-      return;
-    }
-
-    if (preview) {
-      // The same one-pair-per-shift refusal the backend gives
-      const name = djName.trim();
-      const showPreviews = getPreviewGiveaways().filter((g) => g.show_id === pass.show_id);
-      if (findRecentDjGiveaway(showPreviews, name)) {
-        setError(`DJ '${name}' has already given away a pair of passes for this show within the last 4 hours`);
-        return;
-      }
-      recordPreviewGiveaway({
-        show_id: pass.show_id,
-        given_away_by_dj: name,
-        recipient_name: formData.recipient_name.trim(),
-      });
-      onSuccess('given_away');
       return;
     }
 
@@ -145,14 +129,10 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
   };
 
   const handleNoWinner = async () => {
+    if (viewOnly) return;
     setError(null);
 
     if (!checkDjName()) return;
-
-    if (preview) {
-      onSuccess('tried');
-      return;
-    }
 
     try {
       setLoading(true);
@@ -193,85 +173,86 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
       {error && <div className="error-message">{error}</div>}
 
       <form onSubmit={handleGiveaway}>
-        <fieldset className="giveaway-winner-fieldset">
-          <legend>Caller won</legend>
-          <div className="form-group">
-            <label htmlFor="recipient_name">Winner Name *</label>
-            <input
-              type="text"
-              id="recipient_name"
-              value={formData.recipient_name}
-              onChange={(e) => handleInputChange('recipient_name', e.target.value)}
-              disabled={loading}
-              placeholder="Enter winner's name"
-              autoComplete="off"
-            />
-          </div>
-
-          <div className="form-group">
-            <div className="label-with-help">
-              <label htmlFor="recipient_phone">Winner Phone *</label>
-              {winFrequencyDays ? (
-                <Tooltip text="The phone number is checked against the win history of this venue and any venues sharing its limit. If this caller won recently, a warning will appear and you may need to override." />
-              ) : null}
-            </div>
-            <input
-              type="tel"
-              id="recipient_phone"
-              value={formData.recipient_phone}
-              onChange={(e) => handleInputChange('recipient_phone', e.target.value)}
-              onBlur={handlePhoneBlur}
-              disabled={loading}
-              placeholder="Enter winner's phone number"
-              autoComplete="off"
-            />
-            {winEligibility?.eligible === false && (
-              <div className="win-ineligible-warning">
-                <strong>Warning:</strong> This caller already won passes to{' '}
-                <em>{winEligibility.last_win_show}</em>
-                {winEligibility.last_win_venue && <> at <strong>{winEligibility.last_win_venue}</strong></>}{' '}
-                (show date: {winEligibility.last_win_date}),
-                which is only {winEligibility.days_since} day{winEligibility.days_since !== 1 ? 's' : ''} before this show.
-                The venue requires at least {winEligibility.required_days} days between show dates.
-                <label className="override-label">
-                  <input
-                    type="checkbox"
-                    checked={overrideIneligible}
-                    onChange={(e) => setOverrideIneligible(e.target.checked)}
-                  />
-                  Override — proceed anyway and award these passes to this caller
-                </label>
-              </div>
-            )}
-          </div>
-
-          {requiresEmail && (
+        <fieldset className="giveaway-view-only-fieldset" disabled={viewOnly}>
+          <fieldset className="giveaway-winner-fieldset">
+            <legend>Caller won</legend>
             <div className="form-group">
-              <label htmlFor="recipient_email">Winner Email *</label>
-              <p className="field-hint">
-                This venue requires the winner's email address for their guest list.
-              </p>
+              <label htmlFor="recipient_name">Winner Name *</label>
               <input
-                type="email"
-                id="recipient_email"
-                value={formData.recipient_email ?? ''}
-                onChange={(e) => handleInputChange('recipient_email', e.target.value)}
+                type="text"
+                id="recipient_name"
+                value={formData.recipient_name}
+                onChange={(e) => handleInputChange('recipient_name', e.target.value)}
                 disabled={loading}
-                placeholder="Enter winner's email address"
+                placeholder="Enter winner's name"
                 autoComplete="off"
               />
             </div>
-          )}
 
-          <div className="form-actions">
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={loading || isSubmitBlocked}
-            >
-              {loading ? 'Saving...' : 'Give Away'}
-            </button>
-          </div>
+            <div className="form-group">
+              <div className="label-with-help">
+                <label htmlFor="recipient_phone">Winner Phone *</label>
+                {winFrequencyDays ? (
+                  <Tooltip text="The phone number is checked against the win history of this venue and any venues sharing its limit. If this caller won recently, a warning will appear and you may need to override." />
+                ) : null}
+              </div>
+              <input
+                type="tel"
+                id="recipient_phone"
+                value={formData.recipient_phone}
+                onChange={(e) => handleInputChange('recipient_phone', e.target.value)}
+                onBlur={handlePhoneBlur}
+                disabled={loading}
+                placeholder="Enter winner's phone number"
+                autoComplete="off"
+              />
+              {winEligibility?.eligible === false && (
+                <div className="win-ineligible-warning">
+                  <strong>Warning:</strong> This caller already won passes to{' '}
+                  <em>{winEligibility.last_win_show}</em>
+                  {winEligibility.last_win_venue && <> at <strong>{winEligibility.last_win_venue}</strong></>}{' '}
+                  (show date: {winEligibility.last_win_date}),
+                  which is only {winEligibility.days_since} day{winEligibility.days_since !== 1 ? 's' : ''} before this show.
+                  The venue requires at least {winEligibility.required_days} days between show dates.
+                  <label className="override-label">
+                    <input
+                      type="checkbox"
+                      checked={overrideIneligible}
+                      onChange={(e) => setOverrideIneligible(e.target.checked)}
+                    />
+                    Override — proceed anyway and award these passes to this caller
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {requiresEmail && (
+              <div className="form-group">
+                <label htmlFor="recipient_email">Winner Email *</label>
+                <p className="field-hint">
+                  This venue requires the winner's email address for their guest list.
+                </p>
+                <input
+                  type="email"
+                  id="recipient_email"
+                  value={formData.recipient_email ?? ''}
+                  onChange={(e) => handleInputChange('recipient_email', e.target.value)}
+                  disabled={loading}
+                  placeholder="Enter winner's email address"
+                  autoComplete="off"
+                />
+              </div>
+            )}
+
+            <div className="form-actions">
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={loading || isSubmitBlocked}
+              >
+                {loading ? 'Saving...' : 'Give Away'}
+              </button>
+            </div>
         </fieldset>
 
         <div className="giveaway-no-winner">
@@ -286,6 +267,7 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
           </button>
           <span className="field-hint">Records the attempt. The pass stays available.</span>
         </div>
+        </fieldset>
       </form>
     </div>
   );

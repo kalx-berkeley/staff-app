@@ -5,9 +5,7 @@ import { DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, KalxLiveBa
 import MarkdownContent from '../../common/components/MarkdownContent';
 import { formatPhone } from '../../common/utils';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { useAuth } from '../../common/contexts/authHooks';
-import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, canDjEditWinner, canRecordDjGiveaways, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
-import { getPreviewGiveaways } from './previewGiveaways';
+import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, canDjEditWinner, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
 import WinnerEditForm from './WinnerEditForm';
 import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
 import type { ShowResponse, PassResponse } from '../types';
@@ -17,9 +15,6 @@ const ShowDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
-  // Away from the DJ studio, giveaways are only pretend (previewGiveaways.ts)
-  const isPreview = !canRecordDjGiveaways(user);
   // Set by GiveawayPage after a successful giveaway. The DJ has just used their
   // one pair for this show, so the "I'm off the mic" button would only
   // confuse them. Read once, then cleared
@@ -157,10 +152,7 @@ const ShowDetail = () => {
   // The show list only links here with "View" after a recent giveaway, and
   // the backend refuses a second pair for the show this DJ shift.
   const recentDjGiveaway: Pick<PassResponse, 'given_away_at' | 'recipient_name'> | undefined =
-    findRecentDjGiveaway(givenAwayPasses, djName) ??
-    (isPreview
-      ? findRecentDjGiveaway(getPreviewGiveaways().filter((g) => g.show_id === show.id), djName)
-      : undefined);
+    findRecentDjGiveaway(givenAwayPasses, djName);
   const canGiveAway = availablePasses.length > 0 && !justGaveAway && !recentDjGiveaway;
   // Every pair left is pre-assigned to another DJ, so giving one away on air
   // takes it from them. The DJ must click through a warning first.
@@ -352,15 +344,12 @@ const ShowDetail = () => {
         <div className="success-message dj-giveaway-success" role="status">
           Pass pair given away
           {recentDjGiveaway?.recipient_name && <> to <strong>{recentDjGiveaway.recipient_name}</strong></>}. Thanks!
-          {isPreview && ' (Preview only: nothing was recorded.)'}
         </div>
       )}
 
       {justTried && (
         <div className="success-message dj-giveaway-success" role="status">
-          {isPreview
-            ? 'Preview only: no attempt was recorded. On air, the pass would still be available. Thanks for trying!'
-            : <>Attempt recorded. No pass was given away, so it&apos;s still available. Thanks for trying!</>}
+          Attempt recorded. No pass was given away, so it&apos;s still available. Thanks for trying!
         </div>
       )}
 

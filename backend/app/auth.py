@@ -525,9 +525,12 @@ def check_dj_giveaway_access(
     Access is granted if:
     1. Request is from DJ studio network (no authentication required — this
        is the normal path, since DJs on-air don't log in), OR
-    2. In staging, user is an authenticated staff member with active Sublist DJ
-       status (lets Sublist DJ staff test the full giveaway flow remotely
-       before this is rolled out to production)
+    2. In staging, the signed-in user is impersonating the DJ studio network
+       (KALX Staff Admin), so the impersonator can test the real giveaway
+       flow, win frequency checks included, OR
+    3. In staging, user is an authenticated staff member with active Sublist DJ
+       status, or is impersonating one (lets Sublist DJ staff test the full
+       giveaway flow remotely before this is rolled out to production)
 
     :param x_forwarded_user: Email from Apache mod_auth_openidc Google authentication (optional)
     :param x_forwarded_for: IP address from proxy
@@ -541,7 +544,19 @@ def check_dj_giveaway_access(
             return True
 
     if x_forwarded_user and settings.environment == "staging":
-        staff = db.query(Staff).filter(Staff.email == x_forwarded_user).first()
+        from app.models.impersonation_session import ImpersonationSession
+
+        imp = (
+            db.query(ImpersonationSession)
+            .filter(ImpersonationSession.real_email == x_forwarded_user)
+            .first()
+        )
+        if imp and imp.impersonate_dj_network:
+            return True
+        effective_email = (
+            imp.impersonated_email if imp and imp.impersonated_email else x_forwarded_user
+        )
+        staff = db.query(Staff).filter(Staff.email == effective_email).first()
         if staff and _is_sublist_dj(staff):
             return True
 

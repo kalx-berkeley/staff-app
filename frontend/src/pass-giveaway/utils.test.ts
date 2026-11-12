@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   addressHasStateOrZip,
   canDjEditWinner,
+  canRecordDjGiveaways,
   compareVenueNames,
   canUsePassGiveawayAdmin,
   findRecentDjGiveaway,
@@ -175,6 +176,35 @@ describe('showsPassGiveawayAdminLink', () => {
     expect(showsPassGiveawayAdminLink(impersonating)).toBe(false);
     expect(showsPassGiveawayAdminLink({ ...admin, is_impersonating_dj_network: true })).toBe(false);
     expect(canUsePassGiveawayAdmin(impersonating)).toBe(true);
+  });
+});
+
+describe('canRecordDjGiveaways', () => {
+  const user: UserResponse = {
+    email: 'promo@test.com',
+    role: 'promotions',
+    is_dj_network: false,
+    is_station_office_network: false,
+  };
+
+  it('records from the DJ studio network', () => {
+    const studio: UserResponse = { ...user, email: null, role: 'dj', is_dj_network: true };
+    expect(canRecordDjGiveaways(studio)).toBe(true);
+  });
+
+  it('records while impersonating the DJ studio network in staging', () => {
+    const impersonating: UserResponse = { ...user, is_staging: true, is_dj_network: true, is_impersonating_dj_network: true };
+    expect(canRecordDjGiveaways(impersonating)).toBe(true);
+  });
+
+  it('records for Sublist DJ staff in staging', () => {
+    const sublistDj = { ...user, role: 'staff' as const, is_staging: true, profile: { is_sublist_dj: true } } as UserResponse;
+    expect(canRecordDjGiveaways(sublistDj)).toBe(true);
+  });
+
+  it("doesn't record for promotions staff away from the studio, or nobody", () => {
+    expect(canRecordDjGiveaways(user)).toBe(false);
+    expect(canRecordDjGiveaways(null)).toBe(false);
   });
 });
 
