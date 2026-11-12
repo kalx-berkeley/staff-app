@@ -194,6 +194,130 @@ class TestClosing:
         assert body["close_notifications_pending"] is True
 
 
+REMINDER = "Reminder: you're on the guest list for Hold Show"
+
+
+def _claim(db: Session, show: Show, staff: Staff, **kwargs) -> Pass:
+    pass_item = Pass(
+        show_id=show.id, pass_type="staff", status="claimed", staff_id=staff.id, **kwargs
+    )
+    db.add(pass_item)
+    db.commit()
+    return pass_item
+
+
+class TestReminders:
+    """Staff pass winners the close has nothing else to tell get a reminder."""
+
+    def test_solo_winner_is_reminded(self, client, db, venue, promo, host):
+        show = _show(db, venue, staff_instructions="Ask for Sam at the door.")
+        _claim(db, show, host)
+
+        _, mock_send = _close(client, promo, show)
+
+        assert _subjects(mock_send, host) == [REMINDER]
+        body = mock_send.call_args.kwargs["body_text"]
+        assert '"Hold Show" at Hold Venue' in body
+        assert "The show starts at 8:00pm." in body
+        assert "Ask for Sam at the door." in body
+        assert f"/pass-giveaway/staff/shows/{show.id}" in body
+
+    def test_reminder_is_not_held(self, client, db, venue, promo, host, alternate, show):
+        solo = _staff(db, "Sol")
+        _claim(db, show, solo)
+
+        body, mock_send = _close(client, promo, show)
+
+        assert body["close_notifications_pending"] is True
+        assert _subjects(mock_send, solo) == [REMINDER]
+        assert _subjects(mock_send, host) == []
+        assert _subjects(mock_send, alternate) == []
+
+    def test_held_emails_dont_remind_again(
+        self, client, db, venue, promo, host, alternate, show
+    ):
+        solo = _staff(db, "Sol")
+        _claim(db, show, solo)
+        _close(client, promo, show)
+
+        with patch(SEND_EMAIL) as mock_send:
+            _post(client, promo, show, "send-close-notifications")
+
+        assert _subjects(mock_send, solo) == []
+        assert _subjects(mock_send, host) == ["Your guest is confirmed: Hold Show"]
+
+    def test_plus_one_host_gets_only_their_outcome(
+        self, client, db, venue, promo, host, alternate, show
+    ):
+        venue.hold_close_notifications = False
+        db.commit()
+
+        _, mock_send = _close(client, promo, show)
+
+        assert _subjects(mock_send, host) == ["Your guest is confirmed: Hold Show"]
+
+    def test_host_with_waiting_guest_gets_only_their_outcome(
+        self, client, db, venue, promo, host
+    ):
+        venue.hold_close_notifications = False
+        show = _show(db, venue)
+        _claim(
+            db,
+            show,
+            host,
+            guest_waiting=True,
+            guest_name="Gus",
+            guest_priority_at=datetime.now(timezone.utc),
+        )
+
+        _, mock_send = _close(client, promo, show)
+
+        assert _subjects(mock_send, host) == ["Your guest didn't get a pass: Hold Show"]
+
+    def test_held_host_with_waiting_guest_hears_nothing_at_close(
+        self, client, db, venue, promo, host
+    ):
+        show = _show(db, venue)
+        _claim(
+            db,
+            show,
+            host,
+            guest_waiting=True,
+            guest_name="Gus",
+            guest_priority_at=datetime.now(timezone.utc),
+        )
+
+        body, mock_send = _close(client, promo, show)
+
+        assert body["close_notifications_pending"] is True
+        assert _subjects(mock_send, host) == []
+
+    def test_email_preference_off(self, client, db, venue, promo, host):
+        from app.models.notification_preferences import NotificationPreferences
+
+        db.add(NotificationPreferences(staff_id=host.id, email_enabled=False))
+        show = _show(db, venue)
+        _claim(db, show, host)
+
+        _, mock_send = _close(client, promo, show)
+
+        assert mock_send.call_count == 0
+
+    def test_tabler_and_released_passes_arent_reminded(
+        self, client, db, venue, promo, host, alternate
+    ):
+        show = _show(db, venue)
+        db.add(
+            Pass(show_id=show.id, pass_type="tabler", status="claimed", staff_id=host.id)
+        )
+        _claim(db, show, alternate).status = "available"
+        db.commit()
+
+        _, mock_send = _close(client, promo, show)
+
+        assert mock_send.call_count == 0
+
+
 class TestAutoClose:
     def _auto_close(self, db: Session, show: Show):
         with (
@@ -356,7 +480,11 @@ class TestReopen:
         assert any("alex" in c.kwargs["to_email"] for c in promoted.call_args_list)
 
         body, close_send = _close(client, promo, show)
-        assert close_send.call_count == 0
+        # Only the promoted alternate, who now holds a pass alone, hears at close.
+        assert _subjects(close_send, alternate) == [
+            "Reminder: you're on the guest list for Hold Show"
+        ]
+        assert close_send.call_count == 1
         assert body["close_notifications_pending"] is True
 
         with patch(SEND_EMAIL) as mock_send:

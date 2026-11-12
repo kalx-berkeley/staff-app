@@ -1438,6 +1438,26 @@ class TestCloseDuringLottery:
         )
         assert statuses == ["lost", "won", "won"]
 
+    def test_close_draw_winner_gets_one_email(
+        self, client, db, venue, promotions_staff, joe
+    ):
+        """The draw's email tells them they won, so there's no separate reminder."""
+        show = _make_lottery_show(db, venue, num_staff_passes=1)
+        _make_staff_entry(db, show, joe)
+
+        with (
+            patch(self.UNSCHEDULE),
+            patch("app.common.services.notification_service.send_email") as send,
+        ):
+            client.post(
+                f"/api/shows/{show.id}/close",
+                headers={"X-Forwarded-User": promotions_staff.email},
+            )
+
+        to_joe = [c for c in send.call_args_list if c.kwargs["to_email"] == joe.email]
+        assert len(to_joe) == 1
+        assert not to_joe[0].kwargs["subject"].startswith("Reminder")
+
     def test_close_without_entries(self, client, db, venue, promotions_staff):
         show = _make_lottery_show(db, venue, num_staff_passes=2)
 

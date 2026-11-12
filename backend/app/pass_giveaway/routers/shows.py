@@ -153,6 +153,59 @@ def _add_close_outcomes(db, show, digest: CloseDigest) -> dict[str, int]:
     }
 
 
+def _add_close_reminders(db, show, digest: CloseDigest, held: bool) -> None:
+    """
+    Remind staff pass winners that they're on the guest list.
+
+    Only for winners this close has nothing else to tell. Anyone the close told about
+    a lottery draw, a promotion or their guest already hears from it, and a +1 host
+    whose outcome is held hears when a rep sends the held emails.
+
+    :param held: The close's outcome emails are held for a rep to send.
+    """
+    from app.models.pass_model import Pass
+    from app.pass_giveaway.services.alternate_service import AlternateService
+
+    winners = (
+        db.query(Pass)
+        .filter(
+            Pass.show_id == show.id,
+            Pass.pass_type == "staff",
+            Pass.status == "claimed",
+            Pass.guest_of_pass_id.is_(None),
+            Pass.staff_id.isnot(None),
+        )
+        .all()
+    )
+    lines = [
+        (
+            "This is a reminder that the guest list for"
+            f" {AlternateService._show_desc(show)} has been closed, and you're on it."
+        ),
+    ]
+    if show.show_time and not show.show_start_date:
+        start = show.show_time.strftime("%I:%M%p").lstrip("0").lower()
+        lines += ["", f"The show starts at {start}."]
+    if show.staff_instructions:
+        lines += ["", "Instructions from KALX Promotions:", show.staff_instructions]
+    lines += [
+        "",
+        "Please check with the venue for entry details.",
+        "",
+        AlternateService._show_url(show),
+    ]
+    for pass_item in winners:
+        if digest.has_message(pass_item.staff):
+            continue
+        if held and (pass_item.has_guest or pass_item.guest_waiting):
+            continue
+        digest.add_outcome(
+            pass_item.staff,
+            f"Reminder: you're on the guest list for {show.event_name}",
+            lines,
+        )
+
+
 def run_close_side_effects(db, show, digest: CloseDigest | None = None) -> None:
     """
     What follows closing a show, whether manual or automatic.
@@ -160,7 +213,8 @@ def run_close_side_effects(db, show, digest: CloseDigest | None = None) -> None:
     Tells +1 hosts whether their guest is on the guest list, and tells anyone still on
     the alternate list that they did not get a pass. When the show's promoter or venue
     holds those emails, and there's anyone to send them to, they wait for the
-    send-close-notifications endpoint instead.
+    send-close-notifications endpoint instead. Every other staff pass winner gets a
+    reminder that they're on the guest list, which is never held.
 
     :param digest: What the close itself had to tell people, from ``close_show``.
     """
@@ -178,6 +232,7 @@ def run_close_side_effects(db, show, digest: CloseDigest | None = None) -> None:
     AlternateService.expire_on_close(db, show)
     if not hold:
         _add_close_outcomes(db, show, digest)
+    _add_close_reminders(db, show, digest, held=hold)
     digest.send(db)
 
 

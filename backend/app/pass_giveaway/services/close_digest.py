@@ -49,6 +49,10 @@ class CloseDigest:
     def _message(self, staff: Staff) -> _Message:
         return self._messages.setdefault(staff.id, _Message(staff))
 
+    def has_message(self, staff: Staff) -> bool:
+        """Whether this close already has something to tell this person."""
+        return staff.id in self._messages
+
     def add_intro(
         self,
         staff: Staff | None,
