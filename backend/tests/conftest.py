@@ -77,6 +77,24 @@ def block_real_email(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def artist_info_warmups(monkeypatch) -> list[list[str]]:
+    """
+    Record, instead of running, the band popup's background artist info fetches.
+
+    Saving a show with band tags queues `warm_artist_info`, which would call
+    MusicBrainz, Wikidata and Wikipedia for real (and on the app's own
+    database). Each queued call's artist IDs are appended to the returned list.
+    """
+    from app.pass_giveaway.services import artist_info_service
+
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        artist_info_service, "warm_artist_info", lambda ids: calls.append(list(ids))
+    )
+    return calls
+
+
+@pytest.fixture(autouse=True)
 def reset_rate_limiter():
     """Reset in-memory rate limiter state before each test."""
     _reset_for_testing()

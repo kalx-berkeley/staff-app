@@ -4,7 +4,7 @@ import logging
 from datetime import date
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
@@ -30,6 +30,7 @@ from app.pass_giveaway.services.tracking import (
     record_visit_outcome,
 )
 from app.pass_giveaway.services.pass_service import PassService
+from app.pass_giveaway.services import artist_info_service
 from app.pass_giveaway.services import tabler_service
 from app.pass_giveaway.services import entered_winners_service
 from app.common.services.leave_service import today_pt
@@ -56,7 +57,6 @@ from app.models.staff import Staff
 from app.models.staff_status import StaffStatus
 from app.models.show import Show
 from app.models.show_band import ShowBand
-from app.common.services.cache_service import fetch_cached
 from app.models.venue_owner import VenueOwner
 from app.models.promoter_owner import PromoterOwner
 from app.config import settings
@@ -765,6 +765,7 @@ def search_shows(
 @router.post("", response_model=ShowResponse, status_code=status.HTTP_201_CREATED)
 def create_show(
     show_data: ShowCreate,
+    background_tasks: BackgroundTasks,
     promotions: Staff = Depends(get_promotions_staff),
     db: Session = Depends(get_db),
 ):
@@ -793,6 +794,7 @@ def create_show(
         db.add_all(new_bands)
         db.commit()
         db.refresh(show)
+        _precache_band_info(background_tasks, show)
 
     # New shows are always created in draft status, so there is nothing to
     # schedule yet — the auto-close job is scheduled when the show is published.
@@ -961,113 +963,33 @@ def musicbrainz_search(name: str):
         return []
 
 
-# MusicBrainz artist URL relation types shown as icons in the band popup, in
-# the order they're shown.
-ARTIST_LINK_TYPES = (
-    "official homepage",
-    "bandcamp",
-    "discogs",
-    "lyrics",
-    "free streaming",
-    "soundcloud",
-)
-
-
-def _artist_links(mb_data: dict) -> list[dict]:
-    """Return the artist's current links of the ARTIST_LINK_TYPES types.
-
-    Ended relations (links MusicBrainz marks as no longer valid) and anything
-    that isn't an http(s) URL are skipped, as are duplicates.
-    """
-    links = []
-    seen = set()
-    for rel in mb_data.get("relations", []):
-        rel_type = rel.get("type")
-        url = (rel.get("url") or {}).get("resource") or ""
-        if rel_type not in ARTIST_LINK_TYPES or rel.get("ended"):
-            continue
-        if not url.startswith(("https://", "http://")) or (rel_type, url) in seen:
-            continue
-        seen.add((rel_type, url))
-        links.append({"type": rel_type, "url": url})
-    links.sort(key=lambda link: ARTIST_LINK_TYPES.index(link["type"]))
-    return links
-
-
 @router.get("/musicbrainz/artist/{artist_id}/info")
-def get_artist_info(artist_id: str, db: Session = Depends(get_db)):
-    """Fetch a MusicBrainz artist's Wikipedia extract and links.
+def get_artist_info(
+    artist_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+):
+    """Return a MusicBrainz artist's Wikipedia extract and links for the band popup.
 
-    The extract comes via the artist's Wikidata sitelink. The links are the
-    artist's homepage, Bandcamp, Discogs, lyrics, free streaming and
-    SoundCloud URLs from MusicBrainz.
+    Cached info is returned even if it has expired, and then refreshed in the
+    background, so the popup only waits for artists that were never cached.
     """
-    import re
+    lookup = artist_info_service.get_artist_info(db, artist_id, allow_stale=True)
+    if lookup.stale:
+        background_tasks.add_task(artist_info_service.warm_artist_info, [artist_id])
+    return lookup.info
 
-    headers = {
-        "User-Agent": f"kalx-promotions/1.0 ({settings.api_contact_url})",
-        "Accept-Encoding": "gzip, deflate",
-    }
-    result = {"extract": None, "wikipedia_url": None, "links": []}
 
-    try:
-        mb_data = fetch_cached(
-            db,
-            f"https://musicbrainz.org/ws/2/artist/{artist_id}?inc=url-rels&fmt=json",
-            headers=headers,
-        )
-    except Exception as exc:
-        logger.warning("MusicBrainz lookup failed for artist '%s': %s", artist_id, exc)
-        return result
-
-    result["links"] = _artist_links(mb_data)
-
-    try:
-        wikidata_id = None
-        for rel in mb_data.get("relations", []):
-            if rel.get("type") == "wikidata":
-                resource = rel.get("url", {}).get("resource", "")
-                m = re.search(r"wikidata\.org/wiki/(Q\d+)", resource)
-                if m:
-                    wikidata_id = m.group(1)
-                    break
-
-        if not wikidata_id:
-            return result
-
-        wd_data = fetch_cached(
-            db,
-            "https://www.wikidata.org/w/api.php"
-            f"?action=wbgetentities&ids={wikidata_id}&props=sitelinks"
-            "&sitefilter=enwiki&format=json",
-            headers=headers,
-        )
-
-        entity = wd_data.get("entities", {}).get(wikidata_id, {})
-        wiki_title = entity.get("sitelinks", {}).get("enwiki", {}).get("title")
-        if not wiki_title:
-            return result
-
-        wp_data = fetch_cached(
-            db,
-            f"https://en.wikipedia.org/api/rest_v1/page/summary/{wiki_title.replace(' ', '_')}",
-            headers=headers,
-        )
-
-        result["extract"] = wp_data.get("extract")
-        result["wikipedia_url"] = (
-            wp_data.get("content_urls", {}).get("desktop", {}).get("page")
-        )
-    except Exception as exc:
-        logger.warning("Wikipedia lookup failed for artist '%s': %s", artist_id, exc)
-
-    return result
+def _precache_band_info(background_tasks: BackgroundTasks, show: Show) -> None:
+    """Cache the band popup info of the show's tagged artists after the response."""
+    artist_ids = artist_info_service.tagged_artist_ids(show.bands or [])
+    if artist_ids:
+        background_tasks.add_task(artist_info_service.warm_artist_info, artist_ids)
 
 
 @router.put("/{show_id}/bands", response_model=list[ShowBandResponse])
 def update_show_bands(
     show_id: int,
     bands: list[ShowBandCreate],
+    background_tasks: BackgroundTasks,
     promotions: Staff = Depends(get_promotions_staff),
     db: Session = Depends(get_db),
 ):
@@ -1078,6 +1000,7 @@ def update_show_bands(
     db.add_all(new_bands)
     db.commit()
     db.refresh(show)
+    _precache_band_info(background_tasks, show)
     return show.bands
 
 
@@ -1106,6 +1029,7 @@ def _apply_tabler_count(db: Session, show: Show, target: int) -> None:
 def update_show(
     show_id: int,
     show_data: ShowUpdate,
+    background_tasks: BackgroundTasks,
     promotions: Staff = Depends(get_promotions_staff),
     db: Session = Depends(get_db),
 ):
@@ -1259,6 +1183,7 @@ def update_show(
         db.add_all(new_bands)
         db.commit()
         db.refresh(show)
+        _precache_band_info(background_tasks, show)
 
     # Adjust physical pass records when the pair or staff pass count changes
     pass_adjustment = None

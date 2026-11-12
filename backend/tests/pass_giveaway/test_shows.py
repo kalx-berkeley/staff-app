@@ -1505,7 +1505,8 @@ def test_artist_info_includes_links(client: TestClient, test_promotions_staff, m
         ]
     }
     monkeypatch.setattr(
-        "app.pass_giveaway.routers.shows.fetch_cached", lambda db, url, **kw: mb_data
+        "app.common.services.cache_service.fetch_cached_or_stale",
+        lambda db, url, **kw: (mb_data, False),
     )
 
     response = client.get(
@@ -1541,10 +1542,12 @@ def test_artist_info_keeps_links_when_wikipedia_fails(
 
     def fake_fetch(db, url, **kw):
         if "musicbrainz.org" in url:
-            return mb_data
+            return mb_data, False
         raise RuntimeError("Wikidata is down")
 
-    monkeypatch.setattr("app.pass_giveaway.routers.shows.fetch_cached", fake_fetch)
+    monkeypatch.setattr(
+        "app.common.services.cache_service.fetch_cached_or_stale", fake_fetch
+    )
 
     response = client.get(
         "/api/shows/musicbrainz/artist/abc/info",
@@ -1566,7 +1569,9 @@ def test_artist_info_without_musicbrainz(
     def fake_fetch(db, url, **kw):
         raise RuntimeError("MusicBrainz is down")
 
-    monkeypatch.setattr("app.pass_giveaway.routers.shows.fetch_cached", fake_fetch)
+    monkeypatch.setattr(
+        "app.common.services.cache_service.fetch_cached_or_stale", fake_fetch
+    )
 
     response = client.get(
         "/api/shows/musicbrainz/artist/abc/info",
@@ -1574,3 +1579,167 @@ def test_artist_info_without_musicbrainz(
     )
 
     assert response.json() == {"extract": None, "wikipedia_url": None, "links": []}
+
+
+def _band(musicbrainz_id: str | None, name: str, start: int = 0) -> dict:
+    return {
+        "musicbrainz_id": musicbrainz_id,
+        "band_name": name,
+        "start_pos": start,
+        "end_pos": start + len(name),
+    }
+
+
+def _tagged_show_data(venue_id: int, bands: list[dict]) -> dict:
+    return {
+        "event_name": "Wolf Parade, Local Band, Wolf Parade",
+        "venue_id": venue_id,
+        "show_date": "2024-12-31",
+        "show_time": "20:00:00",
+        "age_restriction": "all_ages",
+        "wheelchair_accessible": "yes",
+        "num_pass_pairs": 2,
+        "bands": bands,
+    }
+
+
+def test_creating_a_show_precaches_its_tagged_artists(
+    client: TestClient, test_venue, test_promotions_staff, artist_info_warmups
+):
+    """Each MusicBrainz-tagged artist's popup info is cached once the show is saved."""
+    bands = [
+        _band("mb-wolf", "Wolf Parade"),
+        _band(None, "Local Band", 13),
+        _band("mb-wolf", "Wolf Parade", 25),
+    ]
+
+    response = client.post(
+        "/api/shows",
+        json=_tagged_show_data(test_venue.id, bands),
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.status_code == 201
+    assert artist_info_warmups == [["mb-wolf"]]
+
+
+def test_creating_a_show_without_tagged_artists_precaches_nothing(
+    client: TestClient, test_venue, test_promotions_staff, artist_info_warmups
+):
+    """No warm-up is queued when no tag has a MusicBrainz ID."""
+    response = client.post(
+        "/api/shows",
+        json=_tagged_show_data(test_venue.id, [_band(None, "Local Band", 13)]),
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.status_code == 201
+    assert artist_info_warmups == []
+
+
+def test_editing_a_shows_bands_precaches_its_tagged_artists(
+    client: TestClient, test_venue, test_promotions_staff, artist_info_warmups
+):
+    """Both the show edit and the band-tags endpoint queue a warm-up."""
+    headers = {"X-Forwarded-User": test_promotions_staff.email}
+    show_id = client.post(
+        "/api/shows", json=_tagged_show_data(test_venue.id, []), headers=headers
+    ).json()["id"]
+
+    edited = client.put(
+        f"/api/shows/{show_id}",
+        json={"bands": [_band("mb-wolf", "Wolf Parade")]},
+        headers=headers,
+    )
+    retagged = client.put(
+        f"/api/shows/{show_id}/bands",
+        json=[_band("mb-wolf", "Wolf Parade"), _band("mb-other", "Local Band", 13)],
+        headers=headers,
+    )
+
+    assert edited.status_code == 200
+    assert retagged.status_code == 200
+    assert artist_info_warmups == [["mb-wolf"], ["mb-wolf", "mb-other"]]
+
+
+def test_editing_a_show_without_bands_precaches_nothing(
+    client: TestClient, test_venue, test_promotions_staff, artist_info_warmups
+):
+    """An edit that doesn't send bands leaves the tags, and the cache, alone."""
+    headers = {"X-Forwarded-User": test_promotions_staff.email}
+    show_id = client.post(
+        "/api/shows",
+        json=_tagged_show_data(test_venue.id, [_band("mb-wolf", "Wolf Parade")]),
+        headers=headers,
+    ).json()["id"]
+    artist_info_warmups.clear()
+
+    response = client.put(
+        f"/api/shows/{show_id}", json={"num_pass_pairs": 3}, headers=headers
+    )
+
+    assert response.status_code == 200
+    assert artist_info_warmups == []
+
+
+def _cache_row(db: Session, url: str, payload: dict, *, expired: bool):
+    from datetime import datetime, timedelta, timezone
+
+    from app.models.external_api_cache import ExternalApiCache
+
+    now = datetime.now(timezone.utc)
+    db.add(
+        ExternalApiCache(
+            url=url,
+            payload=payload,
+            fetched_at=now - timedelta(days=100),
+            expires_at=now + timedelta(days=-10 if expired else 10),
+        )
+    )
+    db.commit()
+
+
+def _no_http(monkeypatch):
+    def fail(url, headers):
+        raise AssertionError(f"Unexpected fetch of {url}")
+
+    monkeypatch.setattr("app.common.services.cache_service._get_json", fail)
+
+
+def test_artist_info_serves_expired_cache_and_refreshes_it_in_the_background(
+    client: TestClient, db: Session, test_promotions_staff, monkeypatch, artist_info_warmups
+):
+    """The popup gets the old info at once, and the artist is queued for a refresh."""
+    from app.pass_giveaway.services.artist_info_service import musicbrainz_url
+
+    _no_http(monkeypatch)
+    mb_data = {"relations": [_mb_url_rel("bandcamp", "https://wolfparade.bandcamp.com")]}
+    _cache_row(db, musicbrainz_url("abc"), mb_data, expired=True)
+
+    response = client.get(
+        "/api/shows/musicbrainz/artist/abc/info",
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.json()["links"] == [
+        {"type": "bandcamp", "url": "https://wolfparade.bandcamp.com"}
+    ]
+    assert artist_info_warmups == [["abc"]]
+
+
+def test_artist_info_from_fresh_cache_queues_no_refresh(
+    client: TestClient, db: Session, test_promotions_staff, monkeypatch, artist_info_warmups
+):
+    """Fresh cached info is served without a refresh."""
+    from app.pass_giveaway.services.artist_info_service import musicbrainz_url
+
+    _no_http(monkeypatch)
+    _cache_row(db, musicbrainz_url("abc"), {"relations": []}, expired=False)
+
+    response = client.get(
+        "/api/shows/musicbrainz/artist/abc/info",
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+
+    assert response.json() == {"extract": None, "wikipedia_url": None, "links": []}
+    assert artist_info_warmups == []
