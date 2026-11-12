@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
-import { screen, waitFor, cleanup } from '@testing-library/react';
+import { screen, waitFor, within, cleanup } from '@testing-library/react';
 import App from './App';
 import { renderWithAuth } from './test/render';
 import { usersAPI } from './common/api';
@@ -343,6 +343,18 @@ describe('App - Role-Based UI Elements', () => {
       });
       expect(screen.getByRole('link', { name: /^Staff$/i })).not.toHaveAttribute('aria-current');
       expect(screen.getByRole('link', { name: /^DJ$/i })).not.toHaveAttribute('aria-current');
+    });
+
+    it('should label the view switcher without a "Current" tag on the selected view', async () => {
+      window.history.pushState({}, '', '/pass-giveaway/dj/shows');
+
+      await renderAppWithUser(promotionsUser);
+
+      const switcher = await screen.findByRole('list', { name: 'Switch view' });
+      const djLink = within(switcher).getByRole('link', { name: /^DJ$/i });
+      expect(djLink).toHaveAttribute('aria-current', 'page');
+      // "DJ Current" was being read as "the current DJ".
+      expect(djLink).not.toHaveTextContent(/current/i);
     });
 
     it('should move the indicator when the user switches to another view', async () => {

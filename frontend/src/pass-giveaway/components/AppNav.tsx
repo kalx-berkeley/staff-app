@@ -37,8 +37,10 @@ interface ViewLinkProps {
 }
 
 // One row of the view switcher. The view the user is currently operating in is
-// called out with the view's accent colour and a "Current" tag, so the cue
-// doesn't rest on colour alone. The tag is hidden from assistive tech, which
+// marked by a leading arrow, a thicker left bar, bold text and a brighter
+// background, so the cue rests on shape and weight rather than colour alone.
+// There's deliberately no text tag: one reading "Current" next to "DJ" was
+// read as "the current DJ". The arrow is hidden from assistive tech, which
 // gets the same information from aria-current.
 const ViewLink = ({ view, to, isCurrent }: ViewLinkProps) => (
   <Link
@@ -46,10 +48,10 @@ const ViewLink = ({ view, to, isCurrent }: ViewLinkProps) => (
     className={`app-nav-view-link app-nav-view-${view}${isCurrent ? ' app-nav-view-current' : ''}`}
     aria-current={isCurrent ? 'page' : undefined}
   >
-    <span>{VIEW_LABELS[view]}</span>
     {isCurrent && (
-      <span className="app-nav-view-current-tag" aria-hidden="true">Current</span>
+      <span className="app-nav-view-current-marker" aria-hidden="true">▸</span>
     )}
+    <span>{VIEW_LABELS[view]}</span>
   </Link>
 );
 
@@ -192,7 +194,8 @@ const AppNav = ({ showGoogleLogout = false }: AppNavProps) => {
         )}
         <span className="role-badge" title="Your account role">{roleLabel}</span>
       </div>
-      <ul className="app-nav-views">
+      <div className="app-nav-views-heading" id="app-nav-views-heading">Switch view</div>
+      <ul className="app-nav-views" aria-labelledby="app-nav-views-heading">
         <li>
           {canAccessPromotions ? (
             <ViewLink view="promotions" to={promotionsHome} isCurrent={currentView === 'promotions'} />

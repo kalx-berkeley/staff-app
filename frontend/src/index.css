@@ -435,6 +435,16 @@ body.staging-active .dj-layout {
   align-self: flex-start;
 }
 
+/* Labels the view switcher, so its rows read as choices rather than as a
+   list of names. Styled like .nav-section-label. */
+.app-nav-views-heading {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0.2rem 0 0.25rem;
+}
+
 .app-nav-views {
   list-style: none;
   padding: 0;
@@ -464,18 +474,18 @@ body.staging-active .dj-layout {
   color: white;
 }
 
-/* The view the user is currently operating in. Colour alone isn't the cue —
-   the accent bar, weight and "Current" tag all mark it as well. */
+/* The view the user is currently operating in. Colour alone isn't the cue:
+   the leading arrow, the thicker left bar, bold text and brighter background
+   all mark it too, so it reads the same to colour-blind users. */
 .app-nav-view-current {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem;
+  gap: 0.3rem;
   background: var(--view-bg);
   color: white;
-  font-weight: 600;
-  border-left: 3px solid var(--view-color);
-  padding-left: calc(0.5rem - 3px);
+  font-weight: 700;
+  border-left: 4px solid var(--view-color);
+  padding-left: calc(0.5rem - 4px);
 }
 
 .app-nav-view-current:hover {
@@ -483,16 +493,10 @@ body.staging-active .dj-layout {
   filter: brightness(1.25);
 }
 
-.app-nav-view-current-tag {
+.app-nav-view-current-marker {
   flex-shrink: 0;
-  font-size: 0.58rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--view-color);
-  background: rgba(0, 0, 0, 0.3);
-  padding: 0.05rem 0.3rem;
-  border-radius: 8px;
+  font-size: 0.75rem;
+  line-height: 1;
 }
 
 /* Current-view chip in the mobile top bar (see ViewBadge.tsx). Lives inside
