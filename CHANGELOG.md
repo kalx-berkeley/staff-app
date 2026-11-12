@@ -6,6 +6,41 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.14.0] - 2026-11-12
+
+### Changed
+
+- Rename the show page's "Promotions Contact" heading to "KALX Promotions Rep" ([0140ddf](https://github.com/kalx-berkeley/staff-app/commit/0140ddf))
+- Label the on-air and staff sections of the venue guest list ([cc5217d](https://github.com/kalx-berkeley/staff-app/commit/cc5217d))
+- Ignore a leading "The" when sorting shows by venue name ([3f409b9](https://github.com/kalx-berkeley/staff-app/commit/3f409b9))
+- Separate the DJ giveaway form's winner fields from the Tried button. The winner fields are grouped with Give Away under "Caller won", Tried and an explanation of what it does sit below, and the form uses the page's DJ Name box (now marked required) instead of asking for the DJ name a second time ([b208a28](https://github.com/kalx-berkeley/staff-app/commit/b208a28))
+- Show how many pass pairs are left on the DJ giveaway page instead of a "waiting" row for each one ([02af9a5](https://github.com/kalx-berkeley/staff-app/commit/02af9a5))
+- Mark the selected view in the view switcher with an arrow, a thicker accent bar and bold text under a "Switch view" heading, instead of a "Current" tag that read as "DJ Current" ([2d8fe8e](https://github.com/kalx-berkeley/staff-app/commit/2d8fe8e))
+- Let promotions staff previewing the DJ view away from the DJ studio use the giveaway form, checks included. Give Away and Tried only pretend to save, and a pretend giveaway lasts for the browser tab, so the rest of the DJ view behaves as it does after a real one. Who gets the preview now depends on whether the backend would accept the giveaway, not on their role ([83323db](https://github.com/kalx-berkeley/staff-app/commit/83323db))
+- Warn a DJ before showing a show they already gave a pair away for this DJ shift not to announce it, since they can't record a winner, and stop offering Clothespin for it ([83323db](https://github.com/kalx-berkeley/staff-app/commit/83323db))
+- Delete old pre-deploy database backups after each deploy's backup, keeping 7 days on staging and 30 on production, and always at least the newest 5 and 10 ([172f7f8](https://github.com/kalx-berkeley/staff-app/commit/172f7f8))
+
+### Added
+
+- Add tabler passes for the Publicity department at co-announce shows. They come out of the show's staff passes (2 by default when Co-Announce is checked), are first come, first served, and never have a +1 guest, an alternate list or a lottery. Promotions can assign one to any current staff member, and tablers appear on the guest list as "KALX Co-Announce Table" ([e179a5c](https://github.com/kalx-berkeley/staff-app/commit/e179a5c))
+- Add a staff Venues page listing each venue's KALX promotions reps, searchable by venue, rep name or rep email. The promotions Venues page shows and searches the reps too ([d6be5a8](https://github.com/kalx-berkeley/staff-app/commit/d6be5a8))
+- Add "available passes" filters: the staff Shows page can show only shows with staff passes left to claim, and the DJ Shows page only shows the DJ can give away a pair for now. Both leave out shows past their planned close time ([105d9cc](https://github.com/kalx-berkeley/staff-app/commit/105d9cc))
+- Let a venue share another venue's win frequency limit ("Shares a win frequency limit with" on the venue form), so a caller's wins at any venue in the family count against one limit. The DJ banner and warning name the sister venues ([25dc9fd](https://github.com/kalx-berkeley/staff-app/commit/25dc9fd))
+- Add staff instructions to shows, which only staff see on the staff show page, never the DJ view or guests. A venue's default is filled into its new shows ([9db73ba](https://github.com/kalx-berkeley/staff-app/commit/9db73ba))
+- Email staff pass winners a reminder that they're on the guest list when a show closes, with the show's time, staff instructions and link, unless the close already emails them ([34547ad](https://github.com/kalx-berkeley/staff-app/commit/34547ad))
+- Add a tooltip beside each "View" button on the DJ Shows page saying why the show has no "Give Away" ([83323db](https://github.com/kalx-berkeley/staff-app/commit/83323db))
+
+### Removed
+
+- **Breaking:** remove smtp2go email support. Email is always sent through the local SMTP relay (`LOCAL_SMTP_HOST`/`LOCAL_SMTP_PORT`), and `SMTP2GO_API_KEY` is ignored ([486e752](https://github.com/kalx-berkeley/staff-app/commit/486e752))
+
+### Fixed
+
+- Fix shows being flagged for releases that have left the feature bin, by reading the sheet's "Currently Active Titles by Date" tab instead of "Current Active A-Z". This takes setting `FEATURE_BIN_SHEET_GID` on the server to that tab's `gid` ([e9f359e](https://github.com/kalx-berkeley/staff-app/commit/e9f359e))
+- Fix the DJ show page thanking the DJ for a giveaway after they clicked Tried. It now says the attempt was recorded and the pass is still available ([43ecfcf](https://github.com/kalx-berkeley/staff-app/commit/43ecfcf))
+- Fix DJ names not matching when they differ in case or surrounding spaces, in the DJ's giveaway history and the one-pair-per-show-per-shift check ([83323db](https://github.com/kalx-berkeley/staff-app/commit/83323db))
+- Fix tooltips closing straight after a tap on Android ([83323db](https://github.com/kalx-berkeley/staff-app/commit/83323db))
+
 ## [1.13.3] - 2026-11-11
 
 ### Fixed
@@ -374,6 +409,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.14.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.13.3...v1.14.0
 [1.13.3]: https://github.com/kalx-berkeley/staff-app/compare/v1.13.2...v1.13.3
 [1.13.2]: https://github.com/kalx-berkeley/staff-app/compare/v1.13.1...v1.13.2
 [1.13.1]: https://github.com/kalx-berkeley/staff-app/compare/v1.13.0...v1.13.1
