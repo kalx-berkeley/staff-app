@@ -6,6 +6,25 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.15.0] - 2026-11-13
+
+### Changed
+
+- Show every date and time in Pacific time, to the minute, in emails and on every page. Emails no longer print raw UTC times, and times the browser used to read as local time are now correct ([0e5ed62](https://github.com/kalx-berkeley/staff-app/commit/0e5ed62))
+- Restyle the show information on the staff and promotions show pages as labelled fields in a grid that fits the screen width, with shaded boxes for descriptions and instructions, genre tags, and rep cards with phone and email links ([0e4f1dc](https://github.com/kalx-berkeley/staff-app/commit/0e4f1dc))
+- Style the specialty show page, profile, promoter and venue forms and add-guest form to match the rest of the site, and use the page font in form controls instead of the browser's monospace ([a510bbf](https://github.com/kalx-berkeley/staff-app/commit/a510bbf))
+- Sort venues ignoring a leading "The" and case everywhere venues are listed, including pickers, the deleted venues list and the analytics venue tables ([83a46f1](https://github.com/kalx-berkeley/staff-app/commit/83a46f1))
+- Say "no callers" instead of "failed" for on-air giveaway attempts on the show page and in KALX Staff Analytics ([48a1c14](https://github.com/kalx-berkeley/staff-app/commit/48a1c14))
+- Keep the shows pages' filters in the URL, so Back returns to the same filtered list ([0eafdf5](https://github.com/kalx-berkeley/staff-app/commit/0eafdf5))
+- Show cached band popup info straight away, even when it has expired, and refresh it in the background. Saving a show's band tags now caches each artist's info, so the popup only waits for artists that were never looked up ([d33e8ba](https://github.com/kalx-berkeley/staff-app/commit/d33e8ba))
+- Show the DJ Name box's name on DJ studio guests' log lines, and the page each tab is on (and for how long) on the version and spin-match polls in the access logs ([10b3d62](https://github.com/kalx-berkeley/staff-app/commit/10b3d62)), ([bfc80fc](https://github.com/kalx-berkeley/staff-app/commit/bfc80fc))
+
+### Added
+
+- Let venues and promoters turn on "Track when I've called in the passes". A closed show's guest list then has a Mark Passes Called In button, a reminder until it's clicked, and a "called in" line with the time, the rep's name and Undo. Re-opening the show clears it ([572361a](https://github.com/kalx-berkeley/staff-app/commit/572361a))
+- Let a venue give staff passes for a different date than the on-air pass pairs ("Staff show's date, in days after the on-air show" on the venue form). Each new single-day show there becomes an on-air show with the pass pairs and a staff show with the staff passes, whose date, time and close the rep can adjust. Shows can now have 0 pass pairs; the DJ view hides those, and the staff view hides shows with no staff passes ([cc116b2](https://github.com/kalx-berkeley/staff-app/commit/cc116b2)), ([a6db228](https://github.com/kalx-berkeley/staff-app/commit/a6db228))
+- Log an audit event when a DJ clicks Tried on a giveaway ([4804470](https://github.com/kalx-berkeley/staff-app/commit/4804470))
+
 ## [1.14.0] - 2026-11-12
 
 ### Changed
@@ -409,6 +428,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.15.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.14.0...v1.15.0
 [1.14.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.13.3...v1.14.0
 [1.13.3]: https://github.com/kalx-berkeley/staff-app/compare/v1.13.2...v1.13.3
 [1.13.2]: https://github.com/kalx-berkeley/staff-app/compare/v1.13.1...v1.13.2
