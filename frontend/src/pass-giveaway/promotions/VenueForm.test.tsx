@@ -11,6 +11,7 @@ vi.mock('../api', () => ({
     update: vi.fn(),
     listPromotionsStaff: vi.fn().mockResolvedValue([]),
     list: vi.fn().mockResolvedValue([]),
+    uploadLogo: vi.fn(),
   },
   promotersAPI: {
     list: vi.fn().mockResolvedValue([]),
@@ -546,6 +547,55 @@ describe('VenueForm', () => {
       expect(screen.getByLabelText(nameWithLogoLabel)).toBeChecked();
       fireEvent.click(screen.getByRole('button', { name: /remove logo/i }));
       expect(screen.queryByLabelText(nameWithLogoLabel)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Logo Size', () => {
+    const loadImage = (img: HTMLElement, width: number, height: number) => {
+      Object.defineProperty(img, 'naturalWidth', { value: width, configurable: true });
+      Object.defineProperty(img, 'naturalHeight', { value: height, configurable: true });
+      fireEvent.load(img);
+    };
+
+    it('shows the size of the saved logo', async () => {
+      render(
+        <VenueForm
+          venue={makeVenue({ has_logo: true })}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+
+      loadImage(screen.getByAltText('Venue logo preview'), 400, 200);
+      expect(screen.getByTestId('venue-logo-size')).toHaveTextContent(/^400×200 px$/);
+    });
+
+    it('lets a new venue have a logo, shows its size and uploads it after creating the venue', async () => {
+      const createObjectURL = vi.fn(() => 'blob:logo');
+      vi.stubGlobal('URL', Object.assign(URL, { createObjectURL }));
+      vi.mocked(venuesAPI.create).mockResolvedValue(makeVenue({ id: 7 }));
+      vi.mocked(venuesAPI.uploadLogo).mockResolvedValue(makeVenue({ id: 7, has_logo: true }));
+
+      const { container } = render(
+        <VenueForm venue={null} onClose={mockOnClose} onSuccess={mockOnSuccess} />
+      );
+      await act(async () => {});
+
+      fireEvent.change(screen.getByLabelText(/venue name/i), { target: { value: 'New Venue' } });
+      fireEvent.change(screen.getByLabelText(/^address/i), { target: { value: '1 Main St' } });
+      const file = new File(['x'], 'logo.png', { type: 'image/png' });
+      fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [file] } });
+
+      loadImage(screen.getByAltText('Venue logo preview'), 1600, 400);
+      expect(screen.getByTestId('venue-logo-size')).toHaveTextContent(
+        '1600×400 px (will be scaled down to fit 800×400 px)'
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /create/i }));
+      await waitFor(() => expect(venuesAPI.uploadLogo).toHaveBeenCalledWith(7, file));
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalled());
+      vi.unstubAllGlobals();
     });
   });
 

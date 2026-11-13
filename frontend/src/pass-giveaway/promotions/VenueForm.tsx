@@ -7,6 +7,9 @@ import type { APIError, ValidationError } from '../../common/types';
 import { describeDayOffset } from './splitShow';
 
 const venueLogoUrl = (id: number) => `/api/venues/${id}/logo`;
+// The backend scales uploaded logos to fit within this size (venues.py _LOGO_MAX_PX).
+const LOGO_MAX_WIDTH = 800;
+const LOGO_MAX_HEIGHT = 400;
 
 interface VenueFormProps {
   venue: VenueResponse | null;
@@ -80,6 +83,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null);
   const [pendingLogoDelete, setPendingLogoDelete] = useState(false);
   const [logoKey, setLogoKey] = useState(0);
+  const [logoSize, setLogoSize] = useState<{ width: number; height: number } | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -135,6 +139,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
       setLogoPreview(null);
       setPendingLogoFile(null);
       setPendingLogoDelete(false);
+      setLogoSize(null);
       setLogoKey((k) => k + 1);
     }
   }, [venue]);
@@ -208,6 +213,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
     if (!file) return;
     setPendingLogoFile(file);
     setPendingLogoDelete(false);
+    setLogoSize(null);
     const url = URL.createObjectURL(file);
     setLogoPreview(url);
   };
@@ -216,6 +222,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
     setPendingLogoFile(null);
     setLogoPreview(null);
     setPendingLogoDelete(true);
+    setLogoSize(null);
     setLogoKey((k) => k + 1);
   };
 
@@ -924,64 +931,75 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
             </details>
           </div>
 
-          {venue && (
-            <div className="form-section">
-              <div className="label-with-help">
-                <h4>Venue Logo</h4>
-                <Tooltip text="The logo is displayed on the DJ show page in place of the venue name, unless you choose to show the name too. Use a PNG with a transparent background for best results." />
-              </div>
-              <p className="field-hint">
-                Recommended: PNG with transparent background, landscape orientation (e.g. 400×200 px).
-                Max file size: 5 MB. The image will be scaled to fit within 800×400 px.
-              </p>
-
-              {(logoPreview || (!pendingLogoDelete && hasLogo)) && (
-                <div className="venue-logo-preview">
-                  <img
-                    src={logoPreview ?? `${venueLogoUrl(venue.id)}?v=${logoKey}`}
-                    alt="Venue logo preview"
-                    className="venue-logo-img"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleLogoRemove}
-                    className="btn-danger btn-small"
-                    disabled={submitting}
-                  >
-                    Remove Logo
-                  </button>
-                </div>
-              )}
-
-              {!logoPreview && (pendingLogoDelete || !hasLogo) && (
-                <p className="field-hint">No logo uploaded.</p>
-              )}
-
-              <input
-                key={logoKey}
-                ref={logoInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/gif,image/webp"
-                onChange={handleLogoFileChange}
-                disabled={submitting}
-                style={{ marginTop: '0.5rem' }}
-              />
-
-              {(logoPreview || (!pendingLogoDelete && hasLogo)) && (
-                <div className="form-group form-group-checkbox" style={{ marginTop: '0.5rem' }}>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={showNameWithLogo}
-                      onChange={(e) => setShowNameWithLogo(e.target.checked)}
-                      disabled={submitting}
-                    />
-                    {' '}Show the venue name on the DJ show page as well as the logo
-                  </label>
-                </div>
-              )}
+          <div className="form-section">
+            <div className="label-with-help">
+              <h4>Venue Logo</h4>
+              <Tooltip text="The logo is displayed on the DJ show page in place of the venue name, unless you choose to show the name too. Use a PNG with a transparent background for best results." />
             </div>
-          )}
+            <p className="field-hint">
+              Recommended: PNG with transparent background, landscape orientation (e.g. 400×200 px).
+              Max file size: 5 MB. The image will be scaled to fit within {LOGO_MAX_WIDTH}×{LOGO_MAX_HEIGHT} px.
+            </p>
+
+            {(logoPreview || (!pendingLogoDelete && hasLogo)) && (
+              <div className="venue-logo-preview">
+                <img
+                  src={logoPreview ?? (venue ? `${venueLogoUrl(venue.id)}?v=${logoKey}` : '')}
+                  alt="Venue logo preview"
+                  className="venue-logo-img"
+                  onLoad={(e) =>
+                    setLogoSize({
+                      width: e.currentTarget.naturalWidth,
+                      height: e.currentTarget.naturalHeight,
+                    })
+                  }
+                />
+                {logoSize && (
+                  <span className="field-hint" data-testid="venue-logo-size">
+                    {logoSize.width}×{logoSize.height} px
+                    {logoPreview && (logoSize.width > LOGO_MAX_WIDTH || logoSize.height > LOGO_MAX_HEIGHT) &&
+                      ` (will be scaled down to fit ${LOGO_MAX_WIDTH}×${LOGO_MAX_HEIGHT} px)`}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleLogoRemove}
+                  className="btn-danger btn-small"
+                  disabled={submitting}
+                >
+                  Remove Logo
+                </button>
+              </div>
+            )}
+
+            {!logoPreview && (pendingLogoDelete || !hasLogo) && (
+              <p className="field-hint">No logo uploaded.</p>
+            )}
+
+            <input
+              key={logoKey}
+              ref={logoInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              onChange={handleLogoFileChange}
+              disabled={submitting}
+              style={{ marginTop: '0.5rem' }}
+            />
+
+            {(logoPreview || (!pendingLogoDelete && hasLogo)) && (
+              <div className="form-group form-group-checkbox" style={{ marginTop: '0.5rem' }}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={showNameWithLogo}
+                    onChange={(e) => setShowNameWithLogo(e.target.checked)}
+                    disabled={submitting}
+                  />
+                  {' '}Show the venue name on the DJ show page as well as the logo
+                </label>
+              </div>
+            )}
+          </div>
 
           <div className="form-section">
             <h4>KALX Promotions Reps</h4>
