@@ -4179,6 +4179,12 @@ fieldset.radio-group legend {
   outline: none;
 }
 
+/* A tagged band with no MusicBrainz match: no popup, so no fill or pointer */
+.band-tag-unmatched {
+  border-bottom: 1.5px dotted #76c7c0;
+  font-weight: 500;
+}
+
 /* Band info popup */
 .band-popup {
   background: #fff;
@@ -4285,12 +4291,6 @@ fieldset.radio-group legend {
   text-decoration: underline;
 }
 
-.band-popup__no-match {
-  font-size: 0.82rem;
-  color: #888;
-  font-style: italic;
-  margin-top: 0.15rem;
-}
 
 /* Feature bin popup */
 .feature-bin-release {

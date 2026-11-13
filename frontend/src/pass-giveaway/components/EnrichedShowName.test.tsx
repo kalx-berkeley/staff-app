@@ -88,4 +88,23 @@ describe('EnrichedShowName band popup', () => {
     expect(within(popup).getAllByRole('link')).toHaveLength(1);
     expect(container.querySelector('.band-popup__links')).toBeNull();
   });
+
+  it("doesn't make a band with no MusicBrainz match clickable", async () => {
+    const unmatched: ShowBand = {
+      ...band,
+      musicbrainz_id: null,
+      artist_type: null,
+      artist_country: null,
+    };
+
+    await renderAndSettle(<EnrichedShowName eventName="Wolf Parade" bands={[unmatched]} />);
+
+    expect(screen.queryByRole('button', { name: 'Wolf Parade' })).toBeNull();
+    const tag = screen.getByText('Wolf Parade');
+    expect(tag).toHaveClass('band-tag-unmatched');
+    expect(tag).toHaveAttribute('title', 'Wolf Parade (no MusicBrainz match)');
+    fireEvent.click(tag);
+    expect(document.querySelector('.band-popup')).toBeNull();
+    expect(showsAPI.getArtistInfo).not.toHaveBeenCalled();
+  });
 });

@@ -125,18 +125,14 @@ function BandPopup({ band, onClose, anchorRect, onGenreClick }: BandPopupProps) 
           )}
         </div>
       )}
-      {band.musicbrainz_id ? (
-        <a
-          href={`https://musicbrainz.org/artist/${band.musicbrainz_id}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="band-popup__mb-link"
-        >
-          View on MusicBrainz ↗
-        </a>
-      ) : (
-        <div className="band-popup__no-match">No MusicBrainz match — tagged manually</div>
-      )}
+      <a
+        href={`https://musicbrainz.org/artist/${band.musicbrainz_id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="band-popup__mb-link"
+      >
+        View on MusicBrainz ↗
+      </a>
     </div>
   );
 }
@@ -175,7 +171,17 @@ export default function EnrichedShowName({ eventName, bands, className, onGenreC
   return (
     <span className={className}>
       {segments.map((seg, i) =>
-        seg.kind === 'band' ? (
+        seg.kind === 'band' && !seg.band.musicbrainz_id ? (
+          // A manually tagged band has nothing to show in a popup, so it's
+          // marked more faintly and isn't clickable.
+          <span
+            key={i}
+            className="band-tag-unmatched"
+            title={`${seg.band.band_name} (no MusicBrainz match)`}
+          >
+            {seg.text}
+          </span>
+        ) : seg.kind === 'band' ? (
           <button
             key={i}
             type="button"
