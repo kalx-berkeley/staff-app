@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, fireEvent, within, cleanup } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import VenueList from './VenueList';
 import { venuesAPI } from '../api';
 import { renderAndSettle } from '../../test/render';
@@ -34,7 +35,7 @@ describe('staff VenueList', () => {
   });
 
   it('lists every rep of a venue, each with a mailto link', async () => {
-    await renderAndSettle(<VenueList />);
+    await renderAndSettle(<MemoryRouter><VenueList /></MemoryRouter>);
 
     const fox = within(rowFor('The Fox Theater'));
     expect(fox.getByText('Ana Lopez')).toBeInTheDocument();
@@ -47,7 +48,7 @@ describe('staff VenueList', () => {
   });
 
   it('filters by rep name or email', async () => {
-    await renderAndSettle(<VenueList />);
+    await renderAndSettle(<MemoryRouter><VenueList /></MemoryRouter>);
     const search = screen.getByRole('textbox', { name: 'Search venues' });
 
     fireEvent.change(search, { target: { value: 'ben@' } });
@@ -56,5 +57,14 @@ describe('staff VenueList', () => {
 
     fireEvent.change(search, { target: { value: 'nobody' } });
     expect(screen.getByText('No venues match your search.')).toBeInTheDocument();
+  });
+
+  it("links each venue's name to the shows page filtered to that venue", async () => {
+    await renderAndSettle(<MemoryRouter><VenueList /></MemoryRouter>);
+
+    expect(screen.getByRole('link', { name: 'The Fox Theater' })).toHaveAttribute(
+      'href',
+      '/staff/shows?venue=1',
+    );
   });
 });

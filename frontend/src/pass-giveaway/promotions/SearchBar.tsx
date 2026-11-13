@@ -14,7 +14,11 @@ interface SearchBarProps {
 const SearchBar = ({ shows, onSearch, filters, onFiltersChange }: SearchBarProps) => {
   const { query, venueId, genre } = filters;
   const [venues, setVenues] = useState<VenueResponse[]>([]);
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  // Start open when the URL already sets a venue or genre (such as a venue's
+  // "Shows" link), so the filter in effect is visible.
+  const [filtersExpanded, setFiltersExpanded] = useState(
+    () => venueId !== '' || genre.trim() !== '',
+  );
 
   const onSearchRef = useRef(onSearch);
   onSearchRef.current = onSearch;

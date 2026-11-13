@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { venuesAPI } from '../api';
 import { VenueRepList } from '../components';
 import { filterVenues } from '../venueSearch';
@@ -6,7 +7,10 @@ import { usePageTitle } from '../../common/hooks/usePageTitle';
 import type { VenueResponse } from '../types';
 import type { APIError } from '../../common/types';
 
-/** Every venue with its KALX promotions reps, searchable by venue or rep. */
+/**
+ * Every venue with its KALX promotions reps, searchable by venue or rep. Each
+ * venue's name links to the shows page filtered to that venue.
+ */
 const VenueList = () => {
   usePageTitle('Venues · Staff');
   const [venues, setVenues] = useState<VenueResponse[]>([]);
@@ -83,7 +87,9 @@ const VenueList = () => {
               {filteredVenues.map((venue) => (
                 <tr key={venue.id}>
                   <td>
-                    <div className="venue-reps-table-name">{venue.name}</div>
+                    <div className="venue-reps-table-name">
+                      <Link to={`/staff/shows?venue=${venue.id}`}>{venue.name}</Link>
+                    </div>
                     <div className="venue-reps-table-address">{venue.address}</div>
                   </td>
                   <td>

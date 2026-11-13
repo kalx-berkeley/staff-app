@@ -235,5 +235,21 @@ describe('SearchBar', () => {
         expect(lastCall[0].genre).toEqual(['Jazz']);
       });
     });
+
+    it('should open the filters with a venue the page passes in selected', async () => {
+      render(<Harness shows={[rockShow, jazzShow]} onSearch={mockOnSearch} initial={{ ...NO_FILTERS, venueId: 2 }} />);
+
+      expect(screen.getByRole('button', { name: /Filters \(1\)/ })).toHaveAttribute('aria-expanded', 'true');
+      await waitFor(() => {
+        expect(screen.getByLabelText('Venue')).toHaveValue('2');
+      });
+    });
+
+    it('should start with the filters closed when none are set', async () => {
+      render(<Harness shows={[rockShow]} onSearch={mockOnSearch} />);
+
+      expect(screen.getByRole('button', { name: /Filters/ })).toHaveAttribute('aria-expanded', 'false');
+      await screen.findByRole('option', { name: 'Venue A' });
+    });
   });
 });

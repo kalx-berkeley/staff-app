@@ -51,6 +51,11 @@ const VenueList = () => {
     navigate(`/promotions/venues/${venue.id}/edit`);
   };
 
+  // The staff shows page, with its venue filter set to this venue.
+  const handleShowsClick = (venue: VenueResponse) => {
+    navigate(`/staff/shows?venue=${venue.id}`);
+  };
+
   const handleViewMode = (mode: 'card' | 'compact') => {
     setViewMode(mode);
     localStorage.setItem(VIEW_MODE_KEY, mode);
@@ -159,6 +164,13 @@ const VenueList = () => {
                     >
                       Edit
                     </button>
+                    <button
+                      onClick={() => handleShowsClick(venue)}
+                      className="btn-secondary btn-small"
+                      style={{ marginLeft: '0.5rem' }}
+                    >
+                      Shows
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -182,6 +194,13 @@ const VenueList = () => {
                 className="btn-primary"
               >
                 Edit
+              </button>
+              <button
+                onClick={() => handleShowsClick(venue)}
+                className="btn-secondary"
+                style={{ marginLeft: '0.5rem' }}
+              >
+                Shows
               </button>
             </div>
           ))}
