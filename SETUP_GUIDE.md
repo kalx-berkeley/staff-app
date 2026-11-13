@@ -222,11 +222,13 @@ certbot --apache -d staff.stage.kalx.berkeley.edu
 The auth VirtualHost serves a small static page at `/` so that visitors who land there directly see something useful rather than a blank page or error. The staff VirtualHost needs no static files of its own: its home page at `/` is part of the app, served from the deployed frontend build.
 
 ```bash
-mkdir -p /var/www/html/auth.kalx.berkeley.edu
-mkdir -p /var/www/html/auth.stage.kalx.berkeley.edu
-cp apache/www/html/auth/index.html /var/www/html/auth.kalx.berkeley.edu/
-cp apache/www/html/auth.stage/index.html /var/www/html/auth.stage.kalx.berkeley.edu/
+mkdir -p /var/www/html/auth
+mkdir -p /var/www/html/auth.stage
+cp apache/www/html/auth/index.html /var/www/html/auth/
+cp apache/www/html/auth.stage/index.html /var/www/html/auth.stage/
 ```
+
+These pages aren't part of the staff-app deploy, so copy them again whenever they change.
 
 ### 4. Enable the Sites
 
@@ -706,7 +708,7 @@ df -h                                               # check disk space
 - [ ] Obtained SSL certificate for `auth.kalx.berkeley.edu` via certbot
 - [ ] Obtained SSL certificate for `staff.kalx.berkeley.edu` via certbot
 - [ ] Verified `000-default-le-ssl.conf` (or equivalent) does not have `auth.kalx.berkeley.edu` or `staff.kalx.berkeley.edu` as its `ServerName`
-- [ ] Deployed auth landing page: `sudo cp apache/www/html/auth/index.html /var/www/html/auth.kalx.berkeley.edu/`
+- [ ] Deployed auth landing page: `sudo cp apache/www/html/auth/index.html /var/www/html/auth/`
 - [ ] Enabled both sites with `a2ensite auth.conf staff.conf`
 - [ ] Verified `apache2ctl configtest` passes
 - [ ] Verified `apache2ctl -S` shows both hostnames routed to the correct config files (not the default VirtualHost)

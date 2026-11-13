@@ -24,9 +24,16 @@ not intended to be visited directly.</p>
 // Reached after logout (mod_auth_openidc only allows ?logout= targets on
 // this same host). Auto-forwarding puts a fresh request in front of the
 // staff vhost, which is what triggers Google's account chooser.
+//
+// A logout that should come back to a page (the /go/ short link error page)
+// passes its path in ?next=. Send that to the staff site's /sign-in, which
+// requires a Google login and then goes to next, checking it's a path on the
+// staff site (frontend/src/common/signIn.ts), so it can't be an open redirect.
 var staffHost = location.hostname.replace(/^auth\./, "staff.");
 var link = document.getElementById("staff-link");
-link.href = "https://" + staffHost + "/";
+var next = new URLSearchParams(location.search).get("next");
+link.href = "https://" + staffHost + "/" +
+  (next ? "sign-in?next=" + encodeURIComponent(next) : "");
 link.textContent = staffHost;
 location.replace(link.href);
 </script>

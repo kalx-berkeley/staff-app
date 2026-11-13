@@ -46,10 +46,13 @@ sudo cp apache/sites/auth.conf        /etc/apache2/sites-available/
 sudo cp apache/sites/staff.conf       /etc/apache2/sites-available/
 sudo a2ensite auth.conf staff.conf
 
-# Deploy the auth stub page
-sudo mkdir -p /var/www/html/auth.kalx.berkeley.edu
-sudo cp apache/www/html/auth/index.html /var/www/html/auth.kalx.berkeley.edu/
+# Deploy the auth stub page (staging: auth.stage/ to /var/www/html/auth.stage/)
+sudo mkdir -p /var/www/html/auth
+sudo cp apache/www/html/auth/index.html /var/www/html/auth/
 ```
+
+The auth stub pages aren't part of the staff-app deploy, so copy them again
+whenever they change.
 
 ### Fill in credentials
 

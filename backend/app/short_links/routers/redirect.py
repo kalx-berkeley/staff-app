@@ -7,6 +7,7 @@ can follow a short link.
 
 import re
 from html import escape
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -100,10 +101,17 @@ def _wrong_account(request: Request, email: str) -> str:
     """
     The 403 content: like UnauthorizedPage, suggest logging out and signing in
     with the Google account for the person's KALX email address.
+
+    mod_auth_openidc only logs out to a page on the auth. site, so the logout
+    goes to its landing page with the short link's path in ``next``. That page
+    forwards to the staff site's /sign-in?next=…, which signs the person in
+    again and then follows the short link.
     """
     # Apache preserves the Host header, so this is the staff. site's host
     auth_host = re.sub(r"^staff\.", "auth.", request.url.hostname or "")
-    logout_url = f"https://{auth_host}/redirect_uri?logout=https://{auth_host}/"
+    path = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+    after_logout = f"https://{auth_host}/?next={quote(path, safe='/')}"
+    logout_url = f"https://{auth_host}/redirect_uri?logout={quote(after_logout, safe='')}"
     steps = (
         '<ol style="margin: 0; padding-left: 1.4rem; line-height: 1.6;">'
         f'<li style="{_STEP_STYLE}"><strong>Find your KALX email address.</strong> '
@@ -113,8 +121,8 @@ def _wrong_account(request: Request, email: str) -> str:
         f'style="{_BUTTON_STYLE}">Log out</a></li>'
         f'<li style="{_STEP_STYLE}"><strong>Sign in to Google with that '
         "address.</strong> When Google asks you to choose an account, pick it "
-        "(or choose &quot;Use another account&quot; to add it), then follow "
-        "the short link again.</li>"
+        "(or choose &quot;Use another account&quot; to add it), and "
+        "the short link will open.</li>"
         "</ol>"
         '<p style="margin: 1rem 0 0;">Need help signing in, or don\'t have a '
         "Google account for that address yet? "

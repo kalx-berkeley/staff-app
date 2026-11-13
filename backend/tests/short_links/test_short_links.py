@@ -344,8 +344,11 @@ def test_forbidden_page_offers_to_switch_google_account(client: TestClient, peop
 
     assert response.status_code == 403
     assert "stranger@example.com" in response.text
+    # Logs out to the auth site's landing page with the short link in next,
+    # so the person comes back to it after signing in again
     assert (
-        "https://auth.kalx.example/redirect_uri?logout=https://auth.kalx.example/"
+        "https://auth.kalx.example/redirect_uri?logout="
+        "https%3A%2F%2Fauth.kalx.example%2F%3Fnext%3D%2Fgo%2Ffundraiser"
         in response.text
     )
 
