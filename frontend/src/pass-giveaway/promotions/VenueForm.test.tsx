@@ -462,6 +462,75 @@ describe('VenueForm', () => {
     });
   });
 
+  describe('New Show Defaults', () => {
+    it('groups the show defaults, but not the guest list requirements', async () => {
+      render(<VenueForm venue={null} onClose={mockOnClose} onSuccess={mockOnSuccess} />);
+      await act(async () => {});
+
+      const defaults = screen.getByRole('group', { name: 'New Show Defaults' });
+      for (const label of [
+        /default promoter/i,
+        /default wheelchair accessible/i,
+        /default on-air pass pairs/i,
+        /default on-air description/i,
+        /default staff instructions/i,
+        /hours before show/i,
+      ]) {
+        expect(within(defaults).getByLabelText(label)).toBeInTheDocument();
+      }
+      expect(within(defaults).getByRole('group', { name: /default staff pass adjustment/i })).toBeInTheDocument();
+      const guestList = screen.getByRole('heading', { name: /guest list requirements/i });
+      expect(defaults).not.toContainElement(guestList);
+    });
+  });
+
+  describe('Default Staff Pass Adjustment', () => {
+    it('loads, describes and saves the adjustment', async () => {
+      vi.mocked(venuesAPI.update).mockResolvedValue(makeVenue());
+
+      render(
+        <VenueForm
+          venue={makeVenue({ default_num_pass_pairs: 2, default_staff_pass_adjustment: 1 })}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+
+      expect(screen.getByRole('status')).toHaveTextContent('+1');
+      expect(screen.getByText(/with the default 2 pass pairs, that's 3 staff passes/)).toBeInTheDocument();
+
+      const fewer = screen.getByRole('button', { name: /one fewer default staff pass/i });
+      fireEvent.click(fewer);
+      expect(screen.getByText(/no adjustment/i)).toBeInTheDocument();
+      fireEvent.click(fewer);
+      expect(screen.getByRole('status')).toHaveTextContent('−1');
+      expect(screen.getByText(/with the default 2 pass pairs, that's 1 staff pass\./)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /update/i }));
+      await waitFor(() => {
+        expect(venuesAPI.update).toHaveBeenCalledWith(1, expect.objectContaining({
+          default_staff_pass_adjustment: -1,
+        }));
+      });
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalled());
+    });
+
+    it('stops at the allowed range', async () => {
+      render(
+        <VenueForm
+          venue={makeVenue({ default_staff_pass_adjustment: -5 })}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+
+      expect(screen.getByRole('button', { name: /one fewer default staff pass/i })).toBeDisabled();
+      expect(screen.getByText(/5 staff passes fewer than one per pass pair, but never fewer than 0/)).toBeInTheDocument();
+    });
+  });
+
   describe('Default Wheelchair Accessible', () => {
     it('should load and save Unknown, and clear it with No default', async () => {
       vi.mocked(venuesAPI.update).mockResolvedValue(makeVenue());

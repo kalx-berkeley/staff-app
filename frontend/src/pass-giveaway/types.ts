@@ -153,6 +153,8 @@ export interface VenueCreate {
   default_age_restriction?: AgeRestriction | null;
   default_movie_rating?: MovieRating | null;
   default_num_pass_pairs?: number | null;
+  /** Staff passes above (or, negative, below) one per pass pair that new shows start with. */
+  default_staff_pass_adjustment?: number;
   requires_phone_number?: boolean;
   email_address_requirement?: EmailAddressRequirement;
   staff_guest_requires_name?: boolean;
@@ -187,6 +189,8 @@ export interface VenueUpdate {
   default_age_restriction?: AgeRestriction | null;
   default_movie_rating?: MovieRating | null;
   default_num_pass_pairs?: number | null;
+  /** Staff passes above (or, negative, below) one per pass pair that new shows start with. */
+  default_staff_pass_adjustment?: number;
   requires_phone_number?: boolean;
   email_address_requirement?: EmailAddressRequirement;
   staff_guest_requires_name?: boolean;
@@ -230,6 +234,8 @@ export interface VenueResponse {
   default_age_restriction: AgeRestriction | null;
   default_movie_rating: MovieRating | null;
   default_num_pass_pairs: number | null;
+  /** Staff passes above (or, negative, below) one per pass pair that new shows start with. */
+  default_staff_pass_adjustment?: number;
   requires_phone_number: boolean;
   email_address_requirement: EmailAddressRequirement;
   // Derived: DJs must collect an email address from on-air winners

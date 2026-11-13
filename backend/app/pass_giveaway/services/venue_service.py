@@ -146,6 +146,7 @@ class VenueService:
                 default_age_restriction=venue_data.default_age_restriction,
                 default_movie_rating=venue_data.default_movie_rating,
                 default_num_pass_pairs=venue_data.default_num_pass_pairs,
+                default_staff_pass_adjustment=venue_data.default_staff_pass_adjustment,
                 requires_phone_number=venue_data.requires_phone_number,
                 email_address_requirement=venue_data.email_address_requirement,
                 staff_guest_requires_name=venue_data.staff_guest_requires_name,
@@ -274,6 +275,10 @@ class VenueService:
                 venue.default_movie_rating = venue_data.default_movie_rating
             if "default_num_pass_pairs" in venue_data.model_fields_set:
                 venue.default_num_pass_pairs = venue_data.default_num_pass_pairs
+            if venue_data.default_staff_pass_adjustment is not None:
+                venue.default_staff_pass_adjustment = (
+                    venue_data.default_staff_pass_adjustment
+                )
             if "requires_phone_number" in venue_data.model_fields_set:
                 venue.requires_phone_number = venue_data.requires_phone_number
             if venue_data.email_address_requirement is not None:

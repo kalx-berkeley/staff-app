@@ -24,6 +24,12 @@ StaffPassDayOffset = Annotated[
 ]
 
 
+# Staff passes above or below one per pass pair that new shows at a venue
+# start with. A show has 1-5 pass pairs and 0-15 staff passes, so this range
+# always fits; the show form keeps a show's staff passes from going below 0.
+DefaultStaffPassAdjustment = Annotated[int, Field(ge=-5, le=10)]
+
+
 class VenueContactCreate(BaseModel):
     name: str | None = None
     title: str | None = None
@@ -74,6 +80,7 @@ class VenueCreate(BaseModel):
     default_age_restriction: str | None = None
     default_movie_rating: MovieRating | None = None
     default_num_pass_pairs: int | None = None
+    default_staff_pass_adjustment: DefaultStaffPassAdjustment = 0
     requires_phone_number: bool = False
     email_address_requirement: EmailAddressRequirement = "none"
     staff_guest_requires_name: bool = False
@@ -110,6 +117,7 @@ class VenueUpdate(BaseModel):
     default_age_restriction: str | None = None
     default_movie_rating: MovieRating | None = None
     default_num_pass_pairs: int | None = None
+    default_staff_pass_adjustment: DefaultStaffPassAdjustment | None = None
     requires_phone_number: bool | None = None
     email_address_requirement: EmailAddressRequirement | None = None
     staff_guest_requires_name: bool | None = None
@@ -155,6 +163,7 @@ class VenueResponse(BaseModel):
     default_age_restriction: str | None = None
     default_movie_rating: MovieRating | None = None
     default_num_pass_pairs: int | None = None
+    default_staff_pass_adjustment: int = 0
     requires_phone_number: bool = False
     email_address_requirement: EmailAddressRequirement = "none"
     # Derived from email_address_requirement: DJs must collect on-air winners' emails
@@ -205,6 +214,7 @@ class VenueResponse(BaseModel):
             default_age_restriction=venue.default_age_restriction,
             default_movie_rating=venue.default_movie_rating,
             default_num_pass_pairs=venue.default_num_pass_pairs,
+            default_staff_pass_adjustment=venue.default_staff_pass_adjustment or 0,
             requires_phone_number=venue.requires_phone_number,
             email_address_requirement=venue.email_address_requirement,
             requires_email_address=venue.requires_email_address,

@@ -435,6 +435,29 @@ describe('ShowForm', () => {
     });
   });
 
+  describe('Venue default staff pass adjustment', () => {
+    it("starts a new show with the selected venue's adjustment", async () => {
+      vi.mocked(venuesMyAPI.listMy).mockResolvedValue([
+        mockVenues[0],
+        { ...mockVenues[1], default_num_pass_pairs: 3, default_staff_pass_adjustment: -1 },
+      ]);
+
+      renderShowForm();
+      await waitFor(() => {
+        expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByRole('button', { name: /advanced/i }));
+
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), { target: { value: '2' } });
+      expect(screen.getByRole('status')).toHaveTextContent('−1');
+      expect(screen.getByText(/1 fewer than the standard 3: this show will have 2 staff passes/)).toBeInTheDocument();
+
+      // A venue with no default goes back to no adjustment
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), { target: { value: '1' } });
+      expect(screen.getByRole('status')).toHaveTextContent('0');
+    });
+  });
+
   describe('Error Display', () => {
     it('should display API error message', async () => {
       vi.mocked(showsAPI.create).mockRejectedValue({

@@ -283,6 +283,49 @@ def test_show_name_with_logo_defaults_to_false_and_can_be_set(
     assert response.json()["show_name_with_logo"] is True
 
 
+def test_default_staff_pass_adjustment_defaults_to_zero_and_can_be_set(
+    client: TestClient, test_promotions_staff
+):
+    """New shows at a venue can start with more or fewer staff passes than pairs."""
+    headers = {"X-Forwarded-User": test_promotions_staff.email}
+    response = client.post(
+        "/api/venues", json={"name": "Adjusted", "address": "1 St"}, headers=headers
+    )
+    assert response.status_code == 201
+    venue_id = response.json()["id"]
+    assert response.json()["default_staff_pass_adjustment"] == 0
+
+    response = client.put(
+        f"/api/venues/{venue_id}",
+        json={"default_staff_pass_adjustment": -1},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["default_staff_pass_adjustment"] == -1
+
+    # Leaving it out of an update keeps it
+    response = client.put(
+        f"/api/venues/{venue_id}", json={"name": "Adjusted 2"}, headers=headers
+    )
+    assert response.json()["default_staff_pass_adjustment"] == -1
+
+
+@pytest.mark.parametrize("value", [-6, 11])
+def test_default_staff_pass_adjustment_is_limited(
+    client: TestClient, test_promotions_staff, value
+):
+    response = client.post(
+        "/api/venues",
+        json={
+            "name": "Too Many",
+            "address": "1 St",
+            "default_staff_pass_adjustment": value,
+        },
+        headers={"X-Forwarded-User": test_promotions_staff.email},
+    )
+    assert response.status_code == 422
+
+
 def test_venue_type_rejects_unknown_value(client: TestClient, test_promotions_staff):
     response = client.post(
         "/api/venues",

@@ -10,6 +10,9 @@ const venueLogoUrl = (id: number) => `/api/venues/${id}/logo`;
 // The backend scales uploaded logos to fit within this size (venues.py _LOGO_MAX_PX).
 const LOGO_MAX_WIDTH = 800;
 const LOGO_MAX_HEIGHT = 400;
+// The range the backend allows (schemas/venue.py DefaultStaffPassAdjustment)
+const MIN_DEFAULT_STAFF_PASS_ADJUSTMENT = -5;
+const MAX_DEFAULT_STAFF_PASS_ADJUSTMENT = 10;
 
 interface VenueFormProps {
   venue: VenueResponse | null;
@@ -40,6 +43,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   const [defaultAgeRestriction, setDefaultAgeRestriction] = useState<'' | AgeRestriction>('');
   const [defaultMovieRating, setDefaultMovieRating] = useState<'' | MovieRating>('');
   const [defaultNumPassPairs, setDefaultNumPassPairs] = useState('');
+  const [defaultStaffPassAdjustment, setDefaultStaffPassAdjustment] = useState(0);
   const [requiresPhoneNumber, setRequiresPhoneNumber] = useState(false);
   const [emailAddressRequirement, setEmailAddressRequirement] =
     useState<EmailAddressRequirement>('none');
@@ -53,6 +57,22 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   // Rare: days from the on-air show to the staff show
   const [staffPassDayOffset, setStaffPassDayOffset] = useState('');
   const [rarelyUsedOpen, setRarelyUsedOpen] = useState(false);
+  const defaultPairsNumber = Number(defaultNumPassPairs.trim());
+  const defaultPairs =
+    defaultNumPassPairs.trim() && Number.isInteger(defaultPairsNumber) && defaultPairsNumber >= 1 && defaultPairsNumber <= 5
+      ? defaultPairsNumber
+      : null;
+  const defaultStaffPassAdjustmentHint = (() => {
+    if (defaultStaffPassAdjustment === 0) {
+      return 'No adjustment: new shows get the standard one staff pass per pass pair.';
+    }
+    const n = Math.abs(defaultStaffPassAdjustment);
+    const moreOrFewer = defaultStaffPassAdjustment > 0 ? 'more' : 'fewer';
+    const base = `New shows get ${n} staff pass${n === 1 ? '' : 'es'} ${moreOrFewer} than one per pass pair`;
+    if (defaultPairs == null) return `${base}, but never fewer than 0.`;
+    const total = Math.max(defaultPairs + defaultStaffPassAdjustment, 0);
+    return `${base}: with the default ${defaultPairs} pass pair${defaultPairs === 1 ? '' : 's'}, that's ${total} staff pass${total === 1 ? '' : 'es'}.`;
+  })();
   const staffPassDayOffsetNumber = Number(staffPassDayOffset.trim());
   const staffPassDayOffsetDescription =
     Number.isInteger(staffPassDayOffsetNumber) &&
@@ -102,6 +122,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
       setDefaultAgeRestriction((venue.default_age_restriction ?? '') as '' | AgeRestriction);
       setDefaultMovieRating(venue.default_movie_rating ?? '');
       setDefaultNumPassPairs(venue.default_num_pass_pairs != null ? String(venue.default_num_pass_pairs) : '');
+      setDefaultStaffPassAdjustment(venue.default_staff_pass_adjustment ?? 0);
       setRequiresPhoneNumber(venue.requires_phone_number ?? false);
       setEmailAddressRequirement(venue.email_address_requirement ?? 'none');
       setStaffGuestRequiresName(venue.staff_guest_requires_name ?? false);
@@ -283,6 +304,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           default_age_restriction: defaultAgeValue,
           default_movie_rating: defaultMovieRatingValue,
           default_num_pass_pairs: defaultNumPassPairsValue,
+          default_staff_pass_adjustment: defaultStaffPassAdjustment,
           requires_phone_number: requiresPhoneNumber,
           email_address_requirement: emailAddressRequirement,
           staff_guest_requires_name: staffGuestRequiresName,
@@ -316,6 +338,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           default_age_restriction: defaultAgeValue,
           default_movie_rating: defaultMovieRatingValue,
           default_num_pass_pairs: defaultNumPassPairsValue,
+          default_staff_pass_adjustment: defaultStaffPassAdjustment,
           requires_phone_number: requiresPhoneNumber,
           email_address_requirement: emailAddressRequirement,
           staff_guest_requires_name: staffGuestRequiresName,
@@ -463,42 +486,6 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           </div>
 
           <div className="form-group">
-            <label htmlFor="venue-promoter">Default Promoter</label>
-            <select
-              id="venue-promoter"
-              value={promoterId ?? ''}
-              onChange={(e) => setPromoterId(e.target.value ? Number(e.target.value) : null)}
-              disabled={submitting}
-            >
-              <option value="">Venue is its own promoter</option>
-              {promotersList.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-            <span className="field-hint">
-              New shows at this venue start with this promoter. A show with a promoter belongs to
-              that promoter's KALX promotions reps, who get its guest list, and uses the promoter's
-              guest list requirements rather than this venue's.
-            </span>
-          </div>
-
-          <div className="form-group form-group-checkbox">
-            <label>
-              <input
-                type="checkbox"
-                checked={showsHaveExternalPromoter}
-                onChange={(e) => setShowsHaveExternalPromoter(e.target.checked)}
-                disabled={submitting}
-              />
-              {' '}Shows at this venue can have a promoter different from the venue
-            </label>
-            <span className="field-hint">
-              When checked, a promoter selection field appears in the new show form whenever this
-              venue is selected, allowing individual shows to be assigned a different promoter.
-            </span>
-          </div>
-
-          <div className="form-group">
             <div className="label-with-help">
               <label htmlFor="venue-sourcing-instructions">Venue Show Sourcing Instructions</label>
               <Tooltip text="How the KALX promotions rep decides which of this venue's shows KALX will promote. For example, we may be free to pick any shows we like, or the venue may email the rep a month ahead with the shows they want promoted. Include when to check, where to look and who to ask." />
@@ -601,6 +588,50 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
             )}
           </div>
 
+          <fieldset className="form-fieldset show-defaults-fieldset">
+            <legend>New Show Defaults</legend>
+            <p className="field-hint">
+              These fill in the show form when someone creates a new show at this venue. They can
+              still be changed on each show. Changing them here doesn&apos;t change shows that
+              already exist.
+            </p>
+
+          <div className="form-group">
+            <label htmlFor="venue-promoter">Default Promoter</label>
+            <select
+              id="venue-promoter"
+              value={promoterId ?? ''}
+              onChange={(e) => setPromoterId(e.target.value ? Number(e.target.value) : null)}
+              disabled={submitting}
+            >
+              <option value="">Venue is its own promoter</option>
+              {promotersList.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <span className="field-hint">
+              New shows at this venue start with this promoter. A show with a promoter belongs to
+              that promoter's KALX promotions reps, who get its guest list, and uses the promoter's
+              guest list requirements rather than this venue's.
+            </span>
+          </div>
+
+          <div className="form-group form-group-checkbox">
+            <label>
+              <input
+                type="checkbox"
+                checked={showsHaveExternalPromoter}
+                onChange={(e) => setShowsHaveExternalPromoter(e.target.checked)}
+                disabled={submitting}
+              />
+              {' '}Shows at this venue can have a promoter different from the venue
+            </label>
+            <span className="field-hint">
+              When checked, a promoter selection field appears in the new show form whenever this
+              venue is selected, allowing individual shows to be assigned a different promoter.
+            </span>
+          </div>
+
           <div className="form-row">
             <div className="form-group">
               <label htmlFor="venue-default-wheelchair">Default Wheelchair Accessible</label>
@@ -676,6 +707,53 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
 
           <div className="form-group">
             <div className="label-with-help">
+              <label id="venue-default-staff-pass-adjustment-label">Default Staff Pass Adjustment</label>
+              <Tooltip text="Every show gets the standard one staff pass per on-air pass pair. Only change this when the venue always gives us more or fewer staff passes than that. New shows at this venue start with this Staff Pass Adjustment, and it can still be changed on each show." />
+            </div>
+            <div
+              role="group"
+              aria-labelledby="venue-default-staff-pass-adjustment-label"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <button
+                type="button"
+                className="btn-small btn-secondary"
+                aria-label="One fewer default staff pass"
+                onClick={() => setDefaultStaffPassAdjustment(defaultStaffPassAdjustment - 1)}
+                disabled={submitting || defaultStaffPassAdjustment <= MIN_DEFAULT_STAFF_PASS_ADJUSTMENT}
+              >
+                −
+              </button>
+              <output
+                style={{
+                  minWidth: '2rem',
+                  textAlign: 'center',
+                  fontWeight: defaultStaffPassAdjustment === 0 ? undefined : 'bold',
+                }}
+              >
+                {defaultStaffPassAdjustment > 0
+                  ? `+${defaultStaffPassAdjustment}`
+                  : defaultStaffPassAdjustment < 0
+                    ? `−${-defaultStaffPassAdjustment}`
+                    : '0'}
+              </output>
+              <button
+                type="button"
+                className="btn-small btn-secondary"
+                aria-label="One more default staff pass"
+                onClick={() => setDefaultStaffPassAdjustment(defaultStaffPassAdjustment + 1)}
+                disabled={submitting || defaultStaffPassAdjustment >= MAX_DEFAULT_STAFF_PASS_ADJUSTMENT}
+              >
+                +
+              </button>
+            </div>
+            <span className="field-hint" style={{ display: 'block', marginTop: '0.25rem' }}>
+              {defaultStaffPassAdjustmentHint}
+            </span>
+          </div>
+
+          <div className="form-group">
+            <div className="label-with-help">
               <label htmlFor="venue-default-on-air-description">Default On-Air Description</label>
               <Tooltip text="Pre-filled as the On-Air Description when creating a new show at this venue. Shown to DJs on the show detail page while they are on-air. Describe the show in a factual, value-neutral way. Supports Markdown formatting: headers, paragraphs, lists, blockquotes, bold/italic, and inline or block code. Links and images are not supported." />
             </div>
@@ -723,76 +801,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           </div>
 
           <div className="form-section">
-            <h4>Guest List Requirements (optional)</h4>
-            <p className="field-hint">
-              These settings control what information appears in the guest list when a show at this venue closes,
-              unless the show has a promoter, whose own settings apply instead.
-              They're all optional. Leave every box unchecked if the venue doesn't need any of them.
-            </p>
-            <div className="form-group form-group-checkbox">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={requiresPhoneNumber}
-                  onChange={(e) => setRequiresPhoneNumber(e.target.checked)}
-                  disabled={submitting}
-                />
-                {' '}Include winner's phone number in guest list
-              </label>
-            </div>
-            <EmailAddressRequirementField
-              idPrefix="venue"
-              value={emailAddressRequirement}
-              onChange={setEmailAddressRequirement}
-              disabled={submitting}
-            />
-            <div className="form-group form-group-checkbox">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={staffGuestRequiresName}
-                  onChange={(e) => setStaffGuestRequiresName(e.target.checked)}
-                  disabled={submitting}
-                />
-                {' '}Require staff guests to be listed by name
-              </label>
-              <span className="field-hint">
-                When checked, staff members bringing a +1 guest must provide the guest's name,
-                and the guest list will show the guest's name as a separate entry. When unchecked,
-                the list shows "John Doe and a guest" without requiring the guest's name.
-              </span>
-            </div>
-            <div className="form-group form-group-checkbox">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={holdCloseNotifications}
-                  onChange={(e) => setHoldCloseNotifications(e.target.checked)}
-                  disabled={submitting}
-                />
-                {' '}Wait for me to send close notifications
-              </label>
-              <HoldCloseNotificationsHint />
-            </div>
-            <div className="form-group form-group-checkbox">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={trackPassCallIn}
-                  onChange={(e) => setTrackPassCallIn(e.target.checked)}
-                  disabled={submitting}
-                />
-                {' '}Track when I've called in the passes
-              </label>
-              <span className="field-hint">
-                Closed shows get a Mark Passes Called In button next to the guest list, so you can keep
-                track of which ones you've sent to the venue.
-              </span>
-            </div>
-          </div>
-
-          <div className="form-section">
-            <h4>Lottery Defaults</h4>
+            <h4>Lottery</h4>
             <p className="field-hint">
               When enabled, new shows at this venue will use a lottery window during which staff
               and DJ entries are held and randomly drawn instead of first-come first-served.
@@ -855,7 +864,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           </div>
 
           <div className="form-section">
-            <h4>Default Planned Close Offset</h4>
+            <h4>Planned Close</h4>
             <p className="field-hint">
               When set, new shows at this venue will have their planned close date and time
               automatically pre-filled when the show date and time are entered.
@@ -929,6 +938,76 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
                 </span>
               </div>
             </details>
+          </div>
+          </fieldset>
+
+          <div className="form-section">
+            <h4>Guest List Requirements (optional)</h4>
+            <p className="field-hint">
+              These settings control what information appears in the guest list when a show at this venue closes,
+              unless the show has a promoter, whose own settings apply instead.
+              They're all optional. Leave every box unchecked if the venue doesn't need any of them.
+            </p>
+            <div className="form-group form-group-checkbox">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={requiresPhoneNumber}
+                  onChange={(e) => setRequiresPhoneNumber(e.target.checked)}
+                  disabled={submitting}
+                />
+                {' '}Include winner's phone number in guest list
+              </label>
+            </div>
+            <EmailAddressRequirementField
+              idPrefix="venue"
+              value={emailAddressRequirement}
+              onChange={setEmailAddressRequirement}
+              disabled={submitting}
+            />
+            <div className="form-group form-group-checkbox">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={staffGuestRequiresName}
+                  onChange={(e) => setStaffGuestRequiresName(e.target.checked)}
+                  disabled={submitting}
+                />
+                {' '}Require staff guests to be listed by name
+              </label>
+              <span className="field-hint">
+                When checked, staff members bringing a +1 guest must provide the guest's name,
+                and the guest list will show the guest's name as a separate entry. When unchecked,
+                the list shows "John Doe and a guest" without requiring the guest's name.
+              </span>
+            </div>
+            <div className="form-group form-group-checkbox">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={holdCloseNotifications}
+                  onChange={(e) => setHoldCloseNotifications(e.target.checked)}
+                  disabled={submitting}
+                />
+                {' '}Wait for me to send close notifications
+              </label>
+              <HoldCloseNotificationsHint />
+            </div>
+            <div className="form-group form-group-checkbox">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={trackPassCallIn}
+                  onChange={(e) => setTrackPassCallIn(e.target.checked)}
+                  disabled={submitting}
+                />
+                {' '}Track when I've called in the passes
+              </label>
+              <span className="field-hint">
+                Closed shows get a Mark Passes Called In button next to the guest list, so you can keep
+                track of which ones you've sent to the venue.
+              </span>
+            </div>
           </div>
 
           <div className="form-section">

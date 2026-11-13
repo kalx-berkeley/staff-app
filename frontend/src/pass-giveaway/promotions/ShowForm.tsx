@@ -341,6 +341,7 @@ const ShowForm = () => {
           if (only.default_num_pass_pairs != null) {
             setNumPassPairs(only.default_num_pass_pairs);
           }
+          setStaffPassAdjustment(only.default_staff_pass_adjustment ?? 0);
           setOnAirDescription(only.default_on_air_description ?? '');
           setCallerSpecialInstructions(only.default_caller_special_instructions ?? '');
           setStaffInstructions(only.default_staff_instructions ?? '');
@@ -515,6 +516,10 @@ const ShowForm = () => {
       }
       if (selected?.default_num_pass_pairs != null) {
         setNumPassPairs(selected.default_num_pass_pairs);
+      }
+      // An existing show keeps its staff passes, which may already be claimed
+      if (!isEditing) {
+        setStaffPassAdjustment(selected?.default_staff_pass_adjustment ?? 0);
       }
       setLotteryEnabled(selected?.default_lottery_enabled ?? false);
       setLotteryWindowHours(String(selected?.default_lottery_window_hours ?? 24));
@@ -1497,7 +1502,7 @@ const ShowForm = () => {
               <div className="form-group">
                 <div className="label-with-help">
                   <label id="staff_pass_adjustment_label">Staff Pass Adjustment</label>
-                  <Tooltip text="Every show gets the standard one staff pass per pass pair. Only change this when the venue or promoter gives us more or fewer than that." />
+                  <Tooltip text="Every show gets the standard one staff pass per pass pair. Only change this when the venue or promoter gives us more or fewer than that. A new show starts with its venue's default adjustment, which is set on the venue's page." />
                 </div>
                 <div
                   role="group"

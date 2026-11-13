@@ -42,6 +42,11 @@ class Venue(Base):
     default_age_restriction = Column(String, nullable=True)
     default_movie_rating = Column(String, nullable=True)
     default_num_pass_pairs = Column(Integer, nullable=True)
+    # Staff passes above (or, negative, below) one per pass pair that new
+    # shows at this venue start with. See Show.staff_pass_adjustment.
+    default_staff_pass_adjustment = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     logo_filename = Column(String, nullable=True)
     # When the venue has a logo, the DJ view shows the logo in place of the
     # venue name unless this is set, in which case it shows both.
