@@ -5,9 +5,15 @@ import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, 
 import { formatPhone, formatLeave, isOnLeave, formatDateValue } from '../../common/utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import type { ShowResponse, PreAssignmentData, LotteryStatus, PassResponse, DjSuggestion, DjLeave, AlternateEntry, WaitingGuest } from '../types';
+import type { ShowResponse, PreAssignmentData, LotteryStatus, PassResponse, DjSuggestion, DjLeave, AlternateEntry, WaitingGuest, SpecialtyShowCategory } from '../types';
 import type { APIError, PromotionsStaffProfile } from '../../common/types';
-import { KALX_TABLE_NAME, seatedFallbackNote, waitingFallbackNote } from '../utils';
+import {
+  KALX_TABLE_NAME,
+  seatedFallbackNote,
+  specialtyShowCategoriesByName,
+  specialtyShowLabel,
+  waitingFallbackNote,
+} from '../utils';
 import { formatCalendarDate, formatCalendarDateRange, formatPacific, formatPacificTime, pacificDateString } from '../../common/dateTime';
 
 type SuggestMode = 'choose' | 'date' | 'genre' | null;
@@ -163,7 +169,7 @@ const ShowDetail = () => {
   const [filteredDjNames, setFilteredDjNames] = useState<string[]>([]);
   const [showDjAutocomplete, setShowDjAutocomplete] = useState(false);
   const djAutocompleteRef = useRef<HTMLUListElement>(null);
-  const [specialtyShowNames, setSpecialtyShowNames] = useState<Set<string>>(new Set());
+  const [specialtyShowNames, setSpecialtyShowNames] = useState<Map<string, SpecialtyShowCategory>>(new Map());
 
   // On-air schedule check for the entered DJ/specialty show name, to restrict
   // (and warn about) the pre-assignment date.
@@ -293,7 +299,7 @@ const ShowDetail = () => {
   useEffect(() => {
     autocompleteAPI.getDJNames().then(setDjNames).catch(() => {});
     specialtyShowsAPI.list()
-      .then((shows) => setSpecialtyShowNames(new Set(shows.map((s) => s.name.toLowerCase()))))
+      .then((shows) => setSpecialtyShowNames(specialtyShowCategoriesByName(shows)))
       .catch(() => {});
   }, []);
 
@@ -1089,7 +1095,8 @@ const ShowDetail = () => {
                             {showDjAutocomplete && (
                               <ul className="autocomplete-list" ref={djAutocompleteRef}>
                                 {filteredDjNames.map((name) => {
-                                  const isSpecialty = specialtyShowNames.has(name.toLowerCase());
+                                  const specialtyCategory = specialtyShowNames.get(name.toLowerCase());
+                                  const isSpecialty = specialtyCategory !== undefined;
                                   return (
                                     <li
                                       key={name}
@@ -1098,7 +1105,7 @@ const ShowDetail = () => {
                                     >
                                       <span>{name}</span>
                                       <span className={isSpecialty ? 'specialty-show-badge' : 'dj-name-badge'}>
-                                        {isSpecialty ? 'Specialty Show' : 'DJ'}
+                                        {isSpecialty ? specialtyShowLabel(specialtyCategory) : 'DJ'}
                                       </span>
                                     </li>
                                   );
@@ -1259,7 +1266,7 @@ const ShowDetail = () => {
                                           s.is_specialty ? 'specialty-show-badge' : 'dj-name-badge'
                                         }
                                       >
-                                        {s.is_specialty ? 'Specialty Show' : 'DJ'}
+                                        {s.is_specialty ? specialtyShowLabel(s.specialty_category) : 'DJ'}
                                       </span>
                                     </li>
                                   ))}
@@ -1343,7 +1350,7 @@ const ShowDetail = () => {
                                       s.is_specialty ? 'specialty-show-badge' : 'dj-name-badge'
                                     }
                                   >
-                                    {s.is_specialty ? 'Specialty Show' : 'DJ'}
+                                    {s.is_specialty ? specialtyShowLabel(s.specialty_category) : 'DJ'}
                                   </span>
                                 </li>
                               ))}

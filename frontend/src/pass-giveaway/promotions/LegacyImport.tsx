@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { legacyImportAPI, passesAPI, venuesAPI, showsAPI, autocompleteAPI, specialtyShowsAPI } from '../api';
-import type { PassResponse, VenueResponse, AgeRestriction, MovieRating, ShowSummary, WheelchairAccessible } from '../types';
-import { MOVIE_RATING_LABELS } from '../utils';
+import type { PassResponse, VenueResponse, AgeRestriction, MovieRating, ShowSummary, SpecialtyShowCategory, WheelchairAccessible } from '../types';
+import { MOVIE_RATING_LABELS, specialtyShowCategoriesByName } from '../utils';
 import {
   DatePicker,
   Tooltip,
@@ -260,7 +260,7 @@ const LegacyImport = () => {
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [knownGenres, setKnownGenres] = useState<string[]>([]);
   const [djNames, setDjNames] = useState<string[]>([]);
-  const [specialtyShowNames, setSpecialtyShowNames] = useState<Set<string>>(new Set());
+  const [specialtyShowNames, setSpecialtyShowNames] = useState<Map<string, SpecialtyShowCategory>>(new Map());
   const descriptionCheck = useDescriptionCheck();
 
   // Venue is at the top and persists across imports
@@ -335,7 +335,7 @@ const LegacyImport = () => {
         autocompleteAPI.getDJNames().then(setDjNames).catch(() => {});
         specialtyShowsAPI
           .list()
-          .then((shows) => setSpecialtyShowNames(new Set(shows.map((s) => s.name.toLowerCase()))))
+          .then((shows) => setSpecialtyShowNames(specialtyShowCategoriesByName(shows)))
           .catch(() => {});
         if (venueList.length === 1) {
           setVenueId(venueList[0].id);

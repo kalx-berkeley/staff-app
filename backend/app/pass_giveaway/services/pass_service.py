@@ -794,6 +794,7 @@ class PassService:
                 suggestions.append({
                     "name": specialty_show.name,
                     "is_specialty": True,
+                    "specialty_category": specialty_show.category,
                     "matched_genres": sorted(matched_genres),
                 })
 
@@ -1457,7 +1458,7 @@ class PassService:
         if resolved is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"‘{dj_name.strip()}’ isn't a known DJ or specialty show name",
+                detail=f"‘{dj_name.strip()}’ isn't a known DJ or show name",
             )
         official_name, specialty_show_id = resolved
 

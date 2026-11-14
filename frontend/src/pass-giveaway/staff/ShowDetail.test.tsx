@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { renderAndSettle } from '../../test/render';
 import { BrowserRouter } from 'react-router-dom';
 import ShowDetail from './ShowDetail';
-import { showsAPI, passesAPI, alternatesAPI } from '../api';
+import { showsAPI, passesAPI, alternatesAPI, specialtyShowsAPI } from '../api';
 import type { ShowResponse, PassResponse, AlternateEntry, AlternateQueue } from '../types';
 import type { UserResponse } from '../../common/types';
 
@@ -16,6 +16,7 @@ vi.mock('../api', () => ({
     claim: vi.fn(),
     releaseClaim: vi.fn(),
     removePreassignment: vi.fn(),
+    getPreassignSchedule: vi.fn(),
     addGuest: vi.fn(),
     updateGuestName: vi.fn(),
     removeGuest: vi.fn(),
@@ -25,6 +26,9 @@ vi.mock('../api', () => ({
     join: vi.fn(),
     updateMine: vi.fn(),
     leave: vi.fn(),
+  },
+  specialtyShowsAPI: {
+    listMine: vi.fn(),
   },
 }));
 
@@ -153,6 +157,7 @@ describe('Staff ShowDetail', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(specialtyShowsAPI.listMine).mockResolvedValue([]);
     mockUseAuth.mockReturnValue({ user: null, loading: false, error: null, refetchUser: vi.fn() });
   });
 
@@ -1033,6 +1038,37 @@ describe('Staff ShowDetail', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /release pass/i }));
       await waitFor(() => expect(passesAPI.releaseClaim).toHaveBeenCalledWith(2));
+    });
+  });
+
+  describe('Talk & Info Show staff members', () => {
+    it('lets a staff member who isn’t a DJ reserve a pass pair for their show', async () => {
+      mockUseAuth.mockReturnValue({
+        user: { email: 'news@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { id: 9, name: 'Nia News', phone: '', dj_name: null, is_sublist_dj: false } },
+        loading: false,
+        error: null,
+        refetchUser: vi.fn(),
+      } as unknown as ReturnType<typeof mockUseAuth>);
+      vi.mocked(specialtyShowsAPI.listMine).mockResolvedValue([
+        {
+          id: 7, name: 'Morning Report', category: 'talk', deleted: false, retired: false,
+          spinitron_shows: [], owner_emails: [], owner_details: [], dj_names: [],
+          staff_member_emails: ['news@example.com'], staff_member_details: [],
+          is_owner: false, is_dj: false, is_staff_member: true,
+        },
+      ]);
+      vi.mocked(passesAPI.getPreassignSchedule).mockResolvedValue([]);
+      vi.mocked(showsAPI.get).mockResolvedValue({
+        ...mockShow,
+        passes: [{ ...availablePass, id: 3, pass_type: 'pair' }],
+      });
+
+      await renderAndSettle(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Reserve for On-Air Giveaway' }));
+      expect(await screen.findByDisplayValue('Morning Report (Talk & Info Show)')).toBeInTheDocument();
+      await waitFor(() => expect(passesAPI.getPreassignSchedule).toHaveBeenCalledWith('Morning Report'));
+      expect(await screen.findByText(/No scheduled on-air dates found/)).toBeInTheDocument();
     });
   });
 });

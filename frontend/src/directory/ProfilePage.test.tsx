@@ -183,7 +183,7 @@ describe('ProfilePage', () => {
       'href',
       'https://spinitron.com/KALX/pl/77/',
     );
-    expect(within(shift).getByText('Specialty show')).toBeInTheDocument();
+    expect(within(shift).getByText('Specialty Music Show or Talk & Info Show')).toBeInTheDocument();
   });
 
   it("lets site admins see someone else's profile", async () => {

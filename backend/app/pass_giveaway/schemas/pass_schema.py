@@ -1,6 +1,7 @@
 """Pydantic schemas for Pass API."""
 
 from datetime import date
+from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.common.schemas.types import UtcDatetime
@@ -114,7 +115,10 @@ class DjSuggestion(BaseModel):
     """Schema for a suggested DJ/specialty-show name to pre-assign a pass pair to."""
 
     name: str
+    # A Specialty Music Show or Talk & Info Show rather than a DJ
     is_specialty: bool = False
+    # "music" or "talk" when is_specialty
+    specialty_category: Literal["music", "talk"] | None = None
     matched_genres: list[str] = Field(default_factory=list)
     # Genre suggestions only: set when the DJ's leave of absence covers the show
     on_leave: bool = False

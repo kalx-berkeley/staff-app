@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, fireEvent, within, cleanup, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import SpecialtyShowList from './SpecialtyShowList';
+import SpecialtyShowList, { TalkShowList } from './SpecialtyShowList';
 import { specialtyShowsAPI } from '../api';
 import { renderAndSettle } from '../../test/render';
 import type { SpecialtyShowResponse } from '../types';
@@ -24,6 +24,7 @@ vi.mock('../../common/contexts/authHooks', () => ({
 const show = (overrides: Partial<SpecialtyShowResponse>): SpecialtyShowResponse => ({
   id: 1,
   name: 'Take Five',
+  category: 'music',
   deleted: false,
   retired: false,
   spinitron_shows: [
@@ -32,6 +33,8 @@ const show = (overrides: Partial<SpecialtyShowResponse>): SpecialtyShowResponse 
   owner_emails: [],
   owner_details: [],
   dj_names: [],
+  staff_member_emails: [],
+  staff_member_details: [],
   ...overrides,
 });
 
@@ -59,7 +62,7 @@ describe('SpecialtyShowList', () => {
     ]);
     await renderList();
 
-    expect(specialtyShowsAPI.list).toHaveBeenCalledWith(true);
+    expect(specialtyShowsAPI.list).toHaveBeenCalledWith(true, 'music');
     expect(screen.getByRole('alert')).toHaveTextContent(
       "don't have a Spinitron link yet, so their playlists count as regular DJ shifts for the DJ sublist: Legacy Hour.",
     );
@@ -92,7 +95,7 @@ describe('SpecialtyShowList', () => {
     vi.mocked(specialtyShowsAPI.create).mockRejectedValue({ detail: 'Spinitron has no show' });
     await renderList();
 
-    fireEvent.change(screen.getByPlaceholderText('New specialty show name...'), {
+    fireEvent.change(screen.getByPlaceholderText('New Specialty Music Show name...'), {
       target: { value: 'Night Moves' },
     });
     const add = screen.getByRole('button', { name: 'Add' });
@@ -105,7 +108,42 @@ describe('SpecialtyShowList', () => {
     expect(await screen.findByText('Spinitron has no show')).toBeInTheDocument();
     expect(specialtyShowsAPI.create).toHaveBeenCalledWith({
       name: 'Night Moves',
+      category: 'music',
       spinitron_urls: ['https://spinitron.com/KALX/show/999/'],
+    });
+  });
+
+  it('lists and adds Talk & Info Shows on their own page', async () => {
+    vi.mocked(specialtyShowsAPI.list).mockResolvedValue([
+      show({ id: 7, name: 'Morning Report', category: 'talk' }),
+    ]);
+    vi.mocked(specialtyShowsAPI.create).mockRejectedValue({ detail: 'nope' });
+    await renderAndSettle(
+      <MemoryRouter>
+        <TalkShowList />
+      </MemoryRouter>,
+    );
+
+    expect(specialtyShowsAPI.list).toHaveBeenCalledWith(true, 'talk');
+    expect(screen.getByRole('heading', { name: 'Talk & Info Shows' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Manage' })).toHaveAttribute(
+      'href',
+      '/staff/talk-shows/7',
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('New Talk & Info Show name...'), {
+      target: { value: 'City Desk' },
+    });
+    fireEvent.change(screen.getByLabelText('Spinitron show or playlist link'), {
+      target: { value: 'https://spinitron.com/KALX/show/777/' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(await screen.findByText('nope')).toBeInTheDocument();
+    expect(specialtyShowsAPI.create).toHaveBeenCalledWith({
+      name: 'City Desk',
+      category: 'talk',
+      spinitron_urls: ['https://spinitron.com/KALX/show/777/'],
     });
   });
 });

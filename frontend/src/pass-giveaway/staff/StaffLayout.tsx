@@ -68,9 +68,14 @@ const StaffLayout = () => {
               <NavLink to="/staff/my-passes">My Passes</NavLink>
             </li>
           )}
-          {(user?.role === 'promotions' || mySpecialtyShows.length > 0) && (
+          {(user?.role === 'promotions' || mySpecialtyShows.some((s) => s.category !== 'talk')) && (
             <li>
-              <NavLink to="/staff/specialty-shows">Specialty Shows</NavLink>
+              <NavLink to="/staff/specialty-shows">Specialty Music Shows</NavLink>
+            </li>
+          )}
+          {(user?.role === 'promotions' || mySpecialtyShows.some((s) => s.category === 'talk')) && (
+            <li>
+              <NavLink to="/staff/talk-shows">Talk &amp; Info Shows</NavLink>
             </li>
           )}
           <li>

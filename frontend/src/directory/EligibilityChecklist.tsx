@@ -20,7 +20,7 @@ const REQUIREMENT_COUNT = 5;
 
 const REASONS: Record<NonNullable<PlaylistCheck['reason']>, string> = {
   automated: 'Automated (no live DJ)',
-  specialty: 'Specialty show',
+  specialty: 'Specialty Music Show or Talk & Info Show',
   too_short: 'Shorter than 90 minutes',
 };
 
@@ -172,7 +172,7 @@ const EligibilityChecklist = ({ eligibility: e, otherStaffId }: EligibilityCheck
         <Requirement title="A DJ shift last quarter" check={e.shift}>
           <p>
             In the previous quarter ({e.shift.previous_quarter}) you need at least one DJ shift of{' '}
-            {e.shift.min_minutes} minutes or more under your own DJ name, that isn’t a specialty show. Quarters run Feb–Apr, May–Jul, Aug–Oct and Nov–Jan. Back-to-back playlists count as
+            {e.shift.min_minutes} minutes or more under your own DJ name, that isn’t a Specialty Music Show or Talk & Info Show. Quarters run Feb–Apr, May–Jul, Aug–Oct and Nov–Jan. Back-to-back playlists count as
             one shift. Automated playlists, and shared names like DJ Trainee, don’t count.
           </p>
           <p>

@@ -1300,8 +1300,8 @@ def build_venues(db: Session, window: Window, params: Params) -> list[dict]:
                 "Shows: shows with a show date in the window. On-air:"
                 f" {_ON_AIR_FORMULA} Staff: {_STAFF_FORMULA} Balance: {_BALANCE_FORMULA}"
                 ' Attempts per giveaway: "tried" clicks ÷ pass pairs given away, both by'
-                " when they happened. Pre-assigned: pass pairs pre-assigned to a DJ or"
-                " specialty show ÷ pass pairs.",
+                " when they happened. Pre-assigned: pass pairs pre-assigned to a DJ, a"
+                " Specialty Music Show or a Talk & Info Show ÷ pass pairs.",
                 "Show date (attempts per giveaway: when it happened)",
                 includes=f"{_SHOW_SCOPE} Utilization: {_COMPLETE}",
                 excludes=_LOW_SAMPLE_NOTE,
@@ -1448,7 +1448,8 @@ def build_venue(db: Session, window: Window, params: Params) -> list[dict]:
             ratio(pre, pairs),
             "percent",
             explanation(
-                "Pass pairs pre-assigned to a DJ or specialty show ÷ pass pairs.",
+                "Pass pairs pre-assigned to a DJ, a Specialty Music Show or a Talk & Info"
+                " Show ÷ pass pairs.",
                 "Show date",
                 includes=_SHOW_SCOPE,
                 excludes="Pre-assignments that expired or were removed before the show.",

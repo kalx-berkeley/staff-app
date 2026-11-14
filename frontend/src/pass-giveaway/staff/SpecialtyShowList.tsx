@@ -3,11 +3,28 @@ import { Link, useNavigate } from 'react-router-dom';
 import { specialtyShowsAPI } from '../api';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import type { SpecialtyShowResponse } from '../types';
+import { SPECIALTY_SHOW_KINDS } from '../utils';
+import type { SpecialtyShowCategory, SpecialtyShowResponse } from '../types';
 import type { APIError } from '../../common/types';
 
-const SpecialtyShowList = () => {
-  usePageTitle('Specialty Shows · Staff');
+const HINTS: Record<SpecialtyShowCategory, string> = {
+  music:
+    'Specialty Music Shows are on-air DJ shows that can receive pre-assigned pass pairs.',
+  talk:
+    'Talk & Info Shows are on-air talk and information shows (news, sports, public affairs and so ' +
+    'on) that can receive pre-assigned pass pairs. Their staff members can reserve passes for ' +
+    'the show, whether or not they are DJs.',
+};
+
+interface SpecialtyShowListProps {
+  /** Which kind of show this page lists. */
+  category?: SpecialtyShowCategory;
+}
+
+/** The list of Specialty Music Shows or of Talk & Info Shows, by `category`. */
+const SpecialtyShowList = ({ category = 'music' }: SpecialtyShowListProps) => {
+  const kind = SPECIALTY_SHOW_KINDS[category];
+  usePageTitle(`${kind.plural} · Staff`);
   const navigate = useNavigate();
   const { user } = useAuth();
   const isPromotions = user?.role === 'promotions';
@@ -25,28 +42,32 @@ const SpecialtyShowList = () => {
   const [upcomingTitles, setUpcomingTitles] = useState<string[]>([]);
   const [titleSuggestions, setTitleSuggestions] = useState<string[]>([]);
   const [showTitleSuggestions, setShowTitleSuggestions] = useState(false);
-  const [myDjShowIds, setMyDjShowIds] = useState<Set<number>>(new Set());
+  const [myMemberShowIds, setMyMemberShowIds] = useState<Set<number>>(new Set());
 
   const loadShows = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await specialtyShowsAPI.list(true);
+      const data = await specialtyShowsAPI.list(true, category);
       setShows(data);
     } catch (err) {
       const apiError = err as APIError;
-      setError(typeof apiError.detail === 'string' ? apiError.detail : 'Failed to load specialty shows');
+      setError(typeof apiError.detail === 'string' ? apiError.detail : `Failed to load ${kind.plural}`);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [category, kind.plural]);
 
   useEffect(() => {
     loadShows();
     specialtyShowsAPI.getUpcomingTitles().then(setUpcomingTitles).catch(() => {});
     specialtyShowsAPI
       .listMine()
-      .then((mine) => setMyDjShowIds(new Set(mine.filter((s) => s.is_dj).map((s) => s.id))))
+      .then((mine) =>
+        setMyMemberShowIds(
+          new Set(mine.filter((s) => s.is_dj || s.is_staff_member).map((s) => s.id)),
+        ),
+      )
       .catch(() => {});
   }, [loadShows]);
 
@@ -55,7 +76,7 @@ const SpecialtyShowList = () => {
 
   const canManage = (show: SpecialtyShowResponse) => isPromotions || isOwner(show);
 
-  const isMyDjShow = (show: SpecialtyShowResponse) => myDjShowIds.has(show.id);
+  const isMyShow = (show: SpecialtyShowResponse) => myMemberShowIds.has(show.id);
 
   const handleNameInputChange = (value: string) => {
     setNewName(value);
@@ -83,11 +104,15 @@ const SpecialtyShowList = () => {
     setFormError(null);
     setShowTitleSuggestions(false);
     try {
-      const created = await specialtyShowsAPI.create({ name, spinitron_urls: [spinitronUrl] });
-      navigate(`/staff/specialty-shows/${created.id}`);
+      const created = await specialtyShowsAPI.create({
+        name,
+        category,
+        spinitron_urls: [spinitronUrl],
+      });
+      navigate(`${kind.path}/${created.id}`);
     } catch (err) {
       const apiError = err as APIError;
-      setFormError(typeof apiError.detail === 'string' ? apiError.detail : 'Failed to create specialty show');
+      setFormError(typeof apiError.detail === 'string' ? apiError.detail : `Failed to create ${kind.label}`);
       setSubmitting(false);
     }
   };
@@ -100,7 +125,7 @@ const SpecialtyShowList = () => {
       await loadShows();
     } catch (err) {
       const apiError = err as APIError;
-      setFormError(typeof apiError.detail === 'string' ? apiError.detail : 'Failed to delete specialty show');
+      setFormError(typeof apiError.detail === 'string' ? apiError.detail : `Failed to delete ${kind.label}`);
       setDeleteConfirmId(null);
     } finally {
       setDeleting(false);
@@ -117,12 +142,12 @@ const SpecialtyShowList = () => {
       setFormError(
         typeof apiError.detail === 'string'
           ? apiError.detail
-          : `Failed to ${retired ? 'retire' : 'un-retire'} specialty show`,
+          : `Failed to ${retired ? 'retire' : 'un-retire'} ${kind.label}`,
       );
     }
   };
 
-  if (loading) return <div className="loading">Loading specialty shows...</div>;
+  if (loading) return <div className="loading">Loading {kind.plural}...</div>;
 
   if (error) {
     return (
@@ -141,16 +166,16 @@ const SpecialtyShowList = () => {
   return (
     <div className="venue-list">
       <div className="venue-list-header">
-        <h2>Specialty Shows</h2>
+        <h2>{kind.plural}</h2>
       </div>
 
       <p className="field-hint">
-        Specialty shows are on-air DJ shifts that can receive pre-assigned pass pairs.
-        Their names appear alongside DJ names in all DJ name autocomplete fields. When
-        adding one, use its exact on-air schedule name (the "New specialty show name"
-        field suggests titles from the upcoming Spinitron schedule) so it matches.
+        {HINTS[category]} Their names appear alongside DJ names in all DJ name autocomplete
+        fields. When adding one, use its exact on-air schedule name (the "New{' '}
+        {kind.label} name" field suggests titles from the upcoming Spinitron schedule) so it
+        matches.
         Each show also needs its Spinitron link (a show or playlist page), which is how the
-        Staff Directory tells specialty shows apart from regular DJ shifts. Retire a show
+        Staff Directory tells {kind.plural} apart from regular DJ shifts. Retire a show
         when it ends: it stays on record but can no longer get passes.
       </p>
 
@@ -167,7 +192,7 @@ const SpecialtyShowList = () => {
           <div className="autocomplete-wrapper">
             <input
               type="text"
-              placeholder="New specialty show name..."
+              placeholder={`New ${kind.label} name...`}
               value={newName}
               onChange={(e) => handleNameInputChange(e.target.value)}
               onFocus={() => { if (newName.trim()) setShowTitleSuggestions(true); }}
@@ -224,18 +249,20 @@ const SpecialtyShowList = () => {
       )}
 
       {currentShows.length === 0 ? (
-        <p className="empty-message">No specialty shows yet.</p>
+        <p className="empty-message">No {kind.plural} yet.</p>
       ) : (
         <div className="venue-grid">
           {currentShows.map((show) => (
             <div key={show.id} className="venue-card">
               <h3>{show.name}</h3>
-              {isMyDjShow(show) && (
-                <span className="status-badge status-dj">You're a DJ for this show</span>
+              {isMyShow(show) && (
+                <span className="status-badge status-dj">
+                  {category === 'talk' ? "You're on this show's staff" : "You're a DJ for this show"}
+                </span>
               )}
               {canManage(show) ? (
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                  <Link to={`/staff/specialty-shows/${show.id}`} className="btn-primary btn-small">
+                  <Link to={`${kind.path}/${show.id}`} className="btn-primary btn-small">
                     Manage
                   </Link>
                   <button
@@ -255,7 +282,7 @@ const SpecialtyShowList = () => {
                 </div>
               ) : (
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                  <Link to={`/staff/specialty-shows/${show.id}`} className="btn-secondary btn-small">
+                  <Link to={`${kind.path}/${show.id}`} className="btn-secondary btn-small">
                     View
                   </Link>
                 </div>
@@ -271,7 +298,7 @@ const SpecialtyShowList = () => {
           <ul className="item-list">
             {retiredShows.map((show) => (
               <li key={show.id} className="item-list-row">
-                <Link to={`/staff/specialty-shows/${show.id}`}>{show.name}</Link>
+                <Link to={`${kind.path}/${show.id}`}>{show.name}</Link>
                 {canManage(show) && (
                   <button
                     onClick={() => handleSetRetired(show.id, false)}
@@ -290,14 +317,14 @@ const SpecialtyShowList = () => {
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
-              <h3>Delete Specialty Show</h3>
+              <h3>Delete {kind.label}</h3>
             </div>
             <div className="modal-body">
               <p>
                 Are you sure you want to delete <strong>{deleteTarget.name}</strong>?
               </p>
               <p>
-                This specialty show will be removed from all DJ name autocomplete lists.
+                This {kind.label} will be removed from all DJ name autocomplete lists.
               </p>
             </div>
             <div className="form-actions">
@@ -324,5 +351,8 @@ const SpecialtyShowList = () => {
     </div>
   );
 };
+
+/** The Talk & Info Shows list, at `/staff/talk-shows`. */
+export const TalkShowList = () => <SpecialtyShowList category="talk" />;
 
 export default SpecialtyShowList;

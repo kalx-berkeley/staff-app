@@ -123,7 +123,7 @@ def test_unknown_name_is_refused(client, show, dj):
     """A name that isn't a current DJ or specialty show is refused with a clear message."""
     response = _clothespin(client, show.id, "DJ Fooo")
     assert response.status_code == 400
-    assert response.json()["detail"] == "‘DJ Fooo’ isn't a known DJ or specialty show name"
+    assert response.json()["detail"] == "‘DJ Fooo’ isn't a known DJ or show name"
 
 
 def test_former_staff_dj_name_is_refused(client, db, show):

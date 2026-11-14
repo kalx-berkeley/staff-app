@@ -314,7 +314,7 @@ const MyPasses = () => {
                     )}
                     {entry.entry_type === 'dj' && entry.specialty_show_name && (
                       <div className="info-row">
-                        <span className="info-label">Specialty Show:</span>
+                        <span className="info-label">Reserved for:</span>
                         <span className="info-value">{entry.specialty_show_name}</span>
                       </div>
                     )}

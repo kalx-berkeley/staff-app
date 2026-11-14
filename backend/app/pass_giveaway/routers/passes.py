@@ -24,6 +24,11 @@ from app.pass_giveaway.schemas.pass_schema import (
 )
 from app.pass_giveaway.services.alternate_service import AlternateService
 from app.pass_giveaway.services import tabler_service
+from app.pass_giveaway.services.specialty_show_membership import (
+    is_member as is_show_member,
+    require_can_reserve_for,
+    require_sublist_dj,
+)
 from app.pass_giveaway.services.pass_service import (
     PassService,
     normalize_phone,
@@ -38,6 +43,7 @@ from app.auth import (
     require_staff_pass_claimant,
     resolve_effective_email,
     get_promotions_staff,
+    get_staff_member,
     get_sublist_dj_staff,
     check_dj_access,
     check_dj_giveaway_access,
@@ -912,12 +918,20 @@ async def suggest_preassign_by_date(
     read in the opposite direction (date -> names instead of name -> dates).
     """
     names = await SpinitronUpcomingScheduleService.get_names_for_date(db, date.isoformat())
-    specialty_names = {
-        row[0].lower()
-        for row in db.query(SpecialtyShow.name).filter(SpecialtyShow.current_filter()).all()
+    categories = {
+        name.lower(): category
+        for name, category in (
+            db.query(SpecialtyShow.name, SpecialtyShow.category)
+            .filter(SpecialtyShow.current_filter())
+            .all()
+        )
     }
     return [
-        DjSuggestion(name=name, is_specialty=name.lower() in specialty_names)
+        DjSuggestion(
+            name=name,
+            is_specialty=name.lower() in categories,
+            specialty_category=categories.get(name.lower()),
+        )
         for name in names
     ]
 
@@ -989,34 +1003,29 @@ def set_preassignment(
 def set_self_preassignment(
     pass_id: int,
     data: SelfPreassignmentData,
-    staff: Staff = Depends(get_sublist_dj_staff),
+    staff: Staff = Depends(get_staff_member),
     db: Session = Depends(get_db),
 ):
     """
-    Set pre-assignment for a pass pair to the authenticated Sublist DJ's own DJ name
-    or to a specialty show they are a member of.
+    Pre-assign a pass pair to the signed-in staff member's own DJ name, or to a
+    Specialty Music Show or Talk & Info Show they are a member of.
 
-    Requires Sublist DJ staff authentication. The DJ name is taken from the
-    staff member's own dj_name field — it cannot be set by the caller.
+    Reserving under your own DJ name or for a music show needs Sublist DJ
+    status; reserving for a talk show needs only current staff status. The DJ
+    name is taken from the staff member's own dj_name field — it cannot be set
+    by the caller.
 
     Args:
         pass_id: Pass ID
         data: Pre-assignment data with assignment date and optional specialty_show_id
-        staff: Authenticated Sublist DJ staff member
+        staff: Signed-in staff member
 
     Returns:
         Updated pass_item
     """
     from app.models.specialty_show import SpecialtyShow
-    from app.models.specialty_show_dj import SpecialtyShowDJ
 
-    if not staff.dj_name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You do not have a DJ name set on your staff profile",
-        )
-
-    # Validate specialty show membership if reserving for a specialty show
+    # Validate the show, and that the staff member may reserve for it
     specialty_show = None
     if data.specialty_show_id is not None:
         specialty_show = (
@@ -1030,22 +1039,15 @@ def set_self_preassignment(
         if not specialty_show:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Specialty show not found",
+                detail="Show not found",
             )
-        dj_name_parts = [n.strip() for n in staff.dj_name.split(",")]
-        is_member = (
-            db.query(SpecialtyShowDJ)
-            .filter(
-                SpecialtyShowDJ.specialty_show_id == specialty_show.id,
-                SpecialtyShowDJ.dj_name.in_(dj_name_parts),
-            )
-            .first()
+    if not (specialty_show and specialty_show.is_talk) and not staff.dj_name:
+        require_sublist_dj(staff)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You do not have a DJ name set on your staff profile",
         )
-        if not is_member:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You are not a DJ member of this specialty show",
-            )
+    require_can_reserve_for(db, specialty_show, staff)
 
     # Block direct reservations while lottery is active; check prohibition window
     target_pass = db.query(Pass).filter(Pass.id == pass_id).first()
@@ -1088,7 +1090,7 @@ def set_self_preassignment(
                     )
 
     # Resolve the DJ name to use
-    dj_name_parts = [n.strip() for n in staff.dj_name.split(",")]
+    dj_name_parts = [n.strip() for n in (staff.dj_name or "").split(",")]
     if specialty_show:
         preassign_name = specialty_show.name
     elif data.dj_name_override:
@@ -1112,7 +1114,9 @@ def set_self_preassignment(
     )
 
     audit_details: dict = {
-        "dj": staff.dj_name,
+        "dj": (
+            preassign_name if specialty_show and specialty_show.is_talk else staff.dj_name
+        ),
         "assignment_date": str(data.assignment_date),
         "show_id": pass_item.show_id,
         "preassigned_by_staff_id": staff.id,
@@ -1297,31 +1301,25 @@ def remove_preassignment(
             actor_role = "promotions"
         else:
             # Regular staff: verify their name (or dj_name) matches the preassigned DJ,
-            # or they are a DJ member of the specialty show this pass is reserved for
-            from app.models.specialty_show_dj import SpecialtyShowDJ as SpecialtyShowDJModel
+            # or they are a member of the show this pass is reserved for
+            from app.models.specialty_show import SpecialtyShow
 
             preassigned = pass_pre.preassigned_dj
             staff_names = {staff_record.name.lower()}
             if staff_record.dj_name:
                 staff_names.add(staff_record.dj_name.lower())
 
-            # Check specialty show membership if this pass is reserved for a specialty show
+            # Check show membership if this pass is reserved for a show
             allowed = preassigned and preassigned.lower() in staff_names
-            if (
-                not allowed
-                and pass_pre.preassigned_specialty_show_id
-                and staff_record.dj_name
-            ):
-                is_member = (
-                    db.query(SpecialtyShowDJModel)
-                    .filter(
-                        SpecialtyShowDJModel.specialty_show_id
-                        == pass_pre.preassigned_specialty_show_id,
-                        SpecialtyShowDJModel.dj_name == staff_record.dj_name,
-                    )
+            if not allowed and pass_pre.preassigned_specialty_show_id:
+                reserved_show = (
+                    db.query(SpecialtyShow)
+                    .filter(SpecialtyShow.id == pass_pre.preassigned_specialty_show_id)
                     .first()
                 )
-                allowed = bool(is_member)
+                allowed = reserved_show is not None and is_show_member(
+                    db, reserved_show, staff_record
+                )
 
             if not allowed:
                 raise HTTPException(

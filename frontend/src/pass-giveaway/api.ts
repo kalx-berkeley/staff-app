@@ -57,6 +57,7 @@ import type {
   SpecialtyShowCreate,
   SpecialtyShowOwnerInfo,
   SpecialtyShowResponse,
+  SpecialtyShowCategory,
   SpecialtyShowUpdate,
   SpinMatch,
   StaffLotteryEntryCreate,
@@ -1282,11 +1283,20 @@ export const promotersAPI = {
 };
 
 export const specialtyShowsAPI = {
-  /** Current specialty shows, and retired ones too if `includeRetired`. */
-  list: async (includeRetired = false): Promise<SpecialtyShowResponse[]> => {
+  /**
+   * Current shows, and retired ones too if `includeRetired`. Both kinds
+   * (Specialty Music Shows and Talk & Info Shows) unless `category` picks one.
+   */
+  list: async (
+    includeRetired = false,
+    category?: SpecialtyShowCategory,
+  ): Promise<SpecialtyShowResponse[]> => {
     try {
+      const params: Record<string, string | boolean> = {};
+      if (includeRetired) params.include_retired = true;
+      if (category) params.category = category;
       const response = await apiClient.get<SpecialtyShowResponse[]>('/specialty-shows', {
-        params: includeRetired ? { include_retired: true } : undefined,
+        params: Object.keys(params).length ? params : undefined,
       });
       return response.data;
     } catch (error) {

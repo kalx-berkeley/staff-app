@@ -3,9 +3,15 @@
 // What happens to a +1 guest, and their staff host, if the guest has no pass.
 export type GuestFallback = 'attend_alone' | 'release' | 'wait' | 'wait_then_release';
 
-// Specialty show types
+// Specialty show types. The specialty_shows table holds both kinds of show:
+// Specialty Music Shows ('music', with DJ members) and Talk & Info Shows
+// ('talk', with staff members).
+export type SpecialtyShowCategory = 'music' | 'talk';
+
 export interface SpecialtyShowCreate {
   name: string;
+  // Can't change once the show exists; defaults to 'music'
+  category?: SpecialtyShowCategory;
   owner_emails?: string[];
   // Spinitron show or playlist links; a show needs at least one
   spinitron_urls: string[];
@@ -14,7 +20,10 @@ export interface SpecialtyShowCreate {
 export interface SpecialtyShowUpdate {
   name?: string;
   owner_emails?: string[] | null;
+  // Music shows only
   dj_names?: string[] | null;
+  // Talk shows only
+  staff_member_emails?: string[] | null;
   // Replaces the show's Spinitron shows (null = no change)
   spinitron_urls?: string[] | null;
 }
@@ -34,18 +43,26 @@ export interface SpecialtyShowOwnerInfo {
 export interface SpecialtyShowResponse {
   id: number;
   name: string;
+  category: SpecialtyShowCategory;
   deleted: boolean;
   // Retired shows ran and ended: kept, but no longer offered for passes
   retired: boolean;
   spinitron_shows: SpinitronShowInfo[];
   owner_emails: string[];
   owner_details: SpecialtyShowOwnerInfo[];
+  // Music shows' DJs
   dj_names: string[];
+  // Talk shows' staff members
+  staff_member_emails: string[];
+  staff_member_details: SpecialtyShowOwnerInfo[];
 }
 
 export interface MySpecialtyShowResponse extends SpecialtyShowResponse {
   is_owner: boolean;
+  // A DJ member of a music show
   is_dj: boolean;
+  // A staff member of a talk show
+  is_staff_member: boolean;
 }
 
 // Promoter types
@@ -869,7 +886,9 @@ export interface GenrePreferences {
 // DJ pre-assignment suggestions
 export interface DjSuggestion {
   name: string;
+  // A Specialty Music Show or Talk & Info Show rather than a DJ
   is_specialty: boolean;
+  specialty_category?: SpecialtyShowCategory | null;
   matched_genres: string[];
   // Genre suggestions only: the DJ's leave of absence overlaps the time until the show
   on_leave?: boolean;

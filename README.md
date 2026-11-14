@@ -132,12 +132,12 @@ grouped by area (the pass giveaway first, then the other sub-sites):
   from crowding out the giveaway.
 - **Pre-assignment date restricted to the on-air schedule.** Both the staff self-reservation flow
   and promotions' "Pre-assign to DJ" box check the cached Spinitron schedule and restrict the date
-  picker to dates the chosen DJ (or specialty show) is actually on air, with an override for
-  exceptions and a warning when a picked date doesn't match.
+  picker to dates the chosen DJ (or Specialty Music Show or Talk & Info Show) is actually on
+  air, with an override for exceptions and a warning when a picked date doesn't match.
 - **"Suggest" a DJ for pre-assignment.** From the "Pre-assign to DJ" box on
   `/promotions/shows/:id`, suggest a DJ by on-air date (reversing the cached Spinitron schedule) or
-  by genre (matching Sublist DJs and their specialty shows against the show's genres, from staff's
-  own genre preferences). Accepting a suggestion with a known date auto-saves and advances to the
+  by genre (matching Sublist DJs and their Specialty Music Shows against the show's genres, from
+  staff's own genre preferences). Accepting a suggestion with a known date auto-saves and advances to the
   next available pass pair.
 - **Legacy paper-form import** — a self-contained, removable feature (`LEGACY_IMPORT_ENABLED`)
   for backfilling historical shows during the cutover from the old paper-based process. It creates
@@ -194,8 +194,9 @@ window after the show is published:
 - Staff entrants can request to bring a guest, and can mark that they'll only attend *with* that
   guest — in which case, if no guest pass is available, their own pass is returned to the pool for
   someone else.
-- DJs enter for a specific on-air shift/date (optionally through a recurring "specialty show"),
-  and winners get their pass pair pre-assigned automatically.
+- DJs enter for a specific on-air shift/date (optionally for a Specialty Music Show; staff
+  members of a Talk & Info Show can enter for that show), and winners get their pass pair
+  pre-assigned automatically.
 - Staff lottery losers join the alternate list in the order they entered, and their result email
   gives their position.
 - The draw runs itself the moment the window closes (or can be triggered manually from the admin
@@ -229,7 +230,7 @@ two-month lookback, with no limit on future dates), complete with the performanc
   announced a show but got no callers, which shows up in the guest-list email to the venue.
 - **Winner corrections** — the DJ who recorded a winner can correct their name, phone and email
   within 4 hours of the giveaway and before the show closes.
-- **Clothespin** reserves one unclaimed pass pair for today under a current DJ or specialty show
+- **Clothespin** reserves one unclaimed pass pair for today under a current DJ, Specialty Music Show or Talk & Info Show
   name, and Release Reservation gives a pre-assigned pair back.
 - **DJ view preview** — promotions staff away from the DJ studio can use the DJ giveaway form,
   checks included, but Give Away and Tried only pretend to save.
@@ -261,7 +262,8 @@ two-month lookback, with no limit on future dates), complete with the performanc
 - Per-user notification preferences (email on/off), honored by every email the app sends.
 - **Genre preferences** — staff can pick the genres they like from their profile, autocompleting
   from genres already in use on shows; used to power promotions' pre-assignment suggestions above.
-- A staff view for specialty shows the staff member belongs to.
+- Staff pages for Specialty Music Shows (with DJ members) and Talk & Info Shows (with staff
+  members, who can reserve on-air pass pairs for the show without being DJs).
 
 ### Admin & operations
 
