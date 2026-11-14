@@ -3,6 +3,8 @@ import { autocompleteAPI, specialtyShowsAPI } from '../api';
 import { useOnAirDj } from './useOnAirDj';
 
 import { DJ_NAME_KEY } from '../djName';
+import { specialtyShowCategoriesByName, specialtyShowLabel } from '../utils';
+import type { SpecialtyShowCategory } from '../types';
 
 export { DJ_NAME_KEY };
 
@@ -18,13 +20,13 @@ const DjNameInput = ({ value, onChange, id = 'dj-name-input', required }: DjName
   const [djNames, setDjNames] = useState<string[]>([]);
   const [filteredDjNames, setFilteredDjNames] = useState<string[]>([]);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
-  const [specialtyShowNames, setSpecialtyShowNames] = useState<Set<string>>(new Set());
+  const [specialtyShowNames, setSpecialtyShowNames] = useState<Map<string, SpecialtyShowCategory>>(new Map());
   const autocompleteRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
     autocompleteAPI.getDJNames().then(setDjNames).catch(() => {});
     specialtyShowsAPI.list()
-      .then((shows) => setSpecialtyShowNames(new Set(shows.map((s) => s.name.toLowerCase()))))
+      .then((shows) => setSpecialtyShowNames(specialtyShowCategoriesByName(shows)))
       .catch(() => {});
   }, []);
 
@@ -81,7 +83,8 @@ const DjNameInput = ({ value, onChange, id = 'dj-name-input', required }: DjName
           {showAutocomplete && (
             <ul className="autocomplete-list" ref={autocompleteRef}>
               {filteredDjNames.map((name) => {
-                const isSpecialty = specialtyShowNames.has(name.toLowerCase());
+                const specialtyCategory = specialtyShowNames.get(name.toLowerCase());
+                const isSpecialty = specialtyCategory !== undefined;
                 return (
                   <li
                     key={name}
@@ -90,7 +93,7 @@ const DjNameInput = ({ value, onChange, id = 'dj-name-input', required }: DjName
                   >
                     <span>{name}</span>
                     <span className={isSpecialty ? 'specialty-show-badge' : 'dj-name-badge'}>
-                      {isSpecialty ? 'Specialty Show' : 'DJ'}
+                      {isSpecialty ? specialtyShowLabel(specialtyCategory) : 'DJ'}
                     </span>
                   </li>
                 );

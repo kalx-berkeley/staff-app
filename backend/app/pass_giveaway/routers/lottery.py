@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.common.areas import PASS_GIVEAWAY_AREA
 from app.auth import (
-    get_sublist_dj_staff,
+    get_staff_member,
     require_promotions_or_staff,
     require_staff_pass_claimant,
 )
@@ -25,6 +25,10 @@ from app.pass_giveaway.schemas.lottery import (
 )
 from app.common.services import audit_service
 from app.pass_giveaway.services.lottery_service import LotteryService
+from app.pass_giveaway.services.specialty_show_membership import (
+    require_can_reserve_for,
+    require_sublist_dj,
+)
 from app.pass_giveaway.guest_redaction import GuestRedactingRoute
 
 logger = logging.getLogger(__name__)
@@ -198,30 +202,16 @@ def enter_staff_lottery(
 def enter_dj_lottery(
     show_id: int,
     entry_data: DJLotteryEntryCreate,
-    staff: Staff = Depends(get_sublist_dj_staff),
+    staff: Staff = Depends(get_staff_member),
     db: Session = Depends(get_db),
 ):
-    """Enter the DJ pass-pair lottery for a show (Sublist DJ staff only)."""
+    """
+    Enter the DJ pass-pair lottery for a show: under your own DJ name or for a
+    Specialty Music Show (Sublist DJs only), or for a Talk & Info Show you're
+    a staff member of (any current staff).
+    """
     from fastapi import HTTPException
     from app.models.specialty_show import SpecialtyShow
-    from app.models.specialty_show_dj import SpecialtyShowDJ
-
-    if not staff.dj_name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No DJ name is set on your profile. Contact promotions staff.",
-        )
-    dj_name_parts = [n.strip() for n in staff.dj_name.split(",")]
-
-    if entry_data.dj_name_override:
-        if entry_data.dj_name_override not in dj_name_parts:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="dj_name_override must be one of your registered DJ names",
-            )
-        dj_name = entry_data.dj_name_override
-    else:
-        dj_name = dj_name_parts[0]
 
     specialty_show = None
     if entry_data.specialty_show_id is not None:
@@ -236,21 +226,33 @@ def enter_dj_lottery(
         if not specialty_show:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Specialty show not found",
+                detail="Show not found",
             )
-        is_member = (
-            db.query(SpecialtyShowDJ)
-            .filter(
-                SpecialtyShowDJ.specialty_show_id == specialty_show.id,
-                SpecialtyShowDJ.dj_name.in_(dj_name_parts),
-            )
-            .first()
-        )
-        if not is_member:
+
+    if specialty_show and specialty_show.is_talk:
+        # A talk show's entry is under the show's name; its staff members
+        # needn't be DJs.
+        require_can_reserve_for(db, specialty_show, staff)
+        dj_name = specialty_show.name
+    else:
+        if not staff.dj_name:
+            require_sublist_dj(staff)
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You are not a DJ member of this specialty show",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No DJ name is set on your profile. Contact promotions staff.",
             )
+        dj_name_parts = [n.strip() for n in staff.dj_name.split(",")]
+
+        if entry_data.dj_name_override:
+            if entry_data.dj_name_override not in dj_name_parts:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="dj_name_override must be one of your registered DJ names",
+                )
+            dj_name = entry_data.dj_name_override
+        else:
+            dj_name = dj_name_parts[0]
+        require_can_reserve_for(db, specialty_show, staff)
 
     entry = LotteryService.enter_dj_lottery(
         db,
@@ -309,10 +311,10 @@ def withdraw_staff_entry(
 @router.delete("/{show_id}/lottery/dj_entry", status_code=status.HTTP_204_NO_CONTENT)
 def withdraw_dj_entry(
     show_id: int,
-    staff: Staff = Depends(get_sublist_dj_staff),
+    staff: Staff = Depends(get_staff_member),
     db: Session = Depends(get_db),
 ):
-    """Withdraw a pending DJ lottery entry (Sublist DJ staff only)."""
+    """Withdraw your own pending DJ lottery entry (including one for a talk show)."""
     LotteryService.withdraw_dj_entry(db, show_id=show_id, staff_id=staff.id)
     audit_service.log_event(
         db,

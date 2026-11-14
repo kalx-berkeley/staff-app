@@ -6,6 +6,7 @@ import type {
   MovieRating,
   PassResponse,
   ShowResponse,
+  SpecialtyShowCategory,
   VenueType,
   WheelchairAccessible,
 } from './types';
@@ -263,3 +264,37 @@ export const joinNames = (names: string[]): string =>
   names.length <= 1
     ? names.join('')
     : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+
+/** How each kind of specialty show is named and where its pages live. */
+export const SPECIALTY_SHOW_KINDS: Record<
+  SpecialtyShowCategory,
+  { label: string; plural: string; path: string }
+> = {
+  music: {
+    label: 'Specialty Music Show',
+    plural: 'Specialty Music Shows',
+    path: '/staff/specialty-shows',
+  },
+  talk: {
+    label: 'Talk & Info Show',
+    plural: 'Talk & Info Shows',
+    path: '/staff/talk-shows',
+  },
+};
+
+/** "Specialty Music Show" or "Talk & Info Show"; music when the category is unknown. */
+export const specialtyShowLabel = (category: SpecialtyShowCategory | null | undefined): string =>
+  SPECIALTY_SHOW_KINDS[category ?? 'music'].label;
+
+/** The staff page of one Specialty Music Show or Talk & Info Show. */
+export const specialtyShowPath = (show: { id: number; category?: SpecialtyShowCategory | null }): string =>
+  `${SPECIALTY_SHOW_KINDS[show.category ?? 'music'].path}/${show.id}`;
+
+/**
+ * Lowercased show name → category, for telling which autocomplete names are
+ * Specialty Music Shows or Talk & Info Shows rather than DJs.
+ */
+export const specialtyShowCategoriesByName = (
+  shows: { name: string; category?: SpecialtyShowCategory | null }[],
+): Map<string, SpecialtyShowCategory> =>
+  new Map(shows.map((s) => [s.name.toLowerCase(), s.category ?? 'music']));

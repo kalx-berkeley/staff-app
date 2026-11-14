@@ -1,19 +1,31 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import { specialtyShowsAPI, autocompleteAPI } from '../api';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { PersonAutocomplete, extractPersonEmail } from '../components';
-import type { SpecialtyShowResponse, SpecialtyShowOwnerInfo } from '../types';
+import { SPECIALTY_SHOW_KINDS, specialtyShowPath } from '../utils';
+import type { SpecialtyShowCategory, SpecialtyShowResponse, SpecialtyShowOwnerInfo } from '../types';
 import type { APIError } from '../../common/types';
 
-const SpecialtyShowDetail = () => {
+interface SpecialtyShowDetailProps {
+  /** Which kind of show this page's URL is for. */
+  category?: SpecialtyShowCategory;
+}
+
+/**
+ * One Specialty Music Show or Talk & Info Show. A music show lists its DJs, a
+ * talk show its staff members. A show opened under the other kind's URL is
+ * redirected to its own.
+ */
+const SpecialtyShowDetail = ({ category = 'music' }: SpecialtyShowDetailProps) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const kind = SPECIALTY_SHOW_KINDS[category];
 
   const [show, setShow] = useState<SpecialtyShowResponse | null>(null);
-  usePageTitle(`${show?.name ?? 'Specialty Show'} · Staff`);
+  usePageTitle(`${show?.name ?? kind.label} · Staff`);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -31,7 +43,10 @@ const SpecialtyShowDetail = () => {
   // Spinitron shows state
   const [spinitronInput, setSpinitronInput] = useState('');
 
-  // DJs state
+  // Staff members state (talk shows)
+  const [memberInput, setMemberInput] = useState('');
+
+  // DJs state (music shows)
   const [djInput, setDjInput] = useState('');
   const [djSuggestions, setDjSuggestions] = useState<string[]>([]);
   const [allDJNames, setAllDJNames] = useState<string[]>([]);
@@ -48,21 +63,23 @@ const SpecialtyShowDetail = () => {
     } catch (err) {
       const apiError = err as APIError;
       setError(
-        typeof apiError.detail === 'string' ? apiError.detail : 'Failed to load specialty show'
+        typeof apiError.detail === 'string' ? apiError.detail : `Failed to load ${kind.label}`
       );
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, kind.label]);
 
   useEffect(() => {
     loadShow();
-    autocompleteAPI.getDJNames().then(setAllDJNames).catch(() => {});
     specialtyShowsAPI.listStaffEmails().then(setStaffOptions).catch(() => {});
-    if (id) {
-      specialtyShowsAPI.getDjHistory(parseInt(id)).then(setDjHistory).catch(() => {});
+    if (category === 'music') {
+      autocompleteAPI.getDJNames().then(setAllDJNames).catch(() => {});
+      if (id) {
+        specialtyShowsAPI.getDjHistory(parseInt(id)).then(setDjHistory).catch(() => {});
+      }
     }
-  }, [id, loadShow]);
+  }, [id, loadShow, category]);
 
   const showEphemeralSuccess = (msg: string) => {
     setSuccessMessage(msg);
@@ -154,6 +171,37 @@ const SpecialtyShowDetail = () => {
     );
   };
 
+  const handleAddMember = async (rawEmail: string) => {
+    if (!show) return;
+    const email = extractPersonEmail(rawEmail);
+    if (!email) return;
+    if (show.staff_member_emails.includes(email)) {
+      setFormError('That person is already on this show.');
+      return;
+    }
+    await runMutation(
+      () =>
+        specialtyShowsAPI.update(show.id, {
+          staff_member_emails: [...show.staff_member_emails, email],
+        }),
+      'Staff member added.',
+      'Failed to add staff member',
+      () => setMemberInput('')
+    );
+  };
+
+  const handleRemoveMember = async (email: string) => {
+    if (!show) return;
+    await runMutation(
+      () =>
+        specialtyShowsAPI.update(show.id, {
+          staff_member_emails: show.staff_member_emails.filter((e) => e !== email),
+        }),
+      'Staff member removed.',
+      'Failed to remove staff member'
+    );
+  };
+
   const handleDJInputChange = (value: string) => {
     setDjInput(value);
     if (value.trim()) {
@@ -208,19 +256,23 @@ const SpecialtyShowDetail = () => {
   if (error || !show) {
     return (
       <div className="error">
-        <p>Error: {error || 'Specialty show not found'}</p>
-        <button onClick={() => navigate('/staff/specialty-shows')} className="btn-secondary">
+        <p>Error: {error || `${kind.label} not found`}</p>
+        <button onClick={() => navigate(kind.path)} className="btn-secondary">
           Back
         </button>
       </div>
     );
   }
 
+  if (show.category !== category) {
+    return <Navigate to={specialtyShowPath(show)} replace />;
+  }
+
   return (
     <div className="show-detail">
       <div className="page-header">
-        <button onClick={() => navigate('/staff/specialty-shows')} className="btn-secondary">
-          ← Back to Specialty Shows
+        <button onClick={() => navigate(kind.path)} className="btn-secondary">
+          ← Back to {kind.plural}
         </button>
         <h2>
           {canEdit && editingName ? (
@@ -258,11 +310,11 @@ const SpecialtyShowDetail = () => {
       </div>
 
       {!canEdit && (
-        <p className="field-hint">You're viewing this specialty show. Only its owners or promotions staff can make changes.</p>
+        <p className="field-hint">You're viewing this {kind.label}. Only its owners or promotions staff can make changes.</p>
       )}
       {show.retired && (
         <p className="info-message">
-          This show is retired: it can no longer get passes. Un-retire it from the Specialty Shows list.
+          This show is retired: it can no longer get passes. Un-retire it from the {kind.plural} list.
         </p>
       )}
 
@@ -274,7 +326,7 @@ const SpecialtyShowDetail = () => {
         <section className="info-section">
           <h3>Spinitron</h3>
           <p className="field-hint">
-            The show's page in Spinitron, so the Staff Directory can tell this specialty show apart
+            The show's page in Spinitron, so the Staff Directory can tell this {kind.label} apart
             from regular DJ shifts. Paste a link to the show or to one of its playlists. If the show
             has moved to a new Spinitron show over the years, add each one.
           </p>
@@ -330,7 +382,8 @@ const SpecialtyShowDetail = () => {
         <section className="info-section">
           <h3>Owners</h3>
           <p className="field-hint">
-            Owners can rename this show and manage its owners and DJs.
+            Owners can rename this show and manage its owners and{' '}
+            {category === 'talk' ? 'staff members' : 'DJs'}.
           </p>
           <ul className="item-list">
             {show.owner_details.map(({ email, name }) => (
@@ -369,101 +422,154 @@ const SpecialtyShowDetail = () => {
           )}
         </section>
 
+        {category === 'talk' && (
+          <section className="info-section">
+            <h3>Staff Members</h3>
+            <p className="field-hint">
+              Staff members listed here can reserve on-air pass pairs for this Talk &amp; Info Show.
+              They don't need to be DJs.
+            </p>
+            <ul className="item-list">
+              {show.staff_member_details.map(({ email, name }) => (
+                <li key={email} className="item-list-row">
+                  <span><a href={`mailto:${email}`}>{name || email}</a></span>
+                  {canEdit && (
+                    <button
+                      className="btn-small btn-danger"
+                      onClick={() => handleRemoveMember(email)}
+                      disabled={saving}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </li>
+              ))}
+              {show.staff_member_details.length === 0 && (
+                <li className="item-list-empty">No staff members yet.</li>
+              )}
+            </ul>
+            {canEdit && (
+              <div className="add-item-form">
+                <PersonAutocomplete
+                  value={memberInput}
+                  onChange={setMemberInput}
+                  onSubmit={handleAddMember}
+                  options={staffOptions}
+                  placeholder="Staff name or email address"
+                  disabled={saving}
+                />
+                <button
+                  className="btn-small btn-primary"
+                  onClick={() => handleAddMember(memberInput)}
+                  disabled={saving || !memberInput.trim()}
+                >
+                  Add Staff Member
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
         {/* DJs section */}
-        <section className="info-section">
-          <h3>DJs</h3>
-          <p className="field-hint">
-            DJs listed here can reserve on-air pass pairs for this specialty show.
-          </p>
-          <ul className="item-list">
-            {show.dj_names.map((name) => (
-              <li key={name} className="item-list-row">
-                <span>{name}</span>
-                {canEdit && (
+        {category === 'music' && (
+          <section className="info-section">
+            <h3>DJs</h3>
+            <p className="field-hint">
+              DJs listed here can reserve on-air pass pairs for this Specialty Music Show.
+            </p>
+            <ul className="item-list">
+              {show.dj_names.map((name) => (
+                <li key={name} className="item-list-row">
+                  <span>{name}</span>
+                  {canEdit && (
+                    <button
+                      className="btn-small btn-danger"
+                      onClick={() => handleRemoveDJ(name)}
+                      disabled={saving}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </li>
+              ))}
+              {show.dj_names.length === 0 && (
+                <li className="item-list-empty">No DJs yet.</li>
+              )}
+            </ul>
+            {canEdit && suggestedHosts.length > 0 && (
+              <div className="field-hint" style={{ marginBottom: '0.5rem' }}>
+                Hosted this show recently:{' '}
+                {suggestedHosts.map((name) => (
                   <button
-                    className="btn-small btn-danger"
-                    onClick={() => handleRemoveDJ(name)}
+                    key={name}
+                    type="button"
+                    className="btn-small"
+                    style={{ marginRight: '0.25rem', marginBottom: '0.25rem' }}
+                    onClick={() => handleAddDJ(name)}
                     disabled={saving}
                   >
-                    Remove
+                    + {name}
                   </button>
-                )}
-              </li>
-            ))}
-            {show.dj_names.length === 0 && (
-              <li className="item-list-empty">No DJs yet.</li>
-            )}
-          </ul>
-          {canEdit && suggestedHosts.length > 0 && (
-            <div className="field-hint" style={{ marginBottom: '0.5rem' }}>
-              Hosted this show recently:{' '}
-              {suggestedHosts.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  className="btn-small"
-                  style={{ marginRight: '0.25rem', marginBottom: '0.25rem' }}
-                  onClick={() => handleAddDJ(name)}
-                  disabled={saving}
-                >
-                  + {name}
-                </button>
-              ))}
-            </div>
-          )}
-          {canEdit && (
-            <div className="add-item-form">
-              <div className="autocomplete-wrapper">
-                <input
-                  type="text"
-                  value={djInput}
-                  onChange={(e) => handleDJInputChange(e.target.value)}
-                  onFocus={() => { if (djInput.trim()) setShowDJSuggestions(true); }}
-                  onBlur={() => setTimeout(() => setShowDJSuggestions(false), 200)}
-                  placeholder="DJ name"
-                  className="input-text"
-                  disabled={saving}
-                  autoComplete="off"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') { e.preventDefault(); handleAddDJ(); }
-                    else if (e.key === 'Escape') { setShowDJSuggestions(false); }
-                    else if (e.key === 'Tab' && djSuggestions.length === 1) {
-                      e.preventDefault();
-                      setDjInput(djSuggestions[0]);
-                      setShowDJSuggestions(false);
-                    }
-                  }}
-                />
-                {showDJSuggestions && djSuggestions.length > 0 && (
-                  <ul className="autocomplete-list">
-                    {djSuggestions.map((name) => (
-                      <li
-                        key={name}
-                        onMouseDown={() => handleAddDJ(name)}
-                        className="autocomplete-item"
-                      >
-                        {name}
-                      </li>
-                    ))}
-                    {djSuggestions.length === 1 && (
-                      <li className="autocomplete-hint">Press Tab to complete</li>
-                    )}
-                  </ul>
-                )}
+                ))}
               </div>
-              <button
-                className="btn-small btn-primary"
-                onClick={() => handleAddDJ()}
-                disabled={saving || !djInput.trim()}
-              >
-                Add DJ
-              </button>
-            </div>
-          )}
-        </section>
+            )}
+            {canEdit && (
+              <div className="add-item-form">
+                <div className="autocomplete-wrapper">
+                  <input
+                    type="text"
+                    value={djInput}
+                    onChange={(e) => handleDJInputChange(e.target.value)}
+                    onFocus={() => { if (djInput.trim()) setShowDJSuggestions(true); }}
+                    onBlur={() => setTimeout(() => setShowDJSuggestions(false), 200)}
+                    placeholder="DJ name"
+                    className="input-text"
+                    disabled={saving}
+                    autoComplete="off"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); handleAddDJ(); }
+                      else if (e.key === 'Escape') { setShowDJSuggestions(false); }
+                      else if (e.key === 'Tab' && djSuggestions.length === 1) {
+                        e.preventDefault();
+                        setDjInput(djSuggestions[0]);
+                        setShowDJSuggestions(false);
+                      }
+                    }}
+                  />
+                  {showDJSuggestions && djSuggestions.length > 0 && (
+                    <ul className="autocomplete-list">
+                      {djSuggestions.map((name) => (
+                        <li
+                          key={name}
+                          onMouseDown={() => handleAddDJ(name)}
+                          className="autocomplete-item"
+                        >
+                          {name}
+                        </li>
+                      ))}
+                      {djSuggestions.length === 1 && (
+                        <li className="autocomplete-hint">Press Tab to complete</li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+                <button
+                  className="btn-small btn-primary"
+                  onClick={() => handleAddDJ()}
+                  disabled={saving || !djInput.trim()}
+                >
+                  Add DJ
+                </button>
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </div>
   );
 };
+
+/** One Talk & Info Show, at `/staff/talk-shows/:id`. */
+export const TalkShowDetail = () => <SpecialtyShowDetail category="talk" />;
 
 export default SpecialtyShowDetail;

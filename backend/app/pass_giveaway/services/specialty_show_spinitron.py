@@ -108,7 +108,7 @@ def set_spinitron_shows(
         elif other is not None:
             raise _bad_request(
                 f"Spinitron show {show.title or show.id} already belongs to the "
-                f"specialty show {other.specialty_show.name!r}"
+                f"{other.specialty_show.category_label} {other.specialty_show.name!r}"
             )
     existing = {s.spinitron_show_id: s for s in specialty_show.spinitron_show_rows}
     wanted = {s.id for s in shows}

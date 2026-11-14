@@ -1237,6 +1237,7 @@ def test_suggest_by_genre_matches_sublist_dj_and_specialty_show(
         {
             "name": "Sunday Jazz Brunch",
             "is_specialty": True,
+            "specialty_category": "music",
             "matched_genres": ["rock"],
             "on_leave": False,
             "loa_start": None,
@@ -1245,6 +1246,7 @@ def test_suggest_by_genre_matches_sublist_dj_and_specialty_show(
         {
             "name": "Wolfman",
             "is_specialty": False,
+            "specialty_category": None,
             "matched_genres": ["rock"],
             "on_leave": False,
             "loa_start": None,

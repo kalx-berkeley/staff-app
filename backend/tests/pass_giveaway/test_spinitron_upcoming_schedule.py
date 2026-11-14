@@ -446,6 +446,7 @@ class TestSuggestByDateEndpoint:
             {
                 "name": "Sunday Jazz Brunch",
                 "is_specialty": True,
+                "specialty_category": "music",
                 "matched_genres": [],
                 "on_leave": False,
                 "loa_start": None,
@@ -454,6 +455,7 @@ class TestSuggestByDateEndpoint:
             {
                 "name": "Wolfman",
                 "is_specialty": False,
+                "specialty_category": None,
                 "matched_genres": [],
                 "on_leave": False,
                 "loa_start": None,

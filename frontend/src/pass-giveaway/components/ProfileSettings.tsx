@@ -7,6 +7,7 @@ import GenreTagInput from './GenreTagInput';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import type { PromotionsStaffProfile, StaffProfile, APIError } from '../../common/types';
 import type { NotificationPreferences, MySpecialtyShowResponse } from '../types';
+import { specialtyShowLabel, specialtyShowPath } from '../utils';
 
 // Rendered at both /promotions/profile and /staff/profile; the caller says
 // which section it's mounted under so the page title can name it.
@@ -98,7 +99,7 @@ const ProfileSettings = ({ section }: { section: 'Promotions' | 'Staff' }) => {
       setSpecialtyShowsError(
         typeof apiError.detail === 'string'
           ? apiError.detail
-          : 'Failed to load specialty shows'
+          : 'Failed to load your shows'
       );
     } finally {
       setSpecialtyShowsLoading(false);
@@ -249,7 +250,7 @@ const ProfileSettings = ({ section }: { section: 'Promotions' | 'Staff' }) => {
           {genrePrefsSaved && <div className="success-message">Saved.</div>}
           <p className="field-hint">
             Pick genres you enjoy. If you're a Sublist DJ, promotions staff use this
-            to suggest you (and specialty shows you're part of) when pre-assigning
+            to suggest you (and Specialty Music Shows you're part of) when pre-assigning
             pass pairs to shows in these genres.
           </p>
           <label htmlFor="genre-preferences-input">Genres</label>
@@ -266,9 +267,9 @@ const ProfileSettings = ({ section }: { section: 'Promotions' | 'Staff' }) => {
         </div>
       )}
 
-      <h3>Specialty Shows</h3>
+      <h3>Specialty Music Shows and Talk &amp; Info Shows</h3>
       {specialtyShowsLoading ? (
-        <div className="loading">Loading specialty shows...</div>
+        <div className="loading">Loading your shows...</div>
       ) : specialtyShowsError ? (
         <div className="error">
           <p>Error: {specialtyShowsError}</p>
@@ -276,16 +277,19 @@ const ProfileSettings = ({ section }: { section: 'Promotions' | 'Staff' }) => {
         </div>
       ) : specialtyShows.length === 0 ? (
         <p className="field-hint">
-          You're not an owner or DJ on any specialty shows.
+          You're not an owner, DJ or staff member of any Specialty Music Shows or Talk &amp; Info
+          Shows.
         </p>
       ) : (
         <ul className="profile-specialty-shows">
           {specialtyShows.map((show) => (
             <li key={show.id} className="profile-specialty-show-item">
-              <Link to={`/staff/specialty-shows/${show.id}`}>{show.name}</Link>
+              <Link to={specialtyShowPath(show)}>{show.name}</Link>{' '}
+              <span className="field-hint">{specialtyShowLabel(show.category)}</span>
               <span className="profile-specialty-show-roles">
                 {show.is_owner && <span className="specialty-show-badge">Owner</span>}
                 {show.is_dj && <span className="dj-name-badge">DJ</span>}
+                {show.is_staff_member && <span className="dj-name-badge">Staff</span>}
               </span>
             </li>
           ))}

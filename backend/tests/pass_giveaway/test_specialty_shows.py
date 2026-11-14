@@ -106,7 +106,10 @@ def test_a_spinitron_show_belongs_to_one_specialty_show(client: TestClient, prom
     _create(client)
     response = _create(client, name="Copy")
     assert response.status_code == 400
-    assert "already belongs to the specialty show 'Take Five'" in response.json()["detail"]
+    assert (
+        "already belongs to the Specialty Music Show 'Take Five'"
+        in response.json()["detail"]
+    )
 
 
 def test_a_deleted_shows_spinitron_show_can_move(client: TestClient, promo, db):

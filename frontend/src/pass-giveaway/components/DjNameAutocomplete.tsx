@@ -1,13 +1,18 @@
 import { useState } from 'react';
+import { specialtyShowLabel } from '../utils';
+import type { SpecialtyShowCategory } from '../types';
 
 interface DjNameAutocompleteProps {
   id: string;
   value: string;
   onChange: (name: string) => void;
-  /** Every DJ and specialty show name to suggest (from `autocompleteAPI.getDJNames`). */
+  /** Every DJ and show name to suggest (from `autocompleteAPI.getDJNames`). */
   djNames: string[];
-  /** Lowercased specialty show names, so their suggestions get a "Specialty Show" badge. */
-  specialtyShowNames: Set<string>;
+  /**
+   * Lowercased Specialty Music Show and Talk & Info Show names, so their
+   * suggestions get a badge naming their kind.
+   */
+  specialtyShowNames: Map<string, SpecialtyShowCategory>;
   disabled?: boolean;
   placeholder?: string;
 }
@@ -68,7 +73,8 @@ const DjNameAutocomplete = ({
       {open && (
         <ul className="autocomplete-list">
           {matches.map((name) => {
-            const isSpecialty = specialtyShowNames.has(name.toLowerCase());
+            const specialtyCategory = specialtyShowNames.get(name.toLowerCase());
+            const isSpecialty = specialtyCategory !== undefined;
             return (
               <li
                 key={name}
@@ -81,7 +87,7 @@ const DjNameAutocomplete = ({
               >
                 <span>{name}</span>
                 <span className={isSpecialty ? 'specialty-show-badge' : 'dj-name-badge'}>
-                  {isSpecialty ? 'Specialty Show' : 'DJ'}
+                  {isSpecialty ? specialtyShowLabel(specialtyCategory) : 'DJ'}
                 </span>
               </li>
             );

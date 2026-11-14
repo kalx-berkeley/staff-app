@@ -5,8 +5,8 @@ import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, 
 import { formatPhone, formatLeave, isOnLeave, leaveCoversShow, formatDateValue } from '../../common/utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { STAFF_PASSES_NOT_YET_ACTIVE, seatedFallbackNote, staffPassesNotYetActive, waitingFallbackNote } from '../utils';
-import type { ShowResponse, ClaimData, LotteryStatus, SpecialtyShowResponse, AlternateQueue, AlternateJoinRequest, GuestFallback } from '../types';
+import { STAFF_PASSES_NOT_YET_ACTIVE, seatedFallbackNote, specialtyShowLabel, staffPassesNotYetActive, waitingFallbackNote } from '../utils';
+import type { ShowResponse, ClaimData, LotteryStatus, MySpecialtyShowResponse, AlternateQueue, AlternateJoinRequest, GuestFallback } from '../types';
 import type { StaffProfile, APIError } from '../../common/types';
 import { formatCalendarDate, formatPacific } from '../../common/dateTime';
 
@@ -32,8 +32,9 @@ const ShowDetail = () => {
   const [scheduleDates, setScheduleDates] = useState<string[] | null>(null);
   const [scheduleLoading, setScheduleLoading] = useState(false);
 
-  // Specialty shows the current DJ belongs to (for specialty show pre-assignment)
-  const [myDJSpecialtyShows, setMyDJSpecialtyShows] = useState<SpecialtyShowResponse[]>([]);
+  // Shows the user may reserve on-air passes for: Specialty Music Shows they're
+  // a DJ on (Sublist DJs only) and Talk & Info Shows they're on the staff of
+  const [myReservableShows, setMyReservableShows] = useState<MySpecialtyShowResponse[]>([]);
 
   // +1 guest claim state
   const [guestClaimPassId, setGuestClaimPassId] = useState<number | null>(null);
@@ -122,28 +123,39 @@ const ShowDetail = () => {
     if (show) loadAlternateQueue(show);
   }, [show, loadAlternateQueue]);
 
+  // Reserving under your own DJ name (or for a music show) needs Sublist DJ
+  // status and a DJ name; reserving for a talk show doesn't.
+  const reservingProfile = user?.profile as StaffProfile | undefined;
+  const canReserveAsDj = !!(reservingProfile?.is_sublist_dj && reservingProfile?.dj_name);
+
   useEffect(() => {
-    const staffProfile = user?.profile as StaffProfile | undefined;
-    const djName = staffProfile?.dj_name;
-    if (!djName) return;
-    const myDJNameParts = djName.split(',').map((n) => n.trim().toLowerCase());
-    specialtyShowsAPI.list().then((allShows) => {
-      const mine = allShows.filter((s) =>
-        s.dj_names.some((n) => myDJNameParts.includes(n.toLowerCase()))
+    if (!user?.profile) return;
+    specialtyShowsAPI.listMine().then((mine) => {
+      const reservable = mine.filter((s) =>
+        s.category === 'talk' ? s.is_staff_member : s.is_dj && canReserveAsDj
       );
-      setMyDJSpecialtyShows(mine);
+      // Most people have none; leaving the initial [] skips a re-render
+      if (reservable.length > 0) setMyReservableShows(reservable);
     }).catch(() => {
       // non-fatal
     });
-  }, [user]);
+  }, [user, canReserveAsDj]);
 
-  // Resolve a "Reserve for" value ('' | 'dj:NAME' | 'ss:ID') to the plain DJ or
-  // specialty-show name used to check the on-air schedule.
+  // A "Reserve for" value is '' (the default), 'dj:NAME' or 'ss:ID'. The
+  // default is your first DJ name, or your first show if you can only reserve
+  // for Talk & Info Shows.
+  const defaultReserveFor =
+    canReserveAsDj || myReservableShows.length === 0 ? '' : `ss:${myReservableShows[0].id}`;
+  const withDefaultReserveFor = (reserveFor: string): string => reserveFor || defaultReserveFor;
+
+  // Resolve a "Reserve for" value to the plain DJ or show name used to check
+  // the on-air schedule.
   const resolveReserveForName = useCallback(
-    (reserveFor: string): string => {
+    (rawReserveFor: string): string => {
+      const reserveFor = rawReserveFor || defaultReserveFor;
       if (reserveFor.startsWith('ss:')) {
         const showId = parseInt(reserveFor.slice(3));
-        return myDJSpecialtyShows.find((s) => s.id === showId)?.name ?? '';
+        return myReservableShows.find((s) => s.id === showId)?.name ?? '';
       }
       if (reserveFor.startsWith('dj:')) {
         return reserveFor.slice(3);
@@ -152,7 +164,7 @@ const ShowDetail = () => {
       const myDjName = staffProfile?.dj_name ?? '';
       return myDjName.split(',').map((n) => n.trim()).filter(Boolean)[0] ?? '';
     },
-    [user, myDJSpecialtyShows]
+    [user, myReservableShows, defaultReserveFor]
   );
 
   useEffect(() => {
@@ -371,11 +383,12 @@ const ShowDetail = () => {
     setPassActionError(null);
     setSuccessMessage(null);
     try {
-      const specialtyShowId = preassignSelfReserveFor.startsWith('ss:')
-        ? parseInt(preassignSelfReserveFor.slice(3))
+      const reserveFor = withDefaultReserveFor(preassignSelfReserveFor);
+      const specialtyShowId = reserveFor.startsWith('ss:')
+        ? parseInt(reserveFor.slice(3))
         : undefined;
-      const djNameOverride = preassignSelfReserveFor.startsWith('dj:')
-        ? preassignSelfReserveFor.slice(3)
+      const djNameOverride = reserveFor.startsWith('dj:')
+        ? reserveFor.slice(3)
         : undefined;
       const updatedPass = await passesAPI.selfPreassign(passId, {
         assignment_date: preassignSelfDate,
@@ -456,11 +469,12 @@ const ShowDetail = () => {
     setLotteryActionLoading(true);
     setLotteryActionError(null);
     try {
-      const lotterySpecialtyShowId = lotteryDJReserveFor.startsWith('ss:')
-        ? parseInt(lotteryDJReserveFor.slice(3))
+      const lotteryReserveFor = withDefaultReserveFor(lotteryDJReserveFor);
+      const lotterySpecialtyShowId = lotteryReserveFor.startsWith('ss:')
+        ? parseInt(lotteryReserveFor.slice(3))
         : undefined;
-      const lotteryDjNameOverride = lotteryDJReserveFor.startsWith('dj:')
-        ? lotteryDJReserveFor.slice(3)
+      const lotteryDjNameOverride = lotteryReserveFor.startsWith('dj:')
+        ? lotteryReserveFor.slice(3)
         : undefined;
       await lotteryAPI.enterDJ(show.id, {
         assignment_date: lotteryDJDate,
@@ -564,7 +578,7 @@ const ShowDetail = () => {
         ? 'You already have a staff pass for this show.'
         : undefined;
   const myName = user?.profile?.name ?? null;
-  const mySpecialtyShowIds = new Set(myDJSpecialtyShows.map((s) => s.id));
+  const mySpecialtyShowIds = new Set(myReservableShows.map((s) => s.id));
   const myPreassignedPasses = myName
     ? show.passes.filter(
         (p) =>
@@ -581,17 +595,27 @@ const ShowDetail = () => {
     ? `You're on leave of absence ${formatLeave(staffProfile)}, so you can't claim passes for this show.`
     : '';
   // Replaces the "schedule doesn't show you" warning for a DJ-name reservation
-  // on a date during the DJ's own leave (not a specialty show, which has others).
+  // on a date during the DJ's own leave (not a show, which has others).
   const leaveWarningFor = (reserveFor: string, date: string): string | null =>
-    date && !reserveFor.startsWith('ss:') && isOnLeave(staffProfile, date)
+    date && !withDefaultReserveFor(reserveFor).startsWith('ss:') && isOnLeave(staffProfile, date)
       ? `You're on leave of absence ${formatLeave(staffProfile!)}, so you probably won't be on air on ${formatDate(date)}. Only continue if you're sure that's correct.`
       : null;
-  const isSublistDj = staffProfile?.is_sublist_dj ?? false;
   const myDjName = staffProfile?.dj_name ?? null;
-  const myDjNames = myDjName ? myDjName.split(',').map((n) => n.trim()).filter(Boolean) : [];
+  const myDjNames =
+    canReserveAsDj && myDjName ? myDjName.split(',').map((n) => n.trim()).filter(Boolean) : [];
+  // Sublist DJs, and staff members of a Talk & Info Show, can reserve on-air pass pairs
+  const canReserveOnAir = canReserveAsDj || myReservableShows.length > 0;
+  // The "Reserve for" choices; the first one's value is always '' (the default)
+  const reserveForOptions = [
+    ...myDjNames.map((name) => ({ value: `dj:${name}`, label: `${name} (my DJ name)` })),
+    ...myReservableShows.map((s) => ({
+      value: `ss:${s.id}`,
+      label: `${s.name} (${specialtyShowLabel(s.category)})`,
+    })),
+  ].map((o, i) => (i === 0 ? { ...o, value: '' } : o));
   const pairPasses = show.passes.filter((p) => p.pass_type === 'pair');
   const isVenueOwner = user?.email ? show.venue.owner_emails.includes(user.email) : false;
-  const showReserveForDropdown = myDjNames.length > 1 || myDJSpecialtyShows.length > 0;
+  const showReserveForDropdown = reserveForOptions.length > 1;
 
   const lotteryDeadline = show.published_at
     ? new Date(new Date(show.published_at).getTime() + show.lottery_window_hours * 3600000)
@@ -781,7 +805,7 @@ const ShowDetail = () => {
           </div>
         )}
 
-        {isSublistDj && myDjName && isVenueOwner && show.status !== 'closed' && (
+        {canReserveOnAir && isVenueOwner && show.status !== 'closed' && (
           <div className="pass-claim-section">
             <h3>Reserve Pass Pair for On-Air Giveaway</h3>
             <p className="pass-unavailable-note">
@@ -790,11 +814,11 @@ const ShowDetail = () => {
           </div>
         )}
 
-        {isSublistDj && myDjName && !isVenueOwner && show.status !== 'closed' && (
+        {canReserveOnAir && !isVenueOwner && show.status !== 'closed' && (
           <div className="pass-claim-section">
             <h3>
               Reserve Pass Pair for On-Air Giveaway
-              <Tooltip text="Reserve a pass pair for yourself to give away on-air on a future date. The passes will be held under your DJ name until the air date." />
+              <Tooltip text="Reserve a pass pair to give away on-air on a future date. The passes will be held under your DJ name, or the show you reserve them for, until the air date." />
             </h3>
 
             {lotteryActive && lotteryDeadline && (
@@ -851,14 +875,9 @@ const ShowDetail = () => {
                             onChange={(e) => setLotteryDJReserveFor(e.target.value)}
                             disabled={lotteryActionLoading}
                           >
-                            {myDjNames.map((name, i) => (
-                              <option key={name} value={i === 0 ? '' : `dj:${name}`}>
-                                {name} (my DJ name)
-                              </option>
-                            ))}
-                            {myDJSpecialtyShows.map((s) => (
-                              <option key={s.id} value={`ss:${s.id}`}>
-                                {s.name} (specialty show)
+                            {reserveForOptions.map((o) => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
                               </option>
                             ))}
                           </select>
@@ -866,7 +885,7 @@ const ShowDetail = () => {
                       ) : (
                         <input
                           type="text"
-                          value={myDjNames[0] ?? ''}
+                          value={reserveForOptions[0]?.label ?? ''}
                           readOnly
                           disabled
                           className="input-readonly"
@@ -945,7 +964,7 @@ const ShowDetail = () => {
               <div className="passes-list">
                 {pairPasses.map((pass) => {
                   const isMyDJPass =
-                    pass.preassigned_dj?.toLowerCase() === myDjName.toLowerCase();
+                    !!myDjName && pass.preassigned_dj?.toLowerCase() === myDjName.toLowerCase();
                   const isMySpecialtyShowPass =
                     pass.preassigned_specialty_show_id !== null &&
                     mySpecialtyShowIds.has(pass.preassigned_specialty_show_id!);
@@ -958,8 +977,12 @@ const ShowDetail = () => {
                           <div className="preassignment-info">
                             <p>
                               <strong>Pre-assigned to:</strong> {pass.preassigned_dj}
-                              {pass.preassigned_specialty_show_name && (
-                                <span className="specialty-show-badge"> (Specialty Show)</span>
+                              {pass.preassigned_specialty_show_id !== null && (
+                                <span className="specialty-show-badge">
+                                  {' '}({specialtyShowLabel(
+                                    myReservableShows.find((s) => s.id === pass.preassigned_specialty_show_id)?.category,
+                                  )})
+                                </span>
                               )}
                             </p>
                             {pass.preassigned_date && (
@@ -989,14 +1012,9 @@ const ShowDetail = () => {
                                     onChange={(e) => setPreassignSelfReserveFor(e.target.value)}
                                     disabled={preassignSelfLoading}
                                   >
-                                    {myDjNames.map((name, i) => (
-                                      <option key={name} value={i === 0 ? '' : `dj:${name}`}>
-                                        {name} (my DJ name)
-                                      </option>
-                                    ))}
-                                    {myDJSpecialtyShows.map((s) => (
-                                      <option key={s.id} value={`ss:${s.id}`}>
-                                        {s.name} (specialty show)
+                                    {reserveForOptions.map((o) => (
+                                      <option key={o.value} value={o.value}>
+                                        {o.label}
                                       </option>
                                     ))}
                                   </select>
@@ -1004,7 +1022,7 @@ const ShowDetail = () => {
                               ) : (
                                 <input
                                   type="text"
-                                  value={myDjNames[0] ?? ''}
+                                  value={reserveForOptions[0]?.label ?? ''}
                                   readOnly
                                   disabled
                                   className="input-readonly"

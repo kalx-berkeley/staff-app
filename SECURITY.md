@@ -146,7 +146,7 @@ requests through, and the backend decides what each request may do.
 Without a login, guests from these networks can:
 - see who they are to the app (`GET /api/users/me` reports a guest);
 - see the deployed version (`GET /api/version`), so an open tab knows when to reload;
-- browse shows, venues and specialty shows, including each show's passes (with contact details
+- browse shows, venues, Specialty Music Shows and Talk & Info Shows, including each show's passes (with contact details
   removed, as described below);
 - search winners by phone and release a winner (winner search);
 - record a guest session for KALX Staff Analytics (`POST /api/pass-giveaway/analytics/session`).
@@ -157,7 +157,7 @@ DJ studio guests can also:
   hours of the giveaway and before the show closes;
 - see their own giveaways and the on-air DJ;
 - see and dismiss spin matches;
-- reserve an unclaimed pass pair for today under a current DJ or specialty show name
+- reserve an unclaimed pass pair for today under a current DJ, Specialty Music Show or Talk & Info Show name
   ("Clothespin"), and remove their own pass pre-assignment;
 - record visits to a show's "I'm off the mic" page and the DJ name on them, for KALX Staff
   Analytics (`/api/pass-giveaway/analytics/giveaway-visits`).

@@ -1,16 +1,30 @@
-"""Pydantic schemas for SpecialtyShow API."""
+"""Pydantic schemas for the specialty show API.
+
+Covers both kinds: Specialty Music Shows (category "music") and Talk &
+Information shows (category "talk").
+"""
+
+from typing import Literal
 
 from pydantic import BaseModel, Field, ConfigDict
 
+SpecialtyShowCategory = Literal["music", "talk"]
+
 
 class SpecialtyShowCreate(BaseModel):
-    """Schema for creating a new specialty show."""
+    """Schema for creating a new Specialty Music Show or Talk & Info Show."""
 
     name: str = Field(
         ...,
         min_length=1,
         max_length=200,
-        description="Specialty show name (must be unique)",
+        description="Show name (must be unique across both kinds of show)",
+    )
+    category: SpecialtyShowCategory = Field(
+        "music",
+        description=(
+            "music (Specialty Music Show) or talk (Talk & Info Show); can't change later"
+        ),
     )
     owner_emails: list[str] = Field(
         default_factory=list,
@@ -24,7 +38,7 @@ class SpecialtyShowCreate(BaseModel):
 
 
 class SpecialtyShowUpdate(BaseModel):
-    """Schema for updating an existing specialty show."""
+    """Schema for updating an existing Specialty Music Show or Talk & Info Show."""
 
     name: str | None = Field(None, min_length=1, max_length=200)
     owner_emails: list[str] | None = Field(
@@ -33,7 +47,16 @@ class SpecialtyShowUpdate(BaseModel):
     )
     dj_names: list[str] | None = Field(
         None,
-        description="Replace the full list of DJ names (null = no change)",
+        description=(
+            "Replace the full list of DJ names (null = no change). Music shows only."
+        ),
+    )
+    staff_member_emails: list[str] | None = Field(
+        None,
+        description=(
+            "Replace the full list of staff members by email (null = no change)."
+            " Talk shows only."
+        ),
     )
     spinitron_urls: list[str] | None = Field(
         None,
@@ -68,16 +91,22 @@ class SpecialtyShowResponse(BaseModel):
 
     id: int
     name: str
+    category: SpecialtyShowCategory = "music"
     deleted: bool = False
     retired: bool = False
     spinitron_shows: list[SpinitronShowInfo] = Field(default_factory=list)
     owner_emails: list[str] = Field(default_factory=list)
     owner_details: list[SpecialtyShowOwnerInfo] = Field(default_factory=list)
     dj_names: list[str] = Field(default_factory=list)
+    staff_member_emails: list[str] = Field(default_factory=list)
+    staff_member_details: list[SpecialtyShowOwnerInfo] = Field(default_factory=list)
 
 
 class MySpecialtyShowResponse(SpecialtyShowResponse):
     """Schema for a specialty show in the current user's own list, with their role(s)."""
 
     is_owner: bool = False
+    # A DJ member of a music show
     is_dj: bool = False
+    # A staff member of a talk show
+    is_staff_member: bool = False
