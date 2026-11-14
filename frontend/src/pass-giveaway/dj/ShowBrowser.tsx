@@ -6,6 +6,7 @@ import { Tooltip, DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, K
 import type { ShowSummary, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
+import { useRestoreScrollOnBack } from '../../common/hooks/useRestoreScrollOnBack';
 import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, WHEELCHAIR_ACCESSIBLE_LABELS, compareVenueNames, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
 import { formatCalendarDate, formatCalendarDateRange } from '../../common/dateTime';
 import { useShowListFilters, type ShowListFilterOptions, type ShowSort } from '../showListUrlState';
@@ -33,6 +34,7 @@ const ShowBrowser = () => {
   const [allShows, setAllShows] = useState<ShowSummary[]>([]);
   const [filteredShows, setFilteredShows] = useState<ShowSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const scrollRootRef = useRestoreScrollOnBack(!loading);
   const [error, setError] = useState<string | null>(null);
   const [filters, updateFilters] = useShowListFilters(FILTER_OPTIONS);
   const { status: statusFilter, sort: sortBy, dateFrom, dateTo } = filters;
@@ -286,7 +288,7 @@ const ShowBrowser = () => {
   });
 
   return (
-    <div className="show-browser">
+    <div className="show-browser" ref={scrollRootRef}>
       <div className="page-header">
         <h2>Available Shows</h2>
         <p className="page-description">Browse published shows and give away passes</p>

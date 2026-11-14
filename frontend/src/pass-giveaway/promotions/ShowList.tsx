@@ -6,6 +6,7 @@ import type { APIError } from '../../common/types';
 import SearchBar from './SearchBar';
 import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker } from '../components';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
+import { useRestoreScrollOnBack } from '../../common/hooks/useRestoreScrollOnBack';
 import { compareVenueNames } from '../utils';
 import { formatCalendarDate, formatCalendarDateRange } from '../../common/dateTime';
 import { useShowListFilters, type ShowListFilterOptions, type ShowSort } from '../showListUrlState';
@@ -23,6 +24,7 @@ const ShowList = () => {
   const [allShows, setAllShows] = useState<ShowSummary[]>([]);
   const [searchResults, setSearchResults] = useState<ShowSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const scrollRootRef = useRestoreScrollOnBack(!loading);
   const [error, setError] = useState<string | null>(null);
   const [filters, updateFilters] = useShowListFilters(FILTER_OPTIONS);
   const { mineOnly: showMineOnly, status: statusFilter, sort: sortBy, dateFrom, dateTo } = filters;
@@ -125,7 +127,7 @@ const ShowList = () => {
   });
 
   return (
-    <div className="show-list">
+    <div className="show-list" ref={scrollRootRef}>
       <div className="show-list-header">
         <h2>Shows</h2>
         <div className="mine-toggle">
