@@ -152,7 +152,7 @@ describe('PassGiveawayForm', () => {
       await waitFor(() => {
         expect(passesAPI.giveaway).toHaveBeenCalledWith(1, {
           recipient_name: 'John Doe',
-          recipient_phone: '555-123-4567',
+          recipient_phone: '5551234567',
           recipient_email: null,
           given_away_by_dj: 'DJ Mike',
         });

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { passesAPI, venuePassesAPI } from '../api';
-import { formatPhone } from '../../common/utils';
+import PhoneInput from '../../common/components/PhoneInput';
+import { US_PHONE_DIGITS, usPhoneDigits } from '../../common/utils';
 import type { PassResponse, WinnerEligibility } from '../types';
 import type { APIError } from '../../common/types';
 
@@ -12,8 +13,6 @@ interface WinnerEditFormProps {
   onSaved: (updated: PassResponse) => void;
   onCancel: () => void;
 }
-
-const digits = (phone: string) => phone.replace(/\D/g, '');
 
 const errorDetail = (err: unknown, fallback: string) => {
   const detail = (err as APIError).detail;
@@ -51,8 +50,8 @@ const WinnerEditForm = ({
       .then((winner) => {
         if (cancelled) return;
         setName(winner.recipient_name ?? '');
-        setPhone(winner.recipient_phone ? formatPhone(winner.recipient_phone) : '');
-        setOriginalPhone(digits(winner.recipient_phone ?? ''));
+        setPhone(usPhoneDigits(winner.recipient_phone ?? ''));
+        setOriginalPhone(usPhoneDigits(winner.recipient_phone ?? ''));
         setEmail(winner.recipient_email ?? '');
         setHadEmail(!!winner.recipient_email);
         setLoaded(true);
@@ -72,11 +71,10 @@ const WinnerEditForm = ({
   };
 
   const handlePhoneBlur = async () => {
-    const phoneDigits = digits(phone);
-    if (phoneDigits.length < 10 || phoneDigits === originalPhone) return;
+    if (phone.length !== US_PHONE_DIGITS || phone === originalPhone) return;
     try {
       setWinEligibility(
-        await venuePassesAPI.checkWinner(venueId, phone.trim(), pass.show_id, pass.id)
+        await venuePassesAPI.checkWinner(venueId, phone, pass.show_id, pass.id)
       );
     } catch {
       // Don't block the DJ when the check fails; the backend still logs overrides.
@@ -92,8 +90,8 @@ const WinnerEditForm = ({
       setError('Winner name is required');
       return;
     }
-    if (digits(phone).length < 10) {
-      setError('Phone number must contain at least 10 digits');
+    if (phone.length !== US_PHONE_DIGITS) {
+      setError('Phone number must have 10 digits');
       return;
     }
     if (requiresEmail && !email.trim()) {
@@ -108,7 +106,7 @@ const WinnerEditForm = ({
       setSaving(true);
       const updated = await passesAPI.updateWinner(pass.id, {
         recipient_name: name.trim(),
-        recipient_phone: phone.trim(),
+        recipient_phone: phone,
         recipient_email: email.trim() || null,
         given_away_by_dj: djName.trim(),
       });
@@ -140,14 +138,12 @@ const WinnerEditForm = ({
 
       <div className="form-group">
         <label htmlFor={`edit-recipient-phone-${pass.id}`}>Winner Phone *</label>
-        <input
-          type="tel"
+        <PhoneInput
           id={`edit-recipient-phone-${pass.id}`}
           value={phone}
-          onChange={(e) => handlePhoneChange(e.target.value)}
+          onChange={handlePhoneChange}
           onBlur={handlePhoneBlur}
           disabled={disabled}
-          autoComplete="off"
         />
         {winEligibility?.eligible === false && (
           <div className="win-ineligible-warning">

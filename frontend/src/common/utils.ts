@@ -10,6 +10,28 @@ export function formatPhone(phone: string | null | undefined): string {
   return phone;
 }
 
+/** A US phone number has 10 digits, without the +1 country code. */
+export const US_PHONE_DIGITS = 10;
+
+/**
+ * The digits of a US phone number someone typed or pasted, without a leading
+ * country code 1 (no US area code starts with 1), at most 10.
+ */
+export function usPhoneDigits(text: string): string {
+  return text.replace(/\D/g, '').replace(/^1/, '').slice(0, US_PHONE_DIGITS);
+}
+
+/**
+ * Up to 10 digits formatted as they're typed: "510", "(510) 642",
+ * "(510) 642-1111". Brackets only appear once there's a digit after the area
+ * code, so deleting back to the area code leaves no stray punctuation.
+ */
+export function formatUsPhoneAsTyped(digits: string): string {
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 // Matches "stage" as a full hostname label (e.g. staff.stage.example.org or
 // stage.example.org) without matching unrelated labels like "backstage".
 export function isStagingEnvironment(hostname: string = window.location.hostname): boolean {

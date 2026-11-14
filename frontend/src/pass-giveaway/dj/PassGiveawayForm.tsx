@@ -4,6 +4,8 @@ import { Tooltip } from '../components';
 import type { PassResponse, GiveawayData, WinnerEligibility } from '../types';
 import type { APIError } from '../../common/types';
 import { joinNames } from '../utils';
+import PhoneInput from '../../common/components/PhoneInput';
+import { US_PHONE_DIGITS } from '../../common/utils';
 
 interface PassGiveawayFormProps {
   pass: PassResponse;
@@ -60,14 +62,9 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
     return false;
   };
 
-  const validatePhoneNumber = (phone: string): boolean => {
-    const digitsOnly = phone.replace(/\D/g, '');
-    return digitsOnly.length >= 10;
-  };
-
   const handlePhoneBlur = async () => {
-    const phone = formData.recipient_phone.trim();
-    if (!phone || !validatePhoneNumber(phone) || !venueId) return;
+    const phone = formData.recipient_phone;
+    if (phone.length !== US_PHONE_DIGITS || !venueId) return;
     try {
       const result = await venuePassesAPI.checkWinner(venueId, phone, pass.show_id);
       setWinEligibility(result);
@@ -88,12 +85,12 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
       setError('Winner name is required');
       return;
     }
-    if (!formData.recipient_phone.trim()) {
+    if (!formData.recipient_phone) {
       setError('Winner phone is required');
       return;
     }
-    if (!validatePhoneNumber(formData.recipient_phone)) {
-      setError('Phone number must contain at least 10 digits');
+    if (formData.recipient_phone.length !== US_PHONE_DIGITS) {
+      setError('Phone number must have 10 digits');
       return;
     }
     if (requiresEmail && !formData.recipient_email?.trim()) {
@@ -196,15 +193,13 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
                   <Tooltip text="The phone number is checked against the win history of this venue and any venues sharing its limit. If this caller won recently, a warning will appear and you may need to override." />
                 ) : null}
               </div>
-              <input
-                type="tel"
+              <PhoneInput
                 id="recipient_phone"
                 value={formData.recipient_phone}
-                onChange={(e) => handleInputChange('recipient_phone', e.target.value)}
+                onChange={(phone) => handleInputChange('recipient_phone', phone)}
                 onBlur={handlePhoneBlur}
                 disabled={loading}
                 placeholder="Enter winner's phone number"
-                autoComplete="off"
               />
               {winEligibility?.eligible === false && (
                 <div className="win-ineligible-warning">

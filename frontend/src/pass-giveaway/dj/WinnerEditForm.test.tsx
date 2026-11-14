@@ -83,7 +83,7 @@ describe('WinnerEditForm', () => {
     await vi.waitFor(() => expect(onSaved).toHaveBeenCalledWith(updated));
     expect(passesAPI.updateWinner).toHaveBeenCalledWith(7, {
       recipient_name: 'Jane Winner',
-      recipient_phone: '(510) 555-0100',
+      recipient_phone: '5105550100',
       recipient_email: 'jnae@example.com',
       given_away_by_dj: 'DJ Test',
     });
@@ -118,7 +118,7 @@ describe('WinnerEditForm', () => {
     fireEvent.blur(phone);
 
     expect(await screen.findByText('Earlier Show')).toBeInTheDocument();
-    expect(venuePassesAPI.checkWinner).toHaveBeenCalledWith(2, '510-555-0199', 3, 7);
+    expect(venuePassesAPI.checkWinner).toHaveBeenCalledWith(2, '5105550199', 3, 7);
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     fireEvent.click(screen.getByLabelText(/Override/));
     expect(await screen.findByRole('button', { name: 'Save' })).toBeEnabled();
