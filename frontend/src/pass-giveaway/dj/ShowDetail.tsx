@@ -5,7 +5,7 @@ import { DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, KalxLiveBa
 import MarkdownContent from '../../common/components/MarkdownContent';
 import { formatPhone } from '../../common/utils';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, canDjEditWinner, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
+import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, KALX_CALL_IN_PHONE, KALX_CALL_IN_PHONE_LETTERS, canDjEditWinner, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
 import WinnerEditForm from './WinnerEditForm';
 import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
 import type { ShowResponse, PassResponse } from '../types';
@@ -257,6 +257,10 @@ const ShowDetail = () => {
         <p>
           Please mention these passes are courtesy of{' '}
           <strong>{show.venue.name}</strong>.
+        </p>
+        <p>
+          Listeners call <strong>{KALX_CALL_IN_PHONE}</strong> or{' '}
+          <strong>{KALX_CALL_IN_PHONE_LETTERS}</strong> to win.
         </p>
       </div>
 

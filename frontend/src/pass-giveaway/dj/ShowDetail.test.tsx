@@ -95,6 +95,13 @@ describe('DJ ShowDetail winner editing', () => {
     expect(screen.queryByText(/Staff Instructions/)).not.toBeInTheDocument();
   });
 
+  it('gives the DJ the KALX phone number to announce', async () => {
+    await renderPage(makeShow([winner()]));
+
+    expect(screen.getByText('(510) 642-5259')).toBeInTheDocument();
+    expect(screen.getByText('(510) 642-KALX')).toBeInTheDocument();
+  });
+
   it('offers the DJ who gave the passes away an Edit button', async () => {
     await renderPage(makeShow([winner()]));
 

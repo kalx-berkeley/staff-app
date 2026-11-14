@@ -71,6 +71,10 @@ export const seatedFallbackNote = (fallback: GuestFallback): string => {
   return '';
 };
 
+/** The number on-air listeners call to win passes, and its letters version. */
+export const KALX_CALL_IN_PHONE = '(510) 642-5259';
+export const KALX_CALL_IN_PHONE_LETTERS = '(510) 642-KALX';
+
 /** The table Publicity staff at co-announce shows, using tabler passes. */
 export const KALX_TABLE_NAME = 'KALX Co-Announce Table';
 
