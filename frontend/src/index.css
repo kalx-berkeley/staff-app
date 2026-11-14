@@ -2045,6 +2045,7 @@ fieldset.radio-group legend {
   color: #2f3236;
   line-height: 1.2;
   text-align: center;
+  overflow-wrap: break-word;
 }
 
 .kalx-show-genre {
@@ -2063,7 +2064,7 @@ fieldset.radio-group legend {
 
 .kalx-doc-fields {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 0.3rem 0.75rem;
   align-items: baseline;
   font-size: 1.5rem;
@@ -2077,6 +2078,8 @@ fieldset.radio-group legend {
 
 .kalx-doc-value {
   color: #222;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .kalx-doc-markdown-row {
@@ -2208,6 +2211,25 @@ fieldset.radio-group legend {
 .kalx-giveaway-left {
   flex: 1.2;
   min-width: 0;
+  container-type: inline-size;
+}
+
+/* When a narrow window squeezes the show info column, shrink the show name
+   and put each label above its value, so nothing spills out of the box. */
+.kalx-giveaway-left .kalx-show-name {
+  font-size: clamp(1.75rem, 9cqi, 3.5rem);
+}
+
+@container (max-width: 38rem) {
+  .kalx-giveaway-left .kalx-doc-fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0 0.75rem;
+  }
+
+  .kalx-giveaway-left .kalx-doc-label {
+    white-space: normal;
+    margin-top: 0.4rem;
+  }
 }
 
 .kalx-giveaway-right {
@@ -3817,6 +3839,7 @@ fieldset.radio-group legend {
 
   .kalx-giveaway-split {
     flex-direction: column;
+    align-items: stretch;
   }
 }
 
