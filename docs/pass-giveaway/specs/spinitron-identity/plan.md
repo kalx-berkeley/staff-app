@@ -20,8 +20,10 @@ At any moment the **on-air identity** is one of:
 | A DJ hosting a Specialty Music Show | The show | The show, or the DJ's persona |
 | Anyone (placeholder persona such as "News Team", or a DJ persona) hosting a Talk & Information show | The show | The show only |
 
-Design agreed 2026-11-14. It ships in three phases (see "Phases" below), so
-the old DJ names can be cleaned up on real data between phases 2 and 3.
+Design agreed 2026-11-14. It ships in phases (see "Phases" below), so the old
+DJ names can be cleaned up on real data before phase 3. Each phase is its own
+branch and PR; phase 3's PR isn't merged until the clean-up is finished, since
+any release cut after the merge includes it.
 
 ## Decisions
 
@@ -48,7 +50,7 @@ the old DJ names can be cleaned up on real data between phases 2 and 3.
 | # | Question | Decision |
 |---|---|---|
 | 9 | Music show DJs | Stored as `persona_id` plus a cached persona name for display. |
-| 10 | Pass and record storage | Every DJ name text column gets persona and show identity columns alongside it: pre-assignments (a persona *or* a show, so `preassigned_dj` stops holding show names), giveaways (decision 11), `show_attempts`, `lottery_entries`, `analytics_event` and `analytics_daily_count`. |
+| 10 | Pass and record storage | Every DJ name text column gets persona and show identity columns alongside it: pre-assignments (a persona *or* a show, so `preassigned_dj` stops holding show names), giveaways (decision 11), `show_attempts`, `lottery_entries`, `analytics_event` and `analytics_daily_count`. Phase 2b adds only the columns a picker fills (pre-assignments, lottery entries, music show DJs). The rest (giveaways, attempts, analytics) arrive in phase 3, filled by its migration, since until then the only source is the typed DJ name. |
 | 11 | Giveaway credit during a specialty music show | Both. Giveaways store `given_away_persona_id`, `given_away_specialty_show_id` and a text snapshot of the identity's label. On `passes` and `on_air_winners`. |
 | 12 | Promotions pre-assigning | One picker offering personas linked to current staff (`staff.dj_personas`), plus music and talk shows, each labelled by kind. "Suggest by date" and "suggest by genre" return identities instead of names. |
 | 13 | Pre-assigning a persona on a day they aren't the identity | Warn but allow. The warning says what the schedule shows for that date, for example "X isn't scheduled that day" or "X hosts *Talk Show Y* that day, so assign it to the show". |
@@ -78,18 +80,21 @@ the old DJ names can be cleaned up on real data between phases 2 and 3.
 
 | # | Question | Decision |
 |---|---|---|
-| 30 | Finding names that don't match | A one-time script in `backend/scripts/` reports, for every DJ name text value in every table (open, historical and analytics records alike), the persona it matches (exact, case-insensitive; any Spinitron persona, not only staff ones) or that it matches none. Misses are fixed by hand on real data before phase 3. |
-| 31 | Migration | Fills the persona and show columns for every record, historical and analytics included. It refuses to run while *any* record is still unmatched. |
+| 30 | Finding names that don't match | A one-time script in `backend/scripts/` reports, for every DJ name text value in every table (open, historical and analytics records alike), the persona it matches (exact, case-insensitive; any Spinitron persona, not only staff ones) or that it matches none. Misses are fixed by hand on real data before phase 3, by mapping the name (in `dj_name_mappings`) to a persona, a show, or no one (left unattributed, for placeholders like "Unknown"). Names a show and a persona share, or several personas share (unless exactly one is a staff member's), count as misses. Built as `scripts/spinitron_identity_report.py`, with the matching in `app/pass_giveaway/services/dj_name_matching.py`; it exits 1 while anything needs fixing. |
+| 31 | Migration | Fills the persona and show columns for every record, historical and analytics included, using `dj_name_matching` and the mappings. It refuses to run while *any* record is still unmatched. |
 | 32 | Old text columns | Dropped in a later change, once phase 3 has settled. |
 
 ## Phases
 
-1. **Rename and Talk & Info shows.** Decisions 1–8.
-2. **Personas alongside the text.** Decisions 9–17, plus the clean-up
-   script (decision 30). New writes fill both the persona columns and the old
-   text columns.
-3. **DJ pages use the schedule.** Decisions 18–29 and the migration
-   (decision 31).
+1. **Rename and Talk & Info shows.** Decisions 1–8. (Shipped.)
+2. **2a: The clean-up script.** Decision 30. Released on its own so the
+   clean-up can start straight away.
+3. **2b: Personas where someone picks them.** Decisions 9–17, with the
+   persona columns on pre-assignments, lottery entries and music show DJs.
+   New writes fill both the persona columns and the old text columns.
+4. **3: DJ pages use the schedule.** Decisions 18–29 and the migration
+   (decision 31), which also adds the giveaway, attempt and analytics
+   columns. Re-run the script on release day; release only at zero misses.
 
 Later: drop the text columns (decision 32).
 

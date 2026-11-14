@@ -26,6 +26,7 @@ from .specialty_show_owner import SpecialtyShowOwner
 from .specialty_show_dj import SpecialtyShowDJ
 from .specialty_show_spinitron_show import SpecialtyShowSpinitronShow
 from .talk_show_staff import TalkShowStaff
+from .dj_name_mapping import DjNameMapping
 from .external_api_cache import ExternalApiCache
 from .feature_bin_release import FeatureBinRelease
 from .kalx_live_appearance import KalxLiveAppearance
@@ -70,6 +71,7 @@ __all__ = [
     "SpecialtyShowDJ",
     "SpecialtyShowSpinitronShow",
     "TalkShowStaff",
+    "DjNameMapping",
     "ExternalApiCache",
     "FeatureBinRelease",
     "KalxLiveAppearance",
