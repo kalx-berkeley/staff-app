@@ -722,11 +722,11 @@ const ShowDetail = () => {
   const buildStaffPassLines = (p: typeof staffPasses[number]): string[] => {
     if (!p.staff_name) return [];
     const extras = buildExtras(p.staff_phone, includeStaffEmail ? p.staff_email : null);
-    if (!p.has_guest) return [`1 pass for ${p.staff_name}${extras}`];
+    if (!p.has_guest) return [`${p.staff_name} : 1 pass${extras}`];
     if (staffGuestRequiresName && p.guest_name) {
-      return [`1 pass for ${p.staff_name}${extras}`, `1 pass for ${p.guest_name}`];
+      return [`${p.staff_name} : 1 pass${extras}`, `${p.guest_name} : 1 pass`];
     }
-    return [`1 pair of passes for ${p.staff_name} and a guest${extras}`];
+    return [`${p.staff_name} : 1 pair of passes for them and a guest${extras}`];
   };
 
   const primaryStaffPasses = staffPasses.filter(
@@ -735,14 +735,14 @@ const ShowDetail = () => {
 
   const onAirWinnerLines = passPairs
     .filter((p) => p.status === 'given_away' && p.recipient_name)
-    .map((p) => `1 pair of passes for ${p.recipient_name} and a guest${buildExtras(p.recipient_phone, includeOnAirEmail ? p.recipient_email : null)}`);
+    .map((p) => `${p.recipient_name} : 1 pair of passes for them and a guest${buildExtras(p.recipient_phone, includeOnAirEmail ? p.recipient_email : null)}`);
   const staffWinnerLines = [
     ...primaryStaffPasses.flatMap((p) => buildStaffPassLines(p)),
     ...(show?.passes ?? [])
       .filter((p) => p.pass_type === 'tabler' && p.status === 'claimed' && p.staff_name)
       .map(
         (p) =>
-          `1 pass for ${p.staff_name} (${KALX_TABLE_NAME})${buildExtras(p.staff_phone, includeStaffEmail ? p.staff_email : null)}`
+          `${p.staff_name} : 1 pass (${KALX_TABLE_NAME})${buildExtras(p.staff_phone, includeStaffEmail ? p.staff_email : null)}`
       ),
   ];
   // Each part of the guest list starts with a heading line (match show_service.py)

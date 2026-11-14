@@ -554,8 +554,8 @@ def test_guest_list_marks_tablers(client, db, promo, venue, pub, plain):
     db.expire_all()
     show = db.query(Show).filter(Show.id == data["id"]).one()
     lines = ShowService._build_guest_list_text(show).splitlines()
-    assert "1 pass for Sam" in lines
-    assert "1 pass for Penny (KALX Co-Announce Table)" in lines
+    assert "Sam : 1 pass" in lines
+    assert "Penny : 1 pass (KALX Co-Announce Table)" in lines
 
 
 def test_deleting_show_tells_tablers(client, db, promo, venue, pub):

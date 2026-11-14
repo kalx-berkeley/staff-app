@@ -217,11 +217,11 @@ def test_guest_list_counts_a_staff_member_and_guest_as_a_pair(db: Session):
     assert lines == [
         "",
         "On-air giveaway winners:",
-        "1 pair of passes for Caller and a guest",
+        "Caller : 1 pair of passes for them and a guest",
         "",
         "KALX staff:",
-        "1 pass for solo",
-        "1 pair of passes for host and a guest",
+        "solo : 1 pass",
+        "host : 1 pair of passes for them and a guest",
     ]
 
 
@@ -230,7 +230,7 @@ def test_guest_list_names_a_staff_guest_when_the_venue_requires_it(db: Session):
 
     lines = ShowService._build_guest_list_text(show).splitlines()[1:]
 
-    assert lines[-2:] == ["1 pass for host", "1 pass for Jamie"]
+    assert lines[-2:] == ["host : 1 pass", "Jamie : 1 pass"]
 
 
 @pytest.mark.parametrize(
@@ -262,12 +262,12 @@ def test_guest_list_uses_the_shows_promoters_settings_not_the_venues(db: Session
     assert lines == [
         "",
         "On-air giveaway winners:",
-        "1 pair of passes for Caller and a guest",
+        "Caller : 1 pair of passes for them and a guest",
         "",
         "KALX staff:",
-        "1 pass for solo (solo@example.com)",
-        "1 pass for host (host@example.com)",
-        "1 pass for Jamie",
+        "solo : 1 pass (solo@example.com)",
+        "host : 1 pass (host@example.com)",
+        "Jamie : 1 pass",
     ]
 
 

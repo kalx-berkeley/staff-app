@@ -479,14 +479,14 @@ describe('Promotions ShowDetail — guest list', () => {
 
     await renderShowDetail();
 
-    expect((await screen.findByText(/1 pair of passes for Caller/)).textContent).toBe(
+    expect((await screen.findByText(/Caller : 1 pair of passes/)).textContent).toBe(
       [
         'On-air giveaway winners:',
-        '1 pair of passes for Caller and a guest',
+        'Caller : 1 pair of passes for them and a guest',
         '',
         'KALX staff:',
-        '1 pass for Solo',
-        '1 pair of passes for John Doe and a guest',
+        'Solo : 1 pass',
+        'John Doe : 1 pair of passes for them and a guest',
       ].join('\n'),
     );
   });
@@ -496,9 +496,9 @@ describe('Promotions ShowDetail — guest list', () => {
 
     await renderShowDetail();
 
-    const list = await screen.findByText(/1 pair of passes for Caller/);
-    expect(list).toHaveTextContent('1 pass for Solo (solo@example.com)');
-    expect(list).toHaveTextContent('John Doe and a guest (john@example.com)');
+    const list = await screen.findByText(/Caller : 1 pair of passes/);
+    expect(list).toHaveTextContent('Solo : 1 pass (solo@example.com)');
+    expect(list).toHaveTextContent('John Doe : 1 pair of passes for them and a guest (john@example.com)');
     expect(list).not.toHaveTextContent('caller@example.com');
   });
 
@@ -507,9 +507,9 @@ describe('Promotions ShowDetail — guest list', () => {
 
     await renderShowDetail();
 
-    const list = await screen.findByText(/1 pair of passes for Caller/);
-    expect(list).toHaveTextContent('Caller and a guest (caller@example.com)');
-    expect(list).toHaveTextContent('1 pass for Solo (solo@example.com)');
+    const list = await screen.findByText(/Caller : 1 pair of passes/);
+    expect(list).toHaveTextContent('Caller : 1 pair of passes for them and a guest (caller@example.com)');
+    expect(list).toHaveTextContent('Solo : 1 pass (solo@example.com)');
   });
 });
 

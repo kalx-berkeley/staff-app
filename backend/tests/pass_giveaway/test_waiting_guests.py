@@ -190,7 +190,7 @@ class TestBumpedToTheList:
 
         text = ShowService._build_guest_list_text(show)
 
-        assert "1 pass for Ann" in text
+        assert "Ann : 1 pass" in text
         assert "Ann+1" not in text and "and a guest" not in text
 
 
@@ -847,7 +847,7 @@ class TestReleaseAtClose:
 
         db.refresh(show)
         text = ShowService._build_guest_list_text(show)
-        assert "1 pass for Ann" in text and "Ann+1" not in text
+        assert "Ann : 1 pass" in text and "Ann+1" not in text
         (email,) = _emails_to(mock_send, people["Ann"])
         assert "didn't get a pass" in email["subject"]
         assert "You're on the guest list, but Ann+1" in email["body_text"]
@@ -866,7 +866,7 @@ class TestReleaseAtClose:
         assert _primary(db, show, people["Ben"]) is None
         db.refresh(show)
         text = ShowService._build_guest_list_text(show)
-        assert "Ann and a guest" in text and "Ben" not in text
+        assert "Ann : 1 pair of passes for them and a guest" in text and "Ben" not in text
 
         (ann_email,) = _emails_to(mock_send, people["Ann"])
         assert "confirmed" in ann_email["subject"]

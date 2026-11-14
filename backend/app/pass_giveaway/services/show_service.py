@@ -931,7 +931,7 @@ class ShowService:
             w = p.on_air_winner
             on_air_lines.append(
                 with_extras(
-                    f"1 pair of passes for {w.recipient_name} and a guest",
+                    f"{w.recipient_name} : 1 pair of passes for them and a guest",
                     w.recipient_phone,
                     w.recipient_email if rules.requires_email_address else None,
                 )
@@ -944,27 +944,27 @@ class ShowService:
             staff_email = p.staff_email if rules.includes_staff_email_address else None
             if p.has_guest and rules.staff_guest_requires_name and p.guest_name:
                 staff_lines.append(
-                    with_extras(f"1 pass for {p.staff_name}", p.staff_phone, staff_email)
+                    with_extras(f"{p.staff_name} : 1 pass", p.staff_phone, staff_email)
                 )
-                staff_lines.append(f"1 pass for {p.guest_name}")
+                staff_lines.append(f"{p.guest_name} : 1 pass")
             elif p.has_guest:
                 staff_lines.append(
                     with_extras(
-                        f"1 pair of passes for {p.staff_name} and a guest",
+                        f"{p.staff_name} : 1 pair of passes for them and a guest",
                         p.staff_phone,
                         staff_email,
                     )
                 )
             else:
                 staff_lines.append(
-                    with_extras(f"1 pass for {p.staff_name}", p.staff_phone, staff_email)
+                    with_extras(f"{p.staff_name} : 1 pass", p.staff_phone, staff_email)
                 )
 
         for p in tablers:
             staff_email = p.staff_email if rules.includes_staff_email_address else None
             staff_lines.append(
                 with_extras(
-                    f"1 pass for {p.staff_name} ({TABLE_NAME})", p.staff_phone, staff_email
+                    f"{p.staff_name} : 1 pass ({TABLE_NAME})", p.staff_phone, staff_email
                 )
             )
 
