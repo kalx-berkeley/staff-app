@@ -6,6 +6,22 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.16.0] - 2026-11-14
+
+### Changed
+
+- Group every venue setting that pre-fills new shows in a "New Show Defaults" box on the venue form, separate from the guest list requirements, which apply to every show at close ([746090d](https://github.com/kalx-berkeley/staff-app/commit/746090d))
+- Mark tagged bands with no MusicBrainz match more faintly, and don't open an empty popup for them ([15b71b0](https://github.com/kalx-berkeley/staff-app/commit/15b71b0))
+- Return to the short link after logging out to switch Google accounts from the short link error page, instead of landing on the home page ([f01dd50](https://github.com/kalx-berkeley/staff-app/commit/f01dd50))
+- Record an audit log entry for every tabler pass release, including tabler passes released by lowering a show's tabler pass count ([9e51064](https://github.com/kalx-berkeley/staff-app/commit/9e51064))
+
+### Added
+
+- Let venues set a default Staff Pass Adjustment, which new shows at the venue start with, for venues that always give more or fewer staff passes than one per pass pair ([746090d](https://github.com/kalx-berkeley/staff-app/commit/746090d))
+- Link each venue to the staff shows page filtered to that venue: a Shows button on the promotions Venues page, and the venue name on the staff Venues page. The shows page opens its filters when the link sets one ([7aad79e](https://github.com/kalx-berkeley/staff-app/commit/7aad79e))
+- Show the venue logo's size on the venue form, with a note when an upload will be scaled down, and let new venues have a logo ([41c987e](https://github.com/kalx-berkeley/staff-app/commit/41c987e))
+- Let site admins release anyone's tabler pass. The tabler is emailed with the admin's name ([9e51064](https://github.com/kalx-berkeley/staff-app/commit/9e51064))
+
 ## [1.15.0] - 2026-11-13
 
 ### Changed
@@ -428,6 +444,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.16.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.15.0...v1.16.0
 [1.15.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.14.0...v1.15.0
 [1.14.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.13.3...v1.14.0
 [1.13.3]: https://github.com/kalx-berkeley/staff-app/compare/v1.13.2...v1.13.3
