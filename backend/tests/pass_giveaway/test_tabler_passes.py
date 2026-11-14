@@ -15,6 +15,7 @@ from app.models.staff_department import StaffDepartment
 from app.models.staff_pass_alternate import StaffPassAlternate
 from app.models.staff_status import StaffStatus
 from app.models.venue import Venue
+from app.models.workform_department import DepartmentHead
 from app.pass_giveaway.services.show_service import ShowService
 
 SEND_EMAIL = "app.common.services.notification_service.send_email"
@@ -61,6 +62,25 @@ def pub2(db: Session):
 @pytest.fixture
 def plain(db: Session):
     return _make_staff(db, "Sam")
+
+
+@pytest.fixture
+def head(db: Session):
+    """A site admin by heading a department, with no promotions role."""
+    staff = _make_staff(db, "Hana", "Music")
+    staff.airtable_record_id = "recHANA"
+    db.add(DepartmentHead(department="Music", staff_airtable_record_id="recHANA"))
+    db.commit()
+    return staff
+
+
+def _tabler_releases(db: Session) -> list[AuditLog]:
+    db.expire_all()
+    return [
+        e
+        for e in db.query(AuditLog).filter(AuditLog.event_type == "pass_released").all()
+        if e.details.get("pass_type") == "tabler"
+    ]
 
 
 def _h(staff: Staff) -> dict:
@@ -313,6 +333,18 @@ def test_tabler_releases_own_pass(client, db, promo, venue, pub):
     assert resp.json()["pass_type"] == "tabler"
     assert resp.json()["status"] == "available"
     send.assert_not_called()
+    [entry] = _tabler_releases(db)
+    assert entry.actor_email == pub.email
+    assert entry.details["released_staff_id"] == pub.id
+
+
+def test_other_staff_cant_release_tabler_pass(client, db, promo, venue, pub, pub2):
+    data = _create(client, promo, venue)
+    _publish(db, data["id"])
+    pass_id = _claim_tabler(client, data["id"], pub).json()["id"]
+    resp = client.delete(f"/api/passes/{pass_id}/claim", headers=_h(pub2))
+    assert resp.status_code == 403
+    assert _tabler_releases(db) == []
 
 
 def test_my_claims_include_tabler_pass(client, db, promo, venue, pub):
@@ -363,6 +395,47 @@ def test_promotions_release_emails_tabler(client, db, promo, venue, pub):
     assert resp.status_code == 200
     assert send.call_args.kwargs["to_email"] == pub.email
     assert "released" in send.call_args.kwargs["subject"]
+    assert "KALX Promotions has released" in str(send.call_args.kwargs)
+    [entry] = _tabler_releases(db)
+    assert (entry.actor_email, entry.actor_role) == (promo.email, "promotions")
+    assert entry.details["released_staff_id"] == pub.id
+
+
+# ── Site admins ───────────────────────────────────────────────────────────────
+
+
+def test_site_admin_releases_anyones_tabler_pass(client, db, promo, venue, pub, head):
+    data = _create(client, promo, venue)
+    _publish(db, data["id"])
+    pass_id = _claim_tabler(client, data["id"], pub).json()["id"]
+    with patch(SEND_EMAIL) as send:
+        resp = client.delete(f"/api/passes/{pass_id}/claim", headers=_h(head))
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "available"
+    assert send.call_args.kwargs["to_email"] == pub.email
+    assert "Hana has released" in str(send.call_args.kwargs)
+    [entry] = _tabler_releases(db)
+    assert (entry.actor_email, entry.actor_role) == (head.email, "site_admin")
+    assert entry.details["released_staff_id"] == pub.id
+    assert entry.area == PASS_GIVEAWAY_AREA
+
+
+def test_site_admin_cant_release_others_staff_pass(client, db, promo, venue, plain, head):
+    data = _create(client, promo, venue)
+    _publish(db, data["id"])
+    pass_id = _claim_staff(client, db, data["id"], plain).json()["id"]
+    resp = client.delete(f"/api/passes/{pass_id}/claim", headers=_h(head))
+    assert resp.status_code == 403
+
+
+def test_site_admin_cant_release_after_close(client, db, promo, venue, pub, head):
+    data = _create(client, promo, venue)
+    show = _publish(db, data["id"])
+    pass_id = _claim_tabler(client, data["id"], pub).json()["id"]
+    show.status = "closed"
+    db.commit()
+    resp = client.delete(f"/api/passes/{pass_id}/claim", headers=_h(head))
+    assert resp.status_code == 400
 
 
 # ── Lowering counts ───────────────────────────────────────────────────────────
@@ -386,6 +459,10 @@ def test_lowering_count_with_claims_needs_confirmation(client, db, promo, venue,
     assert resp.status_code == 200
     assert _counts(db, data["id"]) == (3, 0)
     assert send.call_args.kwargs["to_email"] == pub.email
+    [entry] = _tabler_releases(db)
+    assert entry.actor_email == promo.email
+    assert entry.details["released_staff_id"] == pub.id
+    assert entry.details["reason"] == "tabler_passes_lowered"
 
 
 def test_turning_off_co_announce_releases_tablers(client, db, promo, venue, pub):
@@ -460,6 +537,10 @@ def test_lowering_staff_passes_bumps_tabler_claims_last(
     assert _counts(db, data["id"]) == (0, 0)
     assert any(c.kwargs["to_email"] == pub.email for c in send.call_args_list)
     assert "Penny" in [s["name"] for s in resp.json()["pass_adjustment"]["affected_staff"]]
+    [entry] = _tabler_releases(db)
+    assert entry.actor_email == promo.email
+    assert entry.details["released_staff_id"] == pub.id
+    assert entry.details["reason"] == "staff_passes_lowered"
 
 
 # ── Guest list and cancellation ───────────────────────────────────────────────

@@ -15,6 +15,8 @@ interface TablerPassesSectionProps {
   myEmail: string | null;
   /** Whether the user is in Publicity and can claim a tabler pass (staff mode). */
   canClaim?: boolean;
+  /** Whether the user is a site admin, who can release anyone's tabler pass (staff mode). */
+  canReleaseAny?: boolean;
   /** Why the user can't claim one right now, e.g. they hold a staff pass (staff mode). */
   blockedReason?: string | null;
   /** Reload the show after a change. */
@@ -29,13 +31,15 @@ const errorText = (err: unknown, fallback: string): string => {
 /**
  * The tabler passes of a co-announce show: staff passes set aside for
  * Publicity members at the KALX Co-Announce Table. Everyone sees who's tabling;
- * only Publicity members can claim, and promotions can release and assign.
+ * only Publicity members can claim, promotions can release and assign, and
+ * site admins can release.
  */
 const TablerPassesSection = ({
   show,
   mode,
   myEmail,
   canClaim = false,
+  canReleaseAny = false,
   blockedReason = null,
   onChanged,
 }: TablerPassesSectionProps) => {
@@ -109,7 +113,7 @@ const TablerPassesSection = ({
         <ul className="tabler-list" style={{ margin: '0 0 0.75rem', paddingLeft: '1.25rem' }}>
           {claimed.map((p) => {
             const mine = myPass?.id === p.id;
-            const canRelease = isOpen && (mode === 'promotions' || mine);
+            const canRelease = isOpen && (mode === 'promotions' || canReleaseAny || mine);
             return (
               <li key={p.id} style={{ marginBottom: '0.25rem' }}>
                 {p.staff_name ?? 'Unknown'}

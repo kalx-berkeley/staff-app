@@ -77,6 +77,25 @@ describe('TablerPassesSection', () => {
     expect(screen.getByText('Penny')).toBeInTheDocument();
     expect(screen.getByText(/only publicity members can claim/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /claim a tabler pass/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^release$/i })).not.toBeInTheDocument();
+  });
+
+  it("lets a site admin release someone else's tabler pass", async () => {
+    vi.mocked(passesAPI.releaseClaim).mockResolvedValue(tablerPass({ id: 10 }));
+    const onChanged = vi.fn().mockResolvedValue(undefined);
+    await renderAndSettle(
+      <TablerPassesSection
+        show={makeShow([pennyPass])}
+        mode="staff"
+        myEmail="hana@kalx.test"
+        canReleaseAny
+        onChanged={onChanged}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^release$/i }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(passesAPI.releaseClaim).toHaveBeenCalledWith(10);
+    expect(await screen.findByRole('button', { name: /^release$/i })).toBeEnabled();
   });
 
   it('lets a Publicity member claim an open tabler pass', async () => {

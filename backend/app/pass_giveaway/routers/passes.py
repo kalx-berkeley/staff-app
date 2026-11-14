@@ -45,6 +45,8 @@ from app.auth import (
     is_ip_in_network,
     is_current_staff,
     can_claim_tabler_passes,
+    is_site_admin,
+    require_authentication,
     _is_promotions_staff,
 )
 from app.config import settings
@@ -393,49 +395,57 @@ def claim_pass(
 def release_claim(
     pass_id: int,
     user_info: tuple = Depends(require_promotions_or_staff),
+    real_email: str = Depends(require_authentication),
     db: Session = Depends(get_db),
 ):
     """
-    Release a claimed staff pass.
+    Release a claimed staff or tabler pass.
 
     Requires staff member or promotions staff authentication. Staff members
-    may only release their own claim; promotions staff may release any claim.
-    Show must not be closed.
+    may only release their own claim; promotions staff may release any claim,
+    and site admins (checked against the real signed-in user) may release
+    anyone's tabler pass. Show must not be closed.
 
     Args:
         pass_id: Pass ID
         user_info: Tuple of (role, user) from authentication
+        real_email: The signed-in user's email, ignoring impersonation
         db: Database session
 
     Returns:
         Updated pass
     """
     role, user = user_info
+    actor = user
     # Snapshot the claimant before releasing
     pre_pass = db.query(Pass).filter(Pass.id == pass_id).first()
     prior_staff_id = pre_pass.staff_id if pre_pass else None
 
     # Staff may only release their own claim; promotions staff may release
-    # any claim on someone's behalf.
+    # any claim on someone's behalf, and site admins anyone's tabler pass.
     if role == "staff" and pre_pass and pre_pass.staff_id != user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only release your own staff pass",
-        )
+        real_staff = db.query(Staff).filter(Staff.email == real_email).first()
+        if pre_pass.pass_type != "tabler" or not is_site_admin(db, real_staff):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only release your own staff pass",
+            )
+        role, actor = "site_admin", real_staff
 
     prior_staff = pre_pass.staff if pre_pass else None
-    pass_item = PassService.release_claim(db, pass_id, actor_email=user.email)
+    pass_item = PassService.release_claim(db, pass_id, actor_email=actor.email)
 
     audit_service.log_event(
         db,
         event_type="pass_released",
         area=PASS_GIVEAWAY_AREA,
-        actor_email=user.email,
+        actor_email=actor.email,
         actor_role=role,
         entity_type="pass",
         entity_id=pass_item.id,
         details={
             "released_staff_id": prior_staff_id,
+            "released_staff_email": prior_staff.email if prior_staff else None,
             "show_id": pass_item.show_id,
             "pass_type": pass_item.pass_type,
         },
@@ -446,7 +456,16 @@ def release_claim(
         and prior_staff is not None
         and prior_staff.id != user.id
     ):
-        tabler_service.email_released_by_promotions(db, prior_staff, pass_item.show)
+        tabler_service.email_released_by_other(
+            db,
+            prior_staff,
+            pass_item.show,
+            by=(
+                "KALX Promotions"
+                if role == "promotions"
+                else actor.name or "A KALX site admin"
+            ),
+        )
 
     return PassResponse.model_validate(pass_item)
 

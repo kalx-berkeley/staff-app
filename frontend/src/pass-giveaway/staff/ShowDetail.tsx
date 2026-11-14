@@ -1109,6 +1109,7 @@ const ShowDetail = () => {
           mode="staff"
           myEmail={myEmail}
           canClaim={user?.can_claim_tabler_passes ?? false}
+          canReleaseAny={user?.is_site_admin ?? false}
           blockedReason={
             holdsStaffPass
               ? 'You have a staff pass for this show. Release it to claim a tabler pass instead.'

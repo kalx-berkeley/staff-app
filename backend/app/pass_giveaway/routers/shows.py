@@ -1081,8 +1081,11 @@ def get_show(show_id: int, db: Session = Depends(get_db)):
     return _build_show_response(show)
 
 
-def _apply_tabler_count(db: Session, show: Show, target: int) -> None:
-    """Set the show's tabler passes, fill freed staff passes, and email released tablers."""
+def _apply_tabler_count(db: Session, show: Show, target: int, actor_email: str) -> None:
+    """
+    Set the show's tabler passes, fill freed staff passes, and audit and email
+    released tablers.
+    """
     from app.pass_giveaway.services.alternate_service import AlternateService
 
     released = tabler_service.apply_count(db, show, target)
@@ -1091,6 +1094,9 @@ def _apply_tabler_count(db: Session, show: Show, target: int) -> None:
     promotions = AlternateService.fill_open_passes(db, show, trigger="capacity_change")
     db.commit()
     AlternateService.finalize_promotions(db, promotions)
+    tabler_service.log_count_lowered(
+        db, released, show, actor_email, reason="tabler_passes_lowered"
+    )
     tabler_service.email_count_lowered(db, released, show)
     db.refresh(show)
 
@@ -1262,7 +1268,9 @@ def update_show(
         show.num_pass_pairs != old_num_pass_pairs
         or show.staff_pass_adjustment != old_staff_pass_adjustment
     ):
-        result = PassService.adjust_passes_for_show(db, show, show.num_pass_pairs)
+        result = PassService.adjust_passes_for_show(
+            db, show, show.num_pass_pairs, actor_email=promotions.email
+        )
         if result["affected_djs"] or result["affected_staff"]:
             pass_adjustment = result
             ShowService._notify_venue_owners_of_pass_reduction(
@@ -1276,7 +1284,7 @@ def update_show(
         show.num_tabler_passes != tabler_target
         or tabler_target != sum(1 for p in show.passes if p.pass_type == "tabler")
     ):
-        _apply_tabler_count(db, show, tabler_target)
+        _apply_tabler_count(db, show, tabler_target, promotions.email)
 
     entered_winners_service.enter(
         db,

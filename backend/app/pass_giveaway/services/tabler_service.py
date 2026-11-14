@@ -351,7 +351,12 @@ def email_assigned(db: Session, staff: Staff, show: Show) -> None:
     )
 
 
-def email_released_by_promotions(db: Session, staff: Staff, show: Show) -> None:
+def email_released_by_other(db: Session, staff: Staff, show: Show, *, by: str) -> None:
+    """
+    Tell a tabler someone else released their pass.
+
+    :param by: Who released it, e.g. "KALX Promotions" or a site admin's name.
+    """
     from app.pass_giveaway.services.alternate_service import AlternateService
 
     _email(
@@ -359,10 +364,41 @@ def email_released_by_promotions(db: Session, staff: Staff, show: Show) -> None:
         staff,
         show,
         f"Your tabler pass was released: {show.event_name}",
-        "KALX Promotions has released your tabler pass for"
+        f"{by} has released your tabler pass for"
         f" {AlternateService._show_desc(show)}, so you're no longer on the guest"
         f" list for the {TABLE_NAME}.",
     )
+
+
+def log_count_lowered(
+    db: Session, staff_list: list[Staff], show: Show, actor_email: str | None, reason: str
+) -> None:
+    """
+    Audit each tabler pass released because the show's tabler or staff passes
+    were lowered.
+
+    :param reason: ``tabler_passes_lowered`` or ``staff_passes_lowered``.
+    """
+    from app.common.areas import PASS_GIVEAWAY_AREA
+    from app.common.services import audit_service
+
+    for staff in staff_list:
+        audit_service.log_event(
+            db,
+            event_type="pass_released",
+            area=PASS_GIVEAWAY_AREA,
+            actor_email=actor_email,
+            actor_role="promotions",
+            entity_type="show",
+            entity_id=show.id,
+            details={
+                "released_staff_id": staff.id,
+                "released_staff_email": staff.email,
+                "show_id": show.id,
+                "pass_type": TABLER,
+                "reason": reason,
+            },
+        )
 
 
 def email_count_lowered(db: Session, staff_list: list[Staff], show: Show) -> None:

@@ -1733,7 +1733,9 @@ class PassService:
         return stale_passes
 
     @staticmethod
-    def adjust_passes_for_show(db: Session, show, new_num_pairs: int) -> dict:
+    def adjust_passes_for_show(
+        db: Session, show, new_num_pairs: int, actor_email: str | None = None
+    ) -> dict:
         """
         Adjust the physical pass records to match a new num_pass_pairs value.
 
@@ -1748,7 +1750,7 @@ class PassService:
         Staff passes are removed in this order: unclaimed staff passes, unclaimed
         tabler passes (lowering ``num_tabler_passes``), +1 guest passes, staff
         claims (who go to the alternate list), then tabler claims, newest first,
-        whose holders are emailed.
+        whose holders are emailed and audited as released by *actor_email*.
         """
         import random
 
@@ -1947,6 +1949,9 @@ class PassService:
         db.commit()
         AlternateService.finalize_promotions(db, promotions)
         AlternateService.notify_cut_claims(db, show, cut_staff_ids)
+        tabler_service.log_count_lowered(
+            db, released_tablers, show, actor_email, reason="staff_passes_lowered"
+        )
         tabler_service.email_count_lowered(db, released_tablers, show)
         db.refresh(show)
         return {"affected_djs": affected_djs, "affected_staff": affected_staff}

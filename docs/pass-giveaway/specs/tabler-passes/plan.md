@@ -36,7 +36,7 @@ Design agreed 2026-11-11.
 | 17 | Emails | The tabler is emailed when (a) promotions assigns them, (b) promotions releases their pass, and (c) they lose it because the tabler count or the staff passes were lowered, or Co-Announce was turned off. No email when they act themselves, and none to promotions. |
 | 18 | Closing, reopening, unpublishing and deleting | Tabler claims follow the same rules as staff claims. Unclaimed tabler passes are left off the guest list. |
 | 19 | The tabler's own views of their passes | Tabler passes appear wherever the person's staff passes appear, labeled "🪑 KALX Co-Announce Table". That's My Passes: the directory profile doesn't list passes. |
-| 20 | Audit log and analytics | Audit log entries for claims, releases, assignments and count changes, with `area=pass_giveaway`, because staff passes already get them (`pass_claimed`, `pass_released`). No analytics metric. |
+| 20 | Audit log and analytics | Audit log entries for claims, releases, assignments and count changes, with `area=pass_giveaway`, because staff passes already get them (`pass_claimed`, `pass_released`). Every released tabler claim gets its own `pass_released` entry (with `pass_type: "tabler"` and `released_staff_id`), including ones released by lowering the tabler count or the staff passes, which also record a `reason`. No analytics metric. |
 | 21 | Where the count control appears | The New Show and Edit Show forms. Not legacy import, which is being removed soon. |
 | 22 | How passes are stored | See "Data model" below. |
 
@@ -111,8 +111,12 @@ like the rest of the pass giveaway):
   same leave and one-pass rules, but no Publicity requirement. Audit log entry
   with the promotions rep as the actor, and an email to the tabler (decision
   17a).
-- **Release a tabler pass** (promotions), the same `DELETE` endpoint: audit
-  log, and an email to the tabler (decision 17b). The picker lists current
+- **Release a tabler pass** (promotions, or a site admin such as a department
+  head), the same `DELETE` endpoint: audit log, and an email to the tabler
+  (decision 17b) naming who released it ("KALX Promotions" or the site admin).
+  Site admins are checked against the real signed-in user and can release
+  only tabler passes, not other people's staff passes. They get the Release
+  button on the staff show page. The picker lists current
   staff from `GET /api/shows/staff-pass-claimants?include_new=true`.
 
 `auth.can_claim_tabler_passes(staff)` checks current staff in the "Publicity"
