@@ -24,6 +24,7 @@ def test_send_email_staging_logs_not_sends(caplog):
     with patch("app.common.services.notification_service.settings") as mock_settings:
         mock_settings.environment = "staging"
         mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
+        mock_settings.email_from_name = "KALX Staff App"
         mock_settings.webmaster_email = None
 
         with caplog.at_level(
@@ -56,6 +57,7 @@ def test_send_email_staging_tags_subject_and_body_for_webmaster():
     ):
         mock_settings.environment = "staging"
         mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
+        mock_settings.email_from_name = "KALX Staff App"
         mock_settings.webmaster_email = "webmaster@kalx.berkeley.edu"
         mock_settings.local_smtp_host = "localhost"
         mock_settings.local_smtp_port = 25
@@ -95,6 +97,7 @@ def test_send_email_uses_local_smtp():
     ):
         mock_settings.environment = "production"
         mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
+        mock_settings.email_from_name = "KALX Staff App"
         mock_settings.webmaster_email = None
         mock_settings.local_smtp_host = "localhost"
         mock_settings.local_smtp_port = 25
@@ -105,6 +108,12 @@ def test_send_email_uses_local_smtp():
 
     mock_smtp_cls.assert_called_once_with("localhost", 25)
     mock_smtp_instance.sendmail.assert_called_once()
+    envelope_from, _recipients, raw = mock_smtp_instance.sendmail.call_args.args
+    assert envelope_from == "noreply@kalx.berkeley.edu"
+    assert (
+        email.message_from_string(raw)["From"]
+        == "KALX Staff App <noreply@kalx.berkeley.edu>"
+    )
 
 
 def test_send_email_local_smtp_success_audits_response_details(db: Session):
@@ -121,6 +130,7 @@ def test_send_email_local_smtp_success_audits_response_details(db: Session):
     ):
         mock_settings.environment = "production"
         mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
+        mock_settings.email_from_name = "KALX Staff App"
         mock_settings.webmaster_email = None
         mock_settings.local_smtp_host = "localhost"
         mock_settings.local_smtp_port = 25
@@ -149,6 +159,7 @@ def test_send_email_local_smtp_failure_is_audited(db: Session):
     ):
         mock_settings.environment = "production"
         mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
+        mock_settings.email_from_name = "KALX Staff App"
         mock_settings.webmaster_email = None
         mock_settings.local_smtp_host = "localhost"
         mock_settings.local_smtp_port = 25
@@ -172,6 +183,7 @@ def test_send_email_staging_suppressed_is_audited_with_reason(db: Session):
     with patch("app.common.services.notification_service.settings") as mock_settings:
         mock_settings.environment = "staging"
         mock_settings.email_from_address = "noreply@kalx.berkeley.edu"
+        mock_settings.email_from_name = "KALX Staff App"
         mock_settings.webmaster_email = None
 
         from app.common.services.notification_service import send_email

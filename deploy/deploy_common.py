@@ -23,6 +23,7 @@ import urllib.request
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from email.message import EmailMessage
+from email.utils import formataddr
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,7 @@ REQUIRED_CHECKS = ("Run Backend Tests", "Run Frontend Tests")
 # problem that repeats doesn't send an email on every run
 FAILURE_EMAIL_REPEAT_AFTER = datetime.timedelta(hours=12)
 DEFAULT_FROM_ADDRESS = "noreply@kalx.berkeley.edu"
+DEFAULT_FROM_NAME = "KALX Staff App"
 # rsync filter rules for the backend: files the deploy never deletes or
 # overwrites in the deploy directory, then caches it doesn't copy. The caches
 # are "perishable" (-p), so a folder holding nothing but caches, such as one
@@ -453,7 +455,12 @@ def send_email(environment: Environment, subject: str, body: str) -> bool:
         return False
     message = EmailMessage()
     message["Subject"] = subject
-    message["From"] = settings.get("EMAIL_FROM_ADDRESS") or DEFAULT_FROM_ADDRESS
+    message["From"] = formataddr(
+        (
+            settings.get("EMAIL_FROM_NAME") or DEFAULT_FROM_NAME,
+            settings.get("EMAIL_FROM_ADDRESS") or DEFAULT_FROM_ADDRESS,
+        )
+    )
     message["To"] = recipient
     message.set_content(body)
     host = settings.get("LOCAL_SMTP_HOST") or "localhost"

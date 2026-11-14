@@ -566,6 +566,7 @@ Client
 | `STAFF_PHOTO_DIR` | Where the Airtable sync stores resized staff directory photos (relative to `backend/`) | `data/staff_photos` |
 | `CORS_ORIGINS` | Allowed CORS origins | `http://localhost:3000` (production: `https://staff.kalx.berkeley.edu`) |
 | `EMAIL_FROM_ADDRESS` | From address for notification emails | `noreply@kalx.berkeley.edu` |
+| `EMAIL_FROM_NAME` | Display name shown with the From address | `KALX Staff App` |
 | `LOCAL_SMTP_HOST` | Hostname of the local SMTP relay that sends notification emails | `localhost` |
 | `LOCAL_SMTP_PORT` | Port of the local SMTP relay that sends notification emails | `25` |
 | `WEBMASTER_EMAIL` | Recipient for in-app feedback and bug reports | — |

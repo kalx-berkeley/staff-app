@@ -350,6 +350,7 @@ nano ~/staff-app-production/backend/.env
 | `SPINITRON_API_KEY` | Spinitron API key (optional) |
 | `WEBMASTER_EMAIL` | Gets in-app feedback, and the deploy emails |
 | `EMAIL_FROM_ADDRESS` | Optional; defaults to `noreply@kalx.berkeley.edu` |
+| `EMAIL_FROM_NAME` | Optional; defaults to `KALX Staff App` |
 | `SITE_ADMIN_EMAILS` | Optional extra site admins, comma-separated |
 | `WORKFORMS_ENABLED`, `DIRECTORY_ENABLED`, `LEGACY_IMPORT_ENABLED` | `true` or `false` |
 | `FEATURE_BIN_SHEET_ID`, `FEATURE_BIN_SHEET_GID`, `KALX_LIVE_CALENDAR_ID` | Optional; see the maintainers for the values |

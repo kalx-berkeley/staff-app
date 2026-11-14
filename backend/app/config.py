@@ -106,6 +106,8 @@ class Settings(BaseSettings):
 
     # Email notifications via the OS's local SMTP relay
     email_from_address: str = "noreply@kalx.berkeley.edu"
+    # Display name shown with the From address, as "Name <address>"
+    email_from_name: str = "KALX Staff App"
     local_smtp_host: str = "localhost"
     local_smtp_port: int = 25
 

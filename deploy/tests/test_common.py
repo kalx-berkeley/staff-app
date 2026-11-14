@@ -57,7 +57,7 @@ def test_send_email_uses_the_local_relay(home, smtp):
     host, port, message = smtp[0]
     assert (host, port) == ("relay", 25)
     assert message["To"] == "web@example.com"
-    assert message["From"] == "noreply@kalx.berkeley.edu"
+    assert message["From"] == "KALX Staff App <noreply@kalx.berkeley.edu>"
 
 
 def test_send_email_without_a_recipient_sends_nothing(home, smtp):

@@ -4,6 +4,7 @@ import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formataddr
 from typing import TYPE_CHECKING
 
 from app.config import settings
@@ -91,7 +92,7 @@ def _send_via_local_smtp(
         msg = MIMEText(body_text, "plain")
 
     msg["Subject"] = subject
-    msg["From"] = settings.email_from_address
+    msg["From"] = formataddr((settings.email_from_name, settings.email_from_address))
     msg["To"] = to_email
 
     try:
