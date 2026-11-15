@@ -267,3 +267,100 @@ def name_uses(db: Session, directory: NameDirectory) -> list[NameUse]:
                 match = directory.match(name, allow_show=col.allow_show)
             uses.append(NameUse(col, name, rows, match))
     return uses
+
+
+# Columns that store names normalized, so a fix writes the normalized name
+_NORMALIZED_MODELS = (AnalyticsEvent, AnalyticsDailyCount)
+# The unique key of a daily count, apart from its DJ name
+_DAILY_COUNT_KEY = (
+    "day",
+    "event_type",
+    "area",
+    "actor_email",
+    "network",
+    "entity_type",
+    "entity_id",
+    "dimension",
+)
+
+
+def column_by_label(label: str) -> Optional[NameColumn]:
+    """
+    Find a `NAME_COLUMNS` entry by its label, e.g. "passes.given_away_by_dj".
+
+    :param label: The label.
+    :returns: The column, or None.
+    """
+    return next((c for c in NAME_COLUMNS if c.label == label), None)
+
+
+def fix_name(
+    db: Session,
+    old: str,
+    new: str,
+    columns: Optional[Iterable[NameColumn]] = None,
+    show_id: Optional[int] = None,
+) -> dict[str, int]:
+    """
+    Change a DJ name stored as text, in place, without committing.
+
+    Rows match *old* compared normalized, so "dj fooo" also changes "DJ Fooo".
+    Columns that store names normalized (analytics) get *new* normalized. A
+    daily count that would then duplicate another day's count for *new* is
+    added to it and removed.
+
+    :param db: Database session. The caller commits or rolls back.
+    :param old: The name to change.
+    :param new: What to change it to.
+    :param columns: Only these columns; every one in `NAME_COLUMNS` when None.
+    :param show_id: Only rows for this pass giveaway show. Columns without a
+        show (music show DJs, analytics) are then left alone.
+    :returns: Rows changed per column label, leaving out columns with none.
+    :raises ValueError: When either name is blank.
+    """
+    old_key = normalize_dj_name(old)
+    new_text = " ".join(new.split())
+    if not old_key or not new_text:
+        raise ValueError("Names can't be blank")
+
+    changed: dict[str, int] = {}
+    for col in columns if columns is not None else NAME_COLUMNS:
+        model = col.model
+        if show_id is not None and not hasattr(model, "show_id"):
+            continue
+        text = getattr(model, col.column)
+        target = normalize_dj_name(new_text) if model in _NORMALIZED_MODELS else new_text
+        query = db.query(model).filter(text.isnot(None))
+        if show_id is not None:
+            query = query.filter(model.show_id == show_id)
+        values = [
+            v
+            for (v,) in query.with_entities(text).distinct()
+            if normalize_dj_name(v) == old_key and v != target
+        ]
+        if not values:
+            continue
+        rows = query.filter(text.in_(values)).all()
+        for row in rows:
+            if model is AnalyticsDailyCount:
+                twin = (
+                    db.query(AnalyticsDailyCount)
+                    .filter(AnalyticsDailyCount.dj_name == target)
+                    .filter(*(
+                        (
+                            getattr(AnalyticsDailyCount, k).is_(None)
+                            if getattr(row, k) is None
+                            else getattr(AnalyticsDailyCount, k) == getattr(row, k)
+                        )
+                        for k in _DAILY_COUNT_KEY
+                    ))
+                    .first()
+                )
+                if twin is not None:
+                    twin.count += row.count
+                    db.delete(row)
+                    continue
+            setattr(row, col.column, target)
+        db.flush()
+        changed[col.label] = len(rows)
+    return changed
