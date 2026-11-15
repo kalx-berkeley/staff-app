@@ -17,7 +17,10 @@ class LotteryEntry(Base):
     # 'staff' for staff pass entries, 'dj' for on-air pair entries
     entry_type = Column(String, nullable=False)
     staff_id = Column(Integer, ForeignKey("staff.id"), nullable=True, index=True)
+    # DJ entries: the persona entering (null for a talk show entry) and its
+    # name, or the talk show's name
     dj_name = Column(String, nullable=True)
+    persona_id = Column(Integer, nullable=True)
     specialty_show_id = Column(Integer, ForeignKey("specialty_shows.id"), nullable=True)
     assignment_date = Column(Date, nullable=True)
     has_guest = Column(Boolean, nullable=False, default=False, server_default="false")

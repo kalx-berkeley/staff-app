@@ -22,6 +22,9 @@ import type {
   DjSuggestion,
   GenrePreferences,
   GiveawayData,
+  Identity,
+  IdentityChoice,
+  IdentitySchedule,
   JobRunResult,
   LotteryEntryResponse,
   LotteryScheduleItem,
@@ -29,6 +32,7 @@ import type {
   MovieRating,
   MusicBrainzArtist,
   MyAlternateEntry,
+  MyIdentity,
   MyLotteryEntryResponse,
   MySpecialtyShowResponse,
   NotificationPreferences,
@@ -781,18 +785,45 @@ export const passesAPI = {
   },
 
   /**
-   * List upcoming dates (next ~8 weeks) that a DJ or specialty show name is scheduled on-air.
-   *
-   * Used to restrict the pre-assignment date picker to dates the Spinitron
-   * schedule actually backs up.
-   *
-   * @param name - DJ name or specialty show name, exactly as shown in the autocomplete
-   * @returns Promise resolving to an array of YYYY-MM-DD date strings
+   * List what promotions can pre-assign a pass pair to: current staff
+   * members' personas (inactive ones hidden), then the current shows.
    */
-  getPreassignSchedule: async (name: string): Promise<string[]> => {
+  getPreassignIdentities: async (): Promise<Identity[]> => {
     try {
-      const response = await apiClient.get<string[]>('/passes/preassign/schedule', {
-        params: { name },
+      const response = await apiClient.get<Identity[]>('/passes/preassign/identities');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * List what the signed-in staff member can reserve on-air pass pairs for
+   * (their own personas and their shows), each with its schedule.
+   */
+  getMyPreassignIdentities: async (): Promise<MyIdentity[]> => {
+    try {
+      const response = await apiClient.get<MyIdentity[]>('/passes/preassign/my-identities');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * When a persona or show is on the schedule in the next ~8 weeks.
+   *
+   * Used to narrow the pre-assignment date picker, and to warn about a date
+   * the schedule doesn't show it on.
+   *
+   * @param identity - A persona or a show
+   */
+  getPreassignSchedule: async (identity: IdentityChoice): Promise<IdentitySchedule> => {
+    try {
+      const response = await apiClient.get<IdentitySchedule>('/passes/preassign/schedule', {
+        params: identity.persona_id != null
+          ? { persona_id: identity.persona_id }
+          : { specialty_show_id: identity.specialty_show_id },
       });
       return response.data;
     } catch (error) {
@@ -801,16 +832,14 @@ export const passesAPI = {
   },
 
   /**
-   * Get the current or upcoming leave of absence of the DJ named *name*.
+   * Get the current or upcoming leave of absence of the staff member holding a persona.
    *
-   * @param name - DJ name, as typed in the pre-assignment form
-   * @returns Promise resolving to the leave dates, or null for a specialty
-   *   show, an unknown name, or a DJ with no leave on record
+   * @returns Promise resolving to the leave dates, or null when there's none
    */
-  getPreassignLeave: async (name: string): Promise<DjLeave | null> => {
+  getPreassignLeave: async (personaId: number): Promise<DjLeave | null> => {
     try {
       const response = await apiClient.get<DjLeave | null>('/passes/preassign/leave', {
-        params: { name },
+        params: { persona_id: personaId },
       });
       return response.data;
     } catch (error) {
@@ -1372,6 +1401,21 @@ export const specialtyShowsAPI = {
   getUpcomingTitles: async (): Promise<string[]> => {
     try {
       const response = await apiClient.get<string[]>('/specialty-shows/upcoming-titles');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * The personas a music show's DJ editor offers: current staff members'
+   * (inactive ones hidden), plus the show's own DJs.
+   */
+  getDjOptions: async (showId?: number): Promise<Identity[]> => {
+    try {
+      const response = await apiClient.get<Identity[]>('/specialty-shows/dj-options', {
+        params: showId !== undefined ? { show_id: showId } : undefined,
+      });
       return response.data;
     } catch (error) {
       return handleAPIError(error);

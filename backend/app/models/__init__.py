@@ -33,6 +33,7 @@ from .kalx_live_appearance import KalxLiveAppearance
 from .spinitron_show import SpinitronShow
 from .spinitron_playlist import SpinitronPlaylist
 from .spinitron_spin_cache import SpinitronSpinCache
+from .spinitron_persona import SpinitronPersona
 from .dismissed_spin_match import DismissedSpinMatch
 from .workform import Workform, WorkformEntry
 from .workform_airtable_record import WorkformAirtableRecord
@@ -78,6 +79,7 @@ __all__ = [
     "SpinitronShow",
     "SpinitronPlaylist",
     "SpinitronSpinCache",
+    "SpinitronPersona",
     "DismissedSpinMatch",
     "Workform",
     "WorkformEntry",

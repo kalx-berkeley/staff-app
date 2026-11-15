@@ -94,6 +94,15 @@ any release cut after the merge includes it.
 3. **2b: Personas where someone picks them.** Decisions 9–17 and 34, with the
    persona columns on pre-assignments, lottery entries and music show DJs.
    New writes fill both the persona columns and the old text columns.
+   The clean-up was done with the script's `fix` command (correcting stored
+   names in place) rather than mappings, so `dj_name_mappings` is empty.
+   2b's migration fills the new columns on existing rows by matching their
+   names against the personas the database already knows (staff records
+   and the cached schedule), since a migration can't call Spinitron. That
+   covers every staff member's persona, which is all membership and
+   reserving need. Rows it can't match (a persona no staff member holds)
+   stay null until phase 3's migration fills every record. A music show DJ
+   with no persona is kept, and shown as not linked yet, until then.
 4. **3: DJ pages use the schedule.** Decisions 18–29 and the migration
    (decision 31), which also adds the giveaway, attempt and analytics
    columns (decision 33 for historical giveaways). Re-run the script on

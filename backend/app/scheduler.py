@@ -168,6 +168,24 @@ async def sync_dj_shifts():
         db.close()
 
 
+async def sync_spinitron_personas():
+    """
+    Scheduled task to refresh the Spinitron persona names and staff personas'
+    last playlist dates. Runs nightly at 2:15 AM Pacific, after the Airtable
+    staff sync, so new staff members' personas are looked up the same night.
+    """
+    from app.common.services.spinitron_personas import sync_personas
+    from app.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        await sync_personas(db)
+    except Exception as e:
+        logger.error(f"Spinitron persona sync failed: {str(e)}", exc_info=True)
+    finally:
+        db.close()
+
+
 async def roll_up_analytics_events():
     """
     Scheduled task to roll analytics events older than 13 months into daily
@@ -370,6 +388,37 @@ async def bootstrap_spinitron_schedule():
         return
 
     await sync_spinitron_schedule()
+
+
+def bootstrap_spinitron_personas_if_empty():
+    """
+    On startup, sync the Spinitron personas in the background if none are
+    stored yet (a fresh install, or the first start after the table was
+    added), rather than waiting for the nightly run.
+    """
+    if os.getenv("TESTING") == "1":
+        return
+
+    from app.config import settings
+    from app.database import SessionLocal
+    from app.models.spinitron_persona import SpinitronPersona
+
+    if not settings.spinitron_api_key:
+        return
+    db = SessionLocal()
+    try:
+        if db.query(SpinitronPersona.id).first() is not None:
+            return
+    finally:
+        db.close()
+    logger.info("No Spinitron personas stored on startup - syncing in the background")
+    scheduler.add_job(
+        sync_spinitron_personas,
+        trigger=DateTrigger(run_date=datetime.now(timezone.utc)),
+        id="spinitron_persona_bootstrap",
+        name="Sync Spinitron personas (startup)",
+        replace_existing=True,
+    )
 
 
 def _close_automatically(db, show_id: int) -> None:
@@ -690,6 +739,14 @@ def start_scheduler():
 
     # Roll analytics events older than 13 months into daily counts at 4:30 AM
     # Pacific
+    scheduler.add_job(
+        sync_spinitron_personas,
+        trigger=CronTrigger(hour=2, minute=15, timezone=_PT),
+        id="spinitron_persona_sync",
+        name="Sync Spinitron personas and last playlists",
+        replace_existing=True,
+    )
+
     scheduler.add_job(
         roll_up_analytics_events,
         trigger=CronTrigger(hour=4, minute=30, timezone=_PT),

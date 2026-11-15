@@ -3,8 +3,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { renderAndSettle } from '../../test/render';
 import { BrowserRouter } from 'react-router-dom';
 import ShowDetail from './ShowDetail';
-import { showsAPI, passesAPI, alternatesAPI, specialtyShowsAPI } from '../api';
-import type { ShowResponse, PassResponse, AlternateEntry, AlternateQueue } from '../types';
+import { showsAPI, passesAPI, alternatesAPI } from '../api';
+import type { ShowResponse, PassResponse, AlternateEntry, AlternateQueue, MyIdentity } from '../types';
 import type { UserResponse } from '../../common/types';
 
 // Mock the API
@@ -16,7 +16,8 @@ vi.mock('../api', () => ({
     claim: vi.fn(),
     releaseClaim: vi.fn(),
     removePreassignment: vi.fn(),
-    getPreassignSchedule: vi.fn(),
+    getMyPreassignIdentities: vi.fn(),
+    selfPreassign: vi.fn(),
     addGuest: vi.fn(),
     updateGuestName: vi.fn(),
     removeGuest: vi.fn(),
@@ -26,9 +27,6 @@ vi.mock('../api', () => ({
     join: vi.fn(),
     updateMine: vi.fn(),
     leave: vi.fn(),
-  },
-  specialtyShowsAPI: {
-    listMine: vi.fn(),
   },
 }));
 
@@ -157,7 +155,7 @@ describe('Staff ShowDetail', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(specialtyShowsAPI.listMine).mockResolvedValue([]);
+    vi.mocked(passesAPI.getMyPreassignIdentities).mockResolvedValue([]);
     mockUseAuth.mockReturnValue({ user: null, loading: false, error: null, refetchUser: vi.fn() });
   });
 
@@ -1049,15 +1047,12 @@ describe('Staff ShowDetail', () => {
         error: null,
         refetchUser: vi.fn(),
       } as unknown as ReturnType<typeof mockUseAuth>);
-      vi.mocked(specialtyShowsAPI.listMine).mockResolvedValue([
+      vi.mocked(passesAPI.getMyPreassignIdentities).mockResolvedValue([
         {
-          id: 7, name: 'Morning Report', category: 'talk', deleted: false, retired: false,
-          spinitron_shows: [], owner_emails: [], owner_details: [], dj_names: [],
-          staff_member_emails: ['news@example.com'], staff_member_details: [],
-          is_owner: false, is_dj: false, is_staff_member: true,
+          name: 'Morning Report', kind: 'talk', persona_id: null, specialty_show_id: 7,
+          dates: [], talk_show_dates: {},
         },
       ]);
-      vi.mocked(passesAPI.getPreassignSchedule).mockResolvedValue([]);
       vi.mocked(showsAPI.get).mockResolvedValue({
         ...mockShow,
         passes: [{ ...availablePass, id: 3, pass_type: 'pair' }],
@@ -1067,8 +1062,86 @@ describe('Staff ShowDetail', () => {
 
       fireEvent.click(await screen.findByRole('button', { name: 'Reserve for On-Air Giveaway' }));
       expect(await screen.findByDisplayValue('Morning Report (Talk & Info Show)')).toBeInTheDocument();
-      await waitFor(() => expect(passesAPI.getPreassignSchedule).toHaveBeenCalledWith('Morning Report'));
       expect(await screen.findByText(/No scheduled on-air dates found/)).toBeInTheDocument();
+    });
+  });
+
+  describe('Reserving as one of your personas', () => {
+    const loginAsDj = () =>
+      mockUseAuth.mockReturnValue({
+        user: {
+          email: 'wolf@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false,
+          profile: { id: 4, name: 'Wolf', phone: '', dj_name: 'DJ Wolfman, Wolfie', spinitron_ids: [11, 12], is_sublist_dj: true },
+        },
+        loading: false,
+        error: null,
+        refetchUser: vi.fn(),
+      } as unknown as ReturnType<typeof mockUseAuth>);
+
+    const identities: MyIdentity[] = [
+      { name: 'DJ Wolfman', kind: 'persona', persona_id: 11, specialty_show_id: null, dates: ['2099-12-01'], talk_show_dates: {} },
+      { name: 'Wolfie', kind: 'persona', persona_id: 12, specialty_show_id: null, dates: ['2099-12-08'], talk_show_dates: { '2099-12-09': 'Morning Report' } },
+    ];
+
+    const openForm = async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue({
+        ...mockShow,
+        passes: [{ ...availablePass, id: 3, pass_type: 'pair' }],
+      });
+      await renderAndSettle(<BrowserRouter><ShowDetail /></BrowserRouter>);
+      fireEvent.click(await screen.findByRole('button', { name: 'Reserve for On-Air Giveaway' }));
+    };
+
+    it('picks the persona on the schedule for the chosen date', async () => {
+      loginAsDj();
+      vi.mocked(passesAPI.getMyPreassignIdentities).mockResolvedValue(identities);
+      vi.mocked(passesAPI.selfPreassign).mockResolvedValue({
+        ...availablePass, id: 3, pass_type: 'pair', preassigned_dj: 'Wolfie', preassigned_persona_id: 12,
+        preassigned_date: '2099-12-08',
+      });
+
+      await openForm();
+      expect(await screen.findByDisplayValue('DJ Wolfman (my DJ name)')).toBeInTheDocument();
+      fireEvent.change(screen.getByPlaceholderText('MM/DD/YYYY'), { target: { value: '12/08/2099' } });
+
+      expect(await screen.findByDisplayValue('Wolfie (my DJ name)')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() =>
+        expect(passesAPI.selfPreassign).toHaveBeenCalledWith(3, {
+          assignment_date: '2099-12-08',
+          persona_id: 12,
+        }),
+      );
+      expect(await screen.findByText('Pass pre-assigned successfully!')).toBeInTheDocument();
+    });
+
+    it('warns when the chosen persona hosts a Talk & Info Show that day', async () => {
+      loginAsDj();
+      vi.mocked(passesAPI.getMyPreassignIdentities).mockResolvedValue(identities);
+
+      await openForm();
+      fireEvent.change(await screen.findByLabelText('Reserve for:'), { target: { value: 'p:12' } });
+      fireEvent.change(screen.getByPlaceholderText('MM/DD/YYYY'), { target: { value: '12/09/2099' } });
+
+      expect(
+        await screen.findByText(/You host Morning Report \(Talk & Info Show\)/),
+      ).toBeInTheDocument();
+    });
+
+    it("shows a pass promotions pre-assigned to one of your personas as yours", async () => {
+      loginAsDj();
+      vi.mocked(passesAPI.getMyPreassignIdentities).mockResolvedValue(identities);
+      vi.mocked(showsAPI.get).mockResolvedValue({
+        ...mockShow,
+        passes: [{
+          ...availablePass, id: 3, pass_type: 'pair', preassigned_dj: 'Wolfie',
+          preassigned_persona_id: 12, preassigned_date: '2099-12-08',
+        }],
+      });
+
+      await renderAndSettle(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      expect(await screen.findByRole('button', { name: 'Release Reservation' })).toBeInTheDocument();
     });
   });
 });

@@ -17,6 +17,7 @@ from app.models.staff_status import StaffStatus
 from app.models.talk_show_staff import TalkShowStaff
 from app.models.venue import Venue
 from app.pass_giveaway.services.specialty_show_spinitron import specialty_show_ids
+from tests.personas import dj_fields
 
 PROMO = {"X-Forwarded-User": "promo@example.com"}
 NEWS = {"X-Forwarded-User": "news@example.com"}
@@ -150,7 +151,9 @@ def test_each_kind_takes_only_its_own_members(
     client: TestClient, promo, talk_show, db: Session
 ):
     response = client.put(
-        f"/api/specialty-shows/{talk_show.id}", json={"dj_names": ["DJ X"]}, headers=PROMO
+        f"/api/specialty-shows/{talk_show.id}",
+        json={"dj_persona_ids": [123]},
+        headers=PROMO,
     )
     assert response.status_code == 400
     assert response.json()["detail"] == "A Talk & Info Show has staff members, not DJs"
@@ -237,11 +240,16 @@ def test_reserving_under_your_own_name_still_needs_sublist_dj(
 
 def test_music_show_membership_still_needs_sublist_dj(client: TestClient, db: Session):
     dj = _staff(db, "dj@example.com", "Active", "Sublist DJ")
-    dj.dj_name = "DJ Lite"
+    for column, value in dj_fields("DJ Lite").items():
+        setattr(dj, column, value)
     music = SpecialtyShow(name="Take Five")
     db.add(music)
     db.flush()
-    db.add(SpecialtyShowDJ(specialty_show_id=music.id, dj_name="DJ Lite"))
+    db.add(
+        SpecialtyShowDJ(
+            specialty_show_id=music.id, dj_name="DJ Lite", persona_id=dj.spinitron_ids[0]
+        )
+    )
     db.commit()
     show, pair = _show_with_pair(db)
     body = {

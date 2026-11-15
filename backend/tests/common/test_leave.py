@@ -17,6 +17,7 @@ from app.models.staff_pass_alternate import StaffPassAlternate
 from app.models.staff_status import StaffStatus
 from app.models.venue import Venue
 from app.pass_giveaway.services.lottery_service import LotteryService
+from tests.personas import dj_fields, persona_id
 from app.common.services.leave_service import (
     format_leave,
     leave_covers_show,
@@ -46,7 +47,7 @@ def _make_staff(
         phone="555-0000",
         loa_start=loa_start,
         loa_end=loa_end,
-        dj_name=dj_name,
+        **dj_fields(*[n.strip() for n in (dj_name or "").split(",") if n.strip()]),
     )
     db.add(staff)
     db.flush()
@@ -342,28 +343,28 @@ def test_genre_suggestions_label_djs_on_leave_and_sort_them_last(
 
 def test_preassign_leave_lookup(client: TestClient, db: Session, promo):
     today = today_pt()
-    _make_staff(
+    away = _make_staff(
         db,
         "Away",
         loa_start=today,
         loa_end=today + timedelta(days=9),
         dj_name="DJ A, Alt A",
     )
-    _make_staff(db, "Past", loa_end=today - timedelta(days=1), dj_name="DJ P")
+    past = _make_staff(db, "Past", loa_end=today - timedelta(days=1), dj_name="DJ P")
 
-    def lookup(name: str):
+    def lookup(pid: int):
         resp = client.get(
-            "/api/passes/preassign/leave", params={"name": name}, headers=_h(promo)
+            "/api/passes/preassign/leave", params={"persona_id": pid}, headers=_h(promo)
         )
         assert resp.status_code == 200
         return resp.json()
 
-    assert lookup("alt a") == {
+    assert lookup(persona_id(away, "Alt A")) == {
         "loa_start": today.isoformat(),
         "loa_end": (today + timedelta(days=9)).isoformat(),
     }
-    assert lookup("DJ P") is None
-    assert lookup("Nobody") is None
+    assert lookup(persona_id(past, "DJ P")) is None
+    assert lookup(1) is None
 
 
 # ── What staff see ────────────────────────────────────────────────────────────

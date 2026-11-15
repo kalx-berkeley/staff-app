@@ -681,46 +681,33 @@ class PassService:
         )
 
     @staticmethod
-    def find_dj_leave(db: Session, name: str) -> Staff | None:
+    def find_dj_leave(db: Session, persona_id: int) -> Staff | None:
         """
-        Find the staff member behind a DJ name who has a current or upcoming leave.
-
-        Matches the name case-insensitively against each staff member's DJ
-        names (the comma-joined `Staff.dj_name`). Specialty-show titles never
-        match, since a specialty show has several DJs.
+        Find the current staff member holding *persona_id*, if they have a
+        current or upcoming leave of absence.
 
         :param db: Database session.
-        :param name: A DJ name, as typed in the pre-assignment form.
-        :returns: The staff member, or None if no DJ by that name has a leave.
+        :param persona_id: A Spinitron persona ID.
+        :returns: The staff member, or None if no one holding it has a leave.
         """
-        key = name.strip().lower()
-        today = today_pt()
-        candidates = (
-            db.query(Staff)
-            .filter(
-                Staff.dj_name.isnot(None),
-                (Staff.loa_start.isnot(None)) | (Staff.loa_end.isnot(None)),
-            )
-            .all()
-        )
-        for staff in candidates:
-            dj_names = {n.strip().lower() for n in staff.dj_name.split(",")}
-            if key in dj_names and leave_is_current_or_upcoming(staff, today):
-                return staff
+        from app.pass_giveaway.services.identities import persona_holder
+
+        staff = persona_holder(db, persona_id)
+        if staff is not None and leave_is_current_or_upcoming(staff, today_pt()):
+            return staff
         return None
 
     @staticmethod
     def suggest_djs_by_genre(db: Session, show: Show) -> list[dict]:
         """
-        Suggest active Sublist DJs (and specialty shows they belong to) whose genre
-        preferences overlap *show*'s genres, for the "Suggest DJs by genre" pre-assignment
-        flow.
+        Suggest active Sublist DJs' personas (and specialty shows they belong
+        to) whose genre preferences overlap *show*'s genres, for the "Suggest
+        DJs by genre" pre-assignment flow.
 
-        A DJ's `Staff.dj_name` can be a comma-joined list of stage names (same
-        convention as `get_dj_names_for_autocomplete`/self pre-assignment); each
-        name is suggested individually. A specialty show is suggested once, with
-        the union of its member DJs' matched genres, when at least one member has
-        a genre match.
+        Each of a DJ's personas the pickers offer (inactive ones hidden) is
+        suggested on its own. A Specialty Music Show is suggested once, with
+        the union of its member DJs' matched genres, when at least one member
+        has a genre match.
 
         A DJ whose leave of absence overlaps the time between today and the
         show is labeled with their leave dates and sorted after everyone else,
@@ -732,9 +719,7 @@ class PassService:
         """
         from app.auth import _is_sublist_dj
         from app.models.staff_genre_preference import StaffGenrePreference
-        from app.models.specialty_show_dj import (
-            SpecialtyShowDJ,
-        )  # noqa: F401 (via SpecialtyShow.dj_names)
+        from app.pass_giveaway.services.identities import staff_identities
 
         show_genres = {g.lower() for g in show.genre or []}
         if not show_genres:
@@ -743,56 +728,48 @@ class PassService:
         rows = (
             db.query(Staff, StaffGenrePreference)
             .join(StaffGenrePreference, StaffGenrePreference.staff_id == Staff.id)
-            .filter(Staff.dj_name.isnot(None))
+            .filter(Staff.dj_personas.isnot(None))
             .all()
         )
 
-        # Lowercase individual DJ name -> (display name, matched genres, staff).
-        dj_matches: dict[str, tuple[str, set[str], Staff]] = {}
+        today = today_pt()
+        # Persona ID -> matched genres, for the music shows below
+        persona_genres: dict[int, set[str]] = {}
+        suggestions = []
         for staff, prefs in rows:
             if not _is_sublist_dj(staff):
                 continue
             matched = {g.lower() for g in prefs.genres or []} & show_genres
             if not matched:
                 continue
-            for name in staff.dj_name.split(","):
-                name = name.strip()
-                if not name:
-                    continue
-                key = name.lower()
-                if key in dj_matches:
-                    dj_matches[key][1].update(matched)
-                else:
-                    dj_matches[key] = (name, set(matched), staff)
-
-        today = today_pt()
-        suggestions = []
-        for name, genres, staff in dj_matches.values():
-            suggestion = {
-                "name": name,
-                "is_specialty": False,
-                "matched_genres": sorted(genres),
-            }
-            if leave_is_current_or_upcoming(staff, today) and (
+            on_leave = leave_is_current_or_upcoming(staff, today) and (
                 staff.loa_start is None or staff.loa_start <= show.show_date
-            ):
-                suggestion.update(
-                    on_leave=True, loa_start=staff.loa_start, loa_end=staff.loa_end
-                )
-            suggestions.append(suggestion)
+            )
+            for identity in staff_identities(db, staff):
+                persona_genres[identity.persona_id] = matched
+                suggestion = {
+                    "name": identity.name,
+                    "persona_id": identity.persona_id,
+                    "is_specialty": False,
+                    "matched_genres": sorted(matched),
+                }
+                if on_leave:
+                    suggestion.update(
+                        on_leave=True, loa_start=staff.loa_start, loa_end=staff.loa_end
+                    )
+                suggestions.append(suggestion)
 
         specialty_shows = (
             db.query(SpecialtyShow).filter(SpecialtyShow.current_filter()).all()
         )
         for specialty_show in specialty_shows:
             matched_genres: set[str] = set()
-            for member_name in specialty_show.dj_names:
-                entry = dj_matches.get(member_name.strip().lower())
-                if entry:
-                    matched_genres.update(entry[1])
+            for persona_id in specialty_show.dj_persona_ids:
+                matched_genres |= persona_genres.get(persona_id, set())
             if matched_genres:
                 suggestions.append({
                     "name": specialty_show.name,
+                    "specialty_show_id": specialty_show.id,
                     "is_specialty": True,
                     "specialty_category": specialty_show.category,
                     "matched_genres": sorted(matched_genres),
@@ -1389,12 +1366,12 @@ class PassService:
     @staticmethod
     def resolve_dj_or_specialty_name(
         db: Session, name: str
-    ) -> tuple[str, int | None] | None:
+    ) -> tuple[str, int | None, int | None] | None:
         """
-        Match a typed DJ name to a current staff member's DJ name or a current
+        Match a typed DJ name to a current staff member's persona or a current
         specialty show, ignoring case.
 
-        DJ names of current staff (Active or 🆕) are checked first, then
+        Personas of current staff (Active or 🆕) are checked first, then
         specialty show names.
 
         Args:
@@ -1402,27 +1379,30 @@ class PassService:
             name: The name as typed
 
         Returns:
-            (official spelling, specialty show ID or None), or None if nothing matches
+            (official spelling, specialty show ID or None, persona ID or None),
+            or None if nothing matches
         """
         from app.auth import current_staff_filter
+        from app.common.services.spinitron_personas import persona_names, staff_personas
 
-        wanted = name.strip().lower()
+        wanted = " ".join(name.split()).lower()
         if not wanted:
             return None
-        rows = (
-            db.query(Staff.dj_name)
-            .filter(Staff.dj_name.isnot(None), current_staff_filter())
+        staff_rows = (
+            db.query(Staff)
+            .filter(Staff.dj_personas.isnot(None), current_staff_filter())
             .all()
         )
-        for (dj_names,) in rows:
-            for dj_name in dj_names.split(","):
-                if dj_name.strip().lower() == wanted:
-                    return dj_name.strip(), None
+        for staff in staff_rows:
+            for persona in staff_personas(staff):
+                if " ".join(persona["name"].split()).lower() == wanted:
+                    current = persona_names(db, [persona["id"]]).get(persona["id"])
+                    return current or persona["name"], None, persona["id"]
         for specialty in (
             db.query(SpecialtyShow).filter(SpecialtyShow.current_filter()).all()
         ):
             if specialty.name.strip().lower() == wanted:
-                return specialty.name, specialty.id
+                return specialty.name, specialty.id, None
         return None
 
     @staticmethod
@@ -1460,7 +1440,7 @@ class PassService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"‘{dj_name.strip()}’ isn't a known DJ or show name",
             )
-        official_name, specialty_show_id = resolved
+        official_name, specialty_show_id, persona_id = resolved
 
         today = today_pt()
         blocker = PassService.clothespin_blocker(show, today)
@@ -1504,6 +1484,7 @@ class PassService:
                         Pass.preassigned_date: today,
                         Pass.preassigned_by_staff_id: None,
                         Pass.preassigned_specialty_show_id: specialty_show_id,
+                        Pass.preassigned_persona_id: persona_id,
                         Pass.updated_at: datetime.now(timezone.utc),
                     },
                     synchronize_session=False,
@@ -1528,18 +1509,22 @@ class PassService:
         assignment_date: date,
         preassigned_by_staff_id: int | None = None,
         preassigned_specialty_show_id: int | None = None,
+        preassigned_persona_id: int | None = None,
     ) -> Pass:
         """
         Set pre-assignment for a pass pair.
 
-        Records the assigned DJ and date for a pass pair.
+        Records the assigned persona or show, and the date, for a pass pair.
         Only pass pairs can be pre-assigned.
 
         Args:
             db: Database session
             pass_id: Pass ID
-            dj_name: DJ name to assign
+            dj_name: The persona's or show's name
             assignment_date: Date for the assignment
+            preassigned_by_staff_id: Who pre-assigned it
+            preassigned_specialty_show_id: The show, for a show's pass
+            preassigned_persona_id: The persona, for a persona's pass
 
         Returns:
             Updated pass_item
@@ -1591,6 +1576,7 @@ class PassService:
         pass_item.preassigned_date = assignment_date
         pass_item.preassigned_by_staff_id = preassigned_by_staff_id
         pass_item.preassigned_specialty_show_id = preassigned_specialty_show_id
+        pass_item.preassigned_persona_id = preassigned_persona_id
         pass_item.updated_at = datetime.now(timezone.utc)
 
         try:
@@ -1637,6 +1623,7 @@ class PassService:
 
         # Clear pre-assignment
         pass_item.preassigned_dj = None
+        pass_item.preassigned_persona_id = None
         pass_item.preassigned_date = None
         pass_item.preassigned_by_staff_id = None
         pass_item.preassigned_specialty_show_id = None
@@ -1698,6 +1685,7 @@ class PassService:
                 f"DJ '{pass_item.preassigned_dj}', date {pass_item.preassigned_date}"
             )
             pass_item.preassigned_dj = None
+            pass_item.preassigned_persona_id = None
             pass_item.preassigned_date = None
             pass_item.preassigned_by_staff_id = None
             pass_item.preassigned_specialty_show_id = None

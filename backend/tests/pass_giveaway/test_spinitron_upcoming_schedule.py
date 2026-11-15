@@ -1,4 +1,4 @@
-"""Tests for SpinitronUpcomingScheduleService and the preassign-schedule endpoint."""
+"""Tests for SpinitronUpcomingScheduleService and the pre-assignment schedule endpoints."""
 
 from datetime import datetime, timedelta, timezone
 
@@ -7,11 +7,14 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.common.services.spinitron_service import SpinitronShowItem
+from app.models.specialty_show import SpecialtyShow
+from app.models.specialty_show_spinitron_show import SpecialtyShowSpinitronShow
+from app.models.staff import Staff
+from app.models.staff_status import StaffStatus
 from app.pass_giveaway.services.spinitron_upcoming_schedule_service import (
     SpinitronUpcomingScheduleService,
 )
-from app.models.staff import Staff
-from app.models.staff_status import StaffStatus
+from tests.personas import dj_fields
 
 UPCOMING_SERVICE = "app.pass_giveaway.services.spinitron_upcoming_schedule_service"
 PASSES_ROUTER = "app.pass_giveaway.routers.passes"
@@ -22,6 +25,9 @@ PASSES_ROUTER = "app.pass_giveaway.routers.passes"
 # about the UTC/Pacific boundary stay deterministic regardless of when the
 # suite runs.
 _ANCHOR = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+
+WOLFMAN = 1
+NIGHTOWL = 2
 
 
 @pytest.fixture
@@ -39,105 +45,132 @@ def staff_member(db: Session) -> Staff:
 def _show(
     id: int,
     start: datetime,
-    end: datetime,
     persona_id: int | None,
-    title: str | None,
+    title: str | None = None,
 ) -> SpinitronShowItem:
+    """A `/shows` item: *id* is the Spinitron show."""
     return SpinitronShowItem(
-        id=id, start=start, end=end, persona_id=persona_id, title=title
+        id=id,
+        start=start,
+        end=start + timedelta(hours=1),
+        persona_id=persona_id,
+        title=title,
     )
 
 
-def _patch_no_future_playlists(monkeypatch):
-    async def fake_fetch_future_playlists():
-        return []
+def _playlist(
+    id: int, start: datetime, persona_id: int | None, show_id: int | None = None
+) -> SpinitronShowItem:
+    """A future `/playlists` item, belonging to Spinitron show *show_id*."""
+    return SpinitronShowItem(
+        id=id,
+        start=start,
+        end=start + timedelta(hours=1),
+        persona_id=persona_id,
+        title=None,
+        show_id=show_id,
+    )
 
+
+def _patch_schedule(monkeypatch, shows=(), playlists=()):
+    async def fake_fetch_shows(end):
+        return list(shows)
+
+    async def fake_fetch_future_playlists():
+        return list(playlists)
+
+    monkeypatch.setattr(
+        f"{UPCOMING_SERVICE}.SpinitronService.fetch_shows", fake_fetch_shows
+    )
     monkeypatch.setattr(
         f"{UPCOMING_SERVICE}.SpinitronService.fetch_future_playlists",
         fake_fetch_future_playlists,
     )
 
 
-class TestGetDatesForName:
-    async def test_matches_by_dj_name_case_insensitive(self, db: Session, monkeypatch):
-        now = _ANCHOR
-        day1 = now + timedelta(days=3)
-        day2 = now + timedelta(days=10)
-
-        async def fake_fetch_shows(end):
-            return [
-                _show(1, day1, day1 + timedelta(hours=1), 1, "The Howl"),
-                _show(2, day2, day2 + timedelta(hours=1), 1, "The Howl"),
-                _show(3, now, now + timedelta(hours=1), 2, "Sunday Jazz Brunch"),
-            ]
-
-        async def fake_resolve_dj_names(db, shows):
-            return {1: "Wolfman", 2: "Nightowl"}
-
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronService.fetch_shows",
-            fake_fetch_shows,
+def _specialty(db: Session, name: str, spinitron_show_id: int, category="music"):
+    show = SpecialtyShow(name=name, category=category)
+    db.add(show)
+    db.flush()
+    db.add(
+        SpecialtyShowSpinitronShow(
+            specialty_show_id=show.id, spinitron_show_id=spinitron_show_id
         )
-        _patch_no_future_playlists(monkeypatch)
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronScheduleService.resolve_dj_names",
-            fake_resolve_dj_names,
-        )
+    )
+    db.commit()
+    return show
 
-        dates = await SpinitronUpcomingScheduleService.get_dates_for_name(db, "wolfman")
 
-        assert dates == sorted({day1.date().isoformat(), day2.date().isoformat()})
+async def _schedule(db, persona_id=None, specialty_show_id=None):
+    return await SpinitronUpcomingScheduleService.get_identity_schedule(
+        db, persona_id, specialty_show_id
+    )
 
-    async def test_matches_by_exact_specialty_show_title(self, db: Session, monkeypatch):
-        now = _ANCHOR
-        day1 = now + timedelta(days=5)
 
-        async def fake_fetch_shows(end):
-            return [
-                _show(1, day1, day1 + timedelta(hours=1), None, "Sunday Jazz Brunch"),
-            ]
-
-        async def fake_resolve_dj_names(db, shows):
-            return {}
-
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronService.fetch_shows",
-            fake_fetch_shows,
-        )
-        _patch_no_future_playlists(monkeypatch)
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronScheduleService.resolve_dj_names",
-            fake_resolve_dj_names,
+class TestGetIdentitySchedule:
+    async def test_a_personas_dates(self, db: Session, monkeypatch):
+        day1 = _ANCHOR + timedelta(days=3)
+        day2 = _ANCHOR + timedelta(days=10)
+        _patch_schedule(
+            monkeypatch,
+            shows=[
+                _show(100, day1, WOLFMAN),
+                _show(100, day2, WOLFMAN),
+                _show(101, _ANCHOR, NIGHTOWL),
+            ],
         )
 
-        dates = await SpinitronUpcomingScheduleService.get_dates_for_name(
-            db, "Sunday Jazz Brunch"
+        schedule = await _schedule(db, persona_id=WOLFMAN)
+
+        assert schedule == {
+            "dates": [day1.date().isoformat(), day2.date().isoformat()],
+            "talk_show_dates": {},
+        }
+
+    async def test_a_show_is_found_by_its_spinitron_show_not_its_title(
+        self, db: Session, monkeypatch
+    ):
+        brunch = _specialty(db, "Sunday Jazz Brunch", 300)
+        day1 = _ANCHOR + timedelta(days=5)
+        day2 = _ANCHOR + timedelta(days=6)
+        _patch_schedule(
+            monkeypatch,
+            shows=[
+                _show(300, day1, WOLFMAN, "Brunch"),
+                _show(301, day2, None, brunch.name),
+            ],
         )
 
-        assert dates == [day1.date().isoformat()]
+        schedule = await _schedule(db, specialty_show_id=brunch.id)
+
+        assert schedule["dates"] == [day1.date().isoformat()]
+
+    async def test_a_persona_counts_on_its_music_show_days_but_not_its_talk_show_days(
+        self, db: Session, monkeypatch
+    ):
+        _specialty(db, "Take Five", 300)
+        talk = _specialty(db, "Morning Report", 400, category="talk")
+        music_day = _ANCHOR + timedelta(days=1)
+        talk_day = _ANCHOR + timedelta(days=2)
+        _patch_schedule(
+            monkeypatch,
+            playlists=[
+                _playlist(1, music_day, WOLFMAN, show_id=300),
+                _playlist(2, talk_day, WOLFMAN, show_id=400),
+            ],
+        )
+
+        schedule = await _schedule(db, persona_id=WOLFMAN)
+
+        assert schedule == {
+            "dates": [music_day.date().isoformat()],
+            "talk_show_dates": {talk_day.date().isoformat(): talk.name},
+        }
 
     async def test_no_match_returns_empty(self, db: Session, monkeypatch):
-        now = _ANCHOR
+        _patch_schedule(monkeypatch, shows=[_show(100, _ANCHOR, WOLFMAN)])
 
-        async def fake_fetch_shows(end):
-            return [_show(1, now, now + timedelta(hours=1), 1, "The Howl")]
-
-        async def fake_resolve_dj_names(db, shows):
-            return {1: "Wolfman"}
-
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronService.fetch_shows",
-            fake_fetch_shows,
-        )
-        _patch_no_future_playlists(monkeypatch)
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronScheduleService.resolve_dj_names",
-            fake_resolve_dj_names,
-        )
-
-        dates = await SpinitronUpcomingScheduleService.get_dates_for_name(db, "Nightowl")
-
-        assert dates == []
+        assert (await _schedule(db, persona_id=NIGHTOWL))["dates"] == []
 
     async def test_buckets_by_station_local_date_not_utc_date(
         self, db: Session, monkeypatch
@@ -147,291 +180,130 @@ class TestGetDatesForName:
 
         Spinitron gives `start` in UTC. A show airing at 7pm PDT (2am UTC the
         *next* day, since PDT is UTC-7) must still be bucketed under the
-        Pacific calendar date it actually airs on — not the later UTC date —
-        or a DJ with a show later today can look like they have no show
-        until tomorrow.
+        Pacific calendar date it actually airs on.
         """
         # 2026-06-16T02:00:00+00:00 is 2026-06-15 19:00 PDT (7pm Pacific).
-        show_start_utc = datetime(2026, 6, 16, 2, 0, tzinfo=timezone.utc)
+        start = datetime(2026, 6, 16, 2, 0, tzinfo=timezone.utc)
+        _patch_schedule(monkeypatch, shows=[_show(100, start, NIGHTOWL)])
 
-        async def fake_fetch_shows(end):
-            return [
-                _show(
-                    1, show_start_utc, show_start_utc + timedelta(hours=1), 1, "Night Shift"
-                )
-            ]
+        assert (await _schedule(db, persona_id=NIGHTOWL))["dates"] == ["2026-06-15"]
 
-        async def fake_resolve_dj_names(db, shows):
-            return {1: "Nightowl"}
+    async def test_playlist_evening_show_buckets_to_pacific_date_not_utc_date(
+        self, db: Session, monkeypatch
+    ):
+        # 2026-09-15T01:00:00+00:00 is 2026-09-14 18:00 PDT (6pm Pacific).
+        start = datetime(2026, 9, 15, 1, 0, tzinfo=timezone.utc)
+        _patch_schedule(monkeypatch, playlists=[_playlist(1, start, WOLFMAN)])
 
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronService.fetch_shows",
-            fake_fetch_shows,
-        )
-        _patch_no_future_playlists(monkeypatch)
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronScheduleService.resolve_dj_names",
-            fake_resolve_dj_names,
-        )
-
-        dates = await SpinitronUpcomingScheduleService.get_dates_for_name(db, "Nightowl")
-
-        assert dates == ["2026-06-15"]
-
-    async def test_second_call_is_served_from_cache(self, db: Session, monkeypatch):
-        now = _ANCHOR
-        call_count = 0
-
-        async def fake_fetch_shows(end):
-            nonlocal call_count
-            call_count += 1
-            return [_show(1, now, now + timedelta(hours=1), 1, "The Howl")]
-
-        async def fake_resolve_dj_names(db, shows):
-            return {1: "Wolfman"}
-
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronService.fetch_shows",
-            fake_fetch_shows,
-        )
-        _patch_no_future_playlists(monkeypatch)
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronScheduleService.resolve_dj_names",
-            fake_resolve_dj_names,
-        )
-
-        await SpinitronUpcomingScheduleService.get_dates_for_name(db, "Wolfman")
-        await SpinitronUpcomingScheduleService.get_dates_for_name(db, "Wolfman")
-
-        assert call_count == 1
+        assert (await _schedule(db, persona_id=WOLFMAN))["dates"] == ["2026-09-14"]
 
     async def test_matches_via_future_playlist_when_shows_disagrees(
         self, db: Session, monkeypatch
     ):
         """
-        The "Wolfman" scenario from the request: /shows lists a generic
-        placeholder for a slot that a pre-provisioned /playlists entry
-        already has a specific DJ for. The playlist-only match should still
-        count.
+        /shows lists a generic placeholder for a slot that a pre-provisioned
+        /playlists entry already has a specific DJ for. The playlist-only
+        match still counts.
         """
-        now = _ANCHOR
-        day1 = now + timedelta(days=4)
-
-        async def fake_fetch_shows(end):
-            return [_show(1, day1, day1 + timedelta(hours=1), 99, "DJ Trainee")]
-
-        async def fake_fetch_future_playlists():
-            return [_show(2, day1, day1 + timedelta(hours=1), 1, None)]
-
-        async def fake_resolve_dj_names(db, shows):
-            return {99: None, 1: "Wolfman"}
-
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronService.fetch_shows",
-            fake_fetch_shows,
-        )
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronService.fetch_future_playlists",
-            fake_fetch_future_playlists,
-        )
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronScheduleService.resolve_dj_names",
-            fake_resolve_dj_names,
+        day = _ANCHOR + timedelta(days=4)
+        _patch_schedule(
+            monkeypatch,
+            shows=[_show(100, day, 99, "DJ Trainee")],
+            playlists=[_playlist(2, day, WOLFMAN)],
         )
 
-        dates = await SpinitronUpcomingScheduleService.get_dates_for_name(db, "Wolfman")
-
-        assert dates == [day1.date().isoformat()]
-
-    async def test_playlist_evening_show_buckets_to_pacific_date_not_utc_date(
-        self, db: Session, monkeypatch
-    ):
-        """
-        A future-playlist entry airing 6-8pm Pacific must bucket to the
-        Pacific calendar date, not the later UTC date -- an 8pm PDT show is
-        already after midnight UTC. Same boundary as
-        test_buckets_by_station_local_date_not_utc_date, but sourced from a
-        playlist instead of a show.
-        """
-        # 2026-09-15T01:00:00+00:00 is 2026-09-14 18:00 PDT (6pm Pacific).
-        show_start_utc = datetime(2026, 9, 15, 1, 0, tzinfo=timezone.utc)
-        show_end_utc = datetime(2026, 9, 15, 3, 0, tzinfo=timezone.utc)
-
-        async def fake_fetch_shows(end):
-            return []
-
-        async def fake_fetch_future_playlists():
-            return [_show(1, show_start_utc, show_end_utc, 1, None)]
-
-        async def fake_resolve_dj_names(db, shows):
-            return {1: "Wolfman"}
-
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronService.fetch_shows",
-            fake_fetch_shows,
-        )
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronService.fetch_future_playlists",
-            fake_fetch_future_playlists,
-        )
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronScheduleService.resolve_dj_names",
-            fake_resolve_dj_names,
-        )
-
-        dates = await SpinitronUpcomingScheduleService.get_dates_for_name(db, "Wolfman")
-
-        assert dates == ["2026-09-14"]
+        assert (await _schedule(db, persona_id=WOLFMAN))["dates"] == [
+            day.date().isoformat()
+        ]
 
     async def test_future_playlists_beyond_the_window_are_excluded(
         self, db: Session, monkeypatch
     ):
-        # The window filter is computed against the real clock (not
-        # SpinitronUpcomingScheduleService.SCHEDULE_WINDOW_DAYS), so the
-        # "far future" anchor here must be too.
+        # The window filter is computed against the real clock, so the "far
+        # future" anchor here must be too.
         far_future = datetime.now(timezone.utc) + timedelta(days=70)
+        _patch_schedule(monkeypatch, playlists=[_playlist(1, far_future, WOLFMAN)])
+
+        assert (await _schedule(db, persona_id=WOLFMAN))["dates"] == []
+
+    async def test_second_call_is_served_from_cache(self, db: Session, monkeypatch):
+        calls = 0
 
         async def fake_fetch_shows(end):
-            return []
+            nonlocal calls
+            calls += 1
+            return [_show(100, _ANCHOR, WOLFMAN)]
 
-        async def fake_fetch_future_playlists():
-            return [_show(1, far_future, far_future + timedelta(hours=1), 1, None)]
-
-        async def fake_resolve_dj_names(db, shows):
-            return {1: "Wolfman"}
-
+        _patch_schedule(monkeypatch)
         monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronService.fetch_shows",
-            fake_fetch_shows,
-        )
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronService.fetch_future_playlists",
-            fake_fetch_future_playlists,
-        )
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronScheduleService.resolve_dj_names",
-            fake_resolve_dj_names,
+            f"{UPCOMING_SERVICE}.SpinitronService.fetch_shows", fake_fetch_shows
         )
 
-        dates = await SpinitronUpcomingScheduleService.get_dates_for_name(db, "Wolfman")
+        await _schedule(db, persona_id=WOLFMAN)
+        await _schedule(db, persona_id=WOLFMAN)
 
-        assert dates == []
+        assert calls == 1
 
 
-class TestGetNamesForDate:
-    async def test_returns_names_scheduled_on_date(self, db: Session, monkeypatch):
-        now = _ANCHOR
-        day1 = now + timedelta(days=3)
-        day2 = now + timedelta(days=10)
-
-        async def fake_fetch_shows(end):
-            return [
-                _show(1, day1, day1 + timedelta(hours=1), 1, "The Howl"),
-                _show(2, day1, day1 + timedelta(hours=2), None, "Sunday Jazz Brunch"),
-                _show(3, day2, day2 + timedelta(hours=1), 2, "The Hoot"),
-            ]
-
-        async def fake_resolve_dj_names(db, shows):
-            return {1: "Wolfman", 2: "Nightowl"}
-
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronService.fetch_shows",
-            fake_fetch_shows,
-        )
-        _patch_no_future_playlists(monkeypatch)
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronScheduleService.resolve_dj_names",
-            fake_resolve_dj_names,
+class TestGetIdentitiesForDate:
+    async def test_lists_personas_and_shows_on_the_date(self, db: Session, monkeypatch):
+        music = _specialty(db, "Take Five", 300)
+        talk = _specialty(db, "Morning Report", 400, category="talk")
+        day = _ANCHOR + timedelta(days=3)
+        _patch_schedule(
+            monkeypatch,
+            shows=[
+                _show(100, day, WOLFMAN),
+                # A music show: the show, and its DJ's persona
+                _show(300, day + timedelta(hours=2), NIGHTOWL),
+                # A talk show: the show only
+                _show(400, day + timedelta(hours=4), 77),
+                # Neither a show nor a persona
+                _show(500, day + timedelta(hours=6), None, "FREEFORM"),
+                _show(100, day + timedelta(days=7), 55),
+            ],
         )
 
-        names = await SpinitronUpcomingScheduleService.get_names_for_date(
-            db, day1.date().isoformat()
-        )
-
-        assert names == ["Sunday Jazz Brunch", "Wolfman"]
-
-    async def test_leaves_out_non_dj_show_titles(self, db: Session, monkeypatch):
-        """
-        FREEFORM and OVERNIGHTS have no specific DJ behind them, so their
-        titles must not be suggested even when no DJ name resolves.
-        """
-        now = _ANCHOR
-        day = now + timedelta(days=3)
-
-        async def fake_fetch_shows(end):
-            return [
-                _show(1, day, day + timedelta(hours=1), None, "FREEFORM"),
-                _show(2, day, day + timedelta(hours=2), None, "Overnights"),
-                _show(3, day, day + timedelta(hours=3), 1, "FREEFORM"),
-            ]
-
-        async def fake_resolve_dj_names(db, shows):
-            return {1: "Wolfman"}
-
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronService.fetch_shows",
-            fake_fetch_shows,
-        )
-        _patch_no_future_playlists(monkeypatch)
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronScheduleService.resolve_dj_names",
-            fake_resolve_dj_names,
-        )
-
-        names = await SpinitronUpcomingScheduleService.get_names_for_date(
+        found = await SpinitronUpcomingScheduleService.get_identities_for_date(
             db, day.date().isoformat()
         )
 
-        assert names == ["Wolfman"]
-
-    async def test_no_shows_on_date_returns_empty(self, db: Session, monkeypatch):
-        now = _ANCHOR
-
-        async def fake_fetch_shows(end):
-            return [_show(1, now, now + timedelta(hours=1), 1, "The Howl")]
-
-        async def fake_resolve_dj_names(db, shows):
-            return {1: "Wolfman"}
-
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronService.fetch_shows",
-            fake_fetch_shows,
-        )
-        _patch_no_future_playlists(monkeypatch)
-        monkeypatch.setattr(
-            f"{UPCOMING_SERVICE}.SpinitronScheduleService.resolve_dj_names",
-            fake_resolve_dj_names,
-        )
-
-        names = await SpinitronUpcomingScheduleService.get_names_for_date(
-            db, (now + timedelta(days=30)).date().isoformat()
-        )
-
-        assert names == []
+        assert found == [
+            {"persona_id": WOLFMAN, "specialty_show_id": None},
+            {"persona_id": None, "specialty_show_id": music.id},
+            {"persona_id": NIGHTOWL, "specialty_show_id": None},
+            {"persona_id": None, "specialty_show_id": talk.id},
+        ]
 
 
 class TestSuggestByDateEndpoint:
-    def test_returns_matching_names_with_specialty_flag(
+    def test_suggests_staff_personas_and_shows(
         self, client: TestClient, staff_member: Staff, db: Session, monkeypatch
     ):
-        from datetime import datetime as _dt, timezone as _tz
-        from app.models.specialty_show import SpecialtyShow
-
-        specialty = SpecialtyShow(
-            name="Sunday Jazz Brunch",
-            created_at=_dt.now(_tz.utc),
-            updated_at=_dt.now(_tz.utc),
+        dj = Staff(
+            email="wolf@test.com",
+            name="Wolf",
+            phone="",
+            **dj_fields("Wolfman", ids=[WOLFMAN]),
         )
-        db.add(specialty)
+        db.add(dj)
+        db.flush()
+        db.add(StaffStatus(staff_id=dj.id, status="Active"))
         db.commit()
+        brunch = _specialty(db, "Sunday Jazz Brunch", 300)
 
-        async def fake_get_names_for_date(db, date):
+        async def fake_get_identities_for_date(db, date):
             assert date == "2026-09-20"
-            return ["Sunday Jazz Brunch", "Wolfman"]
+            return [
+                {"persona_id": WOLFMAN, "specialty_show_id": None},
+                # No staff member holds this persona
+                {"persona_id": NIGHTOWL, "specialty_show_id": None},
+                {"persona_id": None, "specialty_show_id": brunch.id},
+            ]
 
         monkeypatch.setattr(
-            f"{PASSES_ROUTER}.SpinitronUpcomingScheduleService.get_names_for_date",
-            fake_get_names_for_date,
+            f"{PASSES_ROUTER}.SpinitronUpcomingScheduleService.get_identities_for_date",
+            fake_get_identities_for_date,
         )
 
         response = client.get(
@@ -441,26 +313,12 @@ class TestSuggestByDateEndpoint:
         )
 
         assert response.status_code == 200
-        data = response.json()
-        assert data == [
-            {
-                "name": "Sunday Jazz Brunch",
-                "is_specialty": True,
-                "specialty_category": "music",
-                "matched_genres": [],
-                "on_leave": False,
-                "loa_start": None,
-                "loa_end": None,
-            },
-            {
-                "name": "Wolfman",
-                "is_specialty": False,
-                "specialty_category": None,
-                "matched_genres": [],
-                "on_leave": False,
-                "loa_start": None,
-                "loa_end": None,
-            },
+        assert [
+            (s["name"], s["persona_id"], s["specialty_show_id"], s["specialty_category"])
+            for s in response.json()
+        ] == [
+            ("Sunday Jazz Brunch", None, brunch.id, "music"),
+            ("Wolfman", WOLFMAN, None, None),
         ]
 
     def test_requires_authentication(self, client: TestClient):
@@ -472,28 +330,39 @@ class TestSuggestByDateEndpoint:
 
 
 class TestPreassignScheduleEndpoint:
-    def test_returns_matching_dates(
+    def test_returns_a_personas_schedule(
         self, client: TestClient, staff_member: Staff, monkeypatch
     ):
-        async def fake_get_dates_for_name(db, name):
-            assert name == "Wolfman"
-            return ["2026-09-20", "2026-09-27"]
+        async def fake_get_identity_schedule(db, persona_id, specialty_show_id):
+            assert (persona_id, specialty_show_id) == (WOLFMAN, None)
+            return {"dates": ["2026-09-20"], "talk_show_dates": {"2026-09-27": "News"}}
 
         monkeypatch.setattr(
-            f"{PASSES_ROUTER}.SpinitronUpcomingScheduleService.get_dates_for_name",
-            fake_get_dates_for_name,
+            f"{PASSES_ROUTER}.SpinitronUpcomingScheduleService.get_identity_schedule",
+            fake_get_identity_schedule,
         )
 
         response = client.get(
             "/api/passes/preassign/schedule",
-            params={"name": "Wolfman"},
+            params={"persona_id": WOLFMAN},
             headers={"X-Forwarded-User": staff_member.email},
         )
 
         assert response.status_code == 200
-        assert response.json() == ["2026-09-20", "2026-09-27"]
+        assert response.json() == {
+            "dates": ["2026-09-20"],
+            "talk_show_dates": {"2026-09-27": "News"},
+        }
+
+    def test_needs_exactly_one_identity(self, client: TestClient, staff_member: Staff):
+        headers = {"X-Forwarded-User": staff_member.email}
+        for params in ({}, {"persona_id": 1, "specialty_show_id": 2}):
+            response = client.get(
+                "/api/passes/preassign/schedule", params=params, headers=headers
+            )
+            assert response.status_code == 400
 
     def test_requires_authentication(self, client: TestClient):
-        response = client.get("/api/passes/preassign/schedule", params={"name": "Wolfman"})
+        response = client.get("/api/passes/preassign/schedule", params={"persona_id": 1})
 
         assert response.status_code == 400

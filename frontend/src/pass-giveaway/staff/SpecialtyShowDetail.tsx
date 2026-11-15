@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Navigate, useParams, useNavigate } from 'react-router-dom';
-import { specialtyShowsAPI, autocompleteAPI } from '../api';
+import { specialtyShowsAPI } from '../api';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { PersonAutocomplete, extractPersonEmail } from '../components';
+import { IdentityPicker, PersonAutocomplete, extractPersonEmail } from '../components';
 import { SPECIALTY_SHOW_KINDS, specialtyShowPath } from '../utils';
-import type { SpecialtyShowCategory, SpecialtyShowResponse, SpecialtyShowOwnerInfo } from '../types';
+import type { Identity, SpecialtyShowCategory, SpecialtyShowResponse, SpecialtyShowOwnerInfo } from '../types';
 import type { APIError } from '../../common/types';
 
 interface SpecialtyShowDetailProps {
@@ -46,11 +46,10 @@ const SpecialtyShowDetail = ({ category = 'music' }: SpecialtyShowDetailProps) =
   // Staff members state (talk shows)
   const [memberInput, setMemberInput] = useState('');
 
-  // DJs state (music shows)
-  const [djInput, setDjInput] = useState('');
-  const [djSuggestions, setDjSuggestions] = useState<string[]>([]);
-  const [allDJNames, setAllDJNames] = useState<string[]>([]);
-  const [showDJSuggestions, setShowDJSuggestions] = useState(false);
+  // DJs state (music shows): the persona picked to add, and the personas
+  // that can be added (current staff members')
+  const [djPick, setDjPick] = useState<Identity | null>(null);
+  const [djOptions, setDjOptions] = useState<Identity[]>([]);
   const [djHistory, setDjHistory] = useState<string[]>([]);
 
   const loadShow = useCallback(async () => {
@@ -74,8 +73,8 @@ const SpecialtyShowDetail = ({ category = 'music' }: SpecialtyShowDetailProps) =
     loadShow();
     specialtyShowsAPI.listStaffEmails().then(setStaffOptions).catch(() => {});
     if (category === 'music') {
-      autocompleteAPI.getDJNames().then(setAllDJNames).catch(() => {});
       if (id) {
+        specialtyShowsAPI.getDjOptions(parseInt(id)).then(setDjOptions).catch(() => {});
         specialtyShowsAPI.getDjHistory(parseInt(id)).then(setDjHistory).catch(() => {});
       }
     }
@@ -202,41 +201,35 @@ const SpecialtyShowDetail = ({ category = 'music' }: SpecialtyShowDetailProps) =
     );
   };
 
-  const handleDJInputChange = (value: string) => {
-    setDjInput(value);
-    if (value.trim()) {
-      const filtered = allDJNames.filter((n) => n.toLowerCase().includes(value.toLowerCase()));
-      setDjSuggestions(filtered);
-      setShowDJSuggestions(filtered.length > 0);
-    } else {
-      setDjSuggestions([]);
-      setShowDJSuggestions(false);
-    }
-  };
+  // The show's DJs by persona; an old entry without one can only be removed
+  const djPersonaIds = show
+    ? show.djs.flatMap((d) => (d.persona_id !== null ? [d.persona_id] : []))
+    : [];
 
-  const handleAddDJ = async (name?: string) => {
-    if (!show) return;
-    const djName = (name ?? djInput).trim();
-    if (!djName) return;
-    if (show.dj_names.includes(djName)) {
+  const handleAddDJ = async (persona: Identity | null = djPick) => {
+    if (!show || persona?.persona_id == null) return;
+    if (djPersonaIds.includes(persona.persona_id)) {
       setFormError('That DJ is already in this show.');
       return;
     }
-    setShowDJSuggestions(false);
-    setDjInput('');
+    setDjPick(null);
     await runMutation(
-      () => specialtyShowsAPI.update(show.id, { dj_names: [...show.dj_names, djName] }),
+      () =>
+        specialtyShowsAPI.update(show.id, {
+          dj_persona_ids: [...djPersonaIds, persona.persona_id!],
+        }),
       'DJ added.',
       'Failed to add DJ'
     );
   };
 
-  const handleRemoveDJ = async (djName: string) => {
+  const handleRemoveDJ = async (index: number) => {
     if (!show) return;
+    const removed = show.djs[index].persona_id;
     await runMutation(
       () =>
         specialtyShowsAPI.update(show.id, {
-          dj_names: show.dj_names.filter((n) => n !== djName),
+          dj_persona_ids: djPersonaIds.filter((pid) => pid !== removed),
         }),
       'DJ removed.',
       'Failed to remove DJ'
@@ -249,7 +242,13 @@ const SpecialtyShowDetail = ({ category = 'music' }: SpecialtyShowDetailProps) =
 
   const canEdit = isOwner || user?.role === 'promotions';
 
-  const suggestedHosts = show ? djHistory.filter((name) => !show.dj_names.includes(name)) : [];
+  // Recent hosts of the show's Spinitron show who can be added (by name)
+  const suggestedHosts = djOptions.filter(
+    (o) =>
+      o.persona_id !== null &&
+      !djPersonaIds.includes(o.persona_id) &&
+      djHistory.some((name) => name.toLowerCase() === o.name.toLowerCase())
+  );
 
   if (loading) return <div className="loading">Loading...</div>;
 
@@ -478,13 +477,18 @@ const SpecialtyShowDetail = ({ category = 'music' }: SpecialtyShowDetailProps) =
               DJs listed here can reserve on-air pass pairs for this Specialty Music Show.
             </p>
             <ul className="item-list">
-              {show.dj_names.map((name) => (
-                <li key={name} className="item-list-row">
-                  <span>{name}</span>
-                  {canEdit && (
+              {show.djs.map((dj, index) => (
+                <li key={dj.persona_id ?? `name:${dj.name}`} className="item-list-row">
+                  <span>
+                    {dj.name}
+                    {dj.persona_id === null && (
+                      <span className="field-hint"> (not linked to a Spinitron persona yet)</span>
+                    )}
+                  </span>
+                  {canEdit && dj.persona_id !== null && (
                     <button
                       className="btn-small btn-danger"
-                      onClick={() => handleRemoveDJ(name)}
+                      onClick={() => handleRemoveDJ(index)}
                       disabled={saving}
                     >
                       Remove
@@ -492,71 +496,43 @@ const SpecialtyShowDetail = ({ category = 'music' }: SpecialtyShowDetailProps) =
                   )}
                 </li>
               ))}
-              {show.dj_names.length === 0 && (
+              {show.djs.length === 0 && (
                 <li className="item-list-empty">No DJs yet.</li>
               )}
             </ul>
             {canEdit && suggestedHosts.length > 0 && (
               <div className="field-hint" style={{ marginBottom: '0.5rem' }}>
                 Hosted this show recently:{' '}
-                {suggestedHosts.map((name) => (
+                {suggestedHosts.map((host) => (
                   <button
-                    key={name}
+                    key={host.persona_id}
                     type="button"
                     className="btn-small"
                     style={{ marginRight: '0.25rem', marginBottom: '0.25rem' }}
-                    onClick={() => handleAddDJ(name)}
+                    onClick={() => handleAddDJ(host)}
                     disabled={saving}
                   >
-                    + {name}
+                    + {host.name}
                   </button>
                 ))}
               </div>
             )}
             {canEdit && (
               <div className="add-item-form">
-                <div className="autocomplete-wrapper">
-                  <input
-                    type="text"
-                    value={djInput}
-                    onChange={(e) => handleDJInputChange(e.target.value)}
-                    onFocus={() => { if (djInput.trim()) setShowDJSuggestions(true); }}
-                    onBlur={() => setTimeout(() => setShowDJSuggestions(false), 200)}
-                    placeholder="DJ name"
-                    className="input-text"
-                    disabled={saving}
-                    autoComplete="off"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') { e.preventDefault(); handleAddDJ(); }
-                      else if (e.key === 'Escape') { setShowDJSuggestions(false); }
-                      else if (e.key === 'Tab' && djSuggestions.length === 1) {
-                        e.preventDefault();
-                        setDjInput(djSuggestions[0]);
-                        setShowDJSuggestions(false);
-                      }
-                    }}
-                  />
-                  {showDJSuggestions && djSuggestions.length > 0 && (
-                    <ul className="autocomplete-list">
-                      {djSuggestions.map((name) => (
-                        <li
-                          key={name}
-                          onMouseDown={() => handleAddDJ(name)}
-                          className="autocomplete-item"
-                        >
-                          {name}
-                        </li>
-                      ))}
-                      {djSuggestions.length === 1 && (
-                        <li className="autocomplete-hint">Press Tab to complete</li>
-                      )}
-                    </ul>
+                <IdentityPicker
+                  options={djOptions.filter(
+                    (o) => o.persona_id !== null && !djPersonaIds.includes(o.persona_id)
                   )}
-                </div>
+                  value={djPick}
+                  onChange={setDjPick}
+                  disabled={saving}
+                  placeholder="DJ name"
+                  aria-label="DJ to add"
+                />
                 <button
                   className="btn-small btn-primary"
                   onClick={() => handleAddDJ()}
-                  disabled={saving || !djInput.trim()}
+                  disabled={saving || !djPick}
                 >
                   Add DJ
                 </button>

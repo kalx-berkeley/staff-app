@@ -49,6 +49,7 @@ from app.scheduler import (
     bootstrap_feature_bin_if_stale,
     bootstrap_kalx_live_if_stale,
     bootstrap_spinitron_schedule,
+    bootstrap_spinitron_personas_if_empty,
 )
 from app.auth import check_apache_auth_layer
 from app.config import settings
@@ -196,6 +197,7 @@ async def lifespan(app: FastAPI):
     await bootstrap_feature_bin_if_stale()
     await bootstrap_kalx_live_if_stale()
     await bootstrap_spinitron_schedule()
+    bootstrap_spinitron_personas_if_empty()
     yield
     # Shutdown
     shutdown_scheduler()
