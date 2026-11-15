@@ -6,6 +6,26 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.17.0] - 2026-11-15
+
+### Changed
+
+- Rename Specialty Shows to Specialty Music Shows ([ead58d4](https://github.com/kalx-berkeley/staff-app/commit/ead58d4))
+- Put each winner's name first in the guest list ([8269426](https://github.com/kalx-berkeley/staff-app/commit/8269426))
+- Send notification emails from "KALX Staff App <noreply@kalx.berkeley.edu>" instead of the bare address. `EMAIL_FROM_NAME` sets the name ([75899c5](https://github.com/kalx-berkeley/staff-app/commit/75899c5))
+- Format the winner's phone number as it's typed or pasted on the DJ giveaway form and the DJ's winner edit form ([1176414](https://github.com/kalx-berkeley/staff-app/commit/1176414))
+- Keep the shows lists' scroll position when going back from a show, on the staff, DJ and promotions shows pages ([3862de5](https://github.com/kalx-berkeley/staff-app/commit/3862de5))
+
+### Added
+
+- Add Talk & Info Shows, managed by staff at Staff → Talk & Info Shows. Their members are staff members rather than DJ names, and they can reserve on-air pass pairs and enter the DJ lottery for the show without being Sublist DJs ([ead58d4](https://github.com/kalx-berkeley/staff-app/commit/ead58d4))
+- Show the KALX call-in number on the DJ show page so DJs can announce it ([d141cbf](https://github.com/kalx-berkeley/staff-app/commit/d141cbf))
+- Add `backend/scripts/spinitron_identity_report.py`, which lists the stored DJ names that don't match a Spinitron persona or show, and lets them be mapped by hand to a persona, a show or no one, ahead of the move to Spinitron personas ([27bb7fb](https://github.com/kalx-berkeley/staff-app/commit/27bb7fb))
+
+### Fixed
+
+- Fix the DJ giveaway page's show info overflowing its box in narrow windows ([9271ca9](https://github.com/kalx-berkeley/staff-app/commit/9271ca9))
+
 ## [1.16.0] - 2026-11-14
 
 ### Changed
@@ -444,6 +464,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.17.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.16.0...v1.17.0
 [1.16.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.15.0...v1.16.0
 [1.15.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.14.0...v1.15.0
 [1.14.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.13.3...v1.14.0
