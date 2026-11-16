@@ -400,6 +400,7 @@ def _build_show_response(
             "guest_waiting": pass_item.guest_waiting,
             "guest_position": pass_item.guest_position,
             "preassigned_dj": pass_item.preassigned_dj,
+            "preassigned_persona_id": pass_item.preassigned_persona_id,
             "preassigned_date": pass_item.preassigned_date,
             "preassigned_specialty_show_id": pass_item.preassigned_specialty_show_id,
             "preassigned_specialty_show_name": pass_item.preassigned_specialty_show_name,

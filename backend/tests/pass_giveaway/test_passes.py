@@ -16,6 +16,7 @@ from app.models.specialty_show import SpecialtyShow
 from app.models.specialty_show_dj import SpecialtyShowDJ
 from app.models.staff_genre_preference import StaffGenrePreference
 from app.pass_giveaway.services.pass_service import PassService
+from tests.personas import dj_fields
 
 
 @pytest.fixture
@@ -564,8 +565,22 @@ def test_cannot_claim_closed_show_pass(client, show, staff_member, db):
     assert "closed" in response.json()["detail"].lower()
 
 
+def _add_persona_holder(db: Session, email: str, dj_name: str) -> Staff:
+    """An Active staff member holding one persona named *dj_name*."""
+    staff = Staff(
+        email=email, name=email.split("@")[0], phone="555-0007", **dj_fields(dj_name)
+    )
+    db.add(staff)
+    db.flush()
+    db.add(StaffStatus(staff_id=staff.id, status="Active"))
+    db.commit()
+    db.refresh(staff)
+    return staff
+
+
 def test_set_preassignment(client, show, promotions_staff, db):
-    """Test setting pre-assignment for a pass pair."""
+    """Test setting pre-assignment for a pass pair to a staff member's persona."""
+    holder = _add_persona_holder(db, "djtest@test.com", "DJ Test")
     # Get a pass pair
     pass_item = (
         db.query(Pass)
@@ -579,12 +594,14 @@ def test_set_preassignment(client, show, promotions_staff, db):
 
     response = client.post(
         f"/api/passes/{pass_item.id}/preassign",
-        json={"dj_name": "DJ Test", "assignment_date": "2024-12-30"},
+        json={"persona_id": holder.spinitron_ids[0], "assignment_date": "2024-12-30"},
         headers={"X-Forwarded-User": promotions_staff.email},
     )
     assert response.status_code == 200
     data = response.json()
     assert data["preassigned_dj"] == "DJ Test"
+    assert data["preassigned_persona_id"] == holder.spinitron_ids[0]
+    assert data["preassigned_specialty_show_id"] is None
     assert data["preassigned_date"] == "2024-12-30"
     assert data["status"] == "available"  # Still available
 
@@ -637,26 +654,23 @@ def test_remove_preassignment_uses_impersonated_identity(
         )
         .first()
     )
-    client.post(
-        f"/api/passes/{pass_item.id}/preassign",
-        json={"dj_name": "DJ Match", "assignment_date": "2024-12-30"},
-        headers={"X-Forwarded-User": promotions_staff.email},
-    )
-
-    # The real user is a plain staff member whose own name doesn't match the
-    # pre-assigned DJ — removal would be forbidden as themselves.
+    # The real user is a plain staff member who doesn't hold the pre-assigned
+    # persona — removal would be forbidden as themselves.
     real_staff = Staff(email="real@test.com", name="Real Staff", phone="555-0005")
     db.add(real_staff)
     db.flush()
     db.add(StaffStatus(staff_id=real_staff.id, status="Active"))
 
-    # The impersonated staff member's dj_name matches the pre-assigned DJ.
-    impersonated_staff = Staff(
-        email="imp@test.com", name="Imp Staff", phone="555-0006", dj_name="DJ Match"
+    # The impersonated staff member holds the pre-assigned persona.
+    impersonated_staff = _add_persona_holder(db, "imp@test.com", "DJ Match")
+    client.post(
+        f"/api/passes/{pass_item.id}/preassign",
+        json={
+            "persona_id": impersonated_staff.spinitron_ids[0],
+            "assignment_date": "2024-12-30",
+        },
+        headers={"X-Forwarded-User": promotions_staff.email},
     )
-    db.add(impersonated_staff)
-    db.flush()
-    db.add(StaffStatus(staff_id=impersonated_staff.id, status="Active"))
 
     db.add(
         ImpersonationSession(real_email="real@test.com", impersonated_email="imp@test.com")
@@ -685,9 +699,10 @@ def test_cannot_preassign_staff_pass(client, show, promotions_staff, db):
         .first()
     )
 
+    holder = _add_persona_holder(db, "djtest@test.com", "DJ Test")
     response = client.post(
         f"/api/passes/{pass_item.id}/preassign",
-        json={"dj_name": "DJ Test", "assignment_date": "2024-12-30"},
+        json={"persona_id": holder.spinitron_ids[0], "assignment_date": "2024-12-30"},
         headers={"X-Forwarded-User": promotions_staff.email},
     )
     assert response.status_code == 400
@@ -1198,7 +1213,7 @@ def test_release_winner_no_winner(client, show, promotions_staff, db):
 
 def _make_sublist_dj(db: Session, email: str, dj_name: str, genres: list[str]) -> Staff:
     """Create an active Sublist DJ staff member with the given genre preferences."""
-    staff = Staff(email=email, name=dj_name, phone="555-0003", dj_name=dj_name)
+    staff = Staff(email=email, name=dj_name, phone="555-0003", **dj_fields(dj_name))
     db.add(staff)
     db.flush()
     db.add(StaffStatus(staff_id=staff.id, status="Active"))
@@ -1217,12 +1232,17 @@ def test_suggest_by_genre_matches_sublist_dj_and_specialty_show(
     show.genre = ["Rock", "Blues"]
     db.commit()
 
-    _make_sublist_dj(db, "wolfman@test.com", "Wolfman", ["rock", "hiphop"])
+    wolfman = _make_sublist_dj(db, "wolfman@test.com", "Wolfman", ["rock", "hiphop"])
+    wolfman_id = wolfman.spinitron_ids[0]
 
     specialty = SpecialtyShow(name="Sunday Jazz Brunch")
     db.add(specialty)
     db.flush()
-    db.add(SpecialtyShowDJ(specialty_show_id=specialty.id, dj_name="Wolfman"))
+    db.add(
+        SpecialtyShowDJ(
+            specialty_show_id=specialty.id, dj_name="Wolfman", persona_id=wolfman_id
+        )
+    )
     db.commit()
 
     response = client.get(
@@ -1236,6 +1256,8 @@ def test_suggest_by_genre_matches_sublist_dj_and_specialty_show(
     assert data == [
         {
             "name": "Sunday Jazz Brunch",
+            "persona_id": None,
+            "specialty_show_id": specialty.id,
             "is_specialty": True,
             "specialty_category": "music",
             "matched_genres": ["rock"],
@@ -1245,6 +1267,8 @@ def test_suggest_by_genre_matches_sublist_dj_and_specialty_show(
         },
         {
             "name": "Wolfman",
+            "persona_id": wolfman_id,
+            "specialty_show_id": None,
             "is_specialty": False,
             "specialty_category": None,
             "matched_genres": ["rock"],

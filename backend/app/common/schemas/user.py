@@ -15,6 +15,8 @@ class PromotionsStaffResponse(BaseModel):
     name: str
     phone: str
     dj_name: str | None = None
+    # Spinitron persona IDs linked in Airtable
+    spinitron_ids: list[int] | None = None
     is_sublist_dj: bool = False
     # Leave of absence, inclusive; either may be None (see leave_service)
     loa_start: date | None = None
@@ -31,6 +33,8 @@ class StaffResponse(BaseModel):
     name: str
     phone: str
     dj_name: str | None = None
+    # Spinitron persona IDs linked in Airtable
+    spinitron_ids: list[int] | None = None
     is_sublist_dj: bool = False
     # Leave of absence, inclusive; either may be None (see leave_service)
     loa_start: date | None = None

@@ -139,6 +139,7 @@ class LotteryService:
         dj_name: str,
         assignment_date: date,
         specialty_show_id: int | None = None,
+        persona_id: int | None = None,
     ) -> LotteryEntry:
         """Create or update a DJ's lottery entry for a show."""
         show = db.query(Show).filter(Show.id == show_id).first()
@@ -171,6 +172,7 @@ class LotteryService:
         now = datetime.now(timezone.utc)
         if existing:
             existing.dj_name = dj_name
+            existing.persona_id = persona_id
             existing.specialty_show_id = specialty_show_id
             existing.assignment_date = assignment_date
             existing.updated_at = now
@@ -183,6 +185,7 @@ class LotteryService:
             entry_type="dj",
             staff_id=staff_id,
             dj_name=dj_name,
+            persona_id=persona_id,
             specialty_show_id=specialty_show_id,
             assignment_date=assignment_date,
             status="pending",
@@ -779,9 +782,11 @@ class LotteryService:
             if entry.specialty_show_id and entry.specialty_show:
                 pair_pass.preassigned_dj = entry.specialty_show.name
                 pair_pass.preassigned_specialty_show_id = entry.specialty_show_id
+                pair_pass.preassigned_persona_id = None
             else:
                 pair_pass.preassigned_dj = entry.dj_name
                 pair_pass.preassigned_specialty_show_id = None
+                pair_pass.preassigned_persona_id = entry.persona_id
             pair_pass.preassigned_date = entry.assignment_date
             pair_pass.preassigned_by_staff_id = entry.staff_id
             pair_pass.updated_at = now

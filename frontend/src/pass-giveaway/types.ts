@@ -20,8 +20,8 @@ export interface SpecialtyShowCreate {
 export interface SpecialtyShowUpdate {
   name?: string;
   owner_emails?: string[] | null;
-  // Music shows only
-  dj_names?: string[] | null;
+  // Music shows only: the DJs' Spinitron persona IDs
+  dj_persona_ids?: number[] | null;
   // Talk shows only
   staff_member_emails?: string[] | null;
   // Replaces the show's Spinitron shows (null = no change)
@@ -33,6 +33,41 @@ export interface SpinitronShowInfo {
   id: number;
   title: string | null;
   url: string;
+}
+
+/** One DJ of a Specialty Music Show. persona_id is null only for old entries. */
+export interface SpecialtyShowDJInfo {
+  persona_id: number | null;
+  name: string;
+}
+
+/**
+ * Who a pass pair can be pre-assigned to: a Spinitron persona (of a current
+ * staff member), or a Specialty Music Show or Talk & Info Show.
+ */
+export interface Identity {
+  name: string;
+  kind: 'persona' | SpecialtyShowCategory;
+  persona_id: number | null;
+  specialty_show_id: number | null;
+  // Personas: the staff member who holds it
+  staff_name?: string | null;
+}
+
+/** When an identity is on air in the next ~8 weeks (YYYY-MM-DD dates). */
+export interface IdentitySchedule {
+  dates: string[];
+  // Personas only: days it hosts a Talk & Info Show instead, by show name
+  talk_show_dates: Record<string, string>;
+}
+
+/** One of the signed-in staff member's identities, with its schedule. */
+export type MyIdentity = Identity & IdentitySchedule;
+
+/** A persona or a show: exactly one of the two IDs is set. */
+export interface IdentityChoice {
+  persona_id?: number | null;
+  specialty_show_id?: number | null;
 }
 
 export interface SpecialtyShowOwnerInfo {
@@ -50,8 +85,8 @@ export interface SpecialtyShowResponse {
   spinitron_shows: SpinitronShowInfo[];
   owner_emails: string[];
   owner_details: SpecialtyShowOwnerInfo[];
-  // Music shows' DJs
-  dj_names: string[];
+  // Music shows' DJs (personas), with their current names
+  djs: SpecialtyShowDJInfo[];
   // Talk shows' staff members
   staff_member_emails: string[];
   staff_member_details: SpecialtyShowOwnerInfo[];
@@ -510,6 +545,7 @@ export interface LotteryEntryResponse {
   staff_id: number | null;
   staff_name?: string | null;
   dj_name: string | null;
+  persona_id?: number | null;
   specialty_show_id?: number | null;
   assignment_date: string | null;
   has_guest: boolean;
@@ -612,7 +648,8 @@ export interface StaffLotteryEntryCreate {
 export interface DJLotteryEntryCreate {
   assignment_date: string;
   specialty_show_id?: number | null;
-  dj_name_override?: string | null;
+  // One of your own personas, when not entering for a show
+  persona_id?: number | null;
 }
 
 export interface AffectedStaffMember {
@@ -788,7 +825,9 @@ export interface PassResponse {
   guest_position?: number | null;
 
   // For pre-assigned pairs
+  // The persona's or show's name
   preassigned_dj: string | null;
+  preassigned_persona_id?: number | null;
   preassigned_date: string | null; // ISO date string
   preassigned_specialty_show_id: number | null;
   preassigned_specialty_show_name: string | null;
@@ -806,15 +845,15 @@ export interface ClaimData {
   guest_fallback?: GuestFallback;
 }
 
-export interface PreAssignmentData {
-  dj_name: string;
+export interface PreAssignmentData extends IdentityChoice {
   assignment_date: string; // ISO date string
 }
 
 export interface SelfPreAssignmentData {
   assignment_date: string; // ISO date string
   specialty_show_id?: number | null;
-  dj_name_override?: string | null;
+  // One of your own personas, when not reserving for a show
+  persona_id?: number | null;
 }
 
 export interface WinnerReleaseData {
@@ -886,6 +925,8 @@ export interface GenrePreferences {
 // DJ pre-assignment suggestions
 export interface DjSuggestion {
   name: string;
+  persona_id?: number | null;
+  specialty_show_id?: number | null;
   // A Specialty Music Show or Talk & Info Show rather than a DJ
   is_specialty: boolean;
   specialty_category?: SpecialtyShowCategory | null;

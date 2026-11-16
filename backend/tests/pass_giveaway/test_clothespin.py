@@ -14,6 +14,7 @@ from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
 from app.models.staff_status import StaffStatus
 from app.models.venue import Venue
+from tests.personas import dj_fields
 
 DJ_STUDIO = {"X-Forwarded-For": "192.168.1.100"}  # within default dj_studio_network
 
@@ -26,7 +27,10 @@ def _add_staff(
     department: str | None = None,
 ) -> Staff:
     """Create a staff member with the given statuses."""
-    staff = Staff(email=email, name=email.split("@")[0], phone="555-0100", dj_name=dj_name)
+    names = [n.strip() for n in (dj_name or "").split(",") if n.strip()]
+    staff = Staff(
+        email=email, name=email.split("@")[0], phone="555-0100", **dj_fields(*names)
+    )
     db.add(staff)
     db.flush()
     for s in statuses:

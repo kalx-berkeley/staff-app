@@ -9,7 +9,10 @@ app/pass_giveaway/services/dj_name_matching.py.
 
 A name that can't be matched automatically (a typo, a name two personas
 share, a placeholder like "Unknown") is fixed by mapping it by hand. A
-mapping applies to every row with that name, in every table.
+mapping applies to every row with that name, in every table. A mistake can
+instead be corrected where it's stored with `fix`, which changes the name in
+every table (or only the --column or --show given). It shows what it would
+change and asks first, and records the change in the audit log.
 
 Run from the backend/ directory with DATABASE_URL pointed at the target
 database. It reads Spinitron's persona directory with SPINITRON_API_KEY
@@ -23,6 +26,9 @@ database already knows.
     python scripts/spinitron_identity_report.py map "Unknown" --unattributed
     python scripts/spinitron_identity_report.py unmap "DJ Fooo"
     python scripts/spinitron_identity_report.py mappings        # list mappings
+    python scripts/spinitron_identity_report.py fix "DJ Fooo" "DJ Foo"
+    python scripts/spinitron_identity_report.py fix "DJ Fooo" "DJ Foo" --show 12 \\
+        --column passes.given_away_by_dj --by you@example.com
 
 The report exits with status 1 while any name is unmatched or ambiguous, and
 0 once everything matches.
@@ -33,21 +39,39 @@ import asyncio
 import sys
 from collections import defaultdict
 from pathlib import Path
+from typing import Optional
+
+from sqlalchemy import func
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import app.models  # noqa: E402,F401  (registers every table on Base.metadata)
+from app.common.areas import PASS_GIVEAWAY_AREA  # noqa: E402
+from app.common.services.audit_service import log_event  # noqa: E402
 from app.common.services.spinitron_service import cached_persona_names  # noqa: E402
 from app.common.services.tracking_service import normalize_dj_name  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
 from app.models.dj_name_mapping import DjNameMapping  # noqa: E402
+from app.models.show import Show  # noqa: E402
 from app.pass_giveaway.services.dj_name_matching import (  # noqa: E402
     AMBIGUOUS,
     UNMATCHED,
+    NAME_COLUMNS,
+    NameColumn,
     NameDirectory,
     build_directory,
+    column_by_label,
+    fix_name,
     name_uses,
 )
+
+# Columns whose rows belong to a pass giveaway show, so the report can say
+# which shows a name to fix was used for
+SHOW_COLUMNS = {
+    "passes.preassigned_dj",
+    "passes.given_away_by_dj",
+    "on_air_winners.given_away_by_dj",
+}
 
 
 def _directory(db, offline: bool) -> NameDirectory:
@@ -81,6 +105,61 @@ def _describe(directory: NameDirectory, persona_id, show_id) -> str:
         name = directory.persona_names.get(persona_id, "name unknown")
         return f"persona #{persona_id} ({name})"
     return "no one (unattributed)"
+
+
+def _shows_for(
+    db,
+    column: NameColumn,
+    names: list[str],
+    unmatched_only: bool = True,
+    show_id: Optional[int] = None,
+) -> list[str]:
+    """
+    Describe the shows whose rows in *column* hold one of *names* exactly.
+
+    :param db: Database session.
+    :param column: One of the `SHOW_COLUMNS`.
+    :param names: The names as stored.
+    :param unmatched_only: Leave out rows whose show ID column is set, which
+        already count as matched.
+    :param show_id: Only this show.
+    :returns: One line per show, oldest first, e.g. "2026-12-01 Band (show #3) ×2".
+    """
+    model = column.model
+    query = (
+        db.query(Show.id, Show.event_name, Show.show_date, func.count())
+        .join(model, model.show_id == Show.id)
+        .filter(getattr(model, column.column).in_(names))
+    )
+    if unmatched_only and column.show_id_column:
+        query = query.filter(getattr(model, column.show_id_column).is_(None))
+    if show_id is not None:
+        query = query.filter(Show.id == show_id)
+    rows = query.group_by(Show.id, Show.event_name, Show.show_date).order_by(
+        Show.show_date, Show.id
+    )
+    return [
+        f"{show_date} {event_name} (show #{show_id}) ×{count}"
+        for show_id, event_name, show_date, count in rows
+    ]
+
+
+def _spellings(db, column: NameColumn, name: str) -> list[str]:
+    """
+    Every value stored in *column* that is *name*, compared normalized.
+
+    :param db: Database session.
+    :param column: The column.
+    :param name: The name.
+    :returns: The values as stored.
+    """
+    key = normalize_dj_name(name)
+    text = getattr(column.model, column.column)
+    return [
+        v
+        for (v,) in db.query(text).filter(text.isnot(None)).distinct()
+        if normalize_dj_name(v) == key
+    ]
 
 
 def report(db, offline: bool, show_all: bool) -> int:
@@ -122,6 +201,15 @@ def report(db, offline: bool, show_all: bool) -> int:
             label = "AMBIGUOUS" if match.kind == AMBIGUOUS else "UNMATCHED"
             print(f'  "{group[0].name}"  [{label}]  {where}')
             print(f"      {match.reason}")
+            # The same name with different capitalization is a separate use
+            shows: dict[str, list[str]] = defaultdict(list)
+            for use in group:
+                if use.column.label in SHOW_COLUMNS:
+                    shows[use.column.label] += _shows_for(db, use.column, [use.name])
+            for label, lines in shows.items():
+                print(f"      {label} for:")
+                for line in lines:
+                    print(f"        {line}")
             if match.kind == UNMATCHED:
                 close = directory.suggestions(group[0].name)
                 if close:
@@ -215,6 +303,83 @@ def list_mappings(db) -> int:
     return 0
 
 
+def fix(db, args: argparse.Namespace) -> int:
+    """
+    Change a stored DJ name in place, after showing what changes and asking.
+
+    :param db: Database session.
+    :param args: Parsed arguments.
+    :returns: Exit status.
+    """
+    columns = None
+    if args.column:
+        columns = [column_by_label(label) for label in args.column]
+        if None in columns:
+            known = ", ".join(c.label for c in NAME_COLUMNS)
+            print(f"Unknown column. The columns are: {known}")
+            return 2
+    if args.show is not None and db.get(Show, args.show) is None:
+        print(f"There's no pass giveaway show #{args.show}.")
+        return 2
+
+    # Which shows the rows belong to, read before the names change
+    before: dict[str, list[str]] = defaultdict(list)
+    for col in columns or NAME_COLUMNS:
+        if col.label in SHOW_COLUMNS:
+            before[col.label] = _shows_for(
+                db,
+                col,
+                _spellings(db, col, args.old),
+                unmatched_only=False,
+                show_id=args.show,
+            )
+    try:
+        changed = fix_name(db, args.old, args.new, columns, args.show)
+    except ValueError as e:
+        print(e)
+        return 2
+    if not changed:
+        db.rollback()
+        print(f'No rows hold "{args.old}" (or they already say "{args.new}").')
+        return 2
+
+    print(f'Change "{args.old}" to "{args.new}" in:')
+    for label, rows in changed.items():
+        print(f"  {label} ×{rows}")
+        for line in before.get(label, []):
+            print(f"      {line}")
+    directory = _directory(db, args.offline)
+    match = directory.match(args.new)
+    if match.resolved:
+        desc = _describe(directory, match.persona_id, match.specialty_show_id)
+        print(f'"{args.new}" matches {desc}.')
+    else:
+        print(f'Note: "{args.new}" doesn\'t match either: {match.reason}.')
+
+    if not args.yes and input("Make these changes? [y/N] ").strip().lower() != "y":
+        db.rollback()
+        print("Nothing changed.")
+        return 1
+    db.commit()
+    log_event(
+        db,
+        "dj_name_fixed",
+        actor_email=args.by,
+        actor_role="system",
+        details={
+            "old": args.old,
+            "new": args.new,
+            "show_id": args.show,
+            "rows": changed,
+            "source": "scripts/spinitron_identity_report.py",
+        },
+        area=PASS_GIVEAWAY_AREA,
+    )
+    total = sum(changed.values())
+    print(f"Changed {total} row{'' if total == 1 else 's'}.")
+    return 0
+
+
 def main() -> int:
     """Parse arguments and run the chosen command."""
     parser = argparse.ArgumentParser(
@@ -238,6 +403,17 @@ def main() -> int:
     unmap_cmd = commands.add_parser("unmap", help="Remove a name's mapping")
     unmap_cmd.add_argument("name")
     commands.add_parser("mappings", help="List the mappings")
+    fix_cmd = commands.add_parser("fix", help="Correct a name where it's stored")
+    fix_cmd.add_argument("old", help="The name as stored (case doesn't matter)")
+    fix_cmd.add_argument("new", help="The corrected name")
+    fix_cmd.add_argument(
+        "--column",
+        action="append",
+        help="Only this column, e.g. passes.given_away_by_dj (repeatable)",
+    )
+    fix_cmd.add_argument("--show", type=int, help="Only rows for this pass giveaway show")
+    fix_cmd.add_argument("--by", help="Who is making the change, for the audit log")
+    fix_cmd.add_argument("--yes", action="store_true", help="Don't ask first")
     args = parser.parse_args()
 
     db = SessionLocal()
@@ -248,6 +424,8 @@ def main() -> int:
             return remove_mapping(db, args.name)
         if args.command == "mappings":
             return list_mappings(db)
+        if args.command == "fix":
+            return fix(db, args)
         return report(db, args.offline, args.all)
     finally:
         db.close()

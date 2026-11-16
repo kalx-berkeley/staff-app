@@ -25,10 +25,7 @@ from app.pass_giveaway.schemas.lottery import (
 )
 from app.common.services import audit_service
 from app.pass_giveaway.services.lottery_service import LotteryService
-from app.pass_giveaway.services.specialty_show_membership import (
-    require_can_reserve_for,
-    require_sublist_dj,
-)
+from app.pass_giveaway.services.identities import resolve_reservation
 from app.pass_giveaway.guest_redaction import GuestRedactingRoute
 
 logger = logging.getLogger(__name__)
@@ -206,53 +203,16 @@ def enter_dj_lottery(
     db: Session = Depends(get_db),
 ):
     """
-    Enter the DJ pass-pair lottery for a show: under your own DJ name or for a
-    Specialty Music Show (Sublist DJs only), or for a Talk & Info Show you're
-    a staff member of (any current staff).
+    Enter the DJ pass-pair lottery for a show: as one of your own personas or
+    for a Specialty Music Show (Sublist DJs only), or for a Talk & Info Show
+    you're a staff member of (any current staff).
     """
-    from fastapi import HTTPException
-    from app.models.specialty_show import SpecialtyShow
-
-    specialty_show = None
-    if entry_data.specialty_show_id is not None:
-        specialty_show = (
-            db.query(SpecialtyShow)
-            .filter(
-                SpecialtyShow.id == entry_data.specialty_show_id,
-                SpecialtyShow.current_filter(),
-            )
-            .first()
-        )
-        if not specialty_show:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Show not found",
-            )
-
-    if specialty_show and specialty_show.is_talk:
-        # A talk show's entry is under the show's name; its staff members
-        # needn't be DJs.
-        require_can_reserve_for(db, specialty_show, staff)
-        dj_name = specialty_show.name
-    else:
-        if not staff.dj_name:
-            require_sublist_dj(staff)
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No DJ name is set on your profile. Contact promotions staff.",
-            )
-        dj_name_parts = [n.strip() for n in staff.dj_name.split(",")]
-
-        if entry_data.dj_name_override:
-            if entry_data.dj_name_override not in dj_name_parts:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="dj_name_override must be one of your registered DJ names",
-                )
-            dj_name = entry_data.dj_name_override
-        else:
-            dj_name = dj_name_parts[0]
-        require_can_reserve_for(db, specialty_show, staff)
+    reservation = resolve_reservation(
+        db, staff, entry_data.persona_id, entry_data.specialty_show_id
+    )
+    specialty_show = reservation.show
+    # A talk show's entry is under the show's name; any other under the persona's
+    dj_name = reservation.persona_name or reservation.name
 
     entry = LotteryService.enter_dj_lottery(
         db,
@@ -261,8 +221,14 @@ def enter_dj_lottery(
         dj_name=dj_name,
         assignment_date=entry_data.assignment_date,
         specialty_show_id=specialty_show.id if specialty_show else None,
+        persona_id=reservation.persona_id,
     )
-    audit_details: dict = {"show_id": show_id, "entry_type": "dj", "dj_name": dj_name}
+    audit_details: dict = {
+        "show_id": show_id,
+        "entry_type": "dj",
+        "dj_name": dj_name,
+        "persona_id": reservation.persona_id,
+    }
     if specialty_show:
         audit_details["specialty_show_id"] = specialty_show.id
         audit_details["specialty_show_name"] = specialty_show.name

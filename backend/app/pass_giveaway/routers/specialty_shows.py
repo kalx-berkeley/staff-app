@@ -35,7 +35,12 @@ from app.auth import (
 from app.models.staff import Staff
 from app.models.specialty_show import SpecialtyShow
 from app.models.talk_show_staff import TalkShowStaff
-from app.pass_giveaway.services.specialty_show_membership import dj_name_parts
+from app.pass_giveaway.schemas.pass_schema import Identity
+from app.pass_giveaway.services.identities import (
+    staff_persona_identities,
+    staff_persona_name,
+)
+from app.pass_giveaway.services.specialty_show_membership import dj_show_ids as _dj_show_ids
 from app.models.specialty_show_owner import SpecialtyShowOwner
 from app.models.specialty_show_dj import SpecialtyShowDJ
 from app.pass_giveaway.guest_redaction import GuestRedactingRoute
@@ -76,15 +81,34 @@ def _sync_owners(db: Session, show: SpecialtyShow, owner_emails: list[str]) -> N
             db.add(SpecialtyShowOwner(specialty_show_id=show.id, staff_id=staff_id))
 
 
-def _sync_djs(db: Session, show: SpecialtyShow, dj_names: list[str]) -> None:
-    """Replace the DJ list for a specialty show."""
+def _sync_djs(db: Session, show: SpecialtyShow, persona_ids: list[int]) -> None:
+    """
+    Replace a music show's DJs with these personas.
+
+    A new DJ must be a persona linked to a current staff member. DJs already
+    on the show can stay whoever holds them now. DJs with no persona (old
+    names nothing matched, until phase 3 of the Spinitron identity plan fills
+    them in) are kept, since a persona list can't name them.
+
+    :raises HTTPException: 400 for a persona that can't be added.
+    """
+    existing = {d.persona_id: d for d in show.djs if d.persona_id is not None}
+    wanted: list[int] = []
+    for persona_id in persona_ids:
+        if persona_id not in wanted:
+            wanted.append(persona_id)
+    added = {
+        persona_id: staff_persona_name(db, persona_id)
+        for persona_id in wanted
+        if persona_id not in existing
+    }
     for dj in list(show.djs):
-        db.delete(dj)
-    db.flush()
-    for name in dj_names:
-        name = name.strip()
-        if name:
-            db.add(SpecialtyShowDJ(specialty_show_id=show.id, dj_name=name))
+        if dj.persona_id is not None and dj.persona_id not in wanted:
+            db.delete(dj)
+    for persona_id, name in added.items():
+        db.add(
+            SpecialtyShowDJ(specialty_show_id=show.id, dj_name=name, persona_id=persona_id)
+        )
 
 
 def _sync_staff_members(db: Session, show: SpecialtyShow, emails: list[str]) -> None:
@@ -149,8 +173,8 @@ def list_mine_specialty_shows(
 ):
     """List shows where the current user is an owner and/or a member.
 
-    Unlike `/my` (owner only), this also matches the user's `dj_name` against
-    each music show's DJ roster, and the user against each talk show's staff
+    Unlike `/my` (owner only), this also matches the user's personas against
+    each music show's DJs, and the user against each talk show's staff
     members, since a user can hold either or both roles on a show.
     """
     owner_show_ids = {
@@ -160,15 +184,7 @@ def list_mine_specialty_shows(
         )
     }
 
-    names = dj_name_parts(staff)
-    dj_show_ids = set()
-    if names:
-        dj_show_ids = {
-            show_id
-            for (show_id,) in db.query(SpecialtyShowDJ.specialty_show_id).filter(
-                SpecialtyShowDJ.dj_name.in_(names)
-            )
-        }
+    dj_show_ids = _dj_show_ids(db, staff)
     staff_member_show_ids = {
         show_id
         for (show_id,) in db.query(TalkShowStaff.specialty_show_id).filter(
@@ -196,7 +212,7 @@ def list_mine_specialty_shows(
             spinitron_shows=show.spinitron_shows,
             owner_emails=show.owner_emails,
             owner_details=show.owner_details,
-            dj_names=show.dj_names,
+            djs=show.djs,
             staff_member_emails=show.staff_member_emails,
             staff_member_details=show.staff_member_details,
             is_owner=show.id in owner_show_ids,
@@ -227,6 +243,27 @@ def list_staff_emails(
     Declared before `/{show_id}` so it isn't swallowed by that route.
     """
     return db.query(Staff).filter(current_staff_filter()).order_by(Staff.name).all()
+
+
+@router.get("/dj-options", response_model=list[Identity])
+def list_dj_options(
+    show_id: int | None = Query(None),
+    staff: Staff = Depends(get_staff_member),
+    db: Session = Depends(get_db),
+):
+    """
+    The personas a music show's DJ editor offers: every current staff
+    member's, leaving out inactive ones (decision 16 of the Spinitron identity
+    plan), but always those already DJs of *show_id*.
+
+    Declared before `/{show_id}` so it isn't swallowed by that route.
+    """
+    keep: set[int] = set()
+    if show_id is not None:
+        show = db.query(SpecialtyShow).filter(SpecialtyShow.id == show_id).first()
+        if show is not None:
+            keep = show.dj_persona_ids
+    return staff_persona_identities(db, keep)
 
 
 @router.post("", response_model=SpecialtyShowResponse, status_code=status.HTTP_201_CREATED)
@@ -322,11 +359,11 @@ async def update_specialty_show(
     """
     Update a show (promotions staff or show owner). A show must have a
     Spinitron show, so saving a show that has none needs *spinitron_urls*.
-    Music shows take *dj_names* and talk shows take *staff_member_emails*.
+    Music shows take *dj_persona_ids* and talk shows take *staff_member_emails*.
     """
     role, actor = role_and_staff
     show = _get_editable_show(db, show_id, role, actor)
-    if show.is_talk and data.dj_names is not None:
+    if show.is_talk and data.dj_persona_ids is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A Talk & Info Show has staff members, not DJs",
@@ -365,8 +402,8 @@ async def update_specialty_show(
     if data.owner_emails is not None:
         _sync_owners(db, show, data.owner_emails)
 
-    if data.dj_names is not None:
-        _sync_djs(db, show, data.dj_names)
+    if data.dj_persona_ids is not None:
+        _sync_djs(db, show, data.dj_persona_ids)
 
     if data.staff_member_emails is not None:
         _sync_staff_members(db, show, data.staff_member_emails)

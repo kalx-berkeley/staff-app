@@ -45,10 +45,12 @@ class SpecialtyShowUpdate(BaseModel):
         None,
         description="Replace the full list of owner emails (null = no change)",
     )
-    dj_names: list[str] | None = Field(
+    dj_persona_ids: list[int] | None = Field(
         None,
         description=(
-            "Replace the full list of DJ names (null = no change). Music shows only."
+            "Replace the full list of DJs by Spinitron persona ID (null = no"
+            " change). Music shows only; each must be a current staff member's"
+            " persona, or already one of the show's DJs."
         ),
     )
     staff_member_emails: list[str] | None = Field(
@@ -76,6 +78,15 @@ class SpecialtyShowOwnerInfo(BaseModel):
     name: str | None = None
 
 
+class SpecialtyShowDJInfo(BaseModel):
+    """One DJ of a Specialty Music Show: a persona and its current name."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    persona_id: int | None = None
+    name: str
+
+
 class SpinitronShowInfo(BaseModel):
     """One of a specialty show's Spinitron shows."""
 
@@ -97,7 +108,7 @@ class SpecialtyShowResponse(BaseModel):
     spinitron_shows: list[SpinitronShowInfo] = Field(default_factory=list)
     owner_emails: list[str] = Field(default_factory=list)
     owner_details: list[SpecialtyShowOwnerInfo] = Field(default_factory=list)
-    dj_names: list[str] = Field(default_factory=list)
+    djs: list[SpecialtyShowDJInfo] = Field(default_factory=list)
     staff_member_emails: list[str] = Field(default_factory=list)
     staff_member_details: list[SpecialtyShowOwnerInfo] = Field(default_factory=list)
 

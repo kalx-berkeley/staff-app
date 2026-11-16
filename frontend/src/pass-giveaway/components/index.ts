@@ -6,6 +6,7 @@ export type { AppView } from './currentView';
 export { default as Tooltip } from './Tooltip';
 export { default as DjNameInput, DJ_NAME_KEY } from './DjNameInput';
 export { default as DatePicker } from './DatePicker';
+export { default as IdentityPicker } from './IdentityPicker';
 export { useOnAirDj } from './useOnAirDj';
 export { default as BandAnnotator } from './BandAnnotator';
 export { default as EnrichedShowName } from './EnrichedShowName';

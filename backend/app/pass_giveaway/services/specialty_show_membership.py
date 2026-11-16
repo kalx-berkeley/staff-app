@@ -1,7 +1,8 @@
 """Who belongs to a specialty show, and may reserve on-air passes for it.
 
-A Specialty Music Show's members are DJs, matched by DJ name against
-`SpecialtyShowDJ`, and must be Sublist DJs to reserve passes. A Talk &
+A Specialty Music Show's members are DJ personas (`SpecialtyShowDJ`), matched
+against the personas linked to a staff member, who must be a Sublist DJ to
+reserve passes. A Talk &
 Information show's members are staff members (`TalkShowStaff`), and any
 current staff member (Active or 🆕) on the show may reserve.
 """
@@ -10,15 +11,11 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.auth import _is_sublist_dj, is_current_staff
+from app.common.services.spinitron_personas import staff_persona_ids
 from app.models.specialty_show import SpecialtyShow
 from app.models.specialty_show_dj import SpecialtyShowDJ
 from app.models.staff import Staff
 from app.models.talk_show_staff import TalkShowStaff
-
-
-def dj_name_parts(staff: Staff) -> list[str]:
-    """A staff member's DJ names (the comma-joined `Staff.dj_name`), trimmed."""
-    return [n.strip() for n in (staff.dj_name or "").split(",") if n.strip()]
 
 
 def is_member(db: Session, show: SpecialtyShow, staff: Staff) -> bool:
@@ -36,14 +33,14 @@ def is_member(db: Session, show: SpecialtyShow, staff: Staff) -> bool:
             .first()
             is not None
         )
-    names = dj_name_parts(staff)
-    if not names:
+    persona_ids = staff_persona_ids(staff)
+    if not persona_ids:
         return False
     return (
         db.query(SpecialtyShowDJ)
         .filter(
             SpecialtyShowDJ.specialty_show_id == show.id,
-            SpecialtyShowDJ.dj_name.in_(names),
+            SpecialtyShowDJ.persona_id.in_(persona_ids),
         )
         .first()
         is not None
@@ -58,15 +55,21 @@ def member_show_ids(db: Session, staff: Staff) -> set[int]:
             TalkShowStaff.staff_id == staff.id
         )
     }
-    names = dj_name_parts(staff)
-    if names:
-        ids |= {
-            show_id
-            for (show_id,) in db.query(SpecialtyShowDJ.specialty_show_id).filter(
-                SpecialtyShowDJ.dj_name.in_(names)
-            )
-        }
+    ids |= dj_show_ids(db, staff)
     return ids
+
+
+def dj_show_ids(db: Session, staff: Staff) -> set[int]:
+    """IDs of the music shows one of *staff*'s personas is a DJ of."""
+    persona_ids = staff_persona_ids(staff)
+    if not persona_ids:
+        return set()
+    return {
+        show_id
+        for (show_id,) in db.query(SpecialtyShowDJ.specialty_show_id).filter(
+            SpecialtyShowDJ.persona_id.in_(persona_ids)
+        )
+    }
 
 
 def require_sublist_dj(staff: Staff) -> None:

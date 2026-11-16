@@ -32,7 +32,7 @@ const show = (overrides: Partial<SpecialtyShowResponse>): SpecialtyShowResponse 
   ],
   owner_emails: [],
   owner_details: [],
-  dj_names: [],
+  djs: [],
   staff_member_emails: [],
   staff_member_details: [],
   ...overrides,

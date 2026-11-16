@@ -33,8 +33,12 @@ class Pass(Base):
     staff_id = Column(Integer, ForeignKey("staff.id"), nullable=True)
     claimed_at = Column(DateTime, nullable=True)
 
-    # For pre-assigned pairs (promotions assignment)
+    # For pre-assigned pairs (promotions assignment). A pair is pre-assigned
+    # to a Spinitron persona or to a specialty show (one of the two IDs);
+    # preassigned_dj also holds that persona's or show's name, which the DJ
+    # pages still match against typed DJ names until they move to the schedule.
     preassigned_dj = Column(String, nullable=True)
+    preassigned_persona_id = Column(Integer, nullable=True)
     preassigned_date = Column(Date, nullable=True)
     preassigned_by_staff_id = Column(Integer, ForeignKey("staff.id"), nullable=True)
     preassigned_specialty_show_id = Column(

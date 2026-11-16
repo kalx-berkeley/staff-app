@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { showsAPI, passesAPI, lotteryAPI, specialtyShowsAPI, alternatesAPI } from '../api';
+import { showsAPI, passesAPI, lotteryAPI, alternatesAPI } from '../api';
 import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, AlternateGuestForm, WaitingGuestsList, GuestFallbackOptions, ClaimGuestActions, TablerPassesSection, ShowInfoCards } from '../components';
 import { formatPhone, formatLeave, isOnLeave, leaveCoversShow, formatDateValue } from '../../common/utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { STAFF_PASSES_NOT_YET_ACTIVE, seatedFallbackNote, specialtyShowLabel, staffPassesNotYetActive, waitingFallbackNote } from '../utils';
-import type { ShowResponse, ClaimData, LotteryStatus, MySpecialtyShowResponse, AlternateQueue, AlternateJoinRequest, GuestFallback } from '../types';
+import type { ShowResponse, ClaimData, LotteryStatus, MyIdentity, IdentityChoice, AlternateQueue, AlternateJoinRequest, GuestFallback } from '../types';
 import type { StaffProfile, APIError } from '../../common/types';
 import { formatCalendarDate, formatPacific } from '../../common/dateTime';
 
@@ -25,16 +25,15 @@ const ShowDetail = () => {
   const [preassignSelfPassId, setPreassignSelfPassId] = useState<number | null>(null);
   const [preassignSelfDate, setPreassignSelfDate] = useState('');
   const [preassignSelfLoading, setPreassignSelfLoading] = useState(false);
-  // '' = first DJ name (default); 'dj:NAME' = specific DJ name; 'ss:ID' = specialty show
+  // A "Reserve for" value: '' (the default: see identityFor), 'p:ID' (one of
+  // your personas) or 'ss:ID' (a show)
   const [preassignSelfReserveFor, setPreassignSelfReserveFor] = useState('');
-  // On-air schedule check for preassignSelfReserveFor, to restrict/warn on the reservation date.
-  // null = unknown (not yet checked, or the check failed); [] = checked, no matching dates.
-  const [scheduleDates, setScheduleDates] = useState<string[] | null>(null);
-  const [scheduleLoading, setScheduleLoading] = useState(false);
 
-  // Shows the user may reserve on-air passes for: Specialty Music Shows they're
-  // a DJ on (Sublist DJs only) and Talk & Info Shows they're on the staff of
-  const [myReservableShows, setMyReservableShows] = useState<MySpecialtyShowResponse[]>([]);
+  // What the user may reserve on-air passes for, each with its schedule: their
+  // personas (Sublist DJs only), Specialty Music Shows they're a DJ on
+  // (Sublist DJs only) and Talk & Info Shows they're on the staff of
+  const [myIdentities, setMyIdentities] = useState<MyIdentity[]>([]);
+  const [identitiesLoading, setIdentitiesLoading] = useState(true);
 
   // +1 guest claim state
   const [guestClaimPassId, setGuestClaimPassId] = useState<number | null>(null);
@@ -61,11 +60,8 @@ const ShowDetail = () => {
   // DJ lottery entry form state
   const [showDJLotteryForm, setShowDJLotteryForm] = useState(false);
   const [lotteryDJDate, setLotteryDJDate] = useState('');
-  // '' = first DJ name (default); 'dj:NAME' = specific DJ name; 'ss:ID' = specialty show
+  // Like preassignSelfReserveFor
   const [lotteryDJReserveFor, setLotteryDJReserveFor] = useState('');
-  // On-air schedule check for lotteryDJReserveFor, mirroring scheduleDates above.
-  const [lotteryScheduleDates, setLotteryScheduleDates] = useState<string[] | null>(null);
-  const [lotteryScheduleLoading, setLotteryScheduleLoading] = useState(false);
 
   const loadShow = useCallback(async (silent = false) => {
     if (!id) return;
@@ -123,109 +119,76 @@ const ShowDetail = () => {
     if (show) loadAlternateQueue(show);
   }, [show, loadAlternateQueue]);
 
-  // Reserving under your own DJ name (or for a music show) needs Sublist DJ
-  // status and a DJ name; reserving for a talk show doesn't.
-  const reservingProfile = user?.profile as StaffProfile | undefined;
-  const canReserveAsDj = !!(reservingProfile?.is_sublist_dj && reservingProfile?.dj_name);
-
   useEffect(() => {
-    if (!user?.profile) return;
-    specialtyShowsAPI.listMine().then((mine) => {
-      const reservable = mine.filter((s) =>
-        s.category === 'talk' ? s.is_staff_member : s.is_dj && canReserveAsDj
-      );
-      // Most people have none; leaving the initial [] skips a re-render
-      if (reservable.length > 0) setMyReservableShows(reservable);
-    }).catch(() => {
-      // non-fatal
-    });
-  }, [user, canReserveAsDj]);
-
-  // A "Reserve for" value is '' (the default), 'dj:NAME' or 'ss:ID'. The
-  // default is your first DJ name, or your first show if you can only reserve
-  // for Talk & Info Shows.
-  const defaultReserveFor =
-    canReserveAsDj || myReservableShows.length === 0 ? '' : `ss:${myReservableShows[0].id}`;
-  const withDefaultReserveFor = (reserveFor: string): string => reserveFor || defaultReserveFor;
-
-  // Resolve a "Reserve for" value to the plain DJ or show name used to check
-  // the on-air schedule.
-  const resolveReserveForName = useCallback(
-    (rawReserveFor: string): string => {
-      const reserveFor = rawReserveFor || defaultReserveFor;
-      if (reserveFor.startsWith('ss:')) {
-        const showId = parseInt(reserveFor.slice(3));
-        return myReservableShows.find((s) => s.id === showId)?.name ?? '';
-      }
-      if (reserveFor.startsWith('dj:')) {
-        return reserveFor.slice(3);
-      }
-      const staffProfile = user?.profile as StaffProfile | undefined;
-      const myDjName = staffProfile?.dj_name ?? '';
-      return myDjName.split(',').map((n) => n.trim()).filter(Boolean)[0] ?? '';
-    },
-    [user, myReservableShows, defaultReserveFor]
-  );
-
-  useEffect(() => {
-    if (preassignSelfPassId === null) {
-      setScheduleDates(null);
+    if (!user?.profile) {
+      setIdentitiesLoading(false);
       return;
     }
-    const name = resolveReserveForName(preassignSelfReserveFor);
-    if (!name) {
-      setScheduleDates(null);
-      return;
-    }
-    let cancelled = false;
-    setScheduleLoading(true);
     passesAPI
-      .getPreassignSchedule(name)
-      .then((dates) => {
-        if (cancelled) return;
-        setScheduleDates(dates);
+      .getMyPreassignIdentities()
+      .then((identities) => {
+        // Most people have none; leaving the initial [] skips a re-render
+        if (identities.length > 0) setMyIdentities(identities);
       })
       .catch(() => {
-        if (cancelled) return;
-        setScheduleDates(null);
+        // non-fatal: the reservation form stays hidden
       })
-      .finally(() => {
-        if (!cancelled) setScheduleLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [preassignSelfPassId, preassignSelfReserveFor, resolveReserveForName]);
+      .finally(() => setIdentitiesLoading(false));
+  }, [user]);
 
-  useEffect(() => {
-    if (!showDJLotteryForm) {
-      setLotteryScheduleDates(null);
-      return;
+  const myPersonas = myIdentities.filter((i) => i.kind === 'persona');
+
+  /**
+   * The identity a "Reserve for" value means. The default ('') is your
+   * persona on the schedule on *date*, else your first choice.
+   */
+  const identityFor = (reserveFor: string, date: string): MyIdentity | undefined => {
+    if (reserveFor.startsWith('ss:')) {
+      const showId = parseInt(reserveFor.slice(3));
+      return myIdentities.find((i) => i.specialty_show_id === showId);
     }
-    const name = resolveReserveForName(lotteryDJReserveFor);
-    if (!name) {
-      setLotteryScheduleDates(null);
-      return;
+    if (reserveFor.startsWith('p:')) {
+      const personaId = parseInt(reserveFor.slice(2));
+      return myIdentities.find((i) => i.persona_id === personaId);
     }
-    let cancelled = false;
-    setLotteryScheduleLoading(true);
-    passesAPI
-      .getPreassignSchedule(name)
-      .then((dates) => {
-        if (cancelled) return;
-        setLotteryScheduleDates(dates);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setLotteryScheduleDates(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLotteryScheduleLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [showDJLotteryForm, lotteryDJReserveFor, resolveReserveForName]);
+    return (date && myPersonas.find((i) => i.dates.includes(date))) || myIdentities[0];
+  };
+
+  /**
+   * The on-air dates a "Reserve for" value can pick from. The default, when
+   * it's a persona, offers every day any of your personas is on air.
+   */
+  const scheduleFor = (reserveFor: string): string[] | null => {
+    if (identitiesLoading) return null;
+    const identity = identityFor(reserveFor, '');
+    if (!identity) return null;
+    if (!reserveFor && identity.kind === 'persona') {
+      return [...new Set(myPersonas.flatMap((i) => i.dates))].sort();
+    }
+    return identity.dates;
+  };
+
+  /** Pick *date*, and with the default choice, the persona on air that day. */
+  const pickDate = (
+    date: string,
+    reserveFor: string,
+    setReserveFor: (value: string) => void,
+    setDate: (value: string) => void,
+  ) => {
+    setDate(date);
+    if (!reserveFor && date) {
+      const scheduled = myPersonas.find((i) => i.dates.includes(date));
+      if (scheduled && scheduled !== myIdentities[0]) setReserveFor(`p:${scheduled.persona_id}`);
+    }
+  };
+
+  /** The persona or show a "Reserve for" value means on *date*, for the API. */
+  const choiceFor = (reserveFor: string, date: string): IdentityChoice => {
+    const identity = identityFor(reserveFor, date);
+    return identity?.specialty_show_id != null
+      ? { specialty_show_id: identity.specialty_show_id }
+      : { persona_id: identity?.persona_id ?? null };
+  };
 
   const showEphemeralSuccess = (msg: string) => {
     setSuccessMessage(msg);
@@ -383,17 +346,9 @@ const ShowDetail = () => {
     setPassActionError(null);
     setSuccessMessage(null);
     try {
-      const reserveFor = withDefaultReserveFor(preassignSelfReserveFor);
-      const specialtyShowId = reserveFor.startsWith('ss:')
-        ? parseInt(reserveFor.slice(3))
-        : undefined;
-      const djNameOverride = reserveFor.startsWith('dj:')
-        ? reserveFor.slice(3)
-        : undefined;
       const updatedPass = await passesAPI.selfPreassign(passId, {
         assignment_date: preassignSelfDate,
-        specialty_show_id: specialtyShowId,
-        dj_name_override: djNameOverride,
+        ...choiceFor(preassignSelfReserveFor, preassignSelfDate),
       });
       // Patch just this pass into local state instead of re-fetching the whole
       // show — see handleUnassignSelf for why loadShow() isn't used here.
@@ -469,17 +424,9 @@ const ShowDetail = () => {
     setLotteryActionLoading(true);
     setLotteryActionError(null);
     try {
-      const lotteryReserveFor = withDefaultReserveFor(lotteryDJReserveFor);
-      const lotterySpecialtyShowId = lotteryReserveFor.startsWith('ss:')
-        ? parseInt(lotteryReserveFor.slice(3))
-        : undefined;
-      const lotteryDjNameOverride = lotteryReserveFor.startsWith('dj:')
-        ? lotteryReserveFor.slice(3)
-        : undefined;
       await lotteryAPI.enterDJ(show.id, {
         assignment_date: lotteryDJDate,
-        specialty_show_id: lotterySpecialtyShowId,
-        dj_name_override: lotteryDjNameOverride,
+        ...choiceFor(lotteryDJReserveFor, lotteryDJDate),
       });
       setShowDJLotteryForm(false);
       setLotteryDJDate('');
@@ -578,7 +525,9 @@ const ShowDetail = () => {
         ? 'You already have a staff pass for this show.'
         : undefined;
   const myName = user?.profile?.name ?? null;
-  const mySpecialtyShowIds = new Set(myReservableShows.map((s) => s.id));
+  const mySpecialtyShowIds = new Set(
+    myIdentities.flatMap((i) => (i.specialty_show_id != null ? [i.specialty_show_id] : [])),
+  );
   const myPreassignedPasses = myName
     ? show.passes.filter(
         (p) =>
@@ -594,25 +543,39 @@ const ShowDetail = () => {
   const leaveBlockMessage = staffProfile
     ? `You're on leave of absence ${formatLeave(staffProfile)}, so you can't claim passes for this show.`
     : '';
-  // Replaces the "schedule doesn't show you" warning for a DJ-name reservation
-  // on a date during the DJ's own leave (not a show, which has others).
-  const leaveWarningFor = (reserveFor: string, date: string): string | null =>
-    date && !withDefaultReserveFor(reserveFor).startsWith('ss:') && isOnLeave(staffProfile, date)
-      ? `You're on leave of absence ${formatLeave(staffProfile!)}, so you probably won't be on air on ${formatDate(date)}. Only continue if you're sure that's correct.`
-      : null;
+  /**
+   * A warning about reserving for *reserveFor* on *date*, or null: you're on
+   * leave (not for a show, which has others), or the schedule has you
+   * hosting a Talk & Info Show that day, or not on air at all.
+   */
+  const scheduleWarningFor = (reserveFor: string, date: string, action: string): string | null => {
+    const identity = identityFor(reserveFor, date);
+    if (!date || !identity) return null;
+    if (identity.kind === 'persona' && isOnLeave(staffProfile, date)) {
+      return `You're on leave of absence ${formatLeave(staffProfile!)}, so you probably won't be on air on ${formatDate(date)}. Only continue if you're sure that's correct.`;
+    }
+    if (identitiesLoading || identity.dates.includes(date)) return null;
+    const talkShow = identity.talk_show_dates[date];
+    if (talkShow) {
+      return `You host ${talkShow} (Talk & Info Show) on ${formatDate(date)}, so reserve for the show instead.`;
+    }
+    const who = identity.kind === 'persona' ? 'you' : identity.name;
+    return `The on-air schedule doesn't show ${who} on ${formatDate(date)}. Only ${action} if you're sure that's correct.`;
+  };
+  const myPersonaIds = staffProfile?.spinitron_ids ?? [];
   const myDjName = staffProfile?.dj_name ?? null;
-  const myDjNames =
-    canReserveAsDj && myDjName ? myDjName.split(',').map((n) => n.trim()).filter(Boolean) : [];
   // Sublist DJs, and staff members of a Talk & Info Show, can reserve on-air pass pairs
-  const canReserveOnAir = canReserveAsDj || myReservableShows.length > 0;
+  const canReserveOnAir = myIdentities.length > 0;
   // The "Reserve for" choices; the first one's value is always '' (the default)
-  const reserveForOptions = [
-    ...myDjNames.map((name) => ({ value: `dj:${name}`, label: `${name} (my DJ name)` })),
-    ...myReservableShows.map((s) => ({
-      value: `ss:${s.id}`,
-      label: `${s.name} (${specialtyShowLabel(s.category)})`,
-    })),
-  ].map((o, i) => (i === 0 ? { ...o, value: '' } : o));
+  const reserveForOptions = myIdentities
+    .map((i) => ({
+      value: i.kind === 'persona' ? `p:${i.persona_id}` : `ss:${i.specialty_show_id}`,
+      label: i.kind === 'persona' ? `${i.name} (my DJ name)` : `${i.name} (${specialtyShowLabel(i.kind)})`,
+    }))
+    .map((o, i) => (i === 0 ? { ...o, value: '' } : o));
+  // The value the dropdown shows: the default is shown as the first choice
+  const shownReserveFor = (reserveFor: string): string =>
+    reserveForOptions.some((o) => o.value === reserveFor) ? reserveFor : '';
   const pairPasses = show.passes.filter((p) => p.pass_type === 'pair');
   const isVenueOwner = user?.email ? show.venue.owner_emails.includes(user.email) : false;
   const showReserveForDropdown = reserveForOptions.length > 1;
@@ -741,6 +704,8 @@ const ShowDetail = () => {
 
   // Of the checked schedule dates, which fall on or before the reservation
   // deadline above — the actual pickable range.
+  const scheduleDates = scheduleFor(preassignSelfReserveFor);
+  const lotteryScheduleDates = scheduleFor(lotteryDJReserveFor);
   const scheduleDatesBeforeClose =
     scheduleDates?.filter((d) => d <= maxDJReservationDate) ?? null;
   const lotteryScheduleDatesBeforeClose =
@@ -871,7 +836,7 @@ const ShowDetail = () => {
                           <label htmlFor="lottery-reserve-for">Reserve for:</label>
                           <select
                             id="lottery-reserve-for"
-                            value={lotteryDJReserveFor}
+                            value={shownReserveFor(lotteryDJReserveFor)}
                             onChange={(e) => setLotteryDJReserveFor(e.target.value)}
                             disabled={lotteryActionLoading}
                           >
@@ -891,7 +856,7 @@ const ShowDetail = () => {
                           className="input-readonly"
                         />
                       )}
-                      {lotteryScheduleLoading && (
+                      {identitiesLoading && (
                         <p className="field-hint">Checking on-air schedule…</p>
                       )}
                       {lotteryScheduleDates !== null && lotteryScheduleDates.length === 0 && (
@@ -911,7 +876,9 @@ const ShowDetail = () => {
                         )}
                       <DatePicker
                         value={lotteryDJDate}
-                        onChange={setLotteryDJDate}
+                        onChange={(date) =>
+                          pickDate(date, lotteryDJReserveFor, setLotteryDJReserveFor, setLotteryDJDate)
+                        }
                         max={maxDJReservationDate}
                         disabled={lotteryActionLoading}
                         isDateDisabled={
@@ -920,19 +887,10 @@ const ShowDetail = () => {
                             : undefined
                         }
                       />
-                      {leaveWarningFor(lotteryDJReserveFor, lotteryDJDate) ? (
+                      {scheduleWarningFor(lotteryDJReserveFor, lotteryDJDate, 'enter the lottery for this date') && (
                         <p className="field-warning">
-                          {leaveWarningFor(lotteryDJReserveFor, lotteryDJDate)}
+                          {scheduleWarningFor(lotteryDJReserveFor, lotteryDJDate, 'enter the lottery for this date')}
                         </p>
-                      ) : (
-                        lotteryScheduleDates !== null &&
-                        lotteryDJDate &&
-                        !lotteryScheduleDates.includes(lotteryDJDate) && (
-                          <p className="field-warning">
-                            The on-air schedule doesn't show you on {formatDate(lotteryDJDate)}.
-                            Only enter the lottery for this date if you're sure that's correct.
-                          </p>
-                        )
                       )}
                       <button
                         onClick={handleEnterDJLottery}
@@ -963,8 +921,16 @@ const ShowDetail = () => {
             ) : (
               <div className="passes-list">
                 {pairPasses.map((pass) => {
+                  // By persona; an older pre-assignment without one, by DJ name
                   const isMyDJPass =
-                    !!myDjName && pass.preassigned_dj?.toLowerCase() === myDjName.toLowerCase();
+                    pass.preassigned_persona_id != null
+                      ? myPersonaIds.includes(pass.preassigned_persona_id)
+                      : !!myDjName &&
+                        !!pass.preassigned_dj &&
+                        myDjName
+                          .split(',')
+                          .map((n) => n.trim().toLowerCase())
+                          .includes(pass.preassigned_dj.toLowerCase());
                   const isMySpecialtyShowPass =
                     pass.preassigned_specialty_show_id !== null &&
                     mySpecialtyShowIds.has(pass.preassigned_specialty_show_id!);
@@ -980,7 +946,8 @@ const ShowDetail = () => {
                               {pass.preassigned_specialty_show_id !== null && (
                                 <span className="specialty-show-badge">
                                   {' '}({specialtyShowLabel(
-                                    myReservableShows.find((s) => s.id === pass.preassigned_specialty_show_id)?.category,
+                                    myIdentities.find((i) => i.specialty_show_id === pass.preassigned_specialty_show_id)
+                                      ?.kind as 'music' | 'talk' | undefined,
                                   )})
                                 </span>
                               )}
@@ -1008,7 +975,7 @@ const ShowDetail = () => {
                                   <label htmlFor={`reserve-for-${pass.id}`}>Reserve for:</label>
                                   <select
                                     id={`reserve-for-${pass.id}`}
-                                    value={preassignSelfReserveFor}
+                                    value={shownReserveFor(preassignSelfReserveFor)}
                                     onChange={(e) => setPreassignSelfReserveFor(e.target.value)}
                                     disabled={preassignSelfLoading}
                                   >
@@ -1028,7 +995,7 @@ const ShowDetail = () => {
                                   className="input-readonly"
                                 />
                               )}
-                              {scheduleLoading && (
+                              {identitiesLoading && (
                                 <p className="field-hint">Checking on-air schedule…</p>
                               )}
                               {scheduleDates !== null && scheduleDates.length === 0 && (
@@ -1048,7 +1015,14 @@ const ShowDetail = () => {
                                 )}
                               <DatePicker
                                 value={preassignSelfDate}
-                                onChange={setPreassignSelfDate}
+                                onChange={(date) =>
+                                  pickDate(
+                                    date,
+                                    preassignSelfReserveFor,
+                                    setPreassignSelfReserveFor,
+                                    setPreassignSelfDate,
+                                  )
+                                }
                                 max={maxDJReservationDate}
                                 disabled={preassignSelfLoading}
                                 isDateDisabled={
@@ -1057,20 +1031,10 @@ const ShowDetail = () => {
                                     : undefined
                                 }
                               />
-                              {leaveWarningFor(preassignSelfReserveFor, preassignSelfDate) ? (
+                              {scheduleWarningFor(preassignSelfReserveFor, preassignSelfDate, 'save this') && (
                                 <p className="field-warning">
-                                  {leaveWarningFor(preassignSelfReserveFor, preassignSelfDate)}
+                                  {scheduleWarningFor(preassignSelfReserveFor, preassignSelfDate, 'save this')}
                                 </p>
-                              ) : (
-                                scheduleDates !== null &&
-                                preassignSelfDate &&
-                                !scheduleDates.includes(preassignSelfDate) && (
-                                  <p className="field-warning">
-                                    The on-air schedule doesn't show you on{' '}
-                                    {formatDate(preassignSelfDate)}. Only save this if you're sure
-                                    that's correct.
-                                  </p>
-                                )
                               )}
                               <button
                                 onClick={() => handleSelfPreassignSubmit(pass.id)}

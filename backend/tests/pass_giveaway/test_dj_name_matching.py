@@ -21,6 +21,8 @@ from app.pass_giveaway.services.dj_name_matching import (
     UNATTRIBUTED,
     UNMATCHED,
     build_directory,
+    column_by_label,
+    fix_name,
     name_uses,
 )
 
@@ -164,3 +166,109 @@ def test_name_uses_counts_rows_per_column(db: Session, setup):
     assert uses[("analytics_daily_count.dj_name", "dj lite")].rows == 7
     # Blank names are left out
     assert not any(label == "on_air_winners.given_away_by_dj" for label, _ in uses)
+
+
+def _show(db: Session, venue: Venue, name: str) -> Show:
+    show = Show(
+        event_name=name,
+        venue_id=venue.id,
+        show_date=date(2026, 12, 1),
+        show_time=time(20, 0),
+        age_restriction="all_ages",
+        wheelchair_accessible="yes",
+        num_pass_pairs=3,
+    )
+    db.add(show)
+    db.flush()
+    return show
+
+
+def test_fix_name_changes_every_spelling_in_every_column(db: Session, setup):
+    venue = Venue(name="V", address="1 St")
+    db.add(venue)
+    db.flush()
+    show = _show(db, venue, "S")
+    passes = [
+        Pass(show_id=show.id, pass_type="pair", status="given_away", given_away_by_dj=n)
+        for n in ("DJ Fooo", "dj  fooo", "DJ Other")
+    ]
+    passes.append(
+        Pass(
+            show_id=show.id, pass_type="pair", status="available", preassigned_dj="DJ Fooo"
+        )
+    )
+    db.add_all(passes)
+    db.add(SpecialtyShowDJ(specialty_show_id=setup["music"].id, dj_name="DJ FOOO"))
+    db.add(
+        AnalyticsDailyCount(
+            day=date(2025, 1, 1), event_type="v", area="a", dj_name="dj fooo", count=2
+        )
+    )
+    db.commit()
+
+    changed = fix_name(db, "DJ Fooo", " DJ  Foo ")
+    db.commit()
+
+    assert changed == {
+        "passes.preassigned_dj": 1,
+        "passes.given_away_by_dj": 2,
+        "specialty_show_djs.dj_name": 1,
+        "analytics_daily_count.dj_name": 1,
+    }
+    assert sorted(p.given_away_by_dj or "" for p in db.query(Pass)) == [
+        "",
+        "DJ Foo",
+        "DJ Foo",
+        "DJ Other",
+    ]
+    assert db.query(Pass).filter(Pass.preassigned_dj == "DJ Foo").count() == 1
+    assert db.query(SpecialtyShowDJ).one().dj_name == "DJ Foo"
+    # Analytics names are stored normalized
+    assert db.query(AnalyticsDailyCount).one().dj_name == "dj foo"
+
+
+def test_fix_name_can_be_limited_to_one_column_or_show(db: Session, setup):
+    venue = Venue(name="V", address="1 St")
+    db.add(venue)
+    db.flush()
+    one, two = _show(db, venue, "One"), _show(db, venue, "Two")
+    db.add_all(
+        [
+            Pass(show_id=s.id, pass_type="pair", status="given_away", given_away_by_dj="X")
+            for s in (one, two)
+        ]
+        + [Pass(show_id=one.id, pass_type="pair", status="available", preassigned_dj="X")]
+    )
+    db.add(SpecialtyShowDJ(specialty_show_id=setup["music"].id, dj_name="X"))
+    db.commit()
+
+    assert fix_name(db, "x", "Y", show_id=one.id) == {
+        "passes.preassigned_dj": 1,
+        "passes.given_away_by_dj": 1,
+    }
+    column = column_by_label("passes.given_away_by_dj")
+    assert fix_name(db, "x", "Z", columns=[column]) == {"passes.given_away_by_dj": 1}
+    db.commit()
+    by_show = {p.show_id: p.given_away_by_dj for p in db.query(Pass) if p.given_away_by_dj}
+    assert by_show == {one.id: "Y", two.id: "Z"}
+    assert db.query(SpecialtyShowDJ).one().dj_name == "X"
+
+
+def test_fix_name_merges_daily_counts_it_would_duplicate(db: Session, setup):
+    key = dict(day=date(2025, 1, 1), event_type="v", area="a")
+    db.add_all([
+        AnalyticsDailyCount(**key, dj_name="dj fooo", count=2),
+        AnalyticsDailyCount(**key, dj_name="dj foo", count=5),
+    ])
+    db.commit()
+
+    fix_name(db, "DJ Fooo", "DJ Foo")
+    db.commit()
+
+    row = db.query(AnalyticsDailyCount).one()
+    assert (row.dj_name, row.count) == ("dj foo", 7)
+
+
+def test_fix_name_refuses_blank_names(db: Session, setup):
+    with pytest.raises(ValueError):
+        fix_name(db, "DJ Fooo", "  ")

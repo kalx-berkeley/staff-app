@@ -408,6 +408,25 @@ class SpinitronService:
         return await SpinitronService._fetch_one(f"/playlists/{playlist_id}")
 
     @staticmethod
+    async def fetch_last_playlist_start(persona_id: int) -> Optional[datetime]:
+        """
+        When *persona_id*'s most recent aired playlist started.
+
+        Spinitron lists aired playlists newest first, so this asks for one.
+
+        :returns: The start, or None if the persona has no playlists.
+        :raises RuntimeError: If the API key isn't set or the API returns an error.
+        """
+        data = await SpinitronService._fetch_one(
+            f"/playlists?persona_id={int(persona_id)}&count=1"
+        )
+        for item in (data or {}).get("items", []):
+            start = item.get("start")
+            if start:
+                return datetime.strptime(start, "%Y-%m-%dT%H:%M:%S%z")
+        return None
+
+    @staticmethod
     async def fetch_spins(start: datetime) -> List[SpinitronSpinItem]:
         """
         Fetch Spinitron spins (played songs) logged since *start*.

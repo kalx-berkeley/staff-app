@@ -6,6 +6,8 @@ export interface PromotionsStaffProfile {
   name: string;
   phone: string;
   dj_name?: string | null;
+  // Spinitron persona IDs linked in Airtable
+  spinitron_ids?: number[] | null;
   is_sublist_dj: boolean;
   // Leave of absence (YYYY-MM-DD, inclusive); either may be null
   loa_start?: string | null;
@@ -17,6 +19,8 @@ export interface StaffProfile {
   name: string;
   phone: string;
   dj_name: string | null;
+  // Spinitron persona IDs linked in Airtable
+  spinitron_ids?: number[] | null;
   is_sublist_dj: boolean;
   // Leave of absence (YYYY-MM-DD, inclusive); either may be null
   loa_start?: string | null;

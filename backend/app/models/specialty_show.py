@@ -101,7 +101,11 @@ class SpecialtyShow(Base):
 
     @property
     def dj_names(self) -> list[str]:
-        return [d.dj_name for d in self.djs]
+        return [d.name for d in self.djs]
+
+    @property
+    def dj_persona_ids(self) -> set[int]:
+        return {d.persona_id for d in self.djs if d.persona_id is not None}
 
     @property
     def is_talk(self) -> bool:

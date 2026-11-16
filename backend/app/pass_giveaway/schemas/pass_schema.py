@@ -2,7 +2,7 @@
 
 from datetime import date
 from typing import Literal
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.common.schemas.types import UtcDatetime
 from app.models.guest_fallback import GuestFallback
@@ -73,11 +73,57 @@ class WinnerUpdateData(BaseModel):
     )
 
 
-class PreassignmentData(BaseModel):
-    """Schema for pre-assigning a pass pair to a DJ."""
+class IdentityChoice(BaseModel):
+    """A persona or a specialty show, exactly one of the two."""
 
-    dj_name: str = Field(..., min_length=1, max_length=100, description="DJ name to assign")
+    persona_id: int | None = Field(None, description="A Spinitron persona ID")
+    specialty_show_id: int | None = Field(
+        None, description="A Specialty Music Show or Talk & Info Show ID"
+    )
+
+    @model_validator(mode="after")
+    def _one_identity(self):
+        if (self.persona_id is None) == (self.specialty_show_id is None):
+            raise ValueError("Pick a DJ persona or a show")
+        return self
+
+
+class PreassignmentData(IdentityChoice):
+    """
+    Schema for promotions pre-assigning a pass pair to a persona (linked to a
+    current staff member) or a specialty show.
+    """
+
     assignment_date: date = Field(..., description="Date for the assignment")
+
+
+class Identity(BaseModel):
+    """A persona or a specialty show, as offered by a picker."""
+
+    name: str
+    # "persona", or the show's category
+    kind: Literal["persona", "music", "talk"]
+    persona_id: int | None = None
+    specialty_show_id: int | None = None
+    # Personas: the staff member who holds it
+    staff_name: str | None = None
+
+
+class MyIdentity(Identity):
+    """One of the signed-in staff member's identities, with its schedule."""
+
+    # Days (YYYY-MM-DD) in the next ~8 weeks it's on air and can be reserved for
+    dates: list[str] = Field(default_factory=list)
+    # Personas only: days it hosts a Talk & Info Show instead, by show name
+    talk_show_dates: dict[str, str] = Field(default_factory=dict)
+
+
+class IdentitySchedule(BaseModel):
+    """When a persona or show is on air in the next ~8 weeks."""
+
+    dates: list[str] = Field(default_factory=list)
+    # Personas only: days it hosts a Talk & Info Show instead, by show name
+    talk_show_dates: dict[str, str] = Field(default_factory=dict)
 
 
 class ClothespinData(BaseModel):
@@ -102,19 +148,21 @@ class SelfPreassignmentData(BaseModel):
             " show."
         ),
     )
-    dj_name_override: str | None = Field(
+    persona_id: int | None = Field(
         None,
         description=(
-            "Optional specific DJ name to use when the staff member has multiple names."
-            " Must be one of the names in their dj_name field."
+            "Which of your DJ personas to reserve for, when not reserving for a show."
+            " Defaults to your first."
         ),
     )
 
 
 class DjSuggestion(BaseModel):
-    """Schema for a suggested DJ/specialty-show name to pre-assign a pass pair to."""
+    """Schema for a suggested persona or specialty show to pre-assign a pass pair to."""
 
     name: str
+    persona_id: int | None = None
+    specialty_show_id: int | None = None
     # A Specialty Music Show or Talk & Info Show rather than a DJ
     is_specialty: bool = False
     # "music" or "talk" when is_specialty
@@ -210,6 +258,7 @@ class PassResponse(BaseModel):
 
     # For pre-assigned pairs
     preassigned_dj: str | None = None
+    preassigned_persona_id: int | None = None
     preassigned_date: date | None = None
     preassigned_by_staff_id: int | None = None
     preassigned_specialty_show_id: int | None = None

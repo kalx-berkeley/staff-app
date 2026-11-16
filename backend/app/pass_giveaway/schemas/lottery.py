@@ -22,13 +22,13 @@ class DJLotteryEntryCreate(BaseModel):
         ..., description="Air date the DJ wants the pass pair for"
     )
     specialty_show_id: int | None = Field(
-        None, description="Optional specialty show ID to reserve under instead of DJ name"
+        None, description="Optional specialty show ID to enter for instead of a persona"
     )
-    dj_name_override: str | None = Field(
+    persona_id: int | None = Field(
         None,
         description=(
-            "Optional specific DJ name to use when the staff member has multiple names."
-            " Must be one of the names in their dj_name field."
+            "Which of your DJ personas to enter as, when not entering for a show."
+            " Defaults to your first."
         ),
     )
 
@@ -44,6 +44,7 @@ class LotteryEntryResponse(BaseModel):
     staff_id: int | None
     staff_name: str | None = None
     dj_name: str | None
+    persona_id: int | None = None
     specialty_show_id: int | None = None
     assignment_date: date | None
     has_guest: bool

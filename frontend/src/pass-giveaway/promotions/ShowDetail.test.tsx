@@ -3,8 +3,8 @@ import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { renderAndSettle } from '../../test/render';
 import ShowDetail from './ShowDetail';
-import { showsAPI, passesAPI, autocompleteAPI, specialtyShowsAPI, lotteryAPI, alternatesAPI } from '../api';
-import type { ShowResponse, PassResponse, DjSuggestion } from '../types';
+import { showsAPI, passesAPI, lotteryAPI, alternatesAPI } from '../api';
+import type { ShowResponse, PassResponse, DjSuggestion, Identity } from '../types';
 
 vi.mock('../api', () => ({
   showsAPI: {
@@ -17,16 +17,11 @@ vi.mock('../api', () => ({
     setPreassignment: vi.fn(),
     removePreassignment: vi.fn(),
     removeGuest: vi.fn(),
-    getPreassignSchedule: vi.fn().mockResolvedValue([]),
+    getPreassignIdentities: vi.fn().mockResolvedValue([]),
+    getPreassignSchedule: vi.fn().mockResolvedValue({ dates: [], talk_show_dates: {} }),
     getPreassignLeave: vi.fn().mockResolvedValue(null),
     getSuggestionsByDate: vi.fn(),
     getSuggestionsByGenre: vi.fn(),
-  },
-  autocompleteAPI: {
-    getDJNames: vi.fn().mockResolvedValue([]),
-  },
-  specialtyShowsAPI: {
-    list: vi.fn().mockResolvedValue([]),
   },
   lotteryAPI: {
     getStatus: vi.fn().mockResolvedValue({
@@ -184,12 +179,32 @@ const openPreassignForm = async (passId: number) => {
   fireEvent.click(buttons[passId - 1]);
 };
 
+const WOLFMAN: Identity = {
+  name: 'Wolfman',
+  kind: 'persona',
+  persona_id: 11,
+  specialty_show_id: null,
+  staff_name: 'Wolf Person',
+};
+const NIGHTOWL: Identity = {
+  name: 'Nightowl',
+  kind: 'persona',
+  persona_id: 12,
+  specialty_show_id: null,
+  staff_name: 'Owl Person',
+};
+const BRUNCH: Identity = {
+  name: 'Sunday Jazz Brunch',
+  kind: 'music',
+  persona_id: null,
+  specialty_show_id: 3,
+};
+
 describe('Promotions ShowDetail — Suggest DJs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(autocompleteAPI.getDJNames).mockResolvedValue([]);
-    vi.mocked(specialtyShowsAPI.list).mockResolvedValue([]);
-    vi.mocked(passesAPI.getPreassignSchedule).mockResolvedValue([]);
+    vi.mocked(passesAPI.getPreassignIdentities).mockResolvedValue([WOLFMAN, NIGHTOWL, BRUNCH]);
+    vi.mocked(passesAPI.getPreassignSchedule).mockResolvedValue({ dates: [], talk_show_dates: {} });
     vi.mocked(passesAPI.getPreassignLeave).mockResolvedValue(null);
     vi.mocked(lotteryAPI.getStatus).mockResolvedValue({
       is_active: false,
@@ -221,8 +236,13 @@ describe('Promotions ShowDetail — Suggest DJs', () => {
     vi.mocked(showsAPI.get).mockResolvedValue(show);
 
     const suggestions: DjSuggestion[] = [
-      { name: 'Wolfman', is_specialty: false, matched_genres: ['rock'] },
-      { name: 'Sunday Jazz Brunch', is_specialty: true, matched_genres: ['rock'] },
+      { name: 'Wolfman', persona_id: 11, is_specialty: false, matched_genres: ['rock'] },
+      {
+        name: 'Sunday Jazz Brunch',
+        specialty_show_id: 3,
+        is_specialty: true,
+        matched_genres: ['rock'],
+      },
     ];
     vi.mocked(passesAPI.getSuggestionsByGenre).mockResolvedValue(suggestions);
     vi.mocked(passesAPI.setPreassignment).mockResolvedValue({
@@ -250,7 +270,7 @@ describe('Promotions ShowDetail — Suggest DJs', () => {
 
     await waitFor(() => {
       expect(passesAPI.setPreassignment).toHaveBeenCalledWith(1, {
-        dj_name: 'Wolfman',
+        persona_id: 11,
         assignment_date: '2099-12-20',
       });
     });
@@ -269,8 +289,8 @@ describe('Promotions ShowDetail — Suggest DJs', () => {
     vi.mocked(showsAPI.get).mockResolvedValue(show);
 
     vi.mocked(passesAPI.getSuggestionsByDate).mockResolvedValue([
-      { name: 'Nightowl', is_specialty: false, matched_genres: [] },
-      { name: 'Wolfman', is_specialty: false, matched_genres: [] },
+      { name: 'Nightowl', persona_id: 12, is_specialty: false, matched_genres: [] },
+      { name: 'Wolfman', persona_id: 11, is_specialty: false, matched_genres: [] },
     ]);
     vi.mocked(passesAPI.setPreassignment).mockResolvedValue({
       ...passA,
@@ -290,7 +310,7 @@ describe('Promotions ShowDetail — Suggest DJs', () => {
 
     await waitFor(() => {
       expect(passesAPI.setPreassignment).toHaveBeenCalledWith(1, {
-        dj_name: 'Nightowl',
+        persona_id: 12,
         assignment_date: '2099-12-20',
       });
     });
@@ -307,7 +327,7 @@ describe('Promotions ShowDetail — Suggest DJs', () => {
     vi.mocked(showsAPI.get).mockResolvedValue(show);
 
     const suggestions: DjSuggestion[] = [
-      { name: 'Nightowl', is_specialty: false, matched_genres: [] },
+      { name: 'Nightowl', persona_id: 12, is_specialty: false, matched_genres: [] },
     ];
     vi.mocked(passesAPI.getSuggestionsByDate).mockResolvedValue(suggestions);
     vi.mocked(passesAPI.setPreassignment).mockResolvedValue({
@@ -337,7 +357,7 @@ describe('Promotions ShowDetail — Suggest DJs', () => {
 
     await waitFor(() => {
       expect(passesAPI.setPreassignment).toHaveBeenCalledWith(1, {
-        dj_name: 'Nightowl',
+        persona_id: 12,
         assignment_date: '2099-12-20',
       });
     });
@@ -354,7 +374,7 @@ describe('Promotions ShowDetail — Suggest DJs', () => {
     vi.mocked(showsAPI.get).mockResolvedValue(show);
 
     const suggestions: DjSuggestion[] = [
-      { name: 'Wolfman', is_specialty: false, matched_genres: ['rock'] },
+      { name: 'Wolfman', persona_id: 11, is_specialty: false, matched_genres: ['rock'] },
     ];
     vi.mocked(passesAPI.getSuggestionsByGenre).mockResolvedValue(suggestions);
 
@@ -369,9 +389,107 @@ describe('Promotions ShowDetail — Suggest DJs', () => {
 
     expect(passesAPI.setPreassignment).not.toHaveBeenCalled();
     await waitFor(() => {
-      const input = screen.getByPlaceholderText('DJ Name') as HTMLInputElement;
+      const input = screen.getByPlaceholderText('DJ or show') as HTMLInputElement;
       expect(input.value).toBe('Wolfman');
     });
+    await waitFor(() => {
+      expect(passesAPI.getPreassignSchedule).toHaveBeenCalledWith({ persona_id: 11 });
+    });
+  });
+});
+
+describe('Promotions ShowDetail — pre-assign picker', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(passesAPI.getPreassignIdentities).mockResolvedValue([WOLFMAN, NIGHTOWL, BRUNCH]);
+    vi.mocked(passesAPI.getPreassignLeave).mockResolvedValue(null);
+    vi.mocked(lotteryAPI.getStatus).mockResolvedValue({
+      is_active: false,
+      deadline: null,
+      staff_entry_count: 0,
+      dj_entry_count: 0,
+      my_staff_entry: null,
+      my_dj_entry: null,
+    });
+  });
+
+  const pickWolfman = async () => {
+    const input = screen.getByPlaceholderText('DJ or show');
+    fireEvent.change(input, { target: { value: 'wolf' } });
+    fireEvent.mouseDown(await screen.findByText('Wolfman'));
+  };
+
+  it('pre-assigns the picked persona by its ID', async () => {
+    const pass = { ...basePass, id: 1 };
+    vi.mocked(showsAPI.get).mockResolvedValue(makeShow([pass]));
+    vi.mocked(passesAPI.getPreassignSchedule).mockResolvedValue({
+      dates: ['2099-12-20'],
+      talk_show_dates: {},
+    });
+    vi.mocked(passesAPI.setPreassignment).mockResolvedValue({
+      ...pass,
+      preassigned_dj: 'Wolfman',
+      preassigned_persona_id: 11,
+      preassigned_date: '2099-12-20',
+    });
+
+    await renderShowDetail();
+    await openPreassignForm(1);
+    await pickWolfman();
+    await waitFor(() => {
+      expect(passesAPI.getPreassignSchedule).toHaveBeenCalledWith({ persona_id: 11 });
+    });
+    fireEvent.change(screen.getByPlaceholderText('MM/DD/YYYY'), {
+      target: { value: '12/20/2099' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(passesAPI.setPreassignment).toHaveBeenCalledWith(1, {
+        persona_id: 11,
+        assignment_date: '2099-12-20',
+      });
+    });
+    expect(await screen.findByText('Pre-assigned to:')).toBeInTheDocument();
+  });
+
+  it('warns when the persona hosts a Talk & Info Show that day', async () => {
+    vi.mocked(showsAPI.get).mockResolvedValue(makeShow([{ ...basePass, id: 1 }]));
+    vi.mocked(passesAPI.getPreassignSchedule).mockResolvedValue({
+      dates: [],
+      talk_show_dates: { '2099-12-20': 'Morning Report' },
+    });
+
+    await renderShowDetail();
+    await openPreassignForm(1);
+    await pickWolfman();
+    await screen.findByText(/No scheduled on-air dates found for Wolfman/);
+    fireEvent.change(screen.getByPlaceholderText('MM/DD/YYYY'), {
+      target: { value: '12/20/2099' },
+    });
+
+    expect(
+      await screen.findByText(/Wolfman hosts Morning Report \(Talk & Info Show\)/),
+    ).toBeInTheDocument();
+  });
+
+  it("won't save a typed name that isn't one of the options", async () => {
+    vi.mocked(showsAPI.get).mockResolvedValue(makeShow([{ ...basePass, id: 1 }]));
+
+    await renderShowDetail();
+    await openPreassignForm(1);
+    fireEvent.change(screen.getByPlaceholderText('DJ or show'), {
+      target: { value: 'Nobody' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('MM/DD/YYYY'), {
+      target: { value: '12/20/2099' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(
+      await screen.findByText('Pick a DJ or show, and a date, to pre-assign'),
+    ).toBeInTheDocument();
+    expect(passesAPI.setPreassignment).not.toHaveBeenCalled();
   });
 });
 
@@ -402,9 +520,10 @@ describe('Promotions ShowDetail — leave of absence', () => {
   it('labels genre suggestions for DJs on leave', async () => {
     vi.mocked(showsAPI.get).mockResolvedValue(makeShow([{ ...basePass, id: 1 }]));
     vi.mocked(passesAPI.getSuggestionsByGenre).mockResolvedValue([
-      { name: 'Wolfman', is_specialty: false, matched_genres: ['rock'] },
+      { name: 'Wolfman', persona_id: 11, is_specialty: false, matched_genres: ['rock'] },
       {
         name: 'Away DJ',
+        persona_id: 13,
         is_specialty: false,
         matched_genres: ['rock'],
         on_leave: true,

@@ -15,6 +15,9 @@ from app.pass_giveaway.schemas.pass_schema import (
     DjLeave,
     DjSuggestion,
     GiveawayData,
+    Identity,
+    IdentitySchedule,
+    MyIdentity,
     PreassignmentData,
     SelfPreassignmentData,
     PassResponse,
@@ -23,11 +26,18 @@ from app.pass_giveaway.schemas.pass_schema import (
     WinnerUpdateData,
 )
 from app.pass_giveaway.services.alternate_service import AlternateService
+from app.common.services.spinitron_personas import staff_persona_ids
+from app.pass_giveaway.services.identities import (
+    current_show,
+    my_identities,
+    promotions_identities,
+    resolve_reservation,
+    staff_persona_identities,
+    staff_persona_name,
+)
 from app.pass_giveaway.services import tabler_service
 from app.pass_giveaway.services.specialty_show_membership import (
     is_member as is_show_member,
-    require_can_reserve_for,
-    require_sublist_dj,
 )
 from app.pass_giveaway.services.pass_service import (
     PassService,
@@ -867,38 +877,76 @@ def release_winner(
     return PassResponse.model_validate(pass_item)
 
 
-@router.get("/passes/preassign/schedule", response_model=list[str])
+@router.get("/passes/preassign/identities", response_model=list[Identity])
+def list_preassign_identities(
+    promotions: Staff = Depends(get_promotions_staff),
+    db: Session = Depends(get_db),
+):
+    """
+    What promotions can pre-assign a pass pair to: the personas of current
+    staff (leaving out inactive ones), then the current Specialty Music Shows
+    and Talk & Info Shows.
+    """
+    return promotions_identities(db)
+
+
+@router.get("/passes/preassign/my-identities", response_model=list[MyIdentity])
+async def list_my_preassign_identities(
+    staff: Staff = Depends(get_staff_member),
+    db: Session = Depends(get_db),
+):
+    """
+    What the signed-in staff member can reserve on-air pass pairs for (or enter
+    the DJ lottery as): their own personas when they're a Sublist DJ, and the
+    shows they're a member of, each with the days it's on the schedule.
+    """
+    found = []
+    for identity in my_identities(db, staff):
+        schedule = await SpinitronUpcomingScheduleService.get_identity_schedule(
+            db, identity.persona_id, identity.specialty_show_id
+        )
+        found.append(MyIdentity(**identity.model_dump(), **schedule))
+    return found
+
+
+@router.get("/passes/preassign/schedule", response_model=IdentitySchedule)
 async def get_preassign_schedule(
-    name: str = Query(..., min_length=1, max_length=100),
+    persona_id: int | None = Query(None),
+    specialty_show_id: int | None = Query(None),
     role_and_staff: tuple = Depends(require_promotions_or_staff),
     db: Session = Depends(get_db),
 ):
     """
-    List upcoming dates (next ~8 weeks) that *name* is scheduled on-air.
-
-    *name* is matched the same way the "Reserve for"/"Pre-assign to DJ"
-    autocomplete conflates DJs and specialty shows: either a DJ's persona name
-    or an exact specialty-show title. Used to restrict the date picker when
-    pre-assigning a pass pair, so a promotions or Sublist-DJ staff member
-    only sees dates the schedule actually backs up.
+    The upcoming dates (next ~8 weeks) a persona or a show is on the schedule,
+    and for a persona the dates it hosts a Talk & Info Show instead. Used to
+    narrow the date picker, and to warn about a date it isn't on air, when
+    pre-assigning a pass pair.
     """
-    return await SpinitronUpcomingScheduleService.get_dates_for_name(db, name)
+    if (persona_id is None) == (specialty_show_id is None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Give a persona_id or a specialty_show_id",
+        )
+    return await SpinitronUpcomingScheduleService.get_identity_schedule(
+        db, persona_id, specialty_show_id
+    )
 
 
 @router.get("/passes/preassign/leave", response_model=DjLeave | None)
 def get_preassign_leave(
-    name: str = Query(..., min_length=1, max_length=100),
+    persona_id: int = Query(...),
     role_and_staff: tuple = Depends(require_promotions_or_staff),
     db: Session = Depends(get_db),
 ):
     """
-    Return the current or upcoming leave of absence of the DJ named *name*, if any.
+    Return the current or upcoming leave of absence of the staff member who
+    holds *persona_id*, if any.
 
     Used alongside `/passes/preassign/schedule` to warn when a pass pair is
-    pre-assigned to a DJ for a date during their leave. Null for a specialty
-    show, an unknown name, or a DJ with no leave on record.
+    pre-assigned to a persona for a date during its holder's leave. Null for
+    a persona no current staff member holds, or one with no leave on record.
     """
-    staff = PassService.find_dj_leave(db, name)
+    staff = PassService.find_dj_leave(db, persona_id)
     if staff is None:
         return None
     return DjLeave(loa_start=staff.loa_start, loa_end=staff.loa_end)
@@ -911,29 +959,39 @@ async def suggest_preassign_by_date(
     db: Session = Depends(get_db),
 ):
     """
-    Suggest DJs/specialty shows scheduled on-air on *date*, for the "Suggest DJs by
-    date" pre-assignment flow.
+    Suggest the staff personas and specialty shows on the schedule on *date*,
+    for the "Suggest DJs by date" pre-assignment flow.
 
     Backed by the same cached Spinitron schedule as `/passes/preassign/schedule`,
-    read in the opposite direction (date -> names instead of name -> dates).
+    read in the opposite direction (date -> identities instead of identity ->
+    dates). Personas no current staff member holds are left out, since passes
+    can't be pre-assigned to them.
     """
-    names = await SpinitronUpcomingScheduleService.get_names_for_date(db, date.isoformat())
-    categories = {
-        name.lower(): category
-        for name, category in (
-            db.query(SpecialtyShow.name, SpecialtyShow.category)
-            .filter(SpecialtyShow.current_filter())
-            .all()
+    scheduled = await SpinitronUpcomingScheduleService.get_identities_for_date(
+        db, date.isoformat()
+    )
+    offered = {(i.persona_id, i.specialty_show_id): i for i in promotions_identities(db)}
+    # A persona hidden as inactive is still offered when it's on the schedule
+    scheduled_personas = {s["persona_id"] for s in scheduled if s["persona_id"]}
+    for identity in staff_persona_identities(db, scheduled_personas):
+        offered.setdefault((identity.persona_id, None), identity)
+    suggestions = []
+    for entry in scheduled:
+        identity = offered.get((entry["persona_id"], entry["specialty_show_id"]))
+        if identity is None:
+            continue
+        suggestions.append(
+            DjSuggestion(
+                name=identity.name,
+                persona_id=identity.persona_id,
+                specialty_show_id=identity.specialty_show_id,
+                is_specialty=identity.specialty_show_id is not None,
+                specialty_category=(
+                    identity.kind if identity.specialty_show_id is not None else None
+                ),
+            )
         )
-    }
-    return [
-        DjSuggestion(
-            name=name,
-            is_specialty=name.lower() in categories,
-            specialty_category=categories.get(name.lower()),
-        )
-        for name in names
-    ]
+    return sorted(suggestions, key=lambda s: s.name.lower())
 
 
 @router.get("/passes/preassign/suggest-by-genre", response_model=list[DjSuggestion])
@@ -943,8 +1001,9 @@ def suggest_preassign_by_genre(
     db: Session = Depends(get_db),
 ):
     """
-    Suggest active Sublist DJs (and their specialty shows) whose genre preferences
-    overlap *show_id*'s genres, for the "Suggest DJs by genre" pre-assignment flow.
+    Suggest active Sublist DJs' personas (and their specialty shows) whose genre
+    preferences overlap *show_id*'s genres, for the "Suggest DJs by genre"
+    pre-assignment flow.
     """
     show = db.query(Show).filter(Show.id == show_id).first()
     if not show:
@@ -960,24 +1019,33 @@ def set_preassignment(
     db: Session = Depends(get_db),
 ):
     """
-    Set pre-assignment for a pass pair.
+    Pre-assign a pass pair to a persona linked to a current staff member, or
+    to a current Specialty Music Show or Talk & Info Show.
 
     Requires promotions staff authentication.
 
     Args:
         pass_id: Pass ID
-        preassignment_data: Pre-assignment data with DJ name and date
+        preassignment_data: The persona or show, and the date
         promotions: Authenticated promotions staff member
 
     Returns:
         Updated pass_item
     """
+    show_id = preassignment_data.specialty_show_id
+    if show_id is not None:
+        specialty_show = current_show(db, show_id)
+        name = specialty_show.name
+    else:
+        name = staff_persona_name(db, preassignment_data.persona_id)
     pass_item = PassService.set_preassignment(
         db,
         pass_id,
-        preassignment_data.dj_name,
+        name,
         preassignment_data.assignment_date,
         preassigned_by_staff_id=promotions.id,
+        preassigned_specialty_show_id=show_id,
+        preassigned_persona_id=preassignment_data.persona_id,
     )
 
     audit_service.log_event(
@@ -989,7 +1057,9 @@ def set_preassignment(
         entity_type="pass",
         entity_id=pass_item.id,
         details={
-            "dj": preassignment_data.dj_name,
+            "dj": name,
+            "persona_id": preassignment_data.persona_id,
+            "specialty_show_id": show_id,
             "assignment_date": str(preassignment_data.assignment_date),
             "show_id": pass_item.show_id,
             "preassigned_by_staff_id": promotions.id,
@@ -1007,47 +1077,23 @@ def set_self_preassignment(
     db: Session = Depends(get_db),
 ):
     """
-    Pre-assign a pass pair to the signed-in staff member's own DJ name, or to a
-    Specialty Music Show or Talk & Info Show they are a member of.
+    Pre-assign a pass pair to one of the signed-in staff member's own personas,
+    or to a Specialty Music Show or Talk & Info Show they are a member of.
 
-    Reserving under your own DJ name or for a music show needs Sublist DJ
-    status; reserving for a talk show needs only current staff status. The DJ
-    name is taken from the staff member's own dj_name field — it cannot be set
-    by the caller.
+    Reserving for your own persona or a music show needs Sublist DJ status;
+    reserving for a talk show needs only current staff status. Without a
+    persona or show, it's your first persona.
 
     Args:
         pass_id: Pass ID
-        data: Pre-assignment data with assignment date and optional specialty_show_id
+        data: The date, and optionally a persona or show
         staff: Signed-in staff member
 
     Returns:
         Updated pass_item
     """
-    from app.models.specialty_show import SpecialtyShow
-
-    # Validate the show, and that the staff member may reserve for it
-    specialty_show = None
-    if data.specialty_show_id is not None:
-        specialty_show = (
-            db.query(SpecialtyShow)
-            .filter(
-                SpecialtyShow.id == data.specialty_show_id,
-                SpecialtyShow.current_filter(),
-            )
-            .first()
-        )
-        if not specialty_show:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Show not found",
-            )
-    if not (specialty_show and specialty_show.is_talk) and not staff.dj_name:
-        require_sublist_dj(staff)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You do not have a DJ name set on your staff profile",
-        )
-    require_can_reserve_for(db, specialty_show, staff)
+    reservation = resolve_reservation(db, staff, data.persona_id, data.specialty_show_id)
+    specialty_show = reservation.show
 
     # Block direct reservations while lottery is active; check prohibition window
     target_pass = db.query(Pass).filter(Pass.id == pass_id).first()
@@ -1089,34 +1135,19 @@ def set_self_preassignment(
                         ),
                     )
 
-    # Resolve the DJ name to use
-    dj_name_parts = [n.strip() for n in (staff.dj_name or "").split(",")]
-    if specialty_show:
-        preassign_name = specialty_show.name
-    elif data.dj_name_override:
-        if data.dj_name_override not in dj_name_parts:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="dj_name_override must be one of your registered DJ names",
-            )
-        preassign_name = data.dj_name_override
-    else:
-        preassign_name = dj_name_parts[0]
-    specialty_show_id = specialty_show.id if specialty_show else None
-
     pass_item = PassService.set_preassignment(
         db,
         pass_id,
-        preassign_name,
+        reservation.name,
         data.assignment_date,
         preassigned_by_staff_id=staff.id,
-        preassigned_specialty_show_id=specialty_show_id,
+        preassigned_specialty_show_id=specialty_show.id if specialty_show else None,
+        preassigned_persona_id=None if specialty_show else reservation.persona_id,
     )
 
     audit_details: dict = {
-        "dj": (
-            preassign_name if specialty_show and specialty_show.is_talk else staff.dj_name
-        ),
+        "dj": reservation.persona_name or reservation.name,
+        "persona_id": reservation.persona_id,
         "assignment_date": str(data.assignment_date),
         "show_id": pass_item.show_id,
         "preassigned_by_staff_id": staff.id,
@@ -1300,17 +1331,20 @@ def remove_preassignment(
             actor_email = effective_email
             actor_role = "promotions"
         else:
-            # Regular staff: verify their name (or dj_name) matches the preassigned DJ,
-            # or they are a member of the show this pass is reserved for
-            from app.models.specialty_show import SpecialtyShow
+            # Regular staff: the pass must be reserved for one of their
+            # personas (or, for an older pre-assignment with no persona, their
+            # name or a DJ name), or for a show they're a member of
 
             preassigned = pass_pre.preassigned_dj
             staff_names = {staff_record.name.lower()}
-            if staff_record.dj_name:
-                staff_names.add(staff_record.dj_name.lower())
+            staff_names |= {
+                n.strip().lower() for n in (staff_record.dj_name or "").split(",")
+            }
 
-            # Check show membership if this pass is reserved for a show
-            allowed = preassigned and preassigned.lower() in staff_names
+            if pass_pre.preassigned_persona_id is not None:
+                allowed = pass_pre.preassigned_persona_id in staff_persona_ids(staff_record)
+            else:
+                allowed = bool(preassigned) and preassigned.lower() in staff_names
             if not allowed and pass_pre.preassigned_specialty_show_id:
                 reserved_show = (
                     db.query(SpecialtyShow)

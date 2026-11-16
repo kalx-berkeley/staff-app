@@ -1,22 +1,27 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { showsAPI, passesAPI, autocompleteAPI, specialtyShowsAPI, lotteryAPI, alternatesAPI } from '../api';
-import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, WaitingGuestsList, TablerPassesSection, ShowInfoCards } from '../components';
+import { showsAPI, passesAPI, lotteryAPI, alternatesAPI } from '../api';
+import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, IdentityPicker, AlternateQueueList, WaitingGuestsList, TablerPassesSection, ShowInfoCards } from '../components';
 import { formatPhone, formatLeave, isOnLeave, formatDateValue } from '../../common/utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import type { ShowResponse, PreAssignmentData, LotteryStatus, PassResponse, DjSuggestion, DjLeave, AlternateEntry, WaitingGuest, SpecialtyShowCategory } from '../types';
+import type { ShowResponse, PreAssignmentData, LotteryStatus, PassResponse, DjSuggestion, DjLeave, AlternateEntry, WaitingGuest, Identity, IdentityChoice } from '../types';
 import type { APIError, PromotionsStaffProfile } from '../../common/types';
 import {
   KALX_TABLE_NAME,
   seatedFallbackNote,
-  specialtyShowCategoriesByName,
   specialtyShowLabel,
   waitingFallbackNote,
 } from '../utils';
 import { formatCalendarDate, formatCalendarDateRange, formatPacific, formatPacificTime, pacificDateString } from '../../common/dateTime';
 
 type SuggestMode = 'choose' | 'date' | 'genre' | null;
+
+/** Just the persona or show of an identity or suggestion, for the API. */
+const identityChoice = (identity: IdentityChoice): IdentityChoice =>
+  identity.persona_id != null
+    ? { persona_id: identity.persona_id }
+    : { specialty_show_id: identity.specialty_show_id };
 
 type ConfirmAction = 'close' | 'unpublish' | 'reopen' | 'notify' | null;
 
@@ -158,31 +163,26 @@ const ShowDetail = () => {
 
   // Pre-assignment state
   const [preassignPassId, setPreassignPassId] = useState<number | null>(null);
-  const [preassignDj, setPreassignDj] = useState('');
+  // The persona or show picked to pre-assign to
+  const [preassignIdentity, setPreassignIdentity] = useState<Identity | null>(null);
   const [preassignDate, setPreassignDate] = useState('');
 
   // Lottery status
   const [lotteryStatus, setLotteryStatus] = useState<LotteryStatus | null>(null);
 
-  // DJ autocomplete for pre-assignment
-  const [djNames, setDjNames] = useState<string[]>([]);
-  const [filteredDjNames, setFilteredDjNames] = useState<string[]>([]);
-  const [showDjAutocomplete, setShowDjAutocomplete] = useState(false);
-  const djAutocompleteRef = useRef<HTMLUListElement>(null);
-  const [specialtyShowNames, setSpecialtyShowNames] = useState<Map<string, SpecialtyShowCategory>>(new Map());
+  // What pass pairs can be pre-assigned to: staff personas and shows
+  const [identities, setIdentities] = useState<Identity[]>([]);
 
-  // On-air schedule check for the entered DJ/specialty show name, to restrict
-  // (and warn about) the pre-assignment date.
-  // null = unknown (name not yet checked, or the check failed); [] = checked, no matching dates.
+  // On-air schedule check for the picked persona or show, to restrict (and
+  // warn about) the pre-assignment date.
+  // null = unknown (nothing picked yet, or the check failed); [] = checked, no matching dates.
   const [scheduleDates, setScheduleDates] = useState<string[] | null>(null);
+  // Persona only: dates it hosts a Talk & Info Show instead, by show name
+  const [talkShowDates, setTalkShowDates] = useState<Record<string, string>>({});
   const [scheduleLoading, setScheduleLoading] = useState(false);
-  // The entered DJ's current or upcoming leave of absence, checked alongside
-  // the schedule; null when there's none (or for a specialty show).
+  // The picked persona's holder's current or upcoming leave of absence,
+  // checked alongside the schedule; null when there's none (or for a show).
   const [preassignLeave, setPreassignLeave] = useState<DjLeave | null>(null);
-  // Tracks the name a schedule check was last fetched (or is in flight) for, so
-  // selecting an autocomplete suggestion (which immediately fetches) followed by
-  // the input's blur (which fires right after, for the same name) only fetches once.
-  const lastScheduleFetchNameRef = useRef<string | null>(null);
 
   // "Suggest" flow for the Pre-assign to DJ box: pick a suggestion mode, then
   // browse and accept a suggested DJ/specialty-show name.
@@ -297,77 +297,45 @@ const ShowDetail = () => {
   };
 
   useEffect(() => {
-    autocompleteAPI.getDJNames().then(setDjNames).catch(() => {});
-    specialtyShowsAPI.list()
-      .then((shows) => setSpecialtyShowNames(specialtyShowCategoriesByName(shows)))
-      .catch(() => {});
+    passesAPI.getPreassignIdentities().then(setIdentities).catch(() => {});
   }, []);
 
-  const fetchScheduleForName = async (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) {
-      lastScheduleFetchNameRef.current = null;
-      setScheduleDates(null);
-      setPreassignLeave(null);
-      return;
-    }
-    if (lastScheduleFetchNameRef.current === trimmed) {
-      // Already fetched (or fetching) for this exact name — e.g. selecting an
-      // autocomplete suggestion fetches immediately, and the blur that follows
-      // shouldn't repeat the same request.
-      return;
-    }
-    lastScheduleFetchNameRef.current = trimmed;
+  // Check the schedule (and leave) whenever a different persona or show is picked
+  const preassignPersonaId = preassignIdentity?.persona_id ?? null;
+  const preassignShowId = preassignIdentity?.specialty_show_id ?? null;
+  useEffect(() => {
+    setScheduleDates(null);
+    setTalkShowDates({});
+    setPreassignLeave(null);
+    if (preassignPersonaId === null && preassignShowId === null) return;
+    const choice: IdentityChoice =
+      preassignPersonaId !== null
+        ? { persona_id: preassignPersonaId }
+        : { specialty_show_id: preassignShowId };
+    let cancelled = false;
     setScheduleLoading(true);
-    try {
-      const [dates, leave] = await Promise.all([
-        passesAPI.getPreassignSchedule(trimmed),
-        passesAPI.getPreassignLeave(trimmed).catch(() => null),
-      ]);
-      setScheduleDates(dates);
-      setPreassignLeave(leave);
-    } catch {
-      // Non-fatal — degrade to an unrestricted date picker with no warning.
-      setScheduleDates(null);
-      setPreassignLeave(null);
-    } finally {
-      setScheduleLoading(false);
-    }
-  };
-
-  const handlePreassignDjChange = (value: string) => {
-    setPreassignDj(value);
-    // The name no longer matches whatever was last checked — let the next
-    // fetch (on blur, or on selecting a suggestion) run again.
-    lastScheduleFetchNameRef.current = null;
-    if (value.trim()) {
-      const filtered = djNames.filter((name) =>
-        name.toLowerCase().includes(value.toLowerCase())
-      );
-      setFilteredDjNames(filtered);
-      setShowDjAutocomplete(filtered.length > 0);
-    } else {
-      setShowDjAutocomplete(false);
-    }
-  };
-
-  const selectPreassignDj = (name: string) => {
-    setPreassignDj(name);
-    setShowDjAutocomplete(false);
-    fetchScheduleForName(name);
-  };
-
-  const handlePreassignDjBlur = () => {
-    setTimeout(() => setShowDjAutocomplete(false), 200);
-    fetchScheduleForName(preassignDj);
-  };
-
-  const handlePreassignDjKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Tab' && filteredDjNames.length === 1) {
-      e.preventDefault();
-      selectPreassignDj(filteredDjNames[0]);
-    }
-  };
+    Promise.all([
+      passesAPI.getPreassignSchedule(choice),
+      preassignPersonaId !== null
+        ? passesAPI.getPreassignLeave(preassignPersonaId).catch(() => null)
+        : Promise.resolve(null),
+    ])
+      .then(([schedule, leave]) => {
+        if (cancelled) return;
+        setScheduleDates(schedule.dates);
+        setTalkShowDates(schedule.talk_show_dates);
+        setPreassignLeave(leave);
+      })
+      .catch(() => {
+        // Non-fatal — degrade to an unrestricted date picker with no warning.
+      })
+      .finally(() => {
+        if (!cancelled) setScheduleLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [preassignPersonaId, preassignShowId]);
 
   const handlePublish = async () => {
     if (!show || !id) return;
@@ -446,12 +414,12 @@ const ShowDetail = () => {
   };
 
   const handlePreassignSubmit = async (passId: number) => {
-    if (!preassignDj.trim() || !preassignDate) {
-      setActionError('DJ name and date are required for pre-assignment');
+    if (!preassignIdentity || !preassignDate) {
+      setActionError('Pick a DJ or show, and a date, to pre-assign');
       return;
     }
 
-    if (isVenueOwner && userDjName && preassignDj.trim().toLowerCase() === userDjName.toLowerCase()) {
+    if (isVenueOwner && isOwnPersona(preassignIdentity)) {
       setActionError("You can't pre-assign passes to your own DJ name for a venue you rep.");
       return;
     }
@@ -461,7 +429,7 @@ const ShowDetail = () => {
 
     try {
       const data: PreAssignmentData = {
-        dj_name: preassignDj.trim(),
+        ...identityChoice(preassignIdentity),
         assignment_date: preassignDate,
       };
       const updatedPass = await passesAPI.setPreassignment(passId, data);
@@ -474,11 +442,8 @@ const ShowDetail = () => {
           : prev
       );
       setPreassignPassId(null);
-      setPreassignDj('');
+      setPreassignIdentity(null);
       setPreassignDate('');
-      setScheduleDates(null);
-      setPreassignLeave(null);
-      lastScheduleFetchNameRef.current = null;
     } catch (err) {
       const apiError = err as APIError;
       setActionError(
@@ -493,11 +458,8 @@ const ShowDetail = () => {
 
   const resetPreassignForm = () => {
     setPreassignPassId(null);
-    setPreassignDj('');
+    setPreassignIdentity(null);
     setPreassignDate('');
-    setScheduleDates(null);
-    setPreassignLeave(null);
-    lastScheduleFetchNameRef.current = null;
     setSuggestMode(null);
     setSuggestions(null);
     setSuggestError(null);
@@ -548,19 +510,23 @@ const ShowDetail = () => {
   }, [suggestMode]);
 
   /**
-   * Save a suggestion's DJ/specialty-show name and date to `pass`, then open the
+   * Save a suggestion's persona or show and date to `pass`, then open the
    * next available (unassigned) pass pair with a fresh form, so the next pair
    * starts from the beginning rather than from the last suggestion's date.
    */
   const saveSuggestionAndAdvance = async (
     pass: PassResponse,
-    djName: string,
+    suggestion: DjSuggestion,
     dateStr: string
   ) => {
+    if (isVenueOwner && isOwnPersona(suggestion)) {
+      setActionError("You can't pre-assign passes to your own DJ name for a venue you rep.");
+      return;
+    }
     setActionLoading(true);
     setActionError(null);
     try {
-      const data: PreAssignmentData = { dj_name: djName, assignment_date: dateStr };
+      const data: PreAssignmentData = { ...identityChoice(suggestion), assignment_date: dateStr };
       const updatedPass = await passesAPI.setPreassignment(pass.id, data);
       const updatedPasses =
         show?.passes.map((p) => (p.id === updatedPass.id ? updatedPass : p)) ?? [];
@@ -591,18 +557,23 @@ const ShowDetail = () => {
   const acceptSuggestion = (pass: PassResponse, suggestion: DjSuggestion) => {
     if (suggestMode === 'date') {
       // Guaranteed non-empty — suggestions for this mode only load once a date is set.
-      saveSuggestionAndAdvance(pass, suggestion.name, preassignDate);
+      saveSuggestionAndAdvance(pass, suggestion, preassignDate);
       return;
     }
 
     // Genre mode: only auto-save when a date was already chosen before suggesting.
     if (preassignDate) {
-      saveSuggestionAndAdvance(pass, suggestion.name, preassignDate);
+      saveSuggestionAndAdvance(pass, suggestion, preassignDate);
     } else {
-      setPreassignDj(suggestion.name);
+      setPreassignIdentity(
+        identities.find(
+          (i) =>
+            i.persona_id === (suggestion.persona_id ?? null) &&
+            i.specialty_show_id === (suggestion.specialty_show_id ?? null)
+        ) ?? null
+      );
       setSuggestMode(null);
       setSuggestions(null);
-      fetchScheduleForName(suggestion.name);
     }
   };
 
@@ -683,6 +654,9 @@ const ShowDetail = () => {
   const staffPasses = show?.passes.filter((t) => t.pass_type === 'staff') || [];
   const isVenueOwner = user?.email ? (show?.venue.owner_emails.includes(user.email) ?? false) : false;
   const userDjName = (user?.profile as PromotionsStaffProfile | null)?.dj_name ?? null;
+  const userPersonaIds = (user?.profile as PromotionsStaffProfile | null)?.spinitron_ids ?? [];
+  const isOwnPersona = (choice: IdentityChoice): boolean =>
+    choice.persona_id != null && userPersonaIds.includes(choice.persona_id);
 
   // The pass-pair reservation deadline the backend actually enforces — a
   // plain date comparison against `planned_close_date` (see
@@ -1081,47 +1055,20 @@ const ShowDetail = () => {
                       )}
                       {suggestMode === null && (
                         <>
-                          <div className="autocomplete-wrapper">
-                            <input
-                              type="text"
-                              placeholder="DJ Name"
-                              value={preassignDj}
-                              onChange={(e) => handlePreassignDjChange(e.target.value)}
-                              onKeyDown={handlePreassignDjKeyDown}
-                              onBlur={handlePreassignDjBlur}
-                              disabled={actionLoading}
-                              autoComplete="off"
-                            />
-                            {showDjAutocomplete && (
-                              <ul className="autocomplete-list" ref={djAutocompleteRef}>
-                                {filteredDjNames.map((name) => {
-                                  const specialtyCategory = specialtyShowNames.get(name.toLowerCase());
-                                  const isSpecialty = specialtyCategory !== undefined;
-                                  return (
-                                    <li
-                                      key={name}
-                                      onMouseDown={() => selectPreassignDj(name)}
-                                      className="autocomplete-item"
-                                    >
-                                      <span>{name}</span>
-                                      <span className={isSpecialty ? 'specialty-show-badge' : 'dj-name-badge'}>
-                                        {isSpecialty ? specialtyShowLabel(specialtyCategory) : 'DJ'}
-                                      </span>
-                                    </li>
-                                  );
-                                })}
-                                {filteredDjNames.length === 1 && (
-                                  <li className="autocomplete-hint">Press Tab to complete</li>
-                                )}
-                              </ul>
-                            )}
-                          </div>
+                          <IdentityPicker
+                            options={identities}
+                            value={preassignIdentity}
+                            onChange={setPreassignIdentity}
+                            disabled={actionLoading}
+                            placeholder="DJ or show"
+                            aria-label="Pre-assign to"
+                          />
                           {scheduleLoading && (
                             <p className="field-hint">Checking on-air schedule…</p>
                           )}
                           {scheduleDates !== null && scheduleDates.length === 0 && (
                             <p className="field-hint">
-                              No scheduled on-air dates found for "{preassignDj.trim()}" in the next
+                              No scheduled on-air dates found for {preassignIdentity?.name} in the next
                               ~8 weeks. You can still pick a date below.
                             </p>
                           )}
@@ -1129,7 +1076,7 @@ const ShowDetail = () => {
                             scheduleDates.length > 0 &&
                             scheduleDatesBeforeClose?.length === 0 && (
                               <p className="field-hint">
-                                {preassignDj.trim() || 'This DJ'} has upcoming on-air dates, but none
+                                {preassignIdentity?.name} has upcoming on-air dates, but none
                                 before this show closes on {formatDate(maxPreassignDate!)}. You can
                                 still pick a date below.
                               </p>
@@ -1147,7 +1094,7 @@ const ShowDetail = () => {
                           />
                           {preassignDate && preassignLeave && isOnLeave(preassignLeave, preassignDate) ? (
                             <p className="field-warning">
-                              {preassignDj.trim() || 'This DJ'} is on leave of absence{' '}
+                              {preassignIdentity?.name} is on leave of absence{' '}
                               {formatLeave(preassignLeave)}, so they probably won't be on air on{' '}
                               {formatDate(preassignDate)}. Only save this if you're sure that's
                               correct.
@@ -1155,13 +1102,20 @@ const ShowDetail = () => {
                           ) : (
                             scheduleDates !== null &&
                             preassignDate &&
-                            !scheduleDates.includes(preassignDate) && (
+                            !scheduleDates.includes(preassignDate) &&
+                            (talkShowDates[preassignDate] ? (
                               <p className="field-warning">
-                                The on-air schedule doesn't show {preassignDj.trim() || 'this DJ'}{' '}
-                                scheduled on {formatDate(preassignDate)}. Only save this if you're sure
-                                that's correct.
+                                {preassignIdentity?.name} hosts {talkShowDates[preassignDate]} (Talk
+                                &amp; Info Show) on {formatDate(preassignDate)}, so assign it to the
+                                show instead.
                               </p>
-                            )
+                            ) : (
+                              <p className="field-warning">
+                                The on-air schedule doesn't show {preassignIdentity?.name} scheduled
+                                on {formatDate(preassignDate)}. Only save this if you're sure that's
+                                correct.
+                              </p>
+                            ))
                           )}
                           <button
                             onClick={() => handlePreassignSubmit(pass.id)}
@@ -1256,7 +1210,7 @@ const ShowDetail = () => {
                                 <ul className="autocomplete-list suggestion-list">
                                   {suggestions.map((s) => (
                                     <li
-                                      key={s.name}
+                                      key={`${s.persona_id ?? ''}:${s.specialty_show_id ?? ''}`}
                                       className="autocomplete-item"
                                       onClick={() => acceptSuggestion(pass, s)}
                                     >
@@ -1329,7 +1283,7 @@ const ShowDetail = () => {
                             <ul className="autocomplete-list suggestion-list">
                               {suggestions.map((s) => (
                                 <li
-                                  key={s.name}
+                                  key={`${s.persona_id ?? ''}:${s.specialty_show_id ?? ''}`}
                                   className="autocomplete-item"
                                   onClick={() => acceptSuggestion(pass, s)}
                                 >
