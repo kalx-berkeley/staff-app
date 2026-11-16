@@ -513,6 +513,10 @@ class TestOnAirEndpoint:
             "current_dj_name": None,
             "current_show_ends_at": None,
             "next_dj_name": None,
+            "current": None,
+            "next": None,
+            "next_starts_at": None,
+            "can_switch_early": False,
         }
 
     def test_returns_current_and_next_dj(self, client: TestClient, db: Session):

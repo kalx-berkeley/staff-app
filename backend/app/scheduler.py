@@ -2,7 +2,7 @@
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
@@ -147,7 +147,61 @@ async def sync_spinitron_schedule():
     except Exception as e:
         logger.error(f"Scheduled Spinitron schedule sync failed: {str(e)}", exc_info=True)
     finally:
+        try:
+            schedule_next_slot_resync(db)
+        except Exception as e:
+            logger.error(
+                f"Scheduling the next slot re-sync failed: {str(e)}", exc_info=True
+            )
         db.close()
+
+
+# How long before each schedule slot starts the schedule is re-synced, to
+# catch last-minute changes before the DJ pages credit it
+SLOT_RESYNC_LEAD = timedelta(minutes=10)
+
+
+def next_slot_resync_time(db, now: datetime | None = None) -> datetime | None:
+    """
+    When the next slot re-sync should run: 10 minutes before the first cached
+    slot that starts more than 10 minutes from now, or None if there's none.
+    """
+    from app.models.spinitron_playlist import SpinitronPlaylist
+    from app.models.spinitron_show import SpinitronShow
+
+    now = now or datetime.now(timezone.utc)
+    earliest = now + SLOT_RESYNC_LEAD
+    starts = []
+    for model in (SpinitronPlaylist, SpinitronShow):
+        start = (
+            db.query(model.start)
+            .filter(model.start > earliest)
+            .order_by(model.start.asc())
+            .limit(1)
+            .scalar()
+        )
+        if start is not None:
+            starts.append(start if start.tzinfo else start.replace(tzinfo=timezone.utc))
+    return min(starts) - SLOT_RESYNC_LEAD if starts else None
+
+
+def schedule_next_slot_resync(db) -> None:
+    """
+    Re-sync the Spinitron schedule 10 minutes before the next slot (decision
+    23 of docs/pass-giveaway/specs/spinitron-identity/plan.md). Each re-sync
+    schedules the one after it, so a single job rolls through the day; the
+    6-hourly sync restarts it if the cache ever runs dry.
+    """
+    run_at = next_slot_resync_time(db)
+    if run_at is None:
+        return
+    scheduler.add_job(
+        sync_spinitron_schedule,
+        trigger=DateTrigger(run_date=run_at),
+        id="spinitron_slot_resync",
+        name="Re-sync Spinitron schedule before the next slot",
+        replace_existing=True,
+    )
 
 
 async def sync_dj_shifts():

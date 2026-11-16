@@ -19,8 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.common.services import cache_service
 from app.common.services.spinitron_service import SpinitronService
-from app.models.specialty_show import SpecialtyShow
-from app.models.specialty_show_spinitron_show import SpecialtyShowSpinitronShow
+from app.pass_giveaway.services.specialty_show_spinitron import shows_by_spinitron_id
 
 SCHEDULE_WINDOW_DAYS = 56
 
@@ -55,19 +54,6 @@ class ScheduledIdentity(TypedDict):
     specialty_show_id: Optional[int]
 
 
-def _show_map(db: Session) -> dict[int, SpecialtyShow]:
-    """Spinitron show ID -> the current specialty show it belongs to."""
-    rows = (
-        db.query(SpecialtyShowSpinitronShow.spinitron_show_id, SpecialtyShow)
-        .join(
-            SpecialtyShow, SpecialtyShow.id == SpecialtyShowSpinitronShow.specialty_show_id
-        )
-        .filter(SpecialtyShow.current_filter())
-        .all()
-    )
-    return {spinitron_id: show for spinitron_id, show in rows}
-
-
 class SpinitronUpcomingScheduleService:
     """Read-through cache over Spinitron's near-term schedule, for pre-assignment dates."""
 
@@ -87,7 +73,7 @@ class SpinitronUpcomingScheduleService:
             and for a persona the dates it hosts a talk show instead.
         """
         entries = await SpinitronUpcomingScheduleService._get_entries(db)
-        shows = _show_map(db)
+        shows = shows_by_spinitron_id(db)
         dates: set[str] = set()
         talk: dict[str, str] = {}
         for entry in entries:
@@ -116,7 +102,7 @@ class SpinitronUpcomingScheduleService:
         :returns: Each identity once, in schedule order.
         """
         entries = await SpinitronUpcomingScheduleService._get_entries(db)
-        shows = _show_map(db)
+        shows = shows_by_spinitron_id(db)
         seen: set[tuple] = set()
         found: List[ScheduledIdentity] = []
 

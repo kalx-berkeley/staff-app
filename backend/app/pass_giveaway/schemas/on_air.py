@@ -2,17 +2,44 @@
 
 from datetime import date
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 from app.common.schemas.types import UtcDatetime
 
 
-class OnAirResponse(BaseModel):
-    """Current/next on-air DJ info, derived from the cached Spinitron schedule."""
+class OnAirIdentity(BaseModel):
+    """
+    Who is on air: a persona, or a show (with a music show slot's DJ persona).
+    """
 
+    # "persona", or the show's category
+    kind: Literal["persona", "music", "talk"]
+    # The show's name, or the persona's
+    name: str
+    persona_id: int | None = None
+    persona_name: str | None = None
+    specialty_show_id: int | None = None
+
+
+class OnAirResponse(BaseModel):
+    """Who is on air now and next, from the Spinitron schedule and recent spins."""
+
+    # The DJ names the cached schedule has, for the DJ Name box (until the DJ
+    # pages show identities instead)
     current_dj_name: str | None = None
     current_show_ends_at: UtcDatetime | None = None
     next_dj_name: str | None = None
+    # Who giveaways are credited to now; None for no one (automation,
+    # FREEFORM, a placeholder persona, a gap, or Spinitron unavailable)
+    current: OnAirIdentity | None = None
+    # The next slot, when its start is known
+    next: OnAirIdentity | None = None
+    next_starts_at: UtcDatetime | None = None
+    # Whether the page may offer "I'm <next> — switch now" (the next slot is
+    # someone else and starts within 10 minutes)
+    can_switch_early: bool = False
 
 
 class SpinMatchShow(BaseModel):

@@ -87,6 +87,7 @@ class SpinitronScheduleService:
                 end=show["end"],
                 dj_name=resolved.get(show["persona_id"]),
                 persona_id=show["persona_id"],
+                title=show["title"],
             )
             for show in shows
         ]
@@ -97,6 +98,9 @@ class SpinitronScheduleService:
                 end=playlist["end"],
                 dj_name=resolved.get(playlist["persona_id"]),
                 persona_id=playlist["persona_id"],
+                show_id=playlist.get("show_id"),
+                title=playlist["title"],
+                automation=playlist.get("automation", False),
             )
             for playlist in playlists
         ]
