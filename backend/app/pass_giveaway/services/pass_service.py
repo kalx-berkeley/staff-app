@@ -2,7 +2,7 @@
 
 from datetime import datetime, date, timedelta, timezone
 from zoneinfo import ZoneInfo
-from sqlalchemy import func
+
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from fastapi import HTTPException, status
@@ -507,41 +507,37 @@ class PassService:
         )
 
     @staticmethod
-    def get_dj_history(db: Session, dj_name: str) -> list[Pass]:
+    def get_identities_history(
+        db: Session, persona_ids: set[int], specialty_show_ids: set[int]
+    ) -> list[Pass]:
         """
-        Get all passes given away by or pre-assigned to a specific DJ.
-
-        Returns given_away passes where DJ is the giver, plus available passes
-        that are currently pre-assigned to this DJ (ignoring case) on published
-        shows (a closed, draft or deleted show's pre-assignments can no longer be
-        given away).
-
-        Args:
-            db: Database session
-            dj_name: DJ name to filter by
-
-        Returns:
-            List of passes given away by or pre-assigned to the DJ
+        Passes given away by, or pre-assigned to, any of these personas or
+        shows. Pre-assigned passes count while they're available on a
+        published show.
         """
-        from sqlalchemy import or_
+        from sqlalchemy import false, or_
 
-        # Names are compared ignoring case and surrounding spaces, as the DJ
-        # view does: the name a DJ types may differ in case from the one
-        # saved with a giveaway, and Clothespin saves the name's official
-        # spelling, which may differ in case from what the DJ typed.
-        name = dj_name.strip().lower()
+        def ours(persona_column, show_column):
+            conditions = []
+            if persona_ids:
+                conditions.append(persona_column.in_(persona_ids))
+            if specialty_show_ids:
+                conditions.append(show_column.in_(specialty_show_ids))
+            return or_(*conditions) if conditions else false()
+
         return (
             db.query(Pass)
             .join(Show, Pass.show_id == Show.id)
             .filter(
                 or_(
-                    (func.lower(func.trim(Pass.given_away_by_dj)) == name)
+                    ours(Pass.given_away_persona_id, Pass.given_away_specialty_show_id)
                     & (Pass.status == "given_away"),
-                    (func.lower(func.trim(Pass.preassigned_dj)) == name)
+                    ours(Pass.preassigned_persona_id, Pass.preassigned_specialty_show_id)
                     & (Pass.status == "available")
                     & (Show.status == "published"),
                 )
             )
+            .order_by(Pass.id)
             .all()
         )
 

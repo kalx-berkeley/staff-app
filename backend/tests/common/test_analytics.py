@@ -141,7 +141,7 @@ def test_venue_and_dj_pages_handle_missing_things(client: TestClient, db: Sessio
     assert r.status_code == 200
     assert r.json()["metrics"] == []
     r = client.get("/api/analytics/tabs/dj?dj=unknown", headers=_as("promo@example.com"))
-    assert r.json()["title"] == "Unknown DJ"
+    assert r.json()["title"] == "Unattributed"
 
 
 # ---------------------------------------------------------------------------

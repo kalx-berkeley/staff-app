@@ -13,10 +13,12 @@ from app.config import settings
 from app.models.analytics_event import AnalyticsEvent
 from app.models.on_air_winner import OnAirWinner
 from app.models.pass_model import Pass
+from app.models.spinitron_persona import SpinitronPersona
 from app.models.promoter import Promoter
 from app.models.promoter_owner import PromoterOwner
 from app.models.show import Show
 from app.models.show_attempt import ShowAttempt
+from app.models.specialty_show import SpecialtyShow
 from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
 from app.models.staff_status import StaffStatus
@@ -330,6 +332,8 @@ def test_visit_outcomes_best_wins(client, db, promo, venue, on_air):
     show = _show(db, venue, 5, pairs=2)
     pair = db.query(Pass).filter(Pass.show_id == show.id, Pass.pass_type == "pair").first()
     marmot = dict(persona_id=77, name="DJ Marmot")
+    db.add(SpinitronPersona(id=77, name="DJ Marmot"))
+    db.commit()
 
     # Opened before DJ Marmot's slot, then moved to them after an early switch
     on_air(None)
@@ -375,9 +379,10 @@ def test_visit_outcomes_best_wins(client, db, promo, venue, on_air):
     djs = {r["dj"]: r for r in _tab(client, "djs")["djs"]["rows"]}
     assert djs["DJ Marmot"]["visits"] == 2
     assert djs["DJ Marmot"]["given_away"] == pytest.approx(0.5)
-    assert djs["Unknown DJ"]["visits"] == 1
+    assert djs["DJ Marmot"]["dj_key"] == "persona-77"
+    assert djs["Unattributed"]["visits"] == 1
 
-    dj_page = _tab(client, "dj", "&dj=dj%20marmot")
+    dj_page = _tab(client, "dj", "&dj=persona-77")
     assert dj_page["dj_funnel"]["rows"][0]["visits"] == 2
     assert dj_page["dj_given"]["value"] == 1
     unknown = _tab(client, "dj", "&dj=unknown")
@@ -386,6 +391,43 @@ def test_visit_outcomes_best_wins(client, db, promo, venue, on_air):
     venue_funnel = _tab(client, "venue", f"&venue_id={venue.id}")["venue_funnel"]["rows"][0]
     assert venue_funnel["visits"] == 3
     assert venue_funnel["neither"] == pytest.approx(2 / 3)
+
+
+def test_djs_tab_has_a_row_per_persona_and_show(client, db, promo, venue):
+    """Each persona and show is its own row, named as it is now (decision 29)."""
+    talk = SpecialtyShow(name="Morning Report", category="talk")
+    music = SpecialtyShow(name="Take Five")
+    db.add_all([talk, music, SpinitronPersona(id=5, name="DJ Renamed")])
+    db.flush()
+    show = _show(db, venue, 5, pairs=4)
+    credits = [(5, None), (5, None), (None, talk.id), (5, music.id)]
+    for p, (persona_id, show_id) in zip(
+        db.query(Pass).filter(Pass.show_id == show.id, Pass.pass_type == "pair"), credits
+    ):
+        p.status = "given_away"
+        p.given_away_at = NOW - timedelta(days=1)
+        p.given_away_by_dj = "DJ Old Name"
+        p.given_away_persona_id = persona_id
+        p.given_away_specialty_show_id = show_id
+    db.add(
+        ShowAttempt(
+            show_id=show.id, dj_name="", specialty_show_id=talk.id, attempted_at=NOW
+        )
+    )
+    db.commit()
+
+    rows = {r["dj"]: r for r in _tab(client, "djs")["djs"]["rows"]}
+
+    assert {k: (r["given"], r["tried_count"]) for k, r in rows.items()} == {
+        "DJ Renamed": (2, 0),
+        "Morning Report": (1, 1),
+        # A giveaway during a music show counts for the show
+        "Take Five": (1, 0),
+    }
+    talk_page = _tab(client, "dj", f"&dj=show-{talk.id}")
+    assert (talk_page["dj_given"]["value"], talk_page["dj_tried"]["value"]) == (1, 1)
+    top = _tab(client, "overview")["top_djs_given"]["rows"]
+    assert top[0] == {"dj": "DJ Renamed", "dj_key": "persona-5", "given": 2}
 
 
 def test_promotions_preview_is_not_tracked(client, db, promo, venue):

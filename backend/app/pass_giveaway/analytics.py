@@ -19,7 +19,6 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Callable, Iterable, Optional
-from urllib.parse import quote
 
 from sqlalchemy.orm import Session, selectinload
 
@@ -42,9 +41,7 @@ from app.common.services.analytics_window import Window, today_pacific
 from app.common.services.tracking_service import (
     DJ_STUDIO_NETWORK,
     STATION_OFFICE_NETWORK,
-    UNKNOWN_DJ,
     as_utc,
-    normalize_dj_name,
     normalize_person_name,
     normalize_phone,
     pacific_date,
@@ -56,6 +53,9 @@ from app.models.pass_model import Pass
 from app.models.promoter import Promoter
 from app.models.show import Show
 from app.models.show_attempt import ShowAttempt
+from app.models.specialty_show import SpecialtyShow
+from app.models.spinitron_persona import SpinitronPersona
+from app.models.credit import UNATTRIBUTED
 from app.models.staff import Staff
 from app.models.venue import Venue, venue_sort_key
 from app.pass_giveaway.services.tracking import (
@@ -115,12 +115,16 @@ _VISIT_FORMULA = (
     ' in it: a pass pair given away, else "tried" clicked, else neither.'
 )
 _VISIT_DJ = (
-    'A visit belongs to the DJ named in the giveaway or "tried" click, otherwise to'
-    " the name in the DJ name field at the top of the page. With no name it counts as"
-    ' "Unknown DJ". Names match ignoring case and spacing.'
+    "A visit belongs to who the Spinitron schedule had on air for its giveaway or"
+    ' "tried" click, otherwise when the page was opened (or switched early to the'
+    ' next DJ). With no one on air it counts as "Unattributed".'
 )
 _VISIT_EXCLUDES = "Promotions staff previewing the DJ view, and impersonation."
-_DJ_NAMES = "DJ names match ignoring case and spacing."
+_DJ_NAMES = (
+    "Each DJ persona and each Specialty Music Show or Talk & Info Show is its own row,"
+    " named as it is now. A giveaway during a music show counts for the show; one made"
+    ' while no one was on air is "Unattributed".'
+)
 _WINNERS = (
     "Winners are matched by phone number, digits only and without a leading 1. The"
     " name shown is the most recent one used with that number."
@@ -204,30 +208,51 @@ def _usage(shows: Iterable[Show]) -> _Usage:
     return u
 
 
+def _who(persona_id: Optional[int], specialty_show_id: Optional[int]) -> Optional[str]:
+    """
+    The DJs tab row a record belongs to: its show (a Specialty Music Show or
+    Talk & Info Show slot, so each show gets its own row), else its persona,
+    else None (unattributed). See decision 29 of
+    docs/pass-giveaway/specs/spinitron-identity/plan.md.
+    """
+    if specialty_show_id is not None:
+        return f"show-{specialty_show_id}"
+    if persona_id is not None:
+        return f"persona-{persona_id}"
+    return None
+
+
 def _dj_display_names(db: Session) -> dict[str, str]:
-    """Normalized DJ name → its most common spelling in giveaways and attempts."""
-    spellings: dict[str, Counter] = defaultdict(Counter)
-    for (name,) in db.query(Pass.given_away_by_dj).filter(
-        Pass.given_away_by_dj.isnot(None)
-    ):
-        key = normalize_dj_name(name)
-        if key:
-            spellings[key][name.strip()] += 1
-    for (name,) in db.query(ShowAttempt.dj_name):
-        key = normalize_dj_name(name)
-        if key:
-            spellings[key][name.strip()] += 1
-    return {k: c.most_common(1)[0][0] for k, c in spellings.items()}
+    """Row key → the persona's or show's current name, for every persona and show."""
+    names = {
+        f"persona-{pid}": name
+        for pid, name in db.query(SpinitronPersona.id, SpinitronPersona.name)
+    }
+    names.update({
+        f"show-{sid}": name for sid, name in db.query(SpecialtyShow.id, SpecialtyShow.name)
+    })
+    return names
 
 
 def _dj_label(key: Optional[str], names: dict[str, str]) -> str:
     if not key:
-        return UNKNOWN_DJ
-    return names.get(key, key)
+        return UNATTRIBUTED
+    if key in names:
+        return names[key]
+    kind, _, number = key.partition("-")
+    return f"Persona #{number}" if kind == "persona" else f"Show #{number}"
 
 
 def _dj_link_key(key: Optional[str]) -> str:
-    return quote(key or UNKNOWN_DJ_KEY, safe="")
+    return key or UNKNOWN_DJ_KEY
+
+
+def _given_by(p: Pass) -> Optional[str]:
+    return _who(p.given_away_persona_id, p.given_away_specialty_show_id)
+
+
+def _tried_by(a: ShowAttempt) -> Optional[str]:
+    return _who(a.persona_id, a.specialty_show_id)
 
 
 def _giveaways_in_window(db: Session, window: Window, venue_id: Optional[int] = None):
@@ -270,7 +295,12 @@ class _Visit:
 
 def _visits(db: Session, window: Window) -> list[_Visit]:
     return [
-        _Visit(c.entity_id, c.dj_name, c.dimension or "neither", c.count)
+        _Visit(
+            c.entity_id,
+            _who(c.persona_id, c.specialty_show_id),
+            c.dimension or "neither",
+            c.count,
+        )
         for c in tracking_service.event_counts(
             db, [GIVEAWAY_VISIT], window.start, window.end
         )
@@ -337,9 +367,9 @@ def _params_venue_id(params: Params) -> Optional[int]:
 
 
 def _dj_from_params(params: Params) -> Optional[str]:
-    """The DJ page's DJ: a normalized name, or None for "Unknown DJ"."""
+    """The DJ page's row key (see `_who`), or None for unattributed."""
     key = params.get("dj", "")
-    return None if key == UNKNOWN_DJ_KEY else normalize_dj_name(key)
+    return None if key == UNKNOWN_DJ_KEY else key
 
 
 # ---------------------------------------------------------------------------
@@ -918,8 +948,8 @@ def build_overview(db: Session, window: Window, params: Params) -> list[dict]:
         _same_name_table(wins, window, _venue_win_limits(db), "same_name_different_phones"),
     ]
 
-    given_by_dj = Counter(normalize_dj_name(p.given_away_by_dj) for p in giveaways)
-    tried_by_dj = Counter(normalize_dj_name(a.dj_name) for a in attempts)
+    given_by_dj = Counter(_given_by(p) for p in giveaways)
+    tried_by_dj = Counter(_tried_by(a) for a in attempts)
     metrics.append(
         table(
             "top_djs_given",
@@ -1579,8 +1609,8 @@ def build_djs(db: Session, window: Window, params: Params) -> list[dict]:
     giveaways = _giveaways_in_window(db, window)
     attempts = _attempts_in_window(db, window)
     visits = _visits(db, window)
-    given = Counter(normalize_dj_name(p.given_away_by_dj) for p in giveaways)
-    tried = Counter(normalize_dj_name(a.dj_name) for a in attempts)
+    given = Counter(_given_by(p) for p in giveaways)
+    tried = Counter(_tried_by(a) for a in attempts)
     by_dj: dict[Optional[str], list[_Visit]] = defaultdict(list)
     for v in visits:
         by_dj[v.dj].append(v)
@@ -1632,14 +1662,8 @@ def dj_title(db: Session, params: Params) -> Optional[str]:
 
 def build_dj(db: Session, window: Window, params: Params) -> list[dict]:
     key = _dj_from_params(params)
-    giveaways = [
-        p
-        for p in _giveaways_in_window(db, window)
-        if normalize_dj_name(p.given_away_by_dj) == key
-    ]
-    attempts = [
-        a for a in _attempts_in_window(db, window) if normalize_dj_name(a.dj_name) == key
-    ]
+    giveaways = [p for p in _giveaways_in_window(db, window) if _given_by(p) == key]
+    attempts = [a for a in _attempts_in_window(db, window) if _tried_by(a) == key]
     visits = [v for v in _visits(db, window) if v.dj == key]
     by_venue: dict[str, Counter] = defaultdict(Counter)
     for p in giveaways:

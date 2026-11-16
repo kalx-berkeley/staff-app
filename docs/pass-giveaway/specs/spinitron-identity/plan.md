@@ -111,6 +111,37 @@ any release cut after the merge includes it.
    sync, the offline report could miss names that the online report
    matched. Re-run the script on release day, both online and with
    `--offline`; release only when both report zero misses.
+
+   As built (backend `pass_giveaway/services/on_air_identity.py`, frontend
+   `pass-giveaway/dj/OnAirProvider.tsx` and `OnAirBanner.tsx`), phase 3
+   settled these details the decisions left open:
+   - Spins (decision 23) come from the spin-match cache, which the DJ
+     pages already refresh once a minute, so the identity reads them all
+     the time rather than only through the changeover, at no extra cost.
+   - Running over (decision 24) needs a spin after the playlist's scheduled
+     end, and lasts up to 15 minutes. A DJ who stopped on time hands over at
+     the changeover even before the next DJ's first track. A playlist's
+     spins count from 10 minutes before its start (an early starter).
+   - With no spins, the schedule still prefers a playlist over a show, so
+     a placeholder on `/shows` doesn't hide a DJ's pre-provisioned playlist.
+   - The early switch names the next slot by its start time
+     (`X-DJ-Switch-To`), which survives a re-sync.
+   - The re-sync 10 minutes before each slot is one rolling scheduler job.
+   - Unattributed giveaways aren't held to the one-pair-per-show-per-4-hours
+     rule, since they can't be told apart. An unattributed winner can be
+     corrected while no one is on air.
+   - Winners entered on the show form (preassigned-winners spec) are also
+     credited with the decision 12 picker; blank is unattributed (it was
+     stored as "Unknown").
+   - Re-crediting (decision 28) is the "Giveaway Credit" section of
+     Promotions → Admin, listing recent giveaways (unattributed only by
+     default) with a picker; each change is a `giveaway_recredited` audit
+     log entry.
+   - KALX Staff Analytics' DJs tab (decision 29) has a row per show (a
+     giveaway during a music show counts for the show) and per persona,
+     named as they are now, and an "Unattributed" row.
+   - The `/staff` My Passes history (decision 27) is open to any current
+     staff member, since talk show members needn't be Sublist DJs.
 5. **4: Drop the text columns.** Decision 32, once phase 3 has settled.
 
 ## Facts this plan relies on

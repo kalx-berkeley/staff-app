@@ -37,6 +37,7 @@ from app.pass_giveaway.services.identities import (
 from app.pass_giveaway.services import tabler_service
 from app.pass_giveaway.services.specialty_show_membership import (
     is_member as is_show_member,
+    member_show_ids,
 )
 from app.pass_giveaway.services.on_air_identity import (
     OnAirIdentity,
@@ -59,7 +60,6 @@ from app.auth import (
     resolve_effective_email,
     get_promotions_staff,
     get_staff_member,
-    get_sublist_dj_staff,
     check_dj_access,
     check_dj_giveaway_access,
     check_station_office_access,
@@ -707,35 +707,19 @@ def remove_guest(
 
 @router.get("/passes/staff/my-giveaways", response_model=list[PassResponse])
 def get_staff_my_giveaways(
-    staff: Staff = Depends(get_sublist_dj_staff),
+    user_info: tuple = Depends(require_promotions_or_staff),
     db: Session = Depends(get_db),
 ):
     """
-    Get Sublist DJ staff member's giveaway history using their own DJ name.
-
-    Requires Sublist DJ status. Uses the staff member's dj_name from their profile.
-
-    Returns:
-        List of passes given away by the staff member's DJ name
+    The signed-in staff member's on-air giveaway history and pre-assigned
+    passes, across every persona of theirs and every Specialty Music Show and
+    Talk & Info Show they belong to (decision 27). Empty for someone with
+    neither.
     """
-    if not staff.dj_name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No DJ name is set on your profile. Contact promotions staff.",
-        )
-    dj_names = [n.strip() for n in staff.dj_name.split(",") if n.strip()]
-    if not dj_names:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No DJ name is set on your profile. Contact promotions staff.",
-        )
-    passes = []
-    seen_ids: set[int] = set()
-    for name in dj_names:
-        for pass_item in PassService.get_dj_history(db, name):
-            if pass_item.id not in seen_ids:
-                seen_ids.add(pass_item.id)
-                passes.append(pass_item)
+    _, staff = user_info
+    passes = PassService.get_identities_history(
+        db, staff_persona_ids(staff), member_show_ids(db, staff)
+    )
     return [PassResponse.model_validate(p) for p in passes]
 
 

@@ -35,7 +35,6 @@ RAW_RETENTION_DAYS = 396
 DJ_STUDIO_NETWORK = "dj_studio"
 STATION_OFFICE_NETWORK = "station_office"
 
-UNKNOWN_DJ = "Unknown DJ"
 
 
 def normalize_dj_name(name: Optional[str]) -> Optional[str]:
@@ -184,6 +183,9 @@ class EventCount:
     dj_name: Optional[str]
     dimension: Optional[str]
     count: int
+    # Who was on air: a Spinitron persona and/or a specialty show
+    persona_id: Optional[int] = None
+    specialty_show_id: Optional[int] = None
     # Set for raw events only
     occurred_at: Optional[datetime] = None
     ref: Optional[str] = None
@@ -219,6 +221,8 @@ def event_counts(
                 dj_name=e.dj_name,
                 dimension=e.dimension,
                 count=1,
+                persona_id=e.persona_id,
+                specialty_show_id=e.specialty_show_id,
                 occurred_at=as_utc(e.occurred_at),
                 ref=e.ref,
             )
@@ -244,6 +248,8 @@ def event_counts(
                 dj_name=r.dj_name,
                 dimension=r.dimension,
                 count=r.count,
+                persona_id=r.persona_id,
+                specialty_show_id=r.specialty_show_id,
             )
         )
     return rows
