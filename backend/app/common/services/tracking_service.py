@@ -36,7 +36,6 @@ DJ_STUDIO_NETWORK = "dj_studio"
 STATION_OFFICE_NETWORK = "station_office"
 
 
-
 def normalize_dj_name(name: Optional[str]) -> Optional[str]:
     """Lowercase *name* and collapse its whitespace; None when it's blank."""
     if not name:
