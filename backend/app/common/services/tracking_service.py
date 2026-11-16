@@ -126,6 +126,8 @@ def record_event(
     entity_type: Optional[str] = None,
     entity_id: Optional[int] = None,
     dj_name: Optional[str] = None,
+    persona_id: Optional[int] = None,
+    specialty_show_id: Optional[int] = None,
     dimension: Optional[str] = None,
     details: Optional[dict] = None,
 ) -> Optional[AnalyticsEvent]:
@@ -139,6 +141,8 @@ def record_event(
         for impersonation. Defaults to *actor_email*.
     :param actor_email: Who to record as the actor; null for guests.
     :param dj_name: A DJ name, normalized here.
+    :param persona_id: Who was on air: a Spinitron persona,
+    :param specialty_show_id: and/or a specialty show.
     :returns: The new event, or None if nothing was recorded.
     """
     if is_impersonating(db, real_email or actor_email):
@@ -153,6 +157,8 @@ def record_event(
             entity_type=entity_type,
             entity_id=entity_id,
             dj_name=normalize_dj_name(dj_name),
+            persona_id=persona_id,
+            specialty_show_id=specialty_show_id,
             dimension=dimension,
             details=details,
         )

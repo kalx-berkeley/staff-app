@@ -140,3 +140,28 @@ def client(db: Session) -> TestClient:
 
     # Clean up the override after the test
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def on_air(client: TestClient):
+    """
+    Set who the DJ pages credit, instead of working it out from the cached
+    Spinitron schedule: ``on_air(persona_id=5, name="DJ Test")``, or
+    ``on_air(None)`` for no one. Without a call, the schedule decides (and an
+    empty one is no one).
+
+    :returns: A setter taking an ``OnAirIdentity`` or its fields, which
+        returns the identity it set.
+    """
+    from app.pass_giveaway.services.on_air_identity import OnAirIdentity, dj_identity
+
+    def set_on_air(identity: OnAirIdentity | None = None, **fields) -> OnAirIdentity | None:
+        if identity is None and fields:
+            fields.setdefault("kind", "persona")
+            if fields["kind"] == "persona":
+                fields.setdefault("persona_name", fields.get("name"))
+            identity = OnAirIdentity(**fields)
+        app.dependency_overrides[dj_identity] = lambda: identity
+        return identity
+
+    return set_on_air

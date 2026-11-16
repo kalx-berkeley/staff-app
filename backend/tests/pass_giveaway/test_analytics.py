@@ -317,28 +317,32 @@ def test_reps_report_and_venue_creators(client, db, promo, venue):
 # Giveaway page visits
 
 
-def _visit(client, show_id, visit_id, dj_name="DJ Marmot", headers=DJ_GUEST):
+def _visit(client, show_id, visit_id, headers=DJ_GUEST):
     r = client.post(
         "/api/pass-giveaway/analytics/giveaway-visits",
-        json={"visit_id": visit_id, "show_id": show_id, "dj_name": dj_name},
+        json={"visit_id": visit_id, "show_id": show_id},
         headers=headers,
     )
     assert r.status_code == 204, r.text
 
 
-def test_visit_outcomes_best_wins(client, db, promo, venue):
+def test_visit_outcomes_best_wins(client, db, promo, venue, on_air):
     show = _show(db, venue, 5, pairs=2)
     pair = db.query(Pass).filter(Pass.show_id == show.id, Pass.pass_type == "pair").first()
+    marmot = dict(persona_id=77, name="DJ Marmot")
 
-    _visit(client, show.id, "visit-aaaa-1111", dj_name="")
+    # Opened before DJ Marmot's slot, then moved to them after an early switch
+    on_air(None)
+    _visit(client, show.id, "visit-aaaa-1111")
+    on_air(**marmot)
     client.put(
         "/api/pass-giveaway/analytics/giveaway-visits/visit-aaaa-1111/dj",
-        json={"dj_name": "dj  marmot"},
+        json={"dj_name": "ignored"},
         headers=DJ_GUEST,
     )
     r = client.post(
         f"/api/shows/{show.id}/attempt",
-        json={"dj_name": "DJ Marmot", "visit_id": "visit-aaaa-1111"},
+        json={"visit_id": "visit-aaaa-1111"},
         headers=DJ_GUEST,
     )
     assert r.status_code == 200, r.text
@@ -347,7 +351,6 @@ def test_visit_outcomes_best_wins(client, db, promo, venue):
         json={
             "recipient_name": "Winner",
             "recipient_phone": "510-555-0100",
-            "given_away_by_dj": "DJ Marmot",
             "visit_id": "visit-aaaa-1111",
         },
         headers=DJ_GUEST,
@@ -356,16 +359,17 @@ def test_visit_outcomes_best_wins(client, db, promo, venue):
     # A reload continues the same visit
     _visit(client, show.id, "visit-aaaa-1111")
 
-    _visit(client, show.id, "visit-bbbb-2222", dj_name="DJ Marmot")
-    _visit(client, show.id, "visit-cccc-3333", dj_name="")
+    _visit(client, show.id, "visit-bbbb-2222")
+    on_air(None)
+    _visit(client, show.id, "visit-cccc-3333")
 
     visits = (
         db.query(AnalyticsEvent).filter(AnalyticsEvent.event_type == "giveaway_visit").all()
     )
-    assert sorted((v.ref, v.dimension, v.dj_name) for v in visits) == [
-        ("visit-aaaa-1111", "given_away", "dj marmot"),
-        ("visit-bbbb-2222", "neither", "dj marmot"),
-        ("visit-cccc-3333", "neither", None),
+    assert sorted((v.ref, v.dimension, v.dj_name, v.persona_id) for v in visits) == [
+        ("visit-aaaa-1111", "given_away", "dj marmot", 77),
+        ("visit-bbbb-2222", "neither", "dj marmot", 77),
+        ("visit-cccc-3333", "neither", None, None),
     ]
 
     djs = {r["dj"]: r for r in _tab(client, "djs")["djs"]["rows"]}

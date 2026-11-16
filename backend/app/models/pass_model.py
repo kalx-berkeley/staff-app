@@ -2,7 +2,8 @@
 
 from datetime import datetime, date, timezone
 from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, DateTime, Date
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import object_session, relationship
+from app.models.credit import credit_label
 from app.models.guest_fallback import GuestFallback
 from app.database import Base
 
@@ -184,6 +185,18 @@ class Pass(Base):
     @property
     def show_status(self):
         return self.show.status if self.show else None
+
+    @property
+    def given_away_by(self) -> str | None:
+        """Who a given-away pair is credited to, by current name (see `credit`)."""
+        if self.status != "given_away":
+            return None
+        return credit_label(
+            object_session(self),
+            self.given_away_persona_id,
+            self.given_away_specialty_show_id,
+            self.given_away_by_dj,
+        )
 
     @property
     def preassigned_specialty_show_name(self):

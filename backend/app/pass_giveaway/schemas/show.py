@@ -4,6 +4,7 @@ from datetime import date, time
 from typing import Literal
 
 from pydantic import (
+    AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
@@ -475,7 +476,8 @@ class ShowAttemptResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    dj_name: str
+    # Who was on air, by current name ("Unattributed" for no one)
+    dj_name: str = Field(validation_alias=AliasChoices("credited_name", "dj_name"))
     attempted_at: UtcDatetime
 
 

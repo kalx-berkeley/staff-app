@@ -24,6 +24,11 @@ from app.models.on_air_winner import OnAirWinner
 from app.models.job_log import JobLog
 from app.models.specialty_show import SpecialtyShow
 from app.pass_giveaway.schemas.pass_schema import GiveawayData, WinnerUpdateData
+from app.pass_giveaway.services.on_air_identity import (
+    OnAirIdentity,
+    credit,
+    identity_label,
+)
 from app.pass_giveaway.services.spinitron_schedule_service import SpinitronScheduleService
 
 import re
@@ -145,16 +150,23 @@ class PassService:
             )
 
     @staticmethod
-    def give_away_pass_pair(db: Session, pass_id: int, giveaway_data: GiveawayData) -> Pass:
+    def give_away_pass_pair(
+        db: Session,
+        pass_id: int,
+        giveaway_data: GiveawayData,
+        identity: OnAirIdentity | None,
+    ) -> Pass:
         """
         Give away a pass pair.
 
-        Records winner information and marks the pass_item as given_away.
+        Records winner information and marks the pass_item as given_away,
+        credited to *identity* (who the schedule says is on air), or to no one.
 
         Args:
             db: Database session
             pass_id: Pass ID
-            giveaway_data: Giveaway data with recipient and DJ info
+            giveaway_data: Giveaway data with recipient info
+            identity: Who is on air (`on_air_identity.dj_identity`)
 
         Returns:
             Updated pass_item
@@ -200,15 +212,18 @@ class PassService:
                     ),
                 )
 
-            # Enforce one giveaway per DJ per show within a 4-hour shift window,
-            # comparing DJ names ignoring case and surrounding spaces
+            # Enforce one giveaway per on-air identity per show within a 4-hour
+            # shift window. A giveaway credited to no one can't be told apart.
+            persona_id, specialty_show_id = credit(identity)
             four_hours_ago = datetime.now(timezone.utc) - DJ_SHOW_GIVEAWAY_WINDOW
-            recent_dj_giveaway = (
+            recent_dj_giveaway = identity is not None and (
                 db.query(OnAirWinner)
                 .filter(
                     OnAirWinner.show_id == pass_item.show_id,
-                    func.lower(func.trim(OnAirWinner.given_away_by_dj))
-                    == giveaway_data.given_away_by_dj.strip().lower(),
+                    _null_safe_eq(OnAirWinner.given_away_persona_id, persona_id),
+                    _null_safe_eq(
+                        OnAirWinner.given_away_specialty_show_id, specialty_show_id
+                    ),
                     OnAirWinner.created_at >= four_hours_ago,
                 )
                 .first()
@@ -217,13 +232,16 @@ class PassService:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=(
-                        f"DJ '{giveaway_data.given_away_by_dj}' has already given away"
-                        " a pair of passes for this show within the last 4 hours"
+                        f"{identity.name} has already given away a pair of passes for"
+                        " this show within the last 4 hours"
                     ),
                 )
 
             # Record giveaway on the pass
-            pass_item.given_away_by_dj = giveaway_data.given_away_by_dj
+            label = identity_label(identity)
+            pass_item.given_away_by_dj = label or None
+            pass_item.given_away_persona_id = persona_id
+            pass_item.given_away_specialty_show_id = specialty_show_id
             pass_item.given_away_at = datetime.now(timezone.utc)
             pass_item.status = "given_away"
             pass_item.updated_at = datetime.now(timezone.utc)
@@ -236,7 +254,9 @@ class PassService:
                 recipient_name=giveaway_data.recipient_name,
                 recipient_phone=normalize_phone(giveaway_data.recipient_phone),
                 recipient_email=giveaway_data.recipient_email,
-                given_away_by_dj=giveaway_data.given_away_by_dj,
+                given_away_by_dj=label,
+                given_away_persona_id=persona_id,
+                given_away_specialty_show_id=specialty_show_id,
             )
             db.add(winner)
 
@@ -319,19 +339,21 @@ class PassService:
         }
 
     @staticmethod
-    def get_winner_for_dj_edit(db: Session, pass_id: int, dj_name: str) -> Pass:
+    def get_winner_for_dj_edit(
+        db: Session, pass_id: int, identity: OnAirIdentity | None
+    ) -> Pass:
         """
         Get a given-away pass pair whose winner the on-air DJ may still correct.
 
-        The DJ may correct the winner when the typed DJ name matches the DJ who
-        gave the passes away (ignoring case and surrounding spaces), less than
+        The DJ may correct the winner when the passes were credited to who is
+        on air now (the same persona and show, or both no one), less than
         DJ_SHOW_GIVEAWAY_WINDOW has passed since the giveaway, and the show
         isn't closed or past its planned close time.
 
         Args:
             db: Database session
             pass_id: Pass ID
-            dj_name: The DJ name typed in the DJ view
+            identity: Who is on air (`on_air_identity.dj_identity`)
 
         Returns:
             The pass, with its on_air_winner
@@ -352,8 +374,8 @@ class PassService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="This pass pair has no on-air winner",
             )
-        giver = (pass_item.given_away_by_dj or "").strip().lower()
-        if not giver or giver != dj_name.strip().lower():
+        giver = (pass_item.given_away_persona_id, pass_item.given_away_specialty_show_id)
+        if giver != credit(identity):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only the DJ who gave away these passes can edit the winner",
@@ -444,6 +466,45 @@ class PassService:
                 detail="Database error occurred while editing the winner",
             )
         return before, after
+
+    @staticmethod
+    def get_identity_history(db: Session, identity: OnAirIdentity | None) -> list[Pass]:
+        """
+        Passes given away by, or pre-assigned to, who is on air.
+
+        During a Specialty Music Show that's the show's and its DJ persona's
+        passes; during a talk show, only the show's (decision 19). Pre-assigned
+        passes count while they're available on a published show (a closed,
+        draft or deleted show's can no longer be given away). No one on air has
+        no passes.
+        """
+        from sqlalchemy import false, or_
+
+        if identity is None:
+            return []
+
+        def mine(persona_column, show_column):
+            conditions = []
+            if identity.specialty_show_id is not None:
+                conditions.append(show_column == identity.specialty_show_id)
+            if identity.persona_id is not None and identity.kind != "talk":
+                conditions.append(persona_column == identity.persona_id)
+            return or_(*conditions) if conditions else false()
+
+        return (
+            db.query(Pass)
+            .join(Show, Pass.show_id == Show.id)
+            .filter(
+                or_(
+                    mine(Pass.given_away_persona_id, Pass.given_away_specialty_show_id)
+                    & (Pass.status == "given_away"),
+                    mine(Pass.preassigned_persona_id, Pass.preassigned_specialty_show_id)
+                    & (Pass.status == "available")
+                    & (Show.status == "published"),
+                )
+            )
+            .all()
+        )
 
     @staticmethod
     def get_dj_history(db: Session, dj_name: str) -> list[Pass]:
@@ -549,6 +610,8 @@ class PassService:
 
         pass_item.status = "available"
         pass_item.given_away_by_dj = None
+        pass_item.given_away_persona_id = None
+        pass_item.given_away_specialty_show_id = None
         pass_item.given_away_at = None
         pass_item.updated_at = datetime.now(timezone.utc)
 
@@ -1364,83 +1427,57 @@ class PassService:
         return None
 
     @staticmethod
-    def resolve_dj_or_specialty_name(
-        db: Session, name: str
-    ) -> tuple[str, int | None, int | None] | None:
+    def clothespin(db: Session, show_id: int, identity: OnAirIdentity | None) -> Pass:
         """
-        Match a typed DJ name to a current staff member's persona or a current
-        specialty show, ignoring case.
+        Reserve one unclaimed pass pair of a show for who is on air, for today.
 
-        Personas of current staff (Active or 🆕) are checked first, then
-        specialty show names.
-
-        Args:
-            db: Database session
-            name: The name as typed
-
-        Returns:
-            (official spelling, specialty show ID or None, persona ID or None),
-            or None if nothing matches
-        """
-        from app.auth import current_staff_filter
-        from app.common.services.spinitron_personas import persona_names, staff_personas
-
-        wanted = " ".join(name.split()).lower()
-        if not wanted:
-            return None
-        staff_rows = (
-            db.query(Staff)
-            .filter(Staff.dj_personas.isnot(None), current_staff_filter())
-            .all()
-        )
-        for staff in staff_rows:
-            for persona in staff_personas(staff):
-                if " ".join(persona["name"].split()).lower() == wanted:
-                    current = persona_names(db, [persona["id"]]).get(persona["id"])
-                    return current or persona["name"], None, persona["id"]
-        for specialty in (
-            db.query(SpecialtyShow).filter(SpecialtyShow.current_filter()).all()
-        ):
-            if specialty.name.strip().lower() == wanted:
-                return specialty.name, specialty.id, None
-        return None
-
-    @staticmethod
-    def clothespin(db: Session, show_id: int, dj_name: str) -> Pass:
-        """
-        Reserve one unclaimed pass pair of a show for a DJ for today.
-
-        A pair counts as unclaimed when it is available and not pre-assigned to
-        anyone. The reservation is made with a conditional update, so two DJs
-        clicking at once never get the same pair.
+        During a Specialty Music Show or Talk & Info Show the pair is reserved
+        for the show; otherwise for the on-air persona, which must be linked to
+        a current staff member. A pair counts as unclaimed when it is available
+        and not pre-assigned to anyone. The reservation is made with a
+        conditional update, so two DJs clicking at once never get the same pair.
 
         Args:
             db: Database session
             show_id: Show ID
-            dj_name: The DJ name as typed in the DJ view
+            identity: Who is on air (`on_air_identity.dj_identity`)
 
         Returns:
             The reserved pass pair
 
         Raises:
-            HTTPException: 404 if the show doesn't exist, 400 if the name isn't a
-                known DJ or specialty show, 409 if the show's rules don't allow it,
-                the DJ already has a pair reserved for today, or no unclaimed pair
-                is left
+            HTTPException: 404 if the show doesn't exist, 400 if no one is on
+                air or the persona isn't a current staff member's, 409 if the
+                show's rules don't allow it, the identity already has a pair
+                reserved for today, or no unclaimed pair is left
         """
+        from app.pass_giveaway.services.identities import current_show, persona_holder
+
         show = db.query(Show).filter(Show.id == show_id).first()
         if not show:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Show not found"
             )
 
-        resolved = PassService.resolve_dj_or_specialty_name(db, dj_name)
-        if resolved is None:
+        if identity is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"‘{dj_name.strip()}’ isn't a known DJ or show name",
+                detail=(
+                    "No one is on air right now, so a pass pair can't be reserved."
+                    " If this isn't right, create your Spinitron playlist."
+                ),
             )
-        official_name, specialty_show_id, persona_id = resolved
+        official_name = identity.name
+        if identity.specialty_show_id is not None:
+            specialty_show_id = current_show(db, identity.specialty_show_id).id
+            persona_id = None
+        else:
+            if persona_holder(db, identity.persona_id) is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"{identity.name} isn't linked to a current staff member",
+                )
+            specialty_show_id, persona_id = None, identity.persona_id
 
         today = today_pt()
         blocker = PassService.clothespin_blocker(show, today)
@@ -1457,12 +1494,16 @@ class PassService:
             .order_by(Pass.id)
             .all()
         )
-        if any(
-            p.preassigned_dj
-            and p.preassigned_dj.lower() == official_name.lower()
-            and p.preassigned_date == today
-            for p in pairs
-        ):
+
+        def reserved_for_identity(p: Pass) -> bool:
+            if specialty_show_id is not None:
+                return p.preassigned_specialty_show_id == specialty_show_id
+            return (
+                p.preassigned_specialty_show_id is None
+                and p.preassigned_persona_id == persona_id
+            )
+
+        if any(reserved_for_identity(p) and p.preassigned_date == today for p in pairs):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"{official_name} already has a pass pair reserved for today",
@@ -2008,3 +2049,7 @@ class PassService:
             )
 
         return query.all()
+
+
+def _null_safe_eq(column, value):
+    return column.is_(None) if value is None else column == value

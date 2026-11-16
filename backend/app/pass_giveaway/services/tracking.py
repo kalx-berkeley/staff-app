@@ -21,6 +21,11 @@ from app.config import settings
 from app.database import get_db
 from app.models.analytics_event import AnalyticsEvent
 from app.models.staff import Staff
+from app.pass_giveaway.services.on_air_identity import (
+    OnAirIdentity,
+    credit,
+    identity_label,
+)
 
 GIVEAWAY_VISIT = "giveaway_visit"
 GUEST_SESSION = "guest_session"
@@ -87,11 +92,32 @@ def _visit(db: Session, visit_id: str) -> Optional[AnalyticsEvent]:
     )
 
 
+def _who(identity: Optional[OnAirIdentity]) -> dict:
+    """An event's DJ name, persona and show columns for *identity*."""
+    persona_id, specialty_show_id = credit(identity)
+    return {
+        "dj_name": identity_label(identity),
+        "persona_id": persona_id,
+        "specialty_show_id": specialty_show_id,
+    }
+
+
+def _set_who(event: AnalyticsEvent, identity: Optional[OnAirIdentity]) -> None:
+    who = _who(identity)
+    event.dj_name = tracking_service.normalize_dj_name(who["dj_name"])
+    event.persona_id = who["persona_id"]
+    event.specialty_show_id = who["specialty_show_id"]
+
+
 def start_visit(
-    db: Session, tracking: DjTracking, visit_id: str, show_id: int, dj_name: Optional[str]
+    db: Session,
+    tracking: DjTracking,
+    visit_id: str,
+    show_id: int,
+    identity: Optional[OnAirIdentity],
 ) -> None:
     """
-    Record a giveaway page visit, or continue it after a reload.
+    Record a giveaway page visit by who is on air, or continue it after a reload.
 
     The page keeps its visit ID for 10 minutes in the tab, so a reload within
     that time sends the same ID and continues the same visit.
@@ -99,7 +125,7 @@ def start_visit(
     existing = _visit(db, visit_id)
     if existing:
         if existing.entity_id == show_id:
-            set_visit_dj(db, visit_id, dj_name)
+            set_visit_dj(db, visit_id, identity)
         return
     tracking_service.record_event(
         db,
@@ -110,20 +136,20 @@ def start_visit(
         ref=visit_id,
         entity_type="show",
         entity_id=show_id,
-        dj_name=dj_name,
         dimension="neither",
+        **_who(identity),
     )
 
 
-def set_visit_dj(db: Session, visit_id: str, dj_name: Optional[str]) -> None:
+def set_visit_dj(db: Session, visit_id: str, identity: Optional[OnAirIdentity]) -> None:
     """
-    Update the DJ name a visit belongs to, from the name field at the top of
-    the page. A name sent with a giveaway or "tried" click takes precedence.
+    Update who a visit belongs to, to who is on air now. Who was on air for a
+    giveaway or "tried" click takes precedence.
     """
     visit = _visit(db, visit_id)
     if not visit or (visit.details or {}).get("dj_from_outcome"):
         return
-    visit.dj_name = tracking_service.normalize_dj_name(dj_name)
+    _set_who(visit, identity)
     db.commit()
 
 
@@ -133,11 +159,11 @@ def record_visit_outcome(
     visit_id: Optional[str],
     show_id: int,
     outcome: str,
-    dj_name: Optional[str],
+    identity: Optional[OnAirIdentity],
 ) -> None:
     """
     Record a giveaway or "tried" click in a visit. The visit keeps its best
-    outcome (given away > tried > neither) and the DJ name sent with it.
+    outcome (given away > tried > neither) and who was on air for it.
     """
     if not visit_id or tracking is None:
         return
@@ -153,15 +179,15 @@ def record_visit_outcome(
             ref=visit_id if visit is None else None,
             entity_type="show",
             entity_id=show_id,
-            dj_name=dj_name,
             dimension=outcome,
             details={"dj_from_outcome": True},
+            **_who(identity),
         )
         return
     if OUTCOMES.index(outcome) > OUTCOMES.index(visit.dimension or "neither"):
         visit.dimension = outcome
-    if tracking_service.normalize_dj_name(dj_name):
-        visit.dj_name = tracking_service.normalize_dj_name(dj_name)
+    if identity is not None:
+        _set_who(visit, identity)
         visit.details = {**(visit.details or {}), "dj_from_outcome": True}
     db.commit()
 

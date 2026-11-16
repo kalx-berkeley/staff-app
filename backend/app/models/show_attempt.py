@@ -2,8 +2,9 @@
 
 from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import object_session, relationship
 from app.database import Base
+from app.models.credit import credit_label
 
 
 class ShowAttempt(Base):
@@ -23,3 +24,10 @@ class ShowAttempt(Base):
     )
 
     show = relationship("Show", back_populates="attempts")
+
+    @property
+    def credited_name(self) -> str:
+        """Who was on air, by current name (see `credit`)."""
+        return credit_label(
+            object_session(self), self.persona_id, self.specialty_show_id, self.dj_name
+        )

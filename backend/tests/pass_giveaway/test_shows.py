@@ -9,6 +9,7 @@ from app.models.venue import Venue
 from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
 from app.models.staff_status import StaffStatus
+from app.models.spinitron_persona import SpinitronPersona
 
 
 @pytest.fixture
@@ -1261,12 +1262,19 @@ def test_show_detail_completeness(
     db.commit()
     db.refresh(show)
 
+    # Persona names come from the nightly copy of Spinitron's directory
+    db.add_all([
+        SpinitronPersona(id=900, name="DJ Cool"),
+        SpinitronPersona(id=901, name="DJ Retry"),
+    ])
+
     # Create pass pair that was given away
     pass_given_away = Pass(
         show_id=show.id,
         pass_type="pair",
         status="given_away",
         given_away_by_dj="DJ Cool",
+        given_away_persona_id=900,
         given_away_at=datetime(2024, 12, 25, 10, 30),
     )
 
@@ -1304,6 +1312,7 @@ def test_show_detail_completeness(
     attempt = ShowAttempt(
         show_id=show.id,
         dj_name="DJ Retry",
+        persona_id=901,
         attempted_at=datetime(2024, 12, 24, 15, 45),
     )
     db.add(attempt)
@@ -1383,15 +1392,17 @@ def test_guest_list_email_shows_failed_attempts_in_pacific_time(db: Session, tes
         ShowAttempt(
             show_id=show.id,
             dj_name="DJ Retry",
+            persona_id=901,
             attempted_at=datetime(2026, 11, 13, 3, 15, 42, 123456),
         )
     )
+    db.add(SpinitronPersona(id=901, name="DJ Retry"))
     db.commit()
     db.refresh(show)
 
     text = ShowService._build_guest_list_text(show)
 
-    assert "DJ DJ Retry announced the show on Thu, Nov 12, 2026 at 7:15pm" in text
+    assert "DJ Retry announced the show on Thu, Nov 12, 2026 at 7:15pm" in text
 
 
 @pytest.fixture

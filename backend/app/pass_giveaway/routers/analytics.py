@@ -18,6 +18,7 @@ from app.auth import check_dj_access
 from app.common.services import tracking_service
 from app.database import get_db
 from app.pass_giveaway.guest_redaction import GuestRedactingRoute
+from app.pass_giveaway.services.on_air_identity import OnAirIdentity, dj_identity
 from app.pass_giveaway.services import tracking
 from app.rate_limiter import create_rate_limit_dependency
 
@@ -39,13 +40,10 @@ class GuestSessionRequest(BaseModel):
 
 
 class GiveawayVisitRequest(BaseModel):
+    # Who the visit is by comes from the Spinitron schedule; a DJ name sent
+    # here is ignored
     visit_id: str = Field(..., pattern=_ID_PATTERN)
     show_id: int
-    dj_name: Optional[str] = Field(None, max_length=100)
-
-
-class VisitDjRequest(BaseModel):
-    dj_name: Optional[str] = Field(None, max_length=100)
 
 
 @router.post("/session", status_code=status.HTTP_204_NO_CONTENT)
@@ -81,23 +79,30 @@ def record_giveaway_visit(
     body: GiveawayVisitRequest,
     dj_access: bool = Depends(check_dj_access),
     dj: Optional[tracking.DjTracking] = Depends(tracking.dj_tracking),
+    identity: Optional[OnAirIdentity] = Depends(dj_identity),
     _rate_limit: None = Depends(_tracking_rate_limit),
     db: Session = Depends(get_db),
 ) -> None:
-    """Record a visit to a show's "I'm off the mic" page, or continue it after a reload."""
+    """
+    Record a visit to a show's "I'm off the mic" page by who is on air, or
+    continue it after a reload.
+    """
     if dj is not None:
-        tracking.start_visit(db, dj, body.visit_id, body.show_id, body.dj_name)
+        tracking.start_visit(db, dj, body.visit_id, body.show_id, identity)
 
 
 @router.put("/giveaway-visits/{visit_id}/dj", status_code=status.HTTP_204_NO_CONTENT)
 def set_giveaway_visit_dj(
     visit_id: str,
-    body: VisitDjRequest,
     dj_access: bool = Depends(check_dj_access),
     dj: Optional[tracking.DjTracking] = Depends(tracking.dj_tracking),
+    identity: Optional[OnAirIdentity] = Depends(dj_identity),
     _rate_limit: None = Depends(_tracking_rate_limit),
     db: Session = Depends(get_db),
 ) -> None:
-    """Update the visit's DJ from the DJ name field at the top of the page."""
+    """
+    Move the visit to who is on air now (the page calls this after switching
+    early). A name sent here is ignored.
+    """
     if dj is not None and len(visit_id) <= 64:
-        tracking.set_visit_dj(db, visit_id, body.dj_name)
+        tracking.set_visit_dj(db, visit_id, identity)

@@ -153,14 +153,19 @@ Without a login, guests from these networks can:
 
 DJ studio guests can also:
 - give away passes, record failed giveaway attempts and check winner eligibility;
-- correct the name, phone and email of a winner they recorded, under the same DJ name, within 4
-  hours of the giveaway and before the show closes;
-- see their own giveaways and the on-air DJ;
+- correct the name, phone and email of a winner recorded while the same persona or show was
+  on air, within 4 hours of the giveaway and before the show closes;
+- see the on-air identity's giveaways and pre-assigned passes, and who is on air;
 - see and dismiss spin matches;
-- reserve an unclaimed pass pair for today under a current DJ, Specialty Music Show or Talk & Info Show name
-  ("Clothespin"), and remove their own pass pre-assignment;
-- record visits to a show's "I'm off the mic" page and the DJ name on them, for KALX Staff
-  Analytics (`/api/pass-giveaway/analytics/giveaway-visits`).
+- reserve an unclaimed pass pair for today for the on-air persona (a current staff member's),
+  Specialty Music Show or Talk & Info Show ("Clothespin"), and remove a pre-assignment to it;
+- record visits to a show's "I'm off the mic" page, for KALX Staff Analytics
+  (`/api/pass-giveaway/analytics/giveaway-visits`).
+
+Who is on air is decided by the server from the Spinitron schedule and recent spins
+(`backend/app/pass_giveaway/services/on_air_identity.py`), never from anything the page types.
+The page can only ask to switch early to the next slot (the `X-DJ-Switch-To` header), which the
+server honours only in the last 10 minutes before that slot starts.
 
 The KALX Staff Analytics tracking routes only record an event. They accept a few short,
 validated fields, return nothing, and are rate-limited per IP address. The metrics themselves
@@ -185,9 +190,8 @@ before a response goes out:
 - DJ studio guests keep winner names and phone numbers, which the DJ view shows for each show's
   previous winners and the DJ's own giveaways.
 - DJ studio guests also get the winner's email from `GET /api/passes/{pass_id}/winner`, which
-  answers only under the DJ name that recorded the winner, within 4 hours, so the DJ can correct
-  it. Anyone at the studio computer who types that DJ name can read it, as the DJ name isn't
-  verified.
+  answers only while the persona or show credited with the giveaway is on air, within 4 hours,
+  so the DJ can correct it. Anyone at the studio computer during that time can read it.
 
 Every pass giveaway router applies this, so new endpoints are covered. The redaction tests in
 `backend/tests/common/test_guest_access.py` seed contact details and fail if any guest-reachable

@@ -18,6 +18,14 @@ from app.models.staff_genre_preference import StaffGenrePreference
 from app.pass_giveaway.services.pass_service import PassService
 from tests.personas import dj_fields
 
+# Who the DJ pages credit, unless a test says otherwise
+DJ_TEST_PERSONA_ID = 501
+
+
+@pytest.fixture(autouse=True)
+def dj_test_on_air(on_air):
+    return on_air(persona_id=DJ_TEST_PERSONA_ID, name="DJ Test")
+
 
 @pytest.fixture
 def venue(db: Session):
@@ -325,7 +333,7 @@ def test_get_dj_history(client, show, promotions_staff, db):
 
     # Get history
     response = client.get(
-        "/api/passes/my-giveaways?dj_name=DJ Test",
+        "/api/passes/my-giveaways",
         headers={"X-Forwarded-User": promotions_staff.email},
     )
     assert response.status_code == 200
@@ -334,12 +342,8 @@ def test_get_dj_history(client, show, promotions_staff, db):
     assert passes[0]["given_away_by_dj"] == "DJ Test"
 
 
-@pytest.mark.parametrize("second_name", ["DJ Test", "dj test", " DJ TEST "])
-def test_giveaway_refuses_a_second_pair_for_the_show_this_shift_in_any_case(
-    client, show, db, second_name
-):
-    """A DJ can't give away a second pair for a show within 4 hours, in any case."""
-    first, second = (
+def _two_pairs(db, show):
+    return (
         db.query(Pass)
         .filter(
             Pass.show_id == show.id,
@@ -350,58 +354,109 @@ def test_giveaway_refuses_a_second_pair_for_the_show_this_shift_in_any_case(
         .all()
     )
 
-    def give_away(pass_item, dj_name):
-        return client.post(
-            f"/api/passes/{pass_item.id}/giveaway",
-            json={
-                "recipient_name": "John Doe",
-                "recipient_phone": "555-1234",
-                "given_away_by_dj": dj_name,
-            },
-            headers={"X-Forwarded-For": DJ_STUDIO_IP},
-        )
 
-    assert give_away(first, "DJ Test").status_code == 200
-    response = give_away(second, second_name)
-    assert response.status_code == 400
-    assert "within the last 4 hours" in response.json()["detail"]
-
-
-@pytest.mark.parametrize("typed_name", ["dj test", "DJ TEST", "  DJ Test  "])
-def test_get_dj_history_ignores_case_and_spaces(
-    client, show, promotions_staff, db, typed_name
-):
-    """The DJ's typed name finds their giveaways and pre-assignments in any case."""
-    given, preassigned = (
-        db.query(Pass)
-        .filter(
-            Pass.show_id == show.id,
-            Pass.pass_type == "pair",
-            Pass.status == "available",
-        )
-        .limit(2)
-        .all()
-    )
-    client.post(
-        f"/api/passes/{given.id}/giveaway",
-        json={
-            "recipient_name": "John Doe",
-            "recipient_phone": "555-1234",
-            "given_away_by_dj": "DJ Test",
-        },
+def _give_away_from_studio(client, pass_item, **extra):
+    return client.post(
+        f"/api/passes/{pass_item.id}/giveaway",
+        json={"recipient_name": "John Doe", "recipient_phone": "555-1234", **extra},
         headers={"X-Forwarded-For": DJ_STUDIO_IP},
     )
+
+
+def test_giveaway_is_credited_to_who_is_on_air_not_the_name_sent(client, show, db):
+    pass_item = _two_pairs(db, show)[0]
+    response = _give_away_from_studio(client, pass_item, given_away_by_dj="DJ Typo")
+    assert response.status_code == 200
+    assert response.json()["given_away_by_dj"] == "DJ Test"
+    db.refresh(pass_item)
+    assert pass_item.given_away_persona_id == DJ_TEST_PERSONA_ID
+    assert pass_item.on_air_winner.given_away_persona_id == DJ_TEST_PERSONA_ID
+
+
+def test_giveaway_with_no_one_on_air_is_unattributed(client, show, db, on_air):
+    on_air(None)
+    first, second = _two_pairs(db, show)
+    response = _give_away_from_studio(client, first)
+    assert response.status_code == 200
+    assert response.json()["given_away_by_dj"] == "Unattributed"
+    # Unattributed giveaways can't be told apart, so aren't limited per shift
+    assert _give_away_from_studio(client, second).status_code == 200
+
+
+def test_giveaway_refuses_a_second_pair_for_the_show_this_shift(client, show, db, on_air):
+    """Who is on air can't give away a second pair for a show within 4 hours."""
+    first, second = _two_pairs(db, show)
+    assert _give_away_from_studio(client, first).status_code == 200
+    response = _give_away_from_studio(client, second)
+    assert response.status_code == 400
+    assert "DJ Test has already given away" in response.json()["detail"]
+    # The next DJ can
+    on_air(persona_id=502, name="DJ Next")
+    assert _give_away_from_studio(client, second).status_code == 200
+
+
+def _music_show(db, name="Take Five", category="music") -> SpecialtyShow:
+    specialty = SpecialtyShow(name=name, category=category)
+    db.add(specialty)
+    db.commit()
+    return specialty
+
+
+def test_history_is_the_on_air_identitys_giveaways_and_preassignments(
+    client, show, promotions_staff, db, on_air
+):
+    given, preassigned = _two_pairs(db, show)
+    _give_away_from_studio(client, given)
+    preassigned.preassigned_persona_id = DJ_TEST_PERSONA_ID
     preassigned.preassigned_dj = "DJ Test"
     preassigned.preassigned_date = show.show_date
     db.commit()
 
-    response = client.get(
-        "/api/passes/my-giveaways",
-        params={"dj_name": typed_name},
-        headers={"X-Forwarded-User": promotions_staff.email},
+    def history():
+        response = client.get(
+            "/api/passes/my-giveaways",
+            params={"dj_name": "Ignored"},
+            headers={"X-Forwarded-User": promotions_staff.email},
+        )
+        assert response.status_code == 200
+        return sorted(p["id"] for p in response.json())
+
+    assert history() == sorted([given.id, preassigned.id])
+    on_air(persona_id=502, name="DJ Next")
+    assert history() == []
+    on_air(None)
+    assert history() == []
+
+
+def test_history_during_a_music_show_has_the_shows_and_its_djs_passes(
+    client, show, promotions_staff, db, on_air
+):
+    take_five = _music_show(db)
+    talk = _music_show(db, "Morning Report", "talk")
+    for_show, for_dj = _two_pairs(db, show)
+    for_show.preassigned_specialty_show_id = take_five.id
+    for_dj.preassigned_persona_id = DJ_TEST_PERSONA_ID
+    for p in (for_show, for_dj):
+        p.preassigned_date = show.show_date
+    db.commit()
+
+    def history():
+        response = client.get(
+            "/api/passes/my-giveaways",
+            headers={"X-Forwarded-User": promotions_staff.email},
+        )
+        return sorted(p["id"] for p in response.json())
+
+    on_air(
+        kind="music",
+        name="Take Five",
+        specialty_show_id=take_five.id,
+        persona_id=DJ_TEST_PERSONA_ID,
     )
-    assert response.status_code == 200
-    assert sorted(p["id"] for p in response.json()) == sorted([given.id, preassigned.id])
+    assert history() == sorted([for_show.id, for_dj.id])
+    # During a talk show, only the show's own passes
+    on_air(kind="talk", name="Morning Report", specialty_show_id=talk.id)
+    assert history() == []
 
 
 @pytest.mark.parametrize("show_status", ["closed", "draft", "deleted"])
@@ -419,12 +474,13 @@ def test_get_dj_history_omits_preassigned_passes_on_unpublished_shows(
         .first()
     )
     pass_item.preassigned_dj = "DJ Test"
+    pass_item.preassigned_persona_id = DJ_TEST_PERSONA_ID
     pass_item.preassigned_date = show.show_date
     db.commit()
 
     def history():
         response = client.get(
-            "/api/passes/my-giveaways?dj_name=DJ Test",
+            "/api/passes/my-giveaways",
             headers={"X-Forwarded-User": promotions_staff.email},
         )
         assert response.status_code == 200
@@ -438,7 +494,7 @@ def test_get_dj_history_omits_preassigned_passes_on_unpublished_shows(
     assert history() == []
 
 
-def test_get_dj_autocomplete(client, show, promotions_staff, db):
+def test_get_dj_autocomplete(client, show, promotions_staff, db, on_air):
     """Test DJ name autocomplete."""
     # Give away passes with different DJs
     passes = (
@@ -451,22 +507,22 @@ def test_get_dj_autocomplete(client, show, promotions_staff, db):
         .all()
     )
 
+    on_air(persona_id=601, name="DJ Alpha")
     client.post(
         f"/api/passes/{passes[0].id}/giveaway",
         json={
             "recipient_name": "John Doe",
             "recipient_phone": "555-1234",
-            "given_away_by_dj": "DJ Alpha",
         },
         headers={"X-Forwarded-For": DJ_STUDIO_IP},
     )
 
+    on_air(persona_id=602, name="DJ Beta")
     client.post(
         f"/api/passes/{passes[1].id}/giveaway",
         json={
             "recipient_name": "Jane Doe",
             "recipient_phone": "555-5678",
-            "given_away_by_dj": "DJ Beta",
         },
         headers={"X-Forwarded-For": DJ_STUDIO_IP},
     )
@@ -947,12 +1003,8 @@ def given_away_pass(db: Session, show):
         )
         .first()
     )
-    giveaway_data = GiveawayData(
-        recipient_name="Jane Winner",
-        recipient_phone="555-9999",
-        given_away_by_dj="DJ Test",
-    )
-    return PassService.give_away_pass_pair(db, pass_item.id, giveaway_data)
+    giveaway_data = GiveawayData(recipient_name="Jane Winner", recipient_phone="555-9999")
+    return PassService.give_away_pass_pair(db, pass_item.id, giveaway_data, None)
 
 
 def test_search_by_phone_no_results(client, show, promotions_staff):

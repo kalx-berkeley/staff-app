@@ -26,6 +26,12 @@ from app.pass_giveaway.schemas.show import (
 )
 from app.pass_giveaway.services.language_analysis_service import analyze_description
 from app.pass_giveaway.services.show_service import ShowService
+from app.pass_giveaway.services.on_air_identity import (
+    OnAirIdentity,
+    credit,
+    dj_identity,
+    identity_label,
+)
 from app.pass_giveaway.services.tracking import (
     DjTracking,
     dj_tracking,
@@ -78,7 +84,8 @@ router = APIRouter(prefix="/api/shows", tags=["shows"], route_class=GuestRedacti
 
 
 class AttemptRequest(BaseModel):
-    dj_name: str
+    # Who was on air comes from the Spinitron schedule (`dj_identity`); a
+    # name sent here is ignored
     # The giveaway page visit, for KALX Staff Analytics
     visit_id: str | None = Field(None, max_length=64)
 
@@ -386,7 +393,9 @@ def _build_show_response(
             "recipient_name": pass_item.recipient_name,
             "recipient_phone": pass_item.recipient_phone,
             "recipient_email": pass_item.recipient_email,
-            "given_away_by_dj": pass_item.given_away_by_dj,
+            "given_away_by_dj": pass_item.given_away_by,
+            "given_away_persona_id": pass_item.given_away_persona_id,
+            "given_away_specialty_show_id": pass_item.given_away_specialty_show_id,
             "given_away_at": pass_item.given_away_at,
             "staff_id": pass_item.staff_id,
             "staff_name": pass_item.staff.name if pass_item.staff else None,
@@ -410,7 +419,7 @@ def _build_show_response(
         passes.append(pass_data)
 
     attempts = [
-        {"id": a.id, "dj_name": a.dj_name, "attempted_at": a.attempted_at}
+        {"id": a.id, "dj_name": a.credited_name, "attempted_at": a.attempted_at}
         for a in show.attempts or []
     ]
 
@@ -1672,6 +1681,7 @@ def record_show_attempt(
     body: AttemptRequest,
     dj_access: bool = Depends(check_dj_giveaway_access),
     dj: DjTracking | None = Depends(dj_tracking),
+    identity: OnAirIdentity | None = Depends(dj_identity),
     db: Session = Depends(get_db),
 ):
     """
@@ -1681,7 +1691,8 @@ def record_show_attempt(
     impersonating the DJ studio network). Promotions staff elsewhere see the
     DJ giveaway page view only and cannot record a real attempt.
     """
-    attempt = ShowService.record_attempt(db, show_id, body.dj_name)
+    attempt = ShowService.record_attempt(db, show_id, identity)
+    persona_id, specialty_show_id = credit(identity)
     audit_service.log_event(
         db,
         event_type="giveaway_attempted",
@@ -1689,7 +1700,12 @@ def record_show_attempt(
         actor_role="dj",
         entity_type="show",
         entity_id=show_id,
-        details={"dj": body.dj_name, "event_name": attempt.show.event_name},
+        details={
+            "dj": identity_label(identity) or None,
+            "persona_id": persona_id,
+            "specialty_show_id": specialty_show_id,
+            "event_name": attempt.show.event_name,
+        },
     )
-    record_visit_outcome(db, dj, body.visit_id, show_id, "tried", body.dj_name)
+    record_visit_outcome(db, dj, body.visit_id, show_id, "tried", identity)
     return ShowAttemptResponse.model_validate(attempt)

@@ -118,7 +118,8 @@ def test_log_event_does_not_raise_on_bad_db(db: Session, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_pass_giveaway_audit(client: TestClient, db: Session, published_show):
+def test_pass_giveaway_audit(client: TestClient, db: Session, published_show, on_air):
+    on_air(persona_id=5, name="DJ Test")
     pair_pass = (
         db.query(Pass)
         .filter(Pass.show_id == published_show.id, Pass.pass_type == "pair")
@@ -129,7 +130,6 @@ def test_pass_giveaway_audit(client: TestClient, db: Session, published_show):
         json={
             "recipient_name": "Alice",
             "recipient_phone": "555-0001",
-            "given_away_by_dj": "DJ Test",
         },
         headers={"X-Forwarded-For": "192.168.1.100"},  # within default dj_studio_network
     )
@@ -139,13 +139,15 @@ def test_pass_giveaway_audit(client: TestClient, db: Session, published_show):
     assert row is not None
     assert row.entity_id == pair_pass.id
     assert row.details["dj"] == "DJ Test"
+    assert row.details["persona_id"] == 5
     assert row.details["recipient_name"] == "Alice"
 
 
-def test_giveaway_attempt_audit(client: TestClient, db: Session, published_show):
+def test_giveaway_attempt_audit(client: TestClient, db: Session, published_show, on_air):
+    on_air(persona_id=5, name="DJ Test")
     response = client.post(
         f"/api/shows/{published_show.id}/attempt",
-        json={"dj_name": "DJ Test"},
+        json={},
         headers={"X-Forwarded-For": "192.168.1.100"},  # within default dj_studio_network
     )
     assert response.status_code == 200
@@ -155,7 +157,12 @@ def test_giveaway_attempt_audit(client: TestClient, db: Session, published_show)
     assert row.actor_role == "dj"
     assert row.entity_type == "show"
     assert row.entity_id == published_show.id
-    assert row.details == {"dj": "DJ Test", "event_name": published_show.event_name}
+    assert row.details == {
+        "dj": "DJ Test",
+        "persona_id": 5,
+        "specialty_show_id": None,
+        "event_name": published_show.event_name,
+    }
 
 
 # ---------------------------------------------------------------------------

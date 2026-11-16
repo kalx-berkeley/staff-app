@@ -40,10 +40,12 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Iterable, Literal, Optional, Union
 
+from fastapi import Depends, Header
 from sqlalchemy.orm import Session
 
 from app.common.services.spinitron_personas import persona_names
 from app.common.services.spinitron_service import SpinitronService, placeholder_persona_ids
+from app.database import get_db
 from app.models.specialty_show import SpecialtyShow
 from app.models.spinitron_playlist import SpinitronPlaylist
 from app.models.spinitron_show import SpinitronShow
@@ -306,3 +308,49 @@ async def on_air(db: Session, now: Optional[datetime] = None) -> OnAir:
         next=resolver.slot(_earliest_preferring_playlist(next_playlist, next_show)),
         from_spins=winner is not None,
     )
+
+
+# The header a DJ page sends after "switch now": the start of the slot it
+# switched to, as an ISO 8601 time (decision 25)
+SWITCH_HEADER = "X-DJ-Switch-To"
+
+
+def _parse_switch(value: Optional[str]) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        return _utc(datetime.fromisoformat(value.replace("Z", "+00:00")))
+    except ValueError:
+        return None
+
+
+async def dj_identity(
+    x_dj_switch_to: Optional[str] = Header(None, alias=SWITCH_HEADER),
+    db: Session = Depends(get_db),
+) -> Optional[OnAirIdentity]:
+    """
+    A dependency: who a DJ page action now is credited to, or None for no one.
+
+    The server decides from the schedule and recent spins. The page can only
+    say it switched early to the next slot, which counts only in the last 10
+    minutes before that slot (decision 26).
+    """
+    now = datetime.now(timezone.utc)
+    state = await on_air(db, now)
+    return state.credited(_parse_switch(x_dj_switch_to), now)
+
+
+def credit(identity: Optional[OnAirIdentity]) -> tuple[Optional[int], Optional[int]]:
+    """*identity* as the (persona ID, specialty show ID) a record stores."""
+    if identity is None:
+        return None, None
+    return identity.persona_id, identity.specialty_show_id
+
+
+def identity_label(identity: Optional[OnAirIdentity]) -> str:
+    """
+    The name a record credited to *identity* keeps in its old DJ name text
+    column until phase 4 drops it: the show's or persona's name, which the
+    clean-up report still matches. Empty for no one.
+    """
+    return identity.name if identity is not None else ""
