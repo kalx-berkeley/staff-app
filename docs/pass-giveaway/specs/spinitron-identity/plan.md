@@ -81,7 +81,7 @@ any release cut after the merge includes it.
 | # | Question | Decision |
 |---|---|---|
 | 30 | Finding names that don't match | A one-time script in `backend/scripts/` reports, for every DJ name text value in every table (open, historical and analytics records alike), the persona it matches (exact, case-insensitive; any Spinitron persona, not only staff ones) or that it matches none. Misses are fixed by hand on real data before phase 3, by mapping the name (in `dj_name_mappings`) to a persona, a show, or no one (left unattributed, for placeholders like "Unknown"). Names a show and a persona share, or several personas share (unless exactly one is a staff member's), count as misses. Built as `scripts/spinitron_identity_report.py`, with the matching in `app/pass_giveaway/services/dj_name_matching.py`; it exits 1 while anything needs fixing. |
-| 31 | Migration | Fills the persona and show columns for every record, historical and analytics included, using `dj_name_matching` and the mappings. It refuses to run while *any* record is still unmatched. |
+| 31 | Migration | Fills the persona and show columns for every record, historical and analytics included, using `dj_name_matching` and the mappings. It refuses to run while *any* record is still unmatched. A migration can't call Spinitron, so `build_directory` reads persona names from the `spinitron_personas` table (decision 34) as well as staff records and the schedule cache. The migration then matches the same personas as the online report, including those of DJs no current staff member holds. |
 | 32 | Old text columns | Dropped in phase 4, once phase 3 has settled: first the code still reading them, then a migration. That includes `given_away_by_dj`, since giveaways show their persona's or show's current name. |
 | 33 | Historical giveaway names | Not rewritten. Phase 3's migration fills each giveaway's persona or show ID, and from then on it shows that persona's or show's current name, so a typo like "DJ Fooo" shows as "DJ Foo". Giveaways mapped to no one show as "Unattributed". |
 | 34 | Persona names | A `spinitron_personas` table in common code (persona ID, name, `last_playlist_at`), refreshed nightly from Spinitron's persona directory. Everything that shows a persona's name reads it from here, including personas no current staff member holds. Built in phase 2b. |
@@ -105,8 +105,12 @@ any release cut after the merge includes it.
    with no persona is kept, and shown as not linked yet, until then.
 4. **3: DJ pages use the schedule.** Decisions 18–29 and the migration
    (decision 31), which also adds the giveaway, attempt and analytics
-   columns (decision 33 for historical giveaways). Re-run the script on
-   release day; release only at zero misses.
+   columns (decision 33 for historical giveaways). The first change is
+   `build_directory` reading `spinitron_personas`, so the migration (which
+   runs offline) and the report match the same way. Before 2b's persona
+   sync, the offline report could miss names that the online report
+   matched. Re-run the script on release day, both online and with
+   `--offline`; release only when both report zero misses.
 5. **4: Drop the text columns.** Decision 32, once phase 3 has settled.
 
 ## Facts this plan relies on
