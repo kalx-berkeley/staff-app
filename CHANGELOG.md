@@ -6,6 +6,18 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.18.0] - 2026-11-16
+
+### Changed
+
+- Pick a DJ persona or a show from a list, instead of typing a DJ name, when promotions pre-assign a pass pair, when staff reserve on-air pass pairs or enter the DJ lottery, and when editing a Specialty Music Show's DJs. Promotions can pick any current staff member's persona or any music or talk show, each labelled by kind, and "suggest by date" and "suggest by genre" suggest them too. Staff pick from their own personas and the shows they're members of, starting with the persona scheduled on the pass's date. Pre-assigning a persona on a day the schedule doesn't show them warns but still saves. When a staff member has several personas, those with no playlist in the last 6 months are hidden unless already assigned ([ef99dad](https://github.com/kalx-berkeley/staff-app/commit/ef99dad))
+- Make Specialty Music Show membership follow the DJ's Spinitron persona rather than their typed name. Existing DJs are linked to their persona automatically; a DJ who can't be linked yet stays on the show, marked as not linked ([ef99dad](https://github.com/kalx-berkeley/staff-app/commit/ef99dad))
+
+### Added
+
+- Sync Spinitron persona names, and the date of each staff persona's last playlist, every night. Site admins can also run the sync from KALX Staff Admin ([ef99dad](https://github.com/kalx-berkeley/staff-app/commit/ef99dad))
+- Add a `fix` command to `backend/scripts/spinitron_identity_report.py`, which corrects a stored DJ name in every table (or only a given column or show), after showing what it would change and asking, and records the change in the audit log ([9f504e3](https://github.com/kalx-berkeley/staff-app/commit/9f504e3))
+
 ## [1.17.0] - 2026-11-15
 
 ### Changed
@@ -464,6 +476,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.18.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.17.0...v1.18.0
 [1.17.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.16.0...v1.17.0
 [1.16.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.15.0...v1.16.0
 [1.15.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.14.0...v1.15.0
