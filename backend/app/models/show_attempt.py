@@ -13,7 +13,11 @@ class ShowAttempt(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     show_id = Column(Integer, ForeignKey("shows.id"), nullable=False)
+    # The old typed DJ name, until phase 4 of the Spinitron identity plan
     dj_name = Column(String, nullable=False)
+    # Who was on air: the persona, the show, or both (see Pass)
+    persona_id = Column(Integer, nullable=True)
+    specialty_show_id = Column(Integer, ForeignKey("specialty_shows.id"), nullable=True)
     attempted_at = Column(
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )

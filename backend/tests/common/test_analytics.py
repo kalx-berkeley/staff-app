@@ -265,6 +265,34 @@ def test_rollup_keeps_counts(db: Session):
     assert tracking_service.data_since(db, ["active_day"]) == since_before
 
 
+def test_rollup_keeps_who_was_on_air(db: Session):
+    """Each persona and specialty show gets its own daily count."""
+    now = datetime(2026, 11, 9, 20, 0, tzinfo=timezone.utc)
+    old = (now - timedelta(days=tracking_service.RAW_RETENTION_DAYS + 5)).replace(
+        tzinfo=None
+    )
+    for persona_id, show_id in [(1, None), (1, None), (2, 7), (None, 8)]:
+        db.add(
+            AnalyticsEvent(
+                occurred_at=old,
+                event_type="giveaway",
+                area=COMMON_AREA,
+                dj_name="same name",
+                persona_id=persona_id,
+                specialty_show_id=show_id,
+            )
+        )
+    db.commit()
+
+    assert roll_up_old_events(db, now=now) == 4
+
+    rolled = {
+        (r.persona_id, r.specialty_show_id): r.count
+        for r in db.query(AnalyticsDailyCount).all()
+    }
+    assert rolled == {(1, None): 2, (2, 7): 1, (None, 8): 1}
+
+
 def test_rollup_job_is_listed(client: TestClient, db: Session, monkeypatch):
     _staff(db, "admin@example.com")
     monkeypatch.setattr(settings, "site_admin_emails", "admin@example.com")

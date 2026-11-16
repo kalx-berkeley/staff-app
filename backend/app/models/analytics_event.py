@@ -48,8 +48,12 @@ class AnalyticsEvent(Base):
     ref = Column(String(64), nullable=True, index=True)
     entity_type = Column(String, nullable=True)
     entity_id = Column(Integer, nullable=True)
-    # Normalized DJ name (`tracking_service.normalize_dj_name`)
+    # Normalized DJ name (`tracking_service.normalize_dj_name`), until phase
+    # 4 of the Spinitron identity plan
     dj_name = Column(String, nullable=True)
+    # Who was on air: the persona, the show, or both
+    persona_id = Column(Integer, nullable=True, index=True)
+    specialty_show_id = Column(Integer, nullable=True, index=True)
     # The event's outcome, result or sub-site, depending on its type
     dimension = Column(String, nullable=True)
     # Small extras, not kept by the rollup
@@ -75,6 +79,8 @@ class AnalyticsDailyCount(Base):
     entity_type = Column(String, nullable=True)
     entity_id = Column(Integer, nullable=True)
     dj_name = Column(String, nullable=True)
+    persona_id = Column(Integer, nullable=True, index=True)
+    specialty_show_id = Column(Integer, nullable=True, index=True)
     dimension = Column(String, nullable=True)
     count = Column(Integer, nullable=False)
 
@@ -88,6 +94,8 @@ class AnalyticsDailyCount(Base):
             "entity_type",
             "entity_id",
             "dj_name",
+            "persona_id",
+            "specialty_show_id",
             "dimension",
             name="uq_analytics_daily_count_key",
         ),

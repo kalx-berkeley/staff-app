@@ -25,8 +25,15 @@ class Pass(Base):
         String, nullable=False, default="available"
     )  # "available", "given_away", "claimed"
 
-    # For pass pairs given away on-air — who gave it away and when
+    # For pass pairs given away on-air — who gave it away and when. Credited
+    # to the on-air persona, show, or both (a Specialty Music Show and its
+    # DJ); neither is "Unattributed". given_away_by_dj is the old typed name,
+    # kept until phase 4 of the Spinitron identity plan drops it.
     given_away_by_dj = Column(String, nullable=True)
+    given_away_persona_id = Column(Integer, nullable=True)
+    given_away_specialty_show_id = Column(
+        Integer, ForeignKey("specialty_shows.id"), nullable=True
+    )
     given_away_at = Column(DateTime, nullable=True)
 
     # For staff passes claimed
@@ -79,6 +86,9 @@ class Pass(Base):
     preassigned_by = relationship("Staff", foreign_keys=[preassigned_by_staff_id])
     preassigned_specialty_show = relationship(
         "SpecialtyShow", foreign_keys=[preassigned_specialty_show_id]
+    )
+    given_away_specialty_show = relationship(
+        "SpecialtyShow", foreign_keys=[given_away_specialty_show_id]
     )
     primary_pass = relationship(
         "Pass", foreign_keys=[guest_of_pass_id], remote_side="Pass.id"
