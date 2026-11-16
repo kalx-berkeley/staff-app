@@ -32,7 +32,9 @@ DEPARTMENT_NAME_FIELD = "Department"
 
 _AIRTABLE_RECORD_ID_RE = re.compile(r"^rec[A-Za-z0-9]{14}$")
 
-_SPINITRON_URL_RE = re.compile(r"https://(?:widgets\.)?spinitron\.com/KALX/dj/(\d+)/")
+# A Spinitron DJ profile URL, with or without anything after the persona ID
+# (Airtable links can be ".../dj/180642", ".../dj/180642/" or ".../dj/180642/Big-Bird")
+_SPINITRON_URL_RE = re.compile(r"https?://(?:widgets\.)?spinitron\.com/KALX/dj/(\d+)(?!\w)")
 
 
 def _text_field(fields: Dict[str, Any], name: str) -> str:

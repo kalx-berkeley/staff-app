@@ -484,6 +484,29 @@ async def test_sync_looks_up_dj_names_for_each_persona(
     ]
 
 
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        ("[Big Bird](https://widgets.spinitron.com/KALX/dj/180642)\n", [180642]),
+        ("[Big Bird](https://widgets.spinitron.com/KALX/dj/180642/Big-Bird)", [180642]),
+        ("[DJ Zed](https://spinitron.com/KALX/dj/111/)", [111]),
+        ("[DJ Zed](http://spinitron.com/KALX/dj/111?x=1)", [111]),
+        (
+            "[A](https://spinitron.com/KALX/dj/1), [B](https://spinitron.com/KALX/dj/2/B)",
+            [1, 2],
+        ),
+        ("https://spinitron.com/KALX/dj/111abc", []),
+        ("[Other](https://example.com/KALX/dj/111/)", []),
+        ("DJ Zed", []),
+    ],
+)
+def test_extract_spinitron_ids(raw: str, expected: list[int]):
+    """Persona IDs are found whether or not anything follows the ID in the URL."""
+    from app.common.services.user_service import _extract_spinitron_ids
+
+    assert _extract_spinitron_ids(raw) == expected
+
+
 @pytest.mark.asyncio
 async def test_sync_paid_staff_gets_promotions_role(client: TestClient, db: Session):
     """Sync: user with 'Paid Staff' + 'Active' statuses gets promotions role after sync."""
