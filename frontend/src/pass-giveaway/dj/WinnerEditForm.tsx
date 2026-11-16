@@ -8,7 +8,6 @@ import type { APIError } from '../../common/types';
 interface WinnerEditFormProps {
   pass: PassResponse;
   venueId: number;
-  djName: string;
   requiresEmail: boolean;
   onSaved: (updated: PassResponse) => void;
   onCancel: () => void;
@@ -22,12 +21,12 @@ const errorDetail = (err: unknown, fallback: string) => {
 /**
  * Inline form for the on-air DJ to correct the winner they recorded (a typo in
  * the caller's name, phone or email). It loads the winner from the backend,
- * which only answers the DJ who gave the passes away, within 4 hours.
+ * which only answers while the persona or show credited with the giveaway is
+ * on air, within 4 hours.
  */
 const WinnerEditForm = ({
   pass,
   venueId,
-  djName,
   requiresEmail,
   onSaved,
   onCancel,
@@ -46,7 +45,7 @@ const WinnerEditForm = ({
   useEffect(() => {
     let cancelled = false;
     passesAPI
-      .getWinnerForEdit(pass.id, djName.trim())
+      .getWinnerForEdit(pass.id)
       .then((winner) => {
         if (cancelled) return;
         setName(winner.recipient_name ?? '');
@@ -62,7 +61,7 @@ const WinnerEditForm = ({
     return () => {
       cancelled = true;
     };
-  }, [pass.id, djName]);
+  }, [pass.id]);
 
   const handlePhoneChange = (value: string) => {
     setPhone(value);
@@ -108,7 +107,6 @@ const WinnerEditForm = ({
         recipient_name: name.trim(),
         recipient_phone: phone,
         recipient_email: email.trim() || null,
-        given_away_by_dj: djName.trim(),
       });
       onSaved(updated);
     } catch (err) {

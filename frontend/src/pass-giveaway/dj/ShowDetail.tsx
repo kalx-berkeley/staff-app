@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { showsAPI } from '../api';
-import { DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, KalxLiveBadge } from '../components';
+import { EnrichedShowName, FeatureBinBadge, KalxLiveBadge } from '../components';
 import MarkdownContent from '../../common/components/MarkdownContent';
 import { formatPhone } from '../../common/utils';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, KALX_CALL_IN_PHONE, KALX_CALL_IN_PHONE_LETTERS, canDjEditWinner, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
+import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, KALX_CALL_IN_PHONE, KALX_CALL_IN_PHONE_LETTERS, canDjEditWinner, findRecentDjGiveaway, formatShowRating, isMovieShow, isPreassignedTo } from '../utils';
+import { useOnAir } from './onAirContext';
 import WinnerEditForm from './WinnerEditForm';
 import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
 import type { ShowResponse, PassResponse } from '../types';
@@ -35,7 +36,7 @@ const ShowDetail = () => {
   usePageTitle(`${show?.event_name ?? 'Show'} · DJ`);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [djName, setDjName] = useState(localStorage.getItem(DJ_NAME_KEY) || '');
+  const { identity } = useOnAir();
   const [editingPassId, setEditingPassId] = useState<number | null>(null);
   // Whether the DJ clicked through the "pre-assigned to another DJ" warning.
   const [acknowledgedOthersPreassigned, setAcknowledgedOthersPreassigned] = useState(false);
@@ -91,10 +92,9 @@ const ShowDetail = () => {
     });
 
   const sortAvailablePasses = (passes: PassResponse[]): PassResponse[] => {
-    const name = djName.trim().toLowerCase();
     return [...passes].sort((a, b) => {
-      const aIsMe = !!name && a.preassigned_dj?.toLowerCase() === name;
-      const bIsMe = !!name && b.preassigned_dj?.toLowerCase() === name;
+      const aIsMe = isPreassignedTo(a, identity);
+      const bIsMe = isPreassignedTo(b, identity);
       const aIsUnassigned = !a.preassigned_dj;
       const bIsUnassigned = !b.preassigned_dj;
       // Priority order: my pre-assigned (1) > unassigned (2) > others' pre-assigned (3)
@@ -141,13 +141,12 @@ const ShowDetail = () => {
   // The show list only links here with "View" after a recent giveaway, and
   // the backend refuses a second pair for the show this DJ shift.
   const recentDjGiveaway: Pick<PassResponse, 'given_away_at' | 'recipient_name'> | undefined =
-    findRecentDjGiveaway(givenAwayPasses, djName);
+    findRecentDjGiveaway(givenAwayPasses, identity);
   const canGiveAway = availablePasses.length > 0 && !justGaveAway && !recentDjGiveaway;
   // Every pair left is pre-assigned to another DJ, so giving one away on air
   // takes it from them. The DJ must click through a warning first.
-  const normalizedDjName = djName.trim().toLowerCase();
   const othersPreassignedPasses = availablePasses.filter(
-    (p) => p.preassigned_dj && p.preassigned_dj.trim().toLowerCase() !== normalizedDjName,
+    (p) => p.preassigned_dj && !isPreassignedTo(p, identity),
   );
   // One line per DJ and airdate, with how many pairs they hold.
   const othersPreassignedGroups = [
@@ -174,7 +173,6 @@ const ShowDetail = () => {
       : null;
     return (
       <div className="dj-show-document">
-        <DjNameInput value={djName} onChange={setDjName} id="dj-detail-name" />
         <div className="dj-preassigned-gate" role="alert">
           <h2>You can&apos;t give away passes to this show right now</h2>
           <p>
@@ -208,7 +206,6 @@ const ShowDetail = () => {
   if (onlyOthersPreassigned && !acknowledgedOthersPreassigned) {
     return (
       <div className="dj-show-document">
-        <DjNameInput value={djName} onChange={setDjName} id="dj-detail-name" />
         <div className="dj-preassigned-gate" role="alert">
           <h2>These passes are pre-assigned to another DJ</h2>
           <p>
@@ -247,7 +244,6 @@ const ShowDetail = () => {
 
   return (
     <div className="dj-show-document">
-      <DjNameInput value={djName} onChange={setDjName} id="dj-detail-name" />
 
       <div className="kalx-doc-instructions">
         <p>
@@ -379,7 +375,6 @@ const ShowDetail = () => {
                   <WinnerEditForm
                     pass={pass}
                     venueId={show.venue.id}
-                    djName={djName}
                     requiresEmail={show.guest_list_requirements.requires_email_address}
                     onSaved={handleWinnerSaved}
                     onCancel={() => setEditingPassId(null)}
@@ -390,7 +385,7 @@ const ShowDetail = () => {
                     {pass.recipient_phone && ` · ${formatPhone(pass.recipient_phone)}`}
                     {pass.given_away_by_dj && ` · DJ: ${pass.given_away_by_dj}`}
                     {pass.given_away_at && ` · ${formatDateTime(pass.given_away_at)}`}
-                    {canDjEditWinner(pass, show, djName) && (
+                    {canDjEditWinner(pass, show, identity) && (
                       <button
                         type="button"
                         className="btn-small btn-secondary kalx-winner-edit-btn"

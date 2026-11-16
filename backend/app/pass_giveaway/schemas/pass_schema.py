@@ -40,7 +40,7 @@ class GiveawayData(BaseModel):
         None, max_length=200, description="Winner's email address (required by some venues)"
     )
     # Who gave the passes away comes from the Spinitron schedule
-    # (`on_air_identity.dj_identity`); a name sent here is ignored
+    # (`on_air_identity.dj_identity`)
     visit_id: str | None = Field(
         None, max_length=64, description="The giveaway page visit, for KALX Staff Analytics"
     )
@@ -63,7 +63,7 @@ class WinnerUpdateData(BaseModel):
         ),
     )
     # Only who is on air (`on_air_identity.dj_identity`) may edit their own
-    # giveaway; a DJ name sent here is ignored
+    # giveaway
 
 
 class IdentityChoice(BaseModel):

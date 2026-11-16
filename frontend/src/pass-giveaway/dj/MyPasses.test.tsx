@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import MyPasses from './MyPasses';
-import { passesAPI, autocompleteAPI } from '../api';
+import { passesAPI } from '../api';
+import { persona, withOnAir } from './testOnAir';
 import type { PassResponse } from '../types';
 import { formatDateValue } from '../../common/utils';
 
@@ -10,19 +11,9 @@ vi.mock('../api', () => ({
   passesAPI: {
     getMyGiveaways: vi.fn(),
   },
-  autocompleteAPI: {
-    getDJNames: vi.fn(),
-  },
-  onAirAPI: {
-    getCurrent: vi.fn().mockResolvedValue({
-      current_dj_name: null,
-      current_show_ends_at: null,
-      next_dj_name: null,
-    }),
-  },
 }));
 
-const DJ_NAME_KEY = 'kalx_dj_name';
+const DJ_MIKE = persona(1, 'DJ Mike');
 
 describe('MyPasses', () => {
   const mockPasses: PassResponse[] = [
@@ -88,14 +79,10 @@ describe('MyPasses', () => {
     // Never resolve — resolving promises here trigger state updates outside
     // act() in tests that don't await them.  Tests that need resolved values
     // override these mocks in their own body.
-    vi.mocked(autocompleteAPI.getDJNames).mockReturnValue(new Promise(() => {}));
     vi.mocked(passesAPI.getMyGiveaways).mockReturnValue(new Promise(() => {}));
   });
 
-  const renderWithDJName = (djName = 'DJ Mike') => {
-    localStorage.setItem(DJ_NAME_KEY, djName);
-    return render(<MyPasses />);
-  };
+  const renderWithDJName = () => render(withOnAir(<MyPasses />, DJ_MIKE));
 
   describe('MyPasses Display', () => {
     it('should hide passes for shows more than 3 days ago', async () => {
@@ -195,55 +182,33 @@ describe('MyPasses', () => {
     });
   });
 
-  describe('DJ Name Input', () => {
-    it('should show DJ name input field', () => {
-      render(<MyPasses />);
-      expect(screen.getByLabelText(/dj name/i)).toBeInTheDocument();
-    });
-
-    it('should pre-fill DJ name from localStorage', async () => {
-      localStorage.setItem(DJ_NAME_KEY, 'DJ Sarah');
-      render(<MyPasses />);
-      await waitFor(() => {
-        expect(screen.getByLabelText(/dj name/i)).toHaveValue('DJ Sarah');
-      });
-    });
-
-    it('should auto-load passes when localStorage has a DJ name', async () => {
+  describe('Who is on air', () => {
+    it("loads the on-air identity's passes", async () => {
       vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue(mockPasses);
-      renderWithDJName('DJ Mike');
+      renderWithDJName();
 
-      await waitFor(() => {
-        expect(passesAPI.getMyGiveaways).toHaveBeenCalledWith('DJ Mike');
-      });
+      await waitFor(() => expect(passesAPI.getMyGiveaways).toHaveBeenCalledWith());
+      expect(screen.queryByLabelText(/dj name/i)).not.toBeInTheDocument();
     });
 
-    it('should load passes when Load button is clicked with a DJ name', async () => {
-      vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue(mockPasses);
-      render(<MyPasses />);
+    it('shows nothing, without asking, when no one is on air', async () => {
+      render(withOnAir(<MyPasses />, null));
 
-      const djInput = screen.getByLabelText(/dj name/i);
-      fireEvent.change(djInput, { target: { value: 'DJ Tom' } });
-
-      const loadButton = screen.getByRole('button', { name: /load/i });
-      fireEvent.click(loadButton);
-
-      await waitFor(() => {
-        expect(passesAPI.getMyGiveaways).toHaveBeenCalledWith('DJ Tom');
-      });
-    });
-
-    it('should not load passes when DJ name is empty', async () => {
-      render(<MyPasses />);
-
-      const loadButton = screen.getByRole('button', { name: /load/i });
-      fireEvent.click(loadButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('Error: Please enter your DJ name')).toBeInTheDocument();
-      });
-
+      expect(
+        await screen.findByText('No one is on air, so there are no passes to show.'),
+      ).toBeInTheDocument();
       expect(passesAPI.getMyGiveaways).not.toHaveBeenCalled();
+    });
+
+    it('loads again when who is on air changes (an early switch)', async () => {
+      vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([]);
+      const { rerender } = renderWithDJName();
+      await screen.findByText(/No recent or upcoming giveaways found for/);
+
+      rerender(withOnAir(<MyPasses />, persona(2, 'DJ Next')));
+
+      await waitFor(() => expect(passesAPI.getMyGiveaways).toHaveBeenCalledTimes(2));
+      expect(await screen.findByText('DJ Next')).toBeInTheDocument();
     });
   });
 
@@ -254,9 +219,7 @@ describe('MyPasses', () => {
       );
       renderWithDJName();
 
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /loading/i })).toBeDisabled();
-      });
+      expect(await screen.findByText('Loading…')).toBeInTheDocument();
     });
 
     it('should display error message when API call fails', async () => {

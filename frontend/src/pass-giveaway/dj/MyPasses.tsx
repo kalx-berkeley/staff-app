@@ -1,106 +1,55 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { passesAPI, autocompleteAPI } from '../api';
-import { useOnAirDj } from '../components';
+import { passesAPI } from '../api';
 import type { PassResponse } from '../types';
 import { isRecentShow } from '../utils';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { formatCalendarDate, formatPacific } from '../../common/dateTime';
-import { DJ_NAME_KEY } from '../djName';
+import { useOnAir } from './onAirContext';
 
+/**
+ * The on-air identity's giveaways and pre-assigned passes (decision 27), or
+ * the next identity's after an early switch. A DJ's history across all their
+ * personas and shows is on the signed-in /staff My Passes page.
+ */
 const MyPasses = () => {
   usePageTitle('My Passes · DJ');
-  const [djName, setDjName] = useState(localStorage.getItem(DJ_NAME_KEY) || '');
+  const { loaded: onAirLoaded, identity, identityKey } = useOnAir();
   const [passes, setPasses] = useState<PassResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Autocomplete state
-  const [djNames, setDjNames] = useState<string[]>([]);
-  const [filteredDjNames, setFilteredDjNames] = useState<string[]>([]);
-  const [showAutocomplete, setShowAutocomplete] = useState(false);
-  const autocompleteRef = useRef<HTMLUListElement>(null);
-
   useEffect(() => {
-    autocompleteAPI.getDJNames().then(setDjNames).catch(() => {});
-  }, []);
-
-  const loadPasses = useCallback(async (name: string) => {
-    if (!name.trim()) {
-      setError('Please enter your DJ name');
+    if (!onAirLoaded) return;
+    if (!identity) {
+      setPasses([]);
+      setLoaded(true);
       return;
     }
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await passesAPI.getMyGiveaways(name.trim());
-      setPasses(data);
-      setLoaded(true);
-      localStorage.setItem(DJ_NAME_KEY, name.trim());
-    } catch (err) {
-      const apiError = err as APIError;
-      setError(
-        typeof apiError.detail === 'string'
-          ? apiError.detail
-          : 'Failed to load giveaway history'
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const savedName = localStorage.getItem(DJ_NAME_KEY);
-    if (savedName?.trim()) {
-      loadPasses(savedName);
-    }
-  }, [loadPasses]);
-
-  const handleDjNameChange = (value: string) => {
-    setDjName(value);
-    if (value.trim()) {
-      const filtered = djNames.filter((name) =>
-        name.toLowerCase().includes(value.toLowerCase())
-      );
-      setFilteredDjNames(filtered);
-      setShowAutocomplete(filtered.length > 0);
-    } else {
-      setShowAutocomplete(false);
-    }
-  };
-
-  const selectDjName = (name: string) => {
-    setDjName(name);
-    setShowAutocomplete(false);
-    if (name.trim()) {
-      loadPasses(name);
-    } else {
-      // Cleared automatically (e.g. the on-air schedule moved to a show with
-      // no specific DJ) rather than searched for — don't show a "please
-      // enter your DJ name" error for this.
-      localStorage.setItem(DJ_NAME_KEY, '');
-      setPasses([]);
-      setError(null);
-      setLoaded(false);
-    }
-  };
-
-  const { currentDjName, mismatch, transitionNotice, dismissTransitionNotice } = useOnAirDj(
-    djName,
-    selectDjName
-  );
-
-  const handleDjKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      setShowAutocomplete(false);
-      loadPasses(djName);
-    } else if (e.key === 'Tab' && filteredDjNames.length === 1) {
-      e.preventDefault();
-      selectDjName(filteredDjNames[0]);
-    }
-  };
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    passesAPI
+      .getMyGiveaways()
+      .then((data) => {
+        if (cancelled) return;
+        setPasses(data);
+        setLoaded(true);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const detail = (err as APIError).detail;
+        setError(typeof detail === 'string' ? detail : 'Failed to load giveaway history');
+      })
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+    // identity follows identityKey
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onAirLoaded, identityKey]);
 
   const formatStatus = (status: string) => {
     const map: Record<string, string> = {
@@ -142,81 +91,23 @@ const MyPasses = () => {
         <h2>My Giveaway History</h2>
       </div>
 
-      <div className="dj-name-filter">
-        <div className="form-group-inline">
-          <label htmlFor="dj-name-input">DJ Name:</label>
-          <div className="autocomplete-wrapper" style={{ flex: 1, minWidth: 150 }}>
-            <input
-              id="dj-name-input"
-              type="text"
-              value={djName}
-              onChange={(e) => handleDjNameChange(e.target.value)}
-              onKeyDown={handleDjKeyDown}
-              onBlur={() => setTimeout(() => setShowAutocomplete(false), 200)}
-              placeholder="Enter your DJ name"
-              autoComplete="off"
-            />
-            {showAutocomplete && (
-              <ul className="autocomplete-list" ref={autocompleteRef}>
-                {filteredDjNames.map((name) => (
-                  <li
-                    key={name}
-                    onMouseDown={() => selectDjName(name)}
-                    className="autocomplete-item"
-                  >
-                    {name}
-                  </li>
-                ))}
-                {filteredDjNames.length === 1 && (
-                  <li className="autocomplete-hint">Press Tab to complete</li>
-                )}
-              </ul>
-            )}
-          </div>
-          <button
-            onClick={() => loadPasses(djName)}
-            className="btn-primary"
-            disabled={loading}
-          >
-            {loading ? 'Loading...' : 'Load'}
-          </button>
-        </div>
-        {mismatch && currentDjName && (
-          <div className="dj-name-mismatch-warning">
-            This doesn't match the scheduled on-air DJ ({currentDjName}).{' '}
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => selectDjName(currentDjName)}
-            >
-              Use {currentDjName}
-            </button>
-          </div>
-        )}
-        {transitionNotice && (
-          <div className="dj-name-transition-notice">
-            {transitionNotice}
-            <button
-              type="button"
-              className="dj-name-notice-dismiss"
-              aria-label="Dismiss"
-              onClick={dismissTransitionNotice}
-            >
-              ×
-            </button>
-          </div>
-        )}
-      </div>
-
       {error && (
         <div className="error">
           <p>Error: {error}</p>
         </div>
       )}
 
+      {loading && <div className="loading">Loading…</div>}
+
       {loaded && !loading && recentPasses.length === 0 && (
         <div className="no-passes">
-          <p>No recent or upcoming giveaways found for <strong>{djName}</strong>.</p>
+          <p>
+            {identity ? (
+              <>No recent or upcoming giveaways found for <strong>{identity.name}</strong>.</>
+            ) : (
+              'No one is on air, so there are no passes to show.'
+            )}
+          </p>
         </div>
       )}
 

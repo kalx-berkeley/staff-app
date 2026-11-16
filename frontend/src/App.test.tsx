@@ -23,14 +23,13 @@ vi.mock('./pass-giveaway/api', () => ({
   passesAPI: {
     getMyGiveaways: vi.fn().mockResolvedValue([]),
   },
-  autocompleteAPI: {
-    getDJNames: vi.fn().mockResolvedValue([]),
-  },
   onAirAPI: {
     getCurrent: vi.fn().mockResolvedValue({
-      current_dj_name: null,
-      current_show_ends_at: null,
-      next_dj_name: null,
+      current: null,
+      current_ends_at: null,
+      next: null,
+      next_starts_at: null,
+      can_switch_early: false,
     }),
     getSpinMatches: vi.fn().mockResolvedValue([]),
   },

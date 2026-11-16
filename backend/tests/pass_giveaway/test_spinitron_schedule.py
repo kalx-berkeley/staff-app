@@ -510,10 +510,8 @@ class TestOnAirEndpoint:
         response = client.get("/api/dj/on-air", headers={"X-Forwarded-For": DJ_STUDIO_IP})
         assert response.status_code == 200
         assert response.json() == {
-            "current_dj_name": None,
-            "current_show_ends_at": None,
-            "next_dj_name": None,
             "current": None,
+            "current_ends_at": None,
             "next": None,
             "next_starts_at": None,
             "can_switch_early": False,
@@ -527,6 +525,7 @@ class TestOnAirEndpoint:
                 start=now - timedelta(minutes=30),
                 end=now + timedelta(minutes=30),
                 dj_name="Current DJ",
+                persona_id=7001,
                 fetched_at=now,
             )
         )
@@ -536,6 +535,7 @@ class TestOnAirEndpoint:
                 start=now + timedelta(minutes=30),
                 end=now + timedelta(minutes=90),
                 dj_name="Next DJ",
+                persona_id=7002,
                 fetched_at=now,
             )
         )
@@ -544,9 +544,9 @@ class TestOnAirEndpoint:
         response = client.get("/api/dj/on-air", headers={"X-Forwarded-For": DJ_STUDIO_IP})
         assert response.status_code == 200
         data = response.json()
-        assert data["current_dj_name"] == "Current DJ"
-        assert data["next_dj_name"] == "Next DJ"
-        assert data["current_show_ends_at"] is not None
+        assert data["current"]["name"] == "Current DJ"
+        assert data["next"]["name"] == "Next DJ"
+        assert data["current_ends_at"] is not None
 
     def test_between_shows_returns_only_next(self, client: TestClient, db: Session):
         now = datetime.now(timezone.utc)
@@ -556,6 +556,7 @@ class TestOnAirEndpoint:
                 start=now - timedelta(hours=2),
                 end=now - timedelta(hours=1),
                 dj_name="Past DJ",
+                persona_id=7003,
                 fetched_at=now,
             )
         )
@@ -565,6 +566,7 @@ class TestOnAirEndpoint:
                 start=now + timedelta(minutes=30),
                 end=now + timedelta(minutes=90),
                 dj_name="Upcoming DJ",
+                persona_id=7004,
                 fetched_at=now,
             )
         )
@@ -572,9 +574,9 @@ class TestOnAirEndpoint:
 
         response = client.get("/api/dj/on-air", headers={"X-Forwarded-For": DJ_STUDIO_IP})
         data = response.json()
-        assert data["current_dj_name"] is None
-        assert data["current_show_ends_at"] is None
-        assert data["next_dj_name"] == "Upcoming DJ"
+        assert data["current"] is None
+        assert data["current_ends_at"] is None
+        assert data["next"]["name"] == "Upcoming DJ"
 
     def test_requires_dj_access(self, client: TestClient):
         response = client.get("/api/dj/on-air", headers={"X-Forwarded-For": "8.8.8.8"})
@@ -591,6 +593,7 @@ class TestOnAirEndpoint:
                 start=now - timedelta(minutes=30),
                 end=now + timedelta(minutes=30),
                 dj_name="DJ Trainee",
+                persona_id=7005,
                 fetched_at=now,
             )
         )
@@ -600,13 +603,14 @@ class TestOnAirEndpoint:
                 start=now - timedelta(minutes=30),
                 end=now + timedelta(minutes=30),
                 dj_name="Wolfman",
+                persona_id=7006,
                 fetched_at=now,
             )
         )
         db.commit()
 
         response = client.get("/api/dj/on-air", headers={"X-Forwarded-For": DJ_STUDIO_IP})
-        assert response.json()["current_dj_name"] == "Wolfman"
+        assert response.json()["current"]["name"] == "Wolfman"
 
     def test_falls_back_to_show_when_no_current_playlist(
         self, client: TestClient, db: Session
@@ -618,13 +622,14 @@ class TestOnAirEndpoint:
                 start=now - timedelta(minutes=30),
                 end=now + timedelta(minutes=30),
                 dj_name="Show Only DJ",
+                persona_id=7007,
                 fetched_at=now,
             )
         )
         db.commit()
 
         response = client.get("/api/dj/on-air", headers={"X-Forwarded-For": DJ_STUDIO_IP})
-        assert response.json()["current_dj_name"] == "Show Only DJ"
+        assert response.json()["current"]["name"] == "Show Only DJ"
 
     def test_playlist_only_current_with_no_show(self, client: TestClient, db: Session):
         now = datetime.now(timezone.utc)
@@ -634,13 +639,14 @@ class TestOnAirEndpoint:
                 start=now - timedelta(minutes=30),
                 end=now + timedelta(minutes=30),
                 dj_name="Playlist Only DJ",
+                persona_id=7008,
                 fetched_at=now,
             )
         )
         db.commit()
 
         response = client.get("/api/dj/on-air", headers={"X-Forwarded-For": DJ_STUDIO_IP})
-        assert response.json()["current_dj_name"] == "Playlist Only DJ"
+        assert response.json()["current"]["name"] == "Playlist Only DJ"
 
     def test_next_prefers_playlist_on_exact_tie(self, client: TestClient, db: Session):
         now = datetime.now(timezone.utc)
@@ -651,6 +657,7 @@ class TestOnAirEndpoint:
                 start=next_start,
                 end=next_start + timedelta(hours=1),
                 dj_name="DJ Trainee",
+                persona_id=7009,
                 fetched_at=now,
             )
         )
@@ -660,13 +667,14 @@ class TestOnAirEndpoint:
                 start=next_start,
                 end=next_start + timedelta(hours=1),
                 dj_name="Wolfman",
+                persona_id=7010,
                 fetched_at=now,
             )
         )
         db.commit()
 
         response = client.get("/api/dj/on-air", headers={"X-Forwarded-For": DJ_STUDIO_IP})
-        assert response.json()["next_dj_name"] == "Wolfman"
+        assert response.json()["next"]["name"] == "Wolfman"
 
     def test_next_picks_whichever_source_starts_first(
         self, client: TestClient, db: Session
@@ -678,6 +686,7 @@ class TestOnAirEndpoint:
                 start=now + timedelta(hours=2),
                 end=now + timedelta(hours=3),
                 dj_name="Later Playlist DJ",
+                persona_id=7011,
                 fetched_at=now,
             )
         )
@@ -687,13 +696,14 @@ class TestOnAirEndpoint:
                 start=now + timedelta(minutes=30),
                 end=now + timedelta(hours=1),
                 dj_name="Sooner Show DJ",
+                persona_id=7012,
                 fetched_at=now,
             )
         )
         db.commit()
 
         response = client.get("/api/dj/on-air", headers={"X-Forwarded-For": DJ_STUDIO_IP})
-        assert response.json()["next_dj_name"] == "Sooner Show DJ"
+        assert response.json()["next"]["name"] == "Sooner Show DJ"
 
     def test_duplicate_current_playlists_return_exactly_one(
         self, client: TestClient, db: Session
@@ -706,6 +716,7 @@ class TestOnAirEndpoint:
                 start=now - timedelta(minutes=30),
                 end=now + timedelta(minutes=30),
                 dj_name="First Mistaken DJ",
+                persona_id=7013,
                 fetched_at=now,
             )
         )
@@ -715,6 +726,7 @@ class TestOnAirEndpoint:
                 start=now - timedelta(minutes=20),
                 end=now + timedelta(minutes=40),
                 dj_name="Second Mistaken DJ",
+                persona_id=7014,
                 fetched_at=now,
             )
         )
@@ -722,7 +734,7 @@ class TestOnAirEndpoint:
 
         response = client.get("/api/dj/on-air", headers={"X-Forwarded-For": DJ_STUDIO_IP})
         assert response.status_code == 200
-        assert response.json()["current_dj_name"] in (
+        assert response.json()["current"]["name"] in (
             "First Mistaken DJ",
             "Second Mistaken DJ",
         )

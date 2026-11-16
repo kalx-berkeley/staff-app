@@ -272,7 +272,6 @@ class TestEndpoint:
         assert data["next"]["specialty_show_id"] == talk.id
         assert data["next_starts_at"] is not None
         assert data["can_switch_early"] is True
-        assert data["current_dj_name"] == "DJ One"
 
 
 class TestSlotResync:

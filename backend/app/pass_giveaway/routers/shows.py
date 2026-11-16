@@ -84,8 +84,7 @@ router = APIRouter(prefix="/api/shows", tags=["shows"], route_class=GuestRedacti
 
 
 class AttemptRequest(BaseModel):
-    # Who was on air comes from the Spinitron schedule (`dj_identity`); a
-    # name sent here is ignored
+    # Who was on air comes from the Spinitron schedule (`dj_identity`)
     # The giveaway page visit, for KALX Staff Analytics
     visit_id: str | None = Field(None, max_length=64)
 

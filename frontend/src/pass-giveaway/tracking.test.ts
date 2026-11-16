@@ -25,29 +25,26 @@ describe('pass giveaway tracking', () => {
     vi.useRealTimers();
   });
 
-  it('records a giveaway page visit and later DJ name changes', () => {
+  it('records a giveaway page visit, and moves it when who is on air changes', () => {
     const { result, rerender } = renderHook(
-      ({ name }) => useGiveawayVisit(7, name, true),
-      { initialProps: { name: 'DJ Marmot' } },
+      ({ key }) => useGiveawayVisit(7, key, true),
+      { initialProps: { key: '1|' } },
     );
     const visitId = result.current!;
     expect(visitId).toBeTruthy();
     expect(apiClient.post).toHaveBeenCalledWith('/pass-giveaway/analytics/giveaway-visits', {
       visit_id: visitId,
       show_id: 7,
-      dj_name: 'DJ Marmot',
     });
 
-    rerender({ name: 'DJ Marm' });
-    rerender({ name: 'DJ Otter' });
+    rerender({ key: '1|' });
     expect(apiClient.put).not.toHaveBeenCalled();
-    act(() => {
-      vi.advanceTimersByTime(1600);
-    });
+    // An early switch to the next slot
+    rerender({ key: '2|' });
     expect(apiClient.put).toHaveBeenCalledTimes(1);
     expect(apiClient.put).toHaveBeenCalledWith(
       `/pass-giveaway/analytics/giveaway-visits/${visitId}/dj`,
-      { dj_name: 'DJ Otter' },
+      {},
     );
     expect(result.current).toBe(visitId);
   });

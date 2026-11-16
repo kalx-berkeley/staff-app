@@ -774,21 +774,20 @@ export interface ShowSummary {
 export type PassType = 'pair' | 'staff' | 'tabler';
 export type PassStatus = 'available' | 'given_away' | 'claimed';
 
+/** A giveaway; the server credits it to whoever is on air. */
 export interface GiveawayData {
   recipient_name: string;
   recipient_phone: string;
   recipient_email?: string | null;
-  given_away_by_dj: string;
   /** The giveaway page visit, for KALX Staff Analytics. */
   visit_id?: string | null;
 }
 
-/** Corrected details for an on-air winner; given_away_by_dj is the DJ's typed name. */
+/** Corrected details for an on-air winner (only who is on air may correct their own). */
 export interface WinnerUpdateData {
   recipient_name: string;
   recipient_phone: string;
   recipient_email: string | null;
-  given_away_by_dj: string;
 }
 
 export interface PassResponse {
@@ -801,7 +800,10 @@ export interface PassResponse {
   recipient_name: string | null;
   recipient_phone: string | null;
   recipient_email: string | null;
+  /** Who it's credited to, by current name ("Unattributed" for no one). */
   given_away_by_dj: string | null;
+  given_away_persona_id?: number | null;
+  given_away_specialty_show_id?: number | null;
   given_away_at: string | null; // ISO datetime string
 
   // For staff passes claimed
@@ -951,10 +953,30 @@ export interface PromotionsStaffOption {
 }
 
 // On-air DJ schedule
+/**
+ * Who is on air: a Spinitron persona, or a Specialty Music Show (with its
+ * slot's DJ persona) or Talk & Info Show. The server works it out from the
+ * Spinitron schedule and recent spins.
+ */
+export interface OnAirIdentity {
+  kind: 'persona' | 'music' | 'talk';
+  /** The show's name, or the persona's. */
+  name: string;
+  persona_id: number | null;
+  persona_name: string | null;
+  specialty_show_id: number | null;
+}
+
+/** Who is on air now and next (GET /api/dj/on-air). */
 export interface OnAirInfo {
-  current_dj_name: string | null;
-  current_show_ends_at: string | null;
-  next_dj_name: string | null;
+  /** Who giveaways are credited to now; null for no one. */
+  current: OnAirIdentity | null;
+  /** When the current slot ends (ISO), so the page can look again then. */
+  current_ends_at: string | null;
+  next: OnAirIdentity | null;
+  next_starts_at: string | null;
+  /** Whether to offer "I'm <next> — switch now" (the last 10 minutes before it). */
+  can_switch_early: boolean;
 }
 
 // Spinitron spin matches (played songs matching a show with passes to give away)

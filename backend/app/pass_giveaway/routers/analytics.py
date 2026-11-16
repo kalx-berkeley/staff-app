@@ -40,8 +40,7 @@ class GuestSessionRequest(BaseModel):
 
 
 class GiveawayVisitRequest(BaseModel):
-    # Who the visit is by comes from the Spinitron schedule; a DJ name sent
-    # here is ignored
+    # Who the visit is by comes from the Spinitron schedule
     visit_id: str = Field(..., pattern=_ID_PATTERN)
     show_id: int
 
@@ -102,7 +101,7 @@ def set_giveaway_visit_dj(
 ) -> None:
     """
     Move the visit to who is on air now (the page calls this after switching
-    early). A name sent here is ignored.
+    early).
     """
     if dj is not None and len(visit_id) <= 64:
         tracking.set_visit_dj(db, visit_id, identity)

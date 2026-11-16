@@ -26,14 +26,11 @@ class OnAirIdentity(BaseModel):
 class OnAirResponse(BaseModel):
     """Who is on air now and next, from the Spinitron schedule and recent spins."""
 
-    # The DJ names the cached schedule has, for the DJ Name box (until the DJ
-    # pages show identities instead)
-    current_dj_name: str | None = None
-    current_show_ends_at: UtcDatetime | None = None
-    next_dj_name: str | None = None
     # Who giveaways are credited to now; None for no one (automation,
     # FREEFORM, a placeholder persona, a gap, or Spinitron unavailable)
     current: OnAirIdentity | None = None
+    # When the current slot ends, so the page can look again then
+    current_ends_at: UtcDatetime | None = None
     # The next slot, when its start is known
     next: OnAirIdentity | None = None
     next_starts_at: UtcDatetime | None = None

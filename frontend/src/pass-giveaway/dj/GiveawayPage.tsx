@@ -2,18 +2,17 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { showsAPI } from '../api';
 import PassGiveawayForm from './PassGiveawayForm';
-import { DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, KalxLiveBadge } from '../components';
+import { EnrichedShowName, FeatureBinBadge, KalxLiveBadge } from '../components';
 import MarkdownContent from '../../common/components/MarkdownContent';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { useAuth } from '../../common/contexts/authHooks';
 import type { ShowResponse, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
-import { canRecordDjGiveaways, formatShowRating, isMovieShow } from '../utils';
+import { canRecordDjGiveaways, formatShowRating, isMovieShow, isPreassignedTo } from '../utils';
 import { useGiveawayVisit } from '../tracking';
+import { useOnAir } from './onAirContext';
 import { formatCalendarDate, formatCalendarDateRange } from '../../common/dateTime';
-
-const DJ_NAME_INPUT_ID = 'dj-giveaway-name';
 
 const GiveawayPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -25,9 +24,9 @@ const GiveawayPage = () => {
   usePageTitle(`Pass Giveaway${show ? `: ${show.event_name}` : ''} · DJ`);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [djName, setDjName] = useState(localStorage.getItem(DJ_NAME_KEY) || '');
+  const { identity, identityKey } = useOnAir();
   // KALX Staff Analytics counts each visit to this page and what came of it
-  const visitId = useGiveawayVisit(id ? parseInt(id) : null, djName, !isViewOnly);
+  const visitId = useGiveawayVisit(id ? parseInt(id) : null, identityKey, !isViewOnly);
 
   const loadShow = useCallback(async () => {
     if (!id) return;
@@ -69,11 +68,12 @@ const GiveawayPage = () => {
   const formatDateRange = (startDateStr: string, endDateStr: string): string =>
     formatCalendarDateRange(startDateStr, endDateStr);
 
+  // The on-air identity's pre-assigned pairs first, then unassigned ones,
+  // then other DJs'
   const sortAvailablePasses = (passes: PassResponse[]): PassResponse[] => {
-    const name = djName.trim().toLowerCase();
     return [...passes].sort((a, b) => {
-      const aIsMe = !!name && a.preassigned_dj?.toLowerCase() === name;
-      const bIsMe = !!name && b.preassigned_dj?.toLowerCase() === name;
+      const aIsMe = isPreassignedTo(a, identity);
+      const bIsMe = isPreassignedTo(b, identity);
       const aIsUnassigned = !a.preassigned_dj;
       const bIsUnassigned = !b.preassigned_dj;
       const aPriority = aIsMe ? 1 : aIsUnassigned ? 2 : 3;
@@ -120,8 +120,6 @@ const GiveawayPage = () => {
           </p>
         </div>
       )}
-
-      <DjNameInput value={djName} onChange={setDjName} id={DJ_NAME_INPUT_ID} required />
 
       <div className="kalx-giveaway-split">
         <div className="kalx-giveaway-left">
@@ -236,8 +234,6 @@ const GiveawayPage = () => {
                       state: outcome === 'tried' ? { justTried: true } : { justGaveAway: true },
                     })
                   }
-                  djName={djName}
-                  onMissingDjName={() => document.getElementById(DJ_NAME_INPUT_ID)?.focus()}
                   winFrequencyDays={show.venue.win_frequency_days}
                   winFrequencySharedWith={show.venue.win_frequency_shared_with}
                   requiresEmail={show.guest_list_requirements.requires_email_address}

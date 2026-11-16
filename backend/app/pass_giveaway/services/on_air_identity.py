@@ -87,8 +87,6 @@ class Slot:
     start: datetime
     end: datetime
     identity: Optional[OnAirIdentity]
-    # The cached row's DJ name, for the DJ pages until they show identities
-    dj_name: Optional[str] = None
     playlist_id: Optional[int] = None
 
 
@@ -188,7 +186,6 @@ class _Resolver:
             start=_utc(row.start),
             end=_utc(row.end),
             identity=self.identity(row),
-            dj_name=row.dj_name,
             playlist_id=row.id if isinstance(row, SpinitronPlaylist) else None,
         )
 

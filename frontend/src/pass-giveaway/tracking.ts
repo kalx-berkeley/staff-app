@@ -93,47 +93,43 @@ export function giveawayVisitId(showId: number): string {
 }
 
 /**
- * Record a visit to the show's "I'm off the mic" page, and which DJ it
- * belongs to (the name field at the top of the page, sent again a moment
- * after it changes). Returns the visit ID, to send with a giveaway or
- * "tried" click.
+ * Record a visit to the show's "I'm off the mic" page. The server credits it
+ * to whoever is on air; when that changes while the page is open (an early
+ * switch to the next slot), the visit moves to them. Returns the visit ID,
+ * to send with a giveaway or "tried" click.
+ *
+ * @param identityKey - Changes when who is on air does (`useOnAir().identityKey`).
  */
 export function useGiveawayVisit(
   showId: number | null,
-  djName: string,
+  identityKey: string,
   enabled: boolean,
 ): string | null {
   const visitRef = useRef<{ showId: number; id: string } | null>(null);
-  const sentName = useRef<string | null>(null);
+  const sentKey = useRef<string | null>(null);
 
   if (enabled && showId !== null && visitRef.current?.showId !== showId) {
     visitRef.current = { showId, id: giveawayVisitId(showId) };
-    sentName.current = null;
+    sentKey.current = null;
   }
   const visitId = enabled ? (visitRef.current?.id ?? null) : null;
 
   useEffect(() => {
     if (!visitId || showId === null) return;
-    sentName.current = djName.trim();
+    sentKey.current = identityKey;
     send('post', '/pass-giveaway/analytics/giveaway-visits', {
       visit_id: visitId,
       show_id: showId,
-      dj_name: djName.trim() || null,
     });
-    // Only when the visit starts; name changes are sent below
+    // Only when the visit starts; changes of who is on air are sent below
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visitId, showId]);
 
   useEffect(() => {
-    if (!visitId || sentName.current === null || sentName.current === djName.trim()) return;
-    const timer = setTimeout(() => {
-      sentName.current = djName.trim();
-      send('put', `/pass-giveaway/analytics/giveaway-visits/${visitId}/dj`, {
-        dj_name: djName.trim() || null,
-      });
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [visitId, djName]);
+    if (!visitId || sentKey.current === null || sentKey.current === identityKey) return;
+    sentKey.current = identityKey;
+    send('put', `/pass-giveaway/analytics/giveaway-visits/${visitId}/dj`, {});
+  }, [visitId, identityKey]);
 
   return visitId;
 }

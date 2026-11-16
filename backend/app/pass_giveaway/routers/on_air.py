@@ -45,10 +45,8 @@ async def get_on_air(
     state = await on_air(db, now)
     current, upcoming = state.current, state.next
     return OnAirResponse(
-        current_dj_name=current.dj_name if current else None,
-        current_show_ends_at=current.end if current else None,
-        next_dj_name=upcoming.dj_name if upcoming else None,
         current=_identity(state.identity),
+        current_ends_at=current.end if current else None,
         next=_identity(upcoming.identity if upcoming else None),
         next_starts_at=upcoming.start if upcoming else None,
         can_switch_early=state.can_switch_early(now),

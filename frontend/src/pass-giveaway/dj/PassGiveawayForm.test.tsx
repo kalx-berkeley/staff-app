@@ -54,7 +54,7 @@ describe('PassGiveawayForm', () => {
 
   describe('view only away from the DJ studio', () => {
     it('disables every field and button, so nothing can be sent', async () => {
-      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" viewOnly />);
+      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} viewOnly />);
 
       expect(screen.getByLabelText(/winner name/i)).toBeDisabled();
       expect(screen.getByLabelText(/winner phone/i)).toBeDisabled();
@@ -71,7 +71,7 @@ describe('PassGiveawayForm', () => {
 
   describe('Giveaway Form Validation', () => {
     it('should show validation error when recipient name is empty', async () => {
-      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" />);
+      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} />);
 
       const submitButton = screen.getByRole('button', { name: /give away/i });
       fireEvent.click(submitButton);
@@ -84,7 +84,7 @@ describe('PassGiveawayForm', () => {
     });
 
     it('should show validation error when recipient phone is empty', async () => {
-      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" />);
+      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} />);
 
       const nameInput = screen.getByLabelText(/winner name/i);
       fireEvent.change(nameInput, { target: { value: 'John Doe' } });
@@ -99,35 +99,6 @@ describe('PassGiveawayForm', () => {
       expect(passesAPI.giveaway).not.toHaveBeenCalled();
     });
 
-    it('asks for the page\'s DJ name when Give Away is clicked without one', async () => {
-      const onMissingDjName = vi.fn();
-      render(
-        <PassGiveawayForm
-          pass={mockPass}
-          venueId={1}
-          onSuccess={mockOnSuccess}
-          djName="  "
-          onMissingDjName={onMissingDjName}
-        />,
-      );
-
-      const nameInput = screen.getByLabelText(/winner name/i);
-      const phoneInput = screen.getByLabelText(/winner phone/i);
-
-      fireEvent.change(nameInput, { target: { value: 'John Doe' } });
-      fireEvent.change(phoneInput, { target: { value: '555-123-4567' } });
-
-      const submitButton = screen.getByRole('button', { name: /give away/i });
-      fireEvent.click(submitButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('Enter your DJ name in the DJ Name box at the top of the page')).toBeInTheDocument();
-      });
-      expect(onMissingDjName).toHaveBeenCalled();
-
-      expect(passesAPI.giveaway).not.toHaveBeenCalled();
-    });
-
     it('should submit form when all fields are filled', async () => {
       vi.mocked(passesAPI.giveaway).mockResolvedValue({
         ...mockPass,
@@ -138,7 +109,7 @@ describe('PassGiveawayForm', () => {
         given_away_at: '2024-01-01T12:00:00',
       });
 
-      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" />);
+      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} />);
 
       const nameInput = screen.getByLabelText(/winner name/i);
       const phoneInput = screen.getByLabelText(/winner phone/i);
@@ -154,51 +125,27 @@ describe('PassGiveawayForm', () => {
           recipient_name: 'John Doe',
           recipient_phone: '5551234567',
           recipient_email: null,
-          given_away_by_dj: 'DJ Mike',
         });
       });
 
       expect(mockOnSuccess).toHaveBeenCalledWith('given_away');
     });
 
-    it('asks for the page\'s DJ name when Tried is clicked without one', async () => {
-      const onMissingDjName = vi.fn();
-      render(
-        <PassGiveawayForm
-          pass={mockPass}
-          venueId={1}
-          onSuccess={mockOnSuccess}
-          djName=""
-          onMissingDjName={onMissingDjName}
-        />,
-      );
-
-      const noWinnerButton = screen.getByRole('button', { name: /tried/i });
-      fireEvent.click(noWinnerButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('Enter your DJ name in the DJ Name box at the top of the page')).toBeInTheDocument();
-      });
-      expect(onMissingDjName).toHaveBeenCalled();
-
-      expect(showsAPI.recordAttempt).not.toHaveBeenCalled();
-    });
-
-    it('should record no-winner when DJ name is provided', async () => {
+    it('records a no-winner (the server credits who is on air)', async () => {
       vi.mocked(showsAPI.recordAttempt).mockResolvedValue({
         id: 1,
         dj_name: 'DJ Mike',
         attempted_at: '2024-01-01T12:00:00',
       });
 
-      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" />);
+      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} />);
 
 
       const noWinnerButton = screen.getByRole('button', { name: /tried/i });
       fireEvent.click(noWinnerButton);
 
       await waitFor(() => {
-        expect(showsAPI.recordAttempt).toHaveBeenCalledWith(1, 'DJ Mike', undefined);
+        expect(showsAPI.recordAttempt).toHaveBeenCalledWith(1, undefined);
       });
 
       expect(mockOnSuccess).toHaveBeenCalledWith('tried');
@@ -216,14 +163,14 @@ describe('PassGiveawayForm', () => {
           pass={mockPass}
           venueId={1}
           onSuccess={mockOnSuccess}
-          djName="DJ Mike"
+         
           visitId="visit-123"
         />,
       );
       fireEvent.click(screen.getByRole('button', { name: /tried/i }));
 
       await waitFor(() => {
-        expect(showsAPI.recordAttempt).toHaveBeenCalledWith(1, 'DJ Mike', 'visit-123');
+        expect(showsAPI.recordAttempt).toHaveBeenCalledWith(1, 'visit-123');
       });
       await waitFor(() => expect(mockOnSuccess).toHaveBeenCalledWith('tried'));
     });
@@ -231,7 +178,7 @@ describe('PassGiveawayForm', () => {
 
   describe('Layout', () => {
     it('has no DJ name field of its own', () => {
-      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" />);
+      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} />);
 
       expect(screen.queryByLabelText(/dj name/i)).not.toBeInTheDocument();
     });
@@ -242,7 +189,7 @@ describe('PassGiveawayForm', () => {
           pass={mockPass}
           venueId={1}
           onSuccess={mockOnSuccess}
-          djName="DJ Mike"
+         
           requiresEmail
         />,
       );
@@ -265,7 +212,7 @@ describe('PassGiveawayForm', () => {
         preassigned_date: '2024-12-31',
       };
 
-      render(<PassGiveawayForm pass={preassignedPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" />);
+      render(<PassGiveawayForm pass={preassignedPass} venueId={1} onSuccess={mockOnSuccess} />);
 
       expect(screen.getByText(/pre-assigned to:/i)).toBeInTheDocument();
       expect(screen.getByText(/DJ Mike/)).toBeInTheDocument();
@@ -273,7 +220,7 @@ describe('PassGiveawayForm', () => {
     });
 
     it('should not display pre-assignment notice when pass is not pre-assigned', async () => {
-      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" />);
+      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} />);
 
       expect(screen.queryByText(/pre-assigned to:/i)).not.toBeInTheDocument();
     });
@@ -285,7 +232,7 @@ describe('PassGiveawayForm', () => {
         detail: 'Pass has already been given away',
       });
 
-      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" />);
+      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} />);
 
       const nameInput = screen.getByLabelText(/winner name/i);
       const phoneInput = screen.getByLabelText(/winner phone/i);
@@ -308,7 +255,7 @@ describe('PassGiveawayForm', () => {
         detail: [{ loc: ['body'], msg: 'Invalid data', type: 'value_error' }],
       });
 
-      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" />);
+      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} />);
 
       const nameInput = screen.getByLabelText(/winner name/i);
       const phoneInput = screen.getByLabelText(/winner phone/i);
@@ -329,7 +276,7 @@ describe('PassGiveawayForm', () => {
         detail: 'Show is closed',
       });
 
-      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" />);
+      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} />);
 
 
       const noWinnerButton = screen.getByRole('button', { name: /tried/i });
@@ -347,7 +294,7 @@ describe('PassGiveawayForm', () => {
         () => new Promise((resolve) => setTimeout(resolve, 100))
       );
 
-      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" />);
+      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} />);
 
       const nameInput = screen.getByLabelText(/winner name/i);
       const phoneInput = screen.getByLabelText(/winner phone/i);
@@ -368,7 +315,7 @@ describe('PassGiveawayForm', () => {
         () => new Promise((resolve) => setTimeout(resolve, 100))
       );
 
-      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" />);
+      render(<PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} />);
 
       const nameInput = screen.getByLabelText(/winner name/i);
       const phoneInput = screen.getByLabelText(/winner phone/i);
@@ -393,7 +340,7 @@ describe('PassGiveawayForm', () => {
           pass={mockPass}
           venueId={1}
           onSuccess={mockOnSuccess}
-          djName="DJ Mike"
+         
           winFrequencyDays={30}
           winFrequencySharedWith={['Albany', 'Elmwood']}
         />
@@ -405,7 +352,7 @@ describe('PassGiveawayForm', () => {
 
     it('leaves the notice alone when the limit is the venue\'s own', () => {
       render(
-        <PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} djName="DJ Mike" winFrequencyDays={30} />
+        <PassGiveawayForm pass={mockPass} venueId={1} onSuccess={mockOnSuccess} winFrequencyDays={30} />
       );
       expect(screen.getByText(/limits winners to once every/i)).not.toHaveTextContent('shared with');
     });
@@ -420,7 +367,7 @@ describe('PassGiveawayForm', () => {
         required_days: 30,
       });
       render(
-        <PassGiveawayForm pass={mockPass} venueId={2} onSuccess={mockOnSuccess} djName="DJ Mike" winFrequencyDays={30} />
+        <PassGiveawayForm pass={mockPass} venueId={2} onSuccess={mockOnSuccess} winFrequencyDays={30} />
       );
       const phone = screen.getByLabelText(/winner phone/i);
       fireEvent.change(phone, { target: { value: '5105550100' } });
