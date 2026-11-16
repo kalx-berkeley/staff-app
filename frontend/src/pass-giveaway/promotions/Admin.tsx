@@ -6,6 +6,7 @@ import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { subsiteForPath } from '../../subsites';
 import { formatPacific } from '../../common/dateTime';
+import GiveawayCreditSection from './GiveawayCreditSection';
 
 const Admin = () => {
   usePageTitle('Admin · Promotions');
@@ -173,6 +174,8 @@ const Admin = () => {
           <a href={`${staffAdmin.basePath}/`}>{staffAdmin.name}</a>.
         </p>
       )}
+
+      <GiveawayCreditSection />
 
       <section className="admin-section">
         <h3>Auto-close Schedules</h3>

@@ -86,9 +86,10 @@ class EnteredOnAirWinner(BaseModel):
     recipient_name: str = Field(..., min_length=1, max_length=100)
     recipient_phone: str = Field(..., min_length=1, max_length=20)
     recipient_email: str | None = Field(None, max_length=200)
-    given_away_by_dj: str | None = Field(
-        None, max_length=100, description='Blank is stored as "Unknown"'
-    )
+    # Who it's credited to, from the promotions picker: a persona of a current
+    # staff member or a current show; neither leaves it unattributed
+    persona_id: int | None = None
+    specialty_show_id: int | None = None
 
 
 class EnteredStaffWinner(BaseModel):

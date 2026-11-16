@@ -9,6 +9,7 @@ import apiClient, { handleAPIError } from '../common/api';
 import { pageContextQuery } from '../common/pageTime';
 import { SWITCH_HEADER, addOnAirHeaders } from './dj/onAirHeaders';
 import type {
+  GiveawayCreditItem,
   AgeRestriction,
   AlternateEntry,
   AlternateJoinRequest,
@@ -1190,6 +1191,47 @@ export const adminAPI = {
   getLotterySchedules: async (): Promise<LotteryScheduleItem[]> => {
     try {
       const response = await apiClient.get<LotteryScheduleItem[]>('/pass-giveaway/admin/lottery-schedules');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * Pass pairs given away in the last *days* days, newest first; with
+   * *unattributed*, only those credited to no one.
+   */
+  getGiveaways: async (unattributed: boolean, days: number): Promise<GiveawayCreditItem[]> => {
+    try {
+      const response = await apiClient.get<GiveawayCreditItem[]>('/pass-giveaway/admin/giveaways', {
+        params: { unattributed, days },
+      });
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /** What a giveaway can be credited to: current staff personas, then current shows. */
+  getCreditIdentities: async (): Promise<Identity[]> => {
+    try {
+      const response = await apiClient.get<Identity[]>('/pass-giveaway/admin/credit-identities');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /** Re-credit a giveaway to a persona or a show, or to no one (null). */
+  recreditGiveaway: async (passId: number, identity: Identity | null): Promise<GiveawayCreditItem> => {
+    try {
+      const response = await apiClient.put<GiveawayCreditItem>(
+        `/pass-giveaway/admin/giveaways/${passId}/credit`,
+        {
+          persona_id: identity?.persona_id ?? null,
+          specialty_show_id: identity?.specialty_show_id ?? null,
+        },
+      );
       return response.data;
     } catch (error) {
       return handleAPIError(error);

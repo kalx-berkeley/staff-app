@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { showsAPI } from '../api';
-import { PersonAutocomplete, extractPersonEmail } from '../components';
+import { passesAPI, showsAPI } from '../api';
+import { IdentityPicker, PersonAutocomplete, extractPersonEmail } from '../components';
 import { formatPhone } from '../../common/utils';
-import type { PassResponse, StaffPassClaimant } from '../types';
+import type { Identity, PassResponse, StaffPassClaimant } from '../types';
 import { emptyOnAirRow, emptyStaffRow, staffPassesNeeded } from './enteredWinners';
 import type { FreePasses, OnAirWinnerRow, StaffWinnerRow } from './enteredWinners';
 
@@ -37,6 +37,7 @@ const EnteredWinnersSection = ({
 }: EnteredWinnersSectionProps) => {
   const [open, setOpen] = useState(false);
   const [staffList, setStaffList] = useState<StaffPassClaimant[] | null>(null);
+  const [identities, setIdentities] = useState<Identity[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Show what's wrong when saving is blocked, even if the rep collapsed the section
@@ -48,13 +49,14 @@ const EnteredWinnersSection = ({
   useEffect(() => {
     if (!open || staffList !== null) return;
     let cancelled = false;
-    showsAPI
-      .listStaffPassClaimants()
-      .then((list) => {
-        if (!cancelled) setStaffList(list);
+    Promise.all([showsAPI.listStaffPassClaimants(), passesAPI.getPreassignIdentities()])
+      .then(([list, picks]) => {
+        if (cancelled) return;
+        setStaffList(list);
+        setIdentities(picks);
       })
       .catch(() => {
-        if (!cancelled) setLoadError('Failed to load the staff list');
+        if (!cancelled) setLoadError('Failed to load the staff and DJ lists');
       });
     return () => {
       cancelled = true;
@@ -202,12 +204,12 @@ const EnteredWinnersSection = ({
                   </div>
                   <div className="form-group">
                     <label htmlFor={`${prefix}_dj`}>Given away by</label>
-                    <input
+                    <IdentityPicker
                       id={`${prefix}_dj`}
-                      type="text"
-                      value={row.given_away_by_dj}
-                      onChange={(e) => updateOnAir(row.key, { given_away_by_dj: e.target.value })}
-                      placeholder="DJ name (optional)"
+                      options={identities}
+                      value={row.given_away_by}
+                      onChange={(identity) => updateOnAir(row.key, { given_away_by: identity })}
+                      placeholder="DJ or show (optional)"
                       disabled={disabled}
                     />
                   </div>

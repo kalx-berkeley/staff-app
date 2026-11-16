@@ -19,6 +19,9 @@ class OnAirWinnerImport(BaseModel):
     recipient_phone: str = Field(..., min_length=1, max_length=20)
     recipient_email: Optional[str] = Field(None, max_length=200)
     given_away_by_dj: Optional[str] = Field(None, max_length=200)
+    # Legacy imports don't pick who gave a pair away, so it's unattributed
+    persona_id: None = None
+    specialty_show_id: None = None
 
 
 class StaffPassImport(BaseModel):

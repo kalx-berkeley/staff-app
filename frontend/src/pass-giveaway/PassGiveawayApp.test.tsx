@@ -18,6 +18,8 @@ vi.mock('./api', () => ({
     getAutoCloseSchedules: vi.fn().mockResolvedValue([]),
     getLotterySchedules: vi.fn().mockResolvedValue([]),
     getSeedStatus: vi.fn().mockResolvedValue({ seeded: false }),
+    getGiveaways: vi.fn().mockResolvedValue([]),
+    getCreditIdentities: vi.fn().mockResolvedValue([]),
   },
   showsAPI: { listDeleted: vi.fn().mockResolvedValue([]) },
   venuesAPI: { listDeleted: vi.fn().mockResolvedValue([]) },

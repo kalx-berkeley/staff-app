@@ -25,6 +25,11 @@ vi.mock('../api', () => ({
   promotersAPI: {
     list: vi.fn().mockResolvedValue([]),
   },
+  passesAPI: {
+    getPreassignIdentities: vi.fn().mockResolvedValue([
+      { name: 'DJ Night', kind: 'persona', persona_id: 41, specialty_show_id: null, staff_name: 'Ann Staff' },
+    ]),
+  },
 }));
 
 const mockNavigate = vi.fn();
@@ -981,6 +986,9 @@ describe('ShowForm', () => {
       fireEvent.click(screen.getByRole('button', { name: /add on-air winner/i }));
       fireEvent.change(screen.getByLabelText(/^name/i), { target: { value: 'Caller One' } });
       fireEvent.change(screen.getByLabelText(/^phone/i), { target: { value: '510-555-1234' } });
+      // Who gave it away is picked, not typed
+      fireEvent.change(screen.getByLabelText(/given away by/i), { target: { value: 'night' } });
+      fireEvent.mouseDown(await screen.findByText('DJ Night'));
       fireEvent.click(screen.getByRole('button', { name: /add staff winner/i }));
       const staffInput = screen.getByLabelText(/staff member/i);
       fireEvent.change(staffInput, { target: { value: 'ann' } });
@@ -1003,7 +1011,8 @@ describe('ShowForm', () => {
               recipient_name: 'Caller One',
               recipient_phone: '510-555-1234',
               recipient_email: null,
-              given_away_by_dj: null,
+              persona_id: 41,
+              specialty_show_id: null,
             },
           ],
           staff_winners: [{ staff_id: 7, has_guest: true, guest_name: 'Pal' }],

@@ -15,11 +15,13 @@ from app.models.lottery_entry import LotteryEntry
 from app.models.on_air_winner import OnAirWinner
 from app.models.pass_model import Pass
 from app.models.show import Show
+from app.models.specialty_show import SpecialtyShow
 from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
 from app.models.staff_pass_alternate import StaffPassAlternate
 from app.models.staff_status import StaffStatus
 from app.models.venue import Venue
+from tests.personas import dj_fields
 
 SEND_EMAIL = "app.common.services.notification_service.send_email"
 SHOW_DATE = "2099-12-31"
@@ -107,10 +109,10 @@ class TestNewShow:
         self, client: TestClient, db: Session, rep: Staff, venue: Venue
     ):
         ann = _staff(db, "ann@test.com")
-        ben = _staff(db, "ben@test.com")
+        ben = _staff(db, "ben@test.com", **dj_fields("DJ Night", ids=[901]))
         body = _show_body(
             venue,
-            on_air_winners=[{**WINNER, "given_away_by_dj": "DJ Night"}, WINNER],
+            on_air_winners=[{**WINNER, "persona_id": 901}, WINNER],
             staff_winners=[
                 {"staff_id": ann.id, "has_guest": True, "guest_name": "Pal"},
                 {"staff_id": ben.id},
@@ -126,7 +128,10 @@ class TestNewShow:
         show_id = response.json()["id"]
         pairs = _passes(db, show_id, "pair")
         assert [p.status for p in pairs] == ["given_away", "given_away"]
-        assert [p.given_away_by_dj for p in pairs] == ["DJ Night", "Unknown"]
+        assert [(p.given_away_persona_id, p.given_away_by) for p in pairs] == [
+            (901, "DJ Night"),
+            (None, "Unattributed"),
+        ]
         winners = db.query(OnAirWinner).filter(OnAirWinner.show_id == show_id).all()
         assert {w.recipient_phone for w in winners} == {"5105551234"}
 
@@ -140,6 +145,45 @@ class TestNewShow:
         events = [a.event_type for a in db.query(AuditLog).all()]
         assert events.count("on_air_winner_entered_by_promotions") == 2
         assert events.count("staff_pass_assigned_by_promotions") == 2
+
+    @pytest.mark.parametrize(
+        "credit, status_code",
+        [({"persona_id": 999}, 400), ({"specialty_show_id": 999}, 404)],
+        ids=["persona-not-on-staff", "unknown-show"],
+    )
+    def test_a_winner_credited_to_no_one_known_is_refused(
+        self, client: TestClient, db: Session, rep: Staff, venue: Venue, credit, status_code
+    ):
+        response = client.post(
+            "/api/shows",
+            json=_show_body(venue, on_air_winners=[{**WINNER, **credit}]),
+            headers=_headers(rep),
+        )
+
+        assert response.status_code == status_code
+        assert db.query(Show).count() == 0
+
+    def test_a_winner_can_be_credited_to_a_show(
+        self, client: TestClient, db: Session, rep: Staff, venue: Venue
+    ):
+        music = SpecialtyShow(name="Take Five")
+        db.add(music)
+        db.commit()
+
+        response = client.post(
+            "/api/shows",
+            json=_show_body(
+                venue, on_air_winners=[{**WINNER, "specialty_show_id": music.id}]
+            ),
+            headers=_headers(rep),
+        )
+
+        assert response.status_code == 201, response.text
+        pair = _passes(db, response.json()["id"], "pair")[0]
+        assert (pair.given_away_specialty_show_id, pair.given_away_by) == (
+            music.id,
+            "Take Five",
+        )
 
     def test_venue_win_frequency_limit_is_skipped(
         self, client: TestClient, db: Session, rep: Staff, venue: Venue

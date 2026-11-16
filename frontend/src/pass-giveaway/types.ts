@@ -400,7 +400,9 @@ export interface EnteredOnAirWinner {
   recipient_name: string;
   recipient_phone: string;
   recipient_email?: string | null;
-  given_away_by_dj?: string | null; // blank is stored as "Unknown"
+  // Who it's credited to, from the picker; neither leaves it unattributed
+  persona_id?: number | null;
+  specialty_show_id?: number | null;
 }
 
 // A staff member a promotions rep gives a staff pass on the show form
@@ -637,6 +639,21 @@ export interface LotteryScheduleItem {
   dj_entry_count: number;
   show_status: string;
   schedule_status: 'scheduled' | 'past' | 'executed';
+}
+
+/** A given-away pass pair and who it's credited to, for re-crediting (Promotions → Admin). */
+export interface GiveawayCreditItem {
+  pass_id: number;
+  show_id: number;
+  event_name: string;
+  venue_name: string;
+  show_date: string;
+  recipient_name: string | null;
+  given_away_at: string | null;
+  /** The persona's or show's current name, or "Unattributed". */
+  credited_to: string;
+  persona_id: number | null;
+  specialty_show_id: number | null;
 }
 
 export interface StaffLotteryEntryCreate {
