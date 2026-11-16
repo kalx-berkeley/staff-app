@@ -182,4 +182,25 @@ describe('Staff MyPasses — past shows and winner details', () => {
     expect(screen.queryByText('Caller Name')).not.toBeInTheDocument();
     expect(screen.queryByText(/555-1234/)).not.toBeInTheDocument();
   });
+
+  it("shows a talk show member's history even when they aren't a Sublist DJ", async () => {
+    auth.isSublistDj = false;
+    vi.mocked(passesAPI.getStaffMyGiveaways).mockResolvedValue([
+      makePass({ show_event_name: 'Talk Giveaway', given_away_by_dj: 'Morning Report' }),
+    ]);
+
+    render(<BrowserRouter><MyPasses /></BrowserRouter>);
+
+    expect(await screen.findByText('Talk Giveaway')).toBeInTheDocument();
+    expect(screen.getByText('My Giveaway History')).toBeInTheDocument();
+    expect(screen.getByText('Morning Report')).toBeInTheDocument();
+  });
+
+  it('leaves out the history section for someone with none', async () => {
+    auth.isSublistDj = false;
+    render(<BrowserRouter><MyPasses /></BrowserRouter>);
+
+    await waitFor(() => expect(passesAPI.getStaffMyGiveaways).toHaveBeenCalled());
+    expect(screen.queryByText('My Giveaway History')).not.toBeInTheDocument();
+  });
 });

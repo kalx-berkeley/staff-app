@@ -18,7 +18,13 @@ class OnAirWinner(Base):
     recipient_name = Column(String, nullable=False)
     recipient_phone = Column(String, nullable=False)
     recipient_email = Column(String, nullable=True)
+    # The old typed DJ name, until phase 4 of the Spinitron identity plan
     given_away_by_dj = Column(String, nullable=False)
+    # Who it's credited to: the persona, the show, or both (see Pass)
+    given_away_persona_id = Column(Integer, nullable=True)
+    given_away_specialty_show_id = Column(
+        Integer, ForeignKey("specialty_shows.id"), nullable=True
+    )
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )

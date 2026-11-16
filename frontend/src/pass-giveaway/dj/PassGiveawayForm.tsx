@@ -12,10 +12,6 @@ interface PassGiveawayFormProps {
   venueId: number;
   /** Called after Give Away (`'given_away'`) or Tried (`'tried'`) is recorded. */
   onSuccess: (outcome: GiveawayOutcome) => void;
-  /** The DJ name from the page's DJ Name box. Both Give Away and Tried need it. */
-  djName: string;
-  /** Called when Give Away or Tried is clicked without a DJ name, so the page can focus its DJ Name box. */
-  onMissingDjName?: () => void;
   winFrequencyDays?: number | null;
   // The other venues that share this venue's win frequency limit
   winFrequencySharedWith?: string[];
@@ -32,9 +28,11 @@ interface PassGiveawayFormProps {
 
 export type GiveawayOutcome = 'given_away' | 'tried';
 
-type WinnerFields = Omit<GiveawayData, 'given_away_by_dj' | 'visit_id'>;
+type WinnerFields = Omit<GiveawayData, 'visit_id'>;
 
-const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, winFrequencyDays, winFrequencySharedWith = [], requiresEmail, viewOnly, visitId }: PassGiveawayFormProps) => {
+// Who the giveaway or attempt is credited to is up to the server: whoever
+// the Spinitron schedule has on air (see dj/onAirContext.tsx).
+const PassGiveawayForm = ({ pass, venueId, onSuccess, winFrequencyDays, winFrequencySharedWith = [], requiresEmail, viewOnly, visitId }: PassGiveawayFormProps) => {
   const [formData, setFormData] = useState<WinnerFields>({
     recipient_name: '',
     recipient_phone: '',
@@ -52,14 +50,6 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
       setWinEligibility(null);
       setOverrideIneligible(false);
     }
-  };
-
-  /** Shows the missing DJ name error and returns false when the page's DJ Name box is empty. */
-  const checkDjName = (): boolean => {
-    if (djName.trim()) return true;
-    setError('Enter your DJ name in the DJ Name box at the top of the page');
-    onMissingDjName?.();
-    return false;
   };
 
   const handlePhoneBlur = async () => {
@@ -97,7 +87,6 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
       setError('Winner email address is required by this venue');
       return;
     }
-    if (!checkDjName()) return;
     if (isSubmitBlocked) {
       setError('Winner is ineligible. Check the override box to proceed.');
       return;
@@ -107,7 +96,6 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
       setLoading(true);
       const payload: GiveawayData = {
         ...formData,
-        given_away_by_dj: djName.trim(),
         recipient_email: formData.recipient_email?.trim() || null,
         ...(visitId ? { visit_id: visitId } : {}),
       };
@@ -129,11 +117,9 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, djName, onMissingDjName, w
     if (viewOnly) return;
     setError(null);
 
-    if (!checkDjName()) return;
-
     try {
       setLoading(true);
-      await showsAPI.recordAttempt(pass.show_id, djName.trim(), visitId);
+      await showsAPI.recordAttempt(pass.show_id, visitId);
       onSuccess('tried');
     } catch (err) {
       const apiError = err as APIError;

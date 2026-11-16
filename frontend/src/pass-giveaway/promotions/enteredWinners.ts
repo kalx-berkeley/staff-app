@@ -1,6 +1,6 @@
-import type { EnteredOnAirWinner, EnteredStaffWinner, PassResponse } from '../types';
+import type { EnteredOnAirWinner, EnteredStaffWinner, Identity, PassResponse } from '../types';
 
-// Winners a promotions rep types in on the show form, for a show that replaces
+// Winners a promotions rep enters on the show form, for a show that replaces
 // a cancelled, postponed or moved one. See
 // docs/pass-giveaway/specs/preassigned-winners/plan.md.
 
@@ -9,7 +9,8 @@ export interface OnAirWinnerRow {
   recipient_name: string;
   recipient_phone: string;
   recipient_email: string;
-  given_away_by_dj: string;
+  /** Who it's credited to (a staff persona or a show), or null for unattributed. */
+  given_away_by: Identity | null;
 }
 
 export interface StaffWinnerRow {
@@ -31,7 +32,7 @@ export const emptyOnAirRow = (): OnAirWinnerRow => ({
   recipient_name: '',
   recipient_phone: '',
   recipient_email: '',
-  given_away_by_dj: '',
+  given_away_by: null,
 });
 export const emptyStaffRow = (): StaffWinnerRow => ({
   key: nextKey++,
@@ -105,7 +106,8 @@ export const toOnAirPayload = (rows: OnAirWinnerRow[]): EnteredOnAirWinner[] =>
     recipient_name: r.recipient_name.trim(),
     recipient_phone: r.recipient_phone.trim(),
     recipient_email: r.recipient_email.trim() || null,
-    given_away_by_dj: r.given_away_by_dj.trim() || null,
+    persona_id: r.given_away_by?.persona_id ?? null,
+    specialty_show_id: r.given_away_by?.specialty_show_id ?? null,
   }));
 
 export const toStaffPayload = (rows: StaffWinnerRow[]): EnteredStaffWinner[] =>

@@ -2,7 +2,7 @@
 
 from datetime import date
 from typing import Literal
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 from app.common.schemas.types import UtcDatetime
 from app.models.guest_fallback import GuestFallback
@@ -39,9 +39,8 @@ class GiveawayData(BaseModel):
     recipient_email: str | None = Field(
         None, max_length=200, description="Winner's email address (required by some venues)"
     )
-    given_away_by_dj: str = Field(
-        ..., min_length=1, max_length=100, description="DJ who gave away the passes"
-    )
+    # Who gave the passes away comes from the Spinitron schedule
+    # (`on_air_identity.dj_identity`)
     visit_id: str | None = Field(
         None, max_length=64, description="The giveaway page visit, for KALX Staff Analytics"
     )
@@ -63,14 +62,8 @@ class WinnerUpdateData(BaseModel):
             "Winner's email address; blank clears it (refused when the venue requires one)"
         ),
     )
-    given_away_by_dj: str = Field(
-        ...,
-        min_length=1,
-        max_length=100,
-        description=(
-            "The DJ name typed in the DJ view; must match the DJ who gave the passes away"
-        ),
-    )
+    # Only who is on air (`on_air_identity.dj_identity`) may edit their own
+    # giveaway
 
 
 class IdentityChoice(BaseModel):
@@ -124,17 +117,6 @@ class IdentitySchedule(BaseModel):
     dates: list[str] = Field(default_factory=list)
     # Personas only: days it hosts a Talk & Info Show instead, by show name
     talk_show_dates: dict[str, str] = Field(default_factory=dict)
-
-
-class ClothespinData(BaseModel):
-    """Schema for a DJ reserving a pass pair for themselves for today from the DJ view."""
-
-    dj_name: str = Field(
-        ...,
-        min_length=1,
-        max_length=100,
-        description="The DJ or specialty show name typed in the DJ view",
-    )
 
 
 class SelfPreassignmentData(BaseModel):
@@ -232,7 +214,13 @@ class PassResponse(BaseModel):
     recipient_name: str | None = None
     recipient_phone: str | None = None
     recipient_email: str | None = None
-    given_away_by_dj: str | None = None
+    # Who the giveaway is credited to, by the persona's or show's current
+    # name ("Unattributed" when no one was on air)
+    given_away_by_dj: str | None = Field(
+        None, validation_alias=AliasChoices("given_away_by", "given_away_by_dj")
+    )
+    given_away_persona_id: int | None = None
+    given_away_specialty_show_id: int | None = None
     given_away_at: UtcDatetime | None = None
 
     # For staff passes claimed

@@ -16,8 +16,10 @@ change and asks first, and records the change in the audit log.
 
 Run from the backend/ directory with DATABASE_URL pointed at the target
 database. It reads Spinitron's persona directory with SPINITRON_API_KEY
-(cached for a week); --offline skips that and uses only the personas the
-database already knows.
+(cached for a week); --offline skips that and uses the personas the database
+already knows: the nightly copy of that directory (`spinitron_personas`),
+staff records and the schedule cache. Phase 3's migration matches the same
+way as --offline.
 
     python scripts/spinitron_identity_report.py                 # the report
     python scripts/spinitron_identity_report.py --all           # also list matched names
@@ -90,8 +92,8 @@ def _directory(db, offline: bool) -> NameDirectory:
             print(f"Couldn't read Spinitron's personas ({e}); continuing offline.\n")
     if not personas:
         print(
-            "Note: matching only the personas the database knows (staff records and"
-            " the schedule cache), not Spinitron's full directory.\n"
+            "Note: matching only the personas the database knows (the nightly copy"
+            " of Spinitron's directory, staff records and the schedule cache).\n"
         )
     return build_directory(db, personas)
 

@@ -4,6 +4,7 @@ import type {
   AgeRestriction,
   GuestFallback,
   MovieRating,
+  OnAirIdentity,
   PassResponse,
   ShowResponse,
   SpecialtyShowCategory,
@@ -109,37 +110,77 @@ export function isRecentShow(showDate: string | null | undefined): boolean {
 // this window (one DJ shift); see PassService.giveaway_pass.
 export const DJ_SHOW_GIVEAWAY_WINDOW_HOURS = 4;
 
-// The pass pair this DJ already gave away for the show within the window, if
-// any. Names are compared ignoring case and surrounding spaces.
-export function findRecentDjGiveaway<T extends Pick<PassResponse, 'given_away_by_dj' | 'given_away_at'>>(
-  passes: T[],
-  djName: string,
-  now: Date = new Date(),
-): T | undefined {
-  const name = djName.trim().toLowerCase();
-  if (!name) return undefined;
+// The (persona, specialty show) a giveaway credited to *identity* stores,
+// as the backend's `on_air_identity.credit` does
+const creditOf = (identity: OnAirIdentity | null): [number | null, number | null] =>
+  identity ? [identity.persona_id, identity.specialty_show_id] : [null, null];
+
+/** Whether *pass* was given away while *identity* (or no one, for null) was on air. */
+export function isCreditedTo(
+  pass: Pick<PassResponse, 'given_away_persona_id' | 'given_away_specialty_show_id'>,
+  identity: OnAirIdentity | null,
+): boolean {
+  const [personaId, showId] = creditOf(identity);
+  return (
+    (pass.given_away_persona_id ?? null) === personaId &&
+    (pass.given_away_specialty_show_id ?? null) === showId
+  );
+}
+
+/**
+ * Whether *pass* is pre-assigned to *identity*: to its show, or to its
+ * persona (not during a talk show). Mirrors the backend's `_preassigned_to`.
+ */
+export function isPreassignedTo(
+  pass: Pick<PassResponse, 'preassigned_persona_id' | 'preassigned_specialty_show_id'>,
+  identity: OnAirIdentity | null,
+): boolean {
+  if (!identity) return false;
+  if (identity.specialty_show_id !== null) {
+    if (pass.preassigned_specialty_show_id === identity.specialty_show_id) return true;
+    if (identity.kind === 'talk') return false;
+  }
+  return (
+    identity.persona_id !== null &&
+    pass.preassigned_specialty_show_id === null &&
+    pass.preassigned_persona_id === identity.persona_id
+  );
+}
+
+// The pass pair *identity* gave away within DJ_SHOW_GIVEAWAY_WINDOW_HOURS, if
+// any. The backend allows one per show per identity in that window; with no
+// one on air, giveaways can't be told apart, so none counts.
+export function findRecentDjGiveaway<
+  T extends Pick<
+    PassResponse,
+    'given_away_persona_id' | 'given_away_specialty_show_id' | 'given_away_at'
+  >,
+>(passes: T[], identity: OnAirIdentity | null, now: Date = new Date()): T | undefined {
+  if (!identity) return undefined;
   const windowStart = now.getTime() - DJ_SHOW_GIVEAWAY_WINDOW_HOURS * 60 * 60 * 1000;
   return passes.find(
     (p) =>
-      p.given_away_by_dj?.trim().toLowerCase() === name &&
+      isCreditedTo(p, identity) &&
       !!p.given_away_at &&
       new Date(p.given_away_at).getTime() >= windowStart,
   );
 }
 
-// Whether the DJ named djName may still correct this pass pair's winner: they
-// gave it away (names compared ignoring case and surrounding spaces), within
-// DJ_SHOW_GIVEAWAY_WINDOW_HOURS, and the show isn't closed or past its planned
-// close time (in the studio's local time). The backend checks the same rules.
+// Whether who is on air may still correct this pass pair's winner: it was
+// credited to them (or to no one, while no one is on air), within
+// DJ_SHOW_GIVEAWAY_WINDOW_HOURS, and the show isn't closed or past its
+// planned close time.
 export function canDjEditWinner(
-  pass: Pick<PassResponse, 'status' | 'given_away_by_dj' | 'given_away_at'>,
+  pass: Pick<
+    PassResponse,
+    'status' | 'given_away_persona_id' | 'given_away_specialty_show_id' | 'given_away_at'
+  >,
   show: Pick<ShowResponse, 'status' | 'planned_close_date' | 'planned_close_time'>,
-  djName: string,
+  identity: OnAirIdentity | null,
   now: Date = new Date(),
 ): boolean {
-  const name = djName.trim().toLowerCase();
-  if (pass.status !== 'given_away' || !name || !pass.given_away_at) return false;
-  if (pass.given_away_by_dj?.trim().toLowerCase() !== name) return false;
+  if (pass.status !== 'given_away' || !pass.given_away_at) return false;
+  if (!isCreditedTo(pass, identity)) return false;
   const windowMs = DJ_SHOW_GIVEAWAY_WINDOW_HOURS * 60 * 60 * 1000;
   if (now.getTime() - new Date(pass.given_away_at).getTime() >= windowMs) return false;
   if (show.status === 'closed') return false;

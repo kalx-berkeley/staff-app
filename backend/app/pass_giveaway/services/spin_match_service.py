@@ -82,6 +82,18 @@ class SpinMatchService:
         return bool(settings.spinitron_api_key)
 
     @staticmethod
+    async def recent_spins(db: Session) -> list[dict]:
+        """
+        Spins from the last 15 minutes, most recent first, refetched from
+        Spinitron at most once a minute.
+
+        Each is {"id", "start" (ISO), "artist", "song", "image",
+        "playlist_id"}. Also read by `on_air_identity`, so the DJ pages'
+        polling keeps both features fresh with one Spinitron call a minute.
+        """
+        return await SpinMatchService._get_cached_spins(db)
+
+    @staticmethod
     async def _get_cached_spins(db: Session) -> list[dict]:
         """Return recent spins, refetching from Spinitron if the cache is stale."""
         now = datetime.now(timezone.utc)
@@ -103,6 +115,7 @@ class SpinMatchService:
                 "artist": s["artist"],
                 "song": s["song"],
                 "image": s["image"],
+                "playlist_id": s.get("playlist_id"),
             }
             for s in spins
         ]

@@ -2,10 +2,10 @@
 Roll raw analytics events older than 13 months into daily counts.
 
 Each event becomes a count on its Pacific date, keyed by type, area, actor,
-network, entity, DJ name and dimension. `ref` and `details` are dropped, so
-anything a metric needs from an old event has to be in those columns: that's
-why a giveaway page visit keeps its outcome in `dimension` instead of in
-separate events.
+network, entity, DJ name, persona, specialty show and dimension. `ref` and
+`details` are dropped, so anything a metric needs from an old event has to be
+in those columns: that's why a giveaway page visit keeps its outcome in
+`dimension` instead of in separate events.
 """
 
 from collections import Counter
@@ -46,11 +46,25 @@ def roll_up_old_events(db: Session, now: datetime | None = None) -> int:
             e.entity_type,
             e.entity_id,
             e.dj_name,
+            e.persona_id,
+            e.specialty_show_id,
             e.dimension,
         )] += 1
 
     for key, n in counts.items():
-        day, event_type, area, actor, network, entity_type, entity_id, dj, dimension = key
+        (
+            day,
+            event_type,
+            area,
+            actor,
+            network,
+            entity_type,
+            entity_id,
+            dj,
+            persona_id,
+            show_id,
+            dimension,
+        ) = key
         existing = (
             db.query(AnalyticsDailyCount)
             .filter(
@@ -62,6 +76,8 @@ def roll_up_old_events(db: Session, now: datetime | None = None) -> int:
                 _null_safe_eq(AnalyticsDailyCount.entity_type, entity_type),
                 _null_safe_eq(AnalyticsDailyCount.entity_id, entity_id),
                 _null_safe_eq(AnalyticsDailyCount.dj_name, dj),
+                _null_safe_eq(AnalyticsDailyCount.persona_id, persona_id),
+                _null_safe_eq(AnalyticsDailyCount.specialty_show_id, show_id),
                 _null_safe_eq(AnalyticsDailyCount.dimension, dimension),
             )
             .first()
@@ -79,6 +95,8 @@ def roll_up_old_events(db: Session, now: datetime | None = None) -> int:
                     entity_type=entity_type,
                     entity_id=entity_id,
                     dj_name=dj,
+                    persona_id=persona_id,
+                    specialty_show_id=show_id,
                     dimension=dimension,
                     count=n,
                 )

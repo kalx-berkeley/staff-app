@@ -7,8 +7,9 @@
 
 import apiClient, { handleAPIError } from '../common/api';
 import { pageContextQuery } from '../common/pageTime';
-import { addDjNameHeader } from './djName';
+import { SWITCH_HEADER, addOnAirHeaders } from './dj/onAirHeaders';
 import type {
+  GiveawayCreditItem,
   AgeRestriction,
   AlternateEntry,
   AlternateJoinRequest,
@@ -74,8 +75,9 @@ import type {
   WinnerUpdateData,
 } from './types';
 
-// Name the DJ studio guest on the backend's log lines (see djName.ts).
-apiClient.interceptors.request.use(addDjNameHeader);
+// Name the DJ studio guest on the backend's log lines, and tell it about an
+// early switch to the next on-air slot (see dj/onAirHeaders.ts).
+apiClient.interceptors.request.use(addOnAirHeaders);
 
 /**
  * Shows API methods for managing show records.
@@ -309,19 +311,15 @@ export const showsAPI = {
   /**
    * Record a failed giveaway attempt for a show (DJ only).
    *
+   * The server credits it to whoever is on air.
+   *
    * @param showId - Show ID
-   * @param djName - Name of DJ who attempted the giveaway
    * @param visitId - The giveaway page visit, for KALX Staff Analytics
    * @returns Promise resolving to created ShowAttempt
    */
-  recordAttempt: async (
-    showId: number,
-    djName: string,
-    visitId?: string | null,
-  ): Promise<ShowAttempt> => {
+  recordAttempt: async (showId: number, visitId?: string | null): Promise<ShowAttempt> => {
     try {
       const response = await apiClient.post<ShowAttempt>(`/shows/${showId}/attempt`, {
-        dj_name: djName,
         ...(visitId ? { visit_id: visitId } : {}),
       });
       return response.data;
@@ -677,20 +675,12 @@ export const passesAPI = {
   },
 
   /**
-   * Get current DJ's giveaway history.
-   * Returns all passes given away by the authenticated DJ.
-   * 
-   * @returns Promise resolving to array of passes
-   */
-  /**
    * Get the winner the on-air DJ recorded, including their email, to correct it.
-   * Only answers the DJ who gave the passes away, within 4 hours.
+   * Only answers while the persona or show credited with it is on air, within 4 hours.
    */
-  getWinnerForEdit: async (passId: number, djName: string): Promise<PassResponse> => {
+  getWinnerForEdit: async (passId: number): Promise<PassResponse> => {
     try {
-      const response = await apiClient.get<PassResponse>(`/passes/${passId}/winner`, {
-        params: { dj_name: djName },
-      });
+      const response = await apiClient.get<PassResponse>(`/passes/${passId}/winner`);
       return response.data;
     } catch (error) {
       return handleAPIError(error);
@@ -707,10 +697,18 @@ export const passesAPI = {
     }
   },
 
-  getMyGiveaways: async (djName: string): Promise<PassResponse[]> => {
+  /**
+   * The on-air identity's giveaways and pre-assigned passes (or, after an
+   * early switch, the next identity's).
+   *
+   * @param switchTo - Ask as the next slot starting at this time (ISO), to
+   *   count its passes before switching; the server honours it only in the
+   *   last 10 minutes before that slot.
+   */
+  getMyGiveaways: async (switchTo?: string): Promise<PassResponse[]> => {
     try {
       const response = await apiClient.get<PassResponse[]>('/passes/my-giveaways', {
-        params: { dj_name: djName },
+        headers: switchTo ? { [SWITCH_HEADER]: switchTo } : undefined,
       });
       return response.data;
     } catch (error) {
@@ -886,30 +884,24 @@ export const passesAPI = {
   },
 
   /**
-   * Clothespin: reserve one unclaimed pass pair of a show for a DJ for today
-   * (DJ studio only).
+   * Clothespin: reserve one unclaimed pass pair of a show for whoever is on
+   * air, for today (DJ studio only).
    *
    * @param showId - Show ID
-   * @param djName - DJ or specialty show name typed in the DJ view
    * @returns Promise resolving to the reserved pass pair
    */
-  clothespin: async (showId: number, djName: string): Promise<PassResponse> => {
+  clothespin: async (showId: number): Promise<PassResponse> => {
     try {
-      const response = await apiClient.post<PassResponse>(`/shows/${showId}/clothespin`, {
-        dj_name: djName,
-      });
+      const response = await apiClient.post<PassResponse>(`/shows/${showId}/clothespin`);
       return response.data;
     } catch (error) {
       return handleAPIError(error);
     }
   },
 
-  removePreassignment: async (passId: number, djName?: string): Promise<PassResponse> => {
+  removePreassignment: async (passId: number): Promise<PassResponse> => {
     try {
-      const response = await apiClient.delete<PassResponse>(
-        `/passes/${passId}/preassign`,
-        { params: djName ? { dj_name: djName } : undefined }
-      );
+      const response = await apiClient.delete<PassResponse>(`/passes/${passId}/preassign`);
       return response.data;
     } catch (error) {
       return handleAPIError(error);
@@ -1109,9 +1101,9 @@ export const autocompleteAPI = {
  */
 export const onAirAPI = {
   /**
-   * Get the currently and next scheduled on-air DJ.
+   * Who is on air now and next.
    *
-   * @returns Promise resolving to the current/next on-air DJ info
+   * @returns Promise resolving to the current and next on-air identity
    */
   getCurrent: async (): Promise<OnAirInfo> => {
     try {
@@ -1199,6 +1191,47 @@ export const adminAPI = {
   getLotterySchedules: async (): Promise<LotteryScheduleItem[]> => {
     try {
       const response = await apiClient.get<LotteryScheduleItem[]>('/pass-giveaway/admin/lottery-schedules');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * Pass pairs given away in the last *days* days, newest first; with
+   * *unattributed*, only those credited to no one.
+   */
+  getGiveaways: async (unattributed: boolean, days: number): Promise<GiveawayCreditItem[]> => {
+    try {
+      const response = await apiClient.get<GiveawayCreditItem[]>('/pass-giveaway/admin/giveaways', {
+        params: { unattributed, days },
+      });
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /** What a giveaway can be credited to: current staff personas, then current shows. */
+  getCreditIdentities: async (): Promise<Identity[]> => {
+    try {
+      const response = await apiClient.get<Identity[]>('/pass-giveaway/admin/credit-identities');
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /** Re-credit a giveaway to a persona or a show, or to no one (null). */
+  recreditGiveaway: async (passId: number, identity: Identity | null): Promise<GiveawayCreditItem> => {
+    try {
+      const response = await apiClient.put<GiveawayCreditItem>(
+        `/pass-giveaway/admin/giveaways/${passId}/credit`,
+        {
+          persona_id: identity?.persona_id ?? null,
+          specialty_show_id: identity?.specialty_show_id ?? null,
+        },
+      );
       return response.data;
     } catch (error) {
       return handleAPIError(error);

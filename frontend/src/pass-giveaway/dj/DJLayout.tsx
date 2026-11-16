@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { AppNav, BuildInfo, ViewBadge } from '../components';
 import SpinMatchNotifier from './SpinMatchNotifier';
+import OnAirBanner from './OnAirBanner';
+import OnAirProvider from './OnAirProvider';
 
 const DJLayout = () => {
   const [navOpen, setNavOpen] = useState(false);
@@ -21,6 +23,7 @@ const DJLayout = () => {
   }, [navOpen]);
 
   return (
+    <OnAirProvider>
     <div className="dj-layout">
       <div className="mobile-topbar">
         <button
@@ -61,10 +64,12 @@ const DJLayout = () => {
         </div>
       </nav>
       <main className="dj-content">
+        <OnAirBanner />
         <Outlet />
       </main>
       <SpinMatchNotifier />
     </div>
+    </OnAirProvider>
   );
 };
 

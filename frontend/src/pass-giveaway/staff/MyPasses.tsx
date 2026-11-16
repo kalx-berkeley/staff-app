@@ -151,11 +151,11 @@ const MyPasses = () => {
     loadAlternateEntries();
   }, [loadClaimedPasses, loadLotteryEntries, loadAlternateEntries]);
 
+  // Every persona of theirs and every show they belong to; a talk show
+  // member needn't be a Sublist DJ
   useEffect(() => {
-    if (isSublistDj) {
-      loadPasses();
-    }
-  }, [isSublistDj, loadPasses]);
+    loadPasses();
+  }, [loadPasses]);
 
   const formatStatus = (status: string) => {
     const map: Record<string, string> = {
@@ -425,7 +425,7 @@ const MyPasses = () => {
         </div>
       )}
 
-      {isSublistDj && (
+      {(isSublistDj || passes.length > 0) && (
         <div className="passes-list-section">
           <h3 className="passes-section-title">My Giveaway History</h3>
           {djName && <p className="dj-name-display">DJ Name: <strong>{djName}</strong></p>}

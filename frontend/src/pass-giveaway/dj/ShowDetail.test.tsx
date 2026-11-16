@@ -4,18 +4,15 @@ import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import ShowDetail from './ShowDetail';
 import { showsAPI, passesAPI } from '../api';
 import { renderAndSettle } from '../../test/render';
-import type { PassResponse, ShowResponse } from '../types';
+import type { OnAirIdentity, PassResponse, ShowResponse } from '../types';
+import { persona, withOnAir } from './testOnAir';
+
+const DJ_TEST = persona(1, 'DJ Test');
 
 vi.mock('../api', () => ({
   showsAPI: { get: vi.fn(), getArtistInfo: vi.fn() },
   passesAPI: { getWinnerForEdit: vi.fn(), updateWinner: vi.fn() },
   venuePassesAPI: { checkWinner: vi.fn() },
-}));
-
-// The real DJ name input polls the on-air DJ; the page only needs its value.
-vi.mock('../components', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../components')>()),
-  DjNameInput: () => null,
 }));
 
 vi.mock('react-router-dom', async () => {
@@ -35,6 +32,8 @@ const winner = (overrides: Partial<PassResponse> = {}) =>
     recipient_phone: '5105550100',
     recipient_email: null,
     given_away_by_dj: 'DJ Test',
+    given_away_persona_id: 1,
+    given_away_specialty_show_id: null,
     given_away_at: hoursAgo(1),
     ...overrides,
   }) as PassResponse;
@@ -61,13 +60,15 @@ const makeShow = (passes: PassResponse[], overrides: Partial<ShowResponse> = {})
     ...overrides,
   }) as unknown as ShowResponse;
 
-const renderPage = async (show: ShowResponse, djName = 'DJ Test') => {
-  localStorage.setItem('kalx_dj_name', djName);
+const renderPage = async (show: ShowResponse, identity: OnAirIdentity | null = DJ_TEST) => {
   vi.mocked(showsAPI.get).mockResolvedValue(show);
   await renderAndSettle(
-    <BrowserRouter>
-      <ShowDetail />
-    </BrowserRouter>
+    withOnAir(
+      <BrowserRouter>
+        <ShowDetail />
+      </BrowserRouter>,
+      identity,
+    ),
   );
   await screen.findAllByText(/Jnae Winner/);
   // A giveaway this shift puts a warning in front of the page
@@ -109,7 +110,7 @@ describe('DJ ShowDetail winner editing', () => {
   });
 
   it('hides Edit from another DJ', async () => {
-    await renderPage(makeShow([winner()]), 'DJ Other');
+    await renderPage(makeShow([winner()]), persona(2, 'DJ Other'));
 
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
   });
@@ -150,12 +151,14 @@ describe('DJ ShowDetail right after a giveaway', () => {
   const available = { id: 6, show_id: 1, pass_type: 'pair', status: 'available' } as PassResponse;
 
   const renderAt = async (state: unknown) => {
-    localStorage.setItem('kalx_dj_name', 'DJ Test');
     vi.mocked(showsAPI.get).mockResolvedValue(makeShow([winner(), available], { available_pair_count: 1 }));
     await renderAndSettle(
-      <MemoryRouter initialEntries={[{ pathname: '/dj/shows/1', state }]}>
-        <ShowDetail />
-      </MemoryRouter>
+      withOnAir(
+        <MemoryRouter initialEntries={[{ pathname: '/dj/shows/1', state }]}>
+          <ShowDetail />
+        </MemoryRouter>,
+        DJ_TEST,
+      ),
     );
     await screen.findAllByText('Jnae Winner');
   };
@@ -169,11 +172,13 @@ describe('DJ ShowDetail right after a giveaway', () => {
 
   it('records the attempt without claiming a giveaway just after Tried', async () => {
     vi.mocked(showsAPI.get).mockResolvedValue(makeShow([available], { available_pair_count: 1 }));
-    localStorage.setItem('kalx_dj_name', 'DJ Test');
     await renderAndSettle(
-      <MemoryRouter initialEntries={[{ pathname: '/dj/shows/1', state: { justTried: true } }]}>
-        <ShowDetail />
-      </MemoryRouter>
+      withOnAir(
+        <MemoryRouter initialEntries={[{ pathname: '/dj/shows/1', state: { justTried: true } }]}>
+          <ShowDetail />
+        </MemoryRouter>,
+        DJ_TEST,
+      ),
     );
     const status = await screen.findByRole('status');
     expect(status).toHaveTextContent('Attempt recorded. No pass was given away');
@@ -208,14 +213,16 @@ describe('DJ ShowDetail with pairs pre-assigned to other DJs', () => {
     ({ id: 6, show_id: 1, pass_type: 'pair', status: 'available', ...overrides }) as PassResponse;
 
   const renderWith = async (passes: PassResponse[]) => {
-    localStorage.setItem('kalx_dj_name', 'DJ Test');
     vi.mocked(showsAPI.get).mockResolvedValue(
       makeShow(passes, { available_pair_count: passes.length }),
     );
     await renderAndSettle(
-      <BrowserRouter>
-        <ShowDetail />
-      </BrowserRouter>
+      withOnAir(
+        <BrowserRouter>
+          <ShowDetail />
+        </BrowserRouter>,
+        DJ_TEST,
+      ),
     );
   };
 
@@ -241,8 +248,8 @@ describe('DJ ShowDetail with pairs pre-assigned to other DJs', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it("skips the warning for the DJ's own pre-assigned pair, ignoring case", async () => {
-    await renderWith([pair({ preassigned_dj: 'dj test' })]);
+  it("skips the warning for the on-air DJ's own pre-assigned pair", async () => {
+    await renderWith([pair({ preassigned_dj: 'DJ Test', preassigned_persona_id: 1, preassigned_specialty_show_id: null })]);
     expect(await screen.findByText('Venue:')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });

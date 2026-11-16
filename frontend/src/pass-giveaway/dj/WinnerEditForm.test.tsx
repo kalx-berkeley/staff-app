@@ -34,7 +34,6 @@ const renderForm = (props: Partial<Parameters<typeof WinnerEditForm>[0]> = {}) =
     <WinnerEditForm
       pass={pass}
       venueId={2}
-      djName=" DJ Test "
       requiresEmail={false}
       onSaved={onSaved}
       onCancel={onCancel}
@@ -57,7 +56,7 @@ describe('WinnerEditForm', () => {
     const { result } = renderForm();
     await result;
 
-    expect(passesAPI.getWinnerForEdit).toHaveBeenCalledWith(7, 'DJ Test');
+    expect(passesAPI.getWinnerForEdit).toHaveBeenCalledWith(7);
     expect(screen.getByLabelText(/Winner Name/)).toHaveValue('Jnae Winner');
     expect(screen.getByLabelText(/Winner Phone/)).toHaveValue('(510) 555-0100');
     expect(screen.getByLabelText(/Winner Email/)).toHaveValue('jnae@example.com');
@@ -85,7 +84,6 @@ describe('WinnerEditForm', () => {
       recipient_name: 'Jane Winner',
       recipient_phone: '5105550100',
       recipient_email: 'jnae@example.com',
-      given_away_by_dj: 'DJ Test',
     });
   });
 

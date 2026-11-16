@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { showsAPI, passesAPI } from '../api';
 import SearchBar from '../promotions/SearchBar';
-import { Tooltip, DjNameInput, DJ_NAME_KEY, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker } from '../components';
+import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker } from '../components';
 import type { ShowSummary, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
@@ -10,6 +10,7 @@ import { useRestoreScrollOnBack } from '../../common/hooks/useRestoreScrollOnBac
 import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, WHEELCHAIR_ACCESSIBLE_LABELS, compareVenueNames, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
 import { formatCalendarDate, formatCalendarDateRange } from '../../common/dateTime';
 import { useShowListFilters, type ShowListFilterOptions, type ShowSort } from '../showListUrlState';
+import { useOnAir } from './onAirContext';
 
 const VIEW_MODE_KEY = 'kalx_dj_view_mode';
 
@@ -41,8 +42,9 @@ const ShowBrowser = () => {
   const showAssigned = !filters.hideAssigned;
   const addGenre = (g: string) =>
     updateFilters({ genre: filters.genre ? filters.genre + ', ' + g : g });
-  const [djName, setDjName] = useState(localStorage.getItem(DJ_NAME_KEY) || '');
-  // Every pass this DJ gave away, plus the available ones pre-assigned to them.
+  const { identity, identityKey } = useOnAir();
+  // Every pass the on-air identity gave away, plus the available ones
+  // pre-assigned to it (to its show or, during a music show, its DJ too).
   const [myPasses, setMyPasses] = useState<PassResponse[]>([]);
   const [viewMode, setViewMode] = useState<'card' | 'compact'>(
     (localStorage.getItem(VIEW_MODE_KEY) as 'card' | 'compact') || 'card'
@@ -98,18 +100,21 @@ const ShowBrowser = () => {
   }, [rawShows]);
 
   useEffect(() => {
-    if (!djName.trim()) {
+    if (!identity) {
       setMyPasses([]);
       return;
     }
-    const timer = setTimeout(() => {
-      passesAPI
-        .getMyGiveaways(djName.trim())
-        .then(setMyPasses)
-        .catch(() => setMyPasses([]));
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [djName, assignedRefresh]);
+    let cancelled = false;
+    passesAPI
+      .getMyGiveaways()
+      .then((passes) => !cancelled && setMyPasses(passes))
+      .catch(() => !cancelled && setMyPasses([]));
+    return () => {
+      cancelled = true;
+    };
+    // identity follows identityKey
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identityKey, assignedRefresh]);
 
   const handleViewMode = (mode: 'card' | 'compact') => {
     setViewMode(mode);
@@ -121,7 +126,7 @@ const ShowBrowser = () => {
   // allows one per show per shift, so these shows can't be given away again.
   const recentGiveawayShowIds = new Set(
     myPasses
-      .filter((p) => p.status === 'given_away' && findRecentDjGiveaway([p], djName))
+      .filter((p) => p.status === 'given_away' && findRecentDjGiveaway([p], identity))
       .map((p) => p.show_id)
   );
   const assignedShowIds = new Set(myAssignedPasses.map((p) => p.show_id));
@@ -148,20 +153,20 @@ const ShowBrowser = () => {
       : gaveAwayRecently
       ? recentGiveawayTitle
       : reservedForOthers > 0
-        ? `Every pass pair left for this show is pre-assigned to ${djName.trim() ? 'other DJs' : 'DJs'}. Enter your DJ name above if one of them is yours.`
+        ? `Every pass pair left for this show is pre-assigned to ${identity ? 'other DJs' : 'DJs'}.`
         : 'No pass pairs are left for this show.';
   const reservedLabel = (count: number) =>
-    `${count} pre-assigned to ${djName.trim() ? 'other DJs' : 'DJs'}`;
+    `${count} pre-assigned to ${identity ? 'other DJs' : 'DJs'}`;
   const todayStr = getLocalTodayStr();
   const assignedTodayShowIds = new Set(
     myAssignedPasses.filter((p) => p.preassigned_date === todayStr).map((p) => p.show_id)
   );
 
-  // Clothespin needs a DJ name, a show whose rules allow it with an unclaimed
-  // pair left, no pair already reserved for this DJ for today, and no pair
-  // given away by this DJ this shift (they can't give away another yet).
+  // Clothespin needs someone on air, a show whose rules allow it with an
+  // unclaimed pair left, no pair already reserved for them for today, and no
+  // pair given away by them this shift (they can't give away another yet).
   const canClothespin = (show: ShowSummary) =>
-    !!djName.trim() &&
+    !!identity &&
     show.clothespin_available &&
     !assignedTodayShowIds.has(show.id) &&
     !recentGiveawayShowIds.has(show.id);
@@ -172,14 +177,13 @@ const ShowBrowser = () => {
   };
 
   const handleClothespin = async (show: ShowSummary) => {
-    const name = djName.trim();
     setClothespinShowId(show.id);
     setActionMessage(null);
     try {
-      const pass = await passesAPI.clothespin(show.id, name);
+      const pass = await passesAPI.clothespin(show.id);
       setActionMessage({
         kind: 'success',
-        text: `Reserved a pass pair for ${show.event_name} for ${pass.preassigned_dj ?? name} today.`,
+        text: `Reserved a pass pair for ${show.event_name} for ${pass.preassigned_dj ?? identity?.name} today.`,
       });
       setAssignedRefresh((n) => n + 1);
       await loadShows({ silent: true });
@@ -198,7 +202,7 @@ const ShowBrowser = () => {
     setReleasePassId(pass.id);
     setActionMessage(null);
     try {
-      await passesAPI.removePreassignment(pass.id, djName.trim());
+      await passesAPI.removePreassignment(pass.id);
       setActionMessage({ kind: 'success', text: `Released your pass pair for ${showName}.` });
       setAssignedRefresh((n) => n + 1);
       await loadShows({ silent: true });
@@ -209,7 +213,7 @@ const ShowBrowser = () => {
     }
   };
 
-  const clothespinTitle = "Reserve one pass pair under your DJ name for today's on-air giveaway";
+  const clothespinTitle = "Reserve one pass pair for today's on-air giveaway, for who is on air";
 
   const renderClothespinButton = (show: ShowSummary, small: boolean) =>
     canClothespin(show) && (
@@ -294,8 +298,6 @@ const ShowBrowser = () => {
         <p className="page-description">Browse published shows and give away passes</p>
       </div>
 
-      <DjNameInput value={djName} onChange={setDjName} id="dj-shows-name" />
-
       {actionMessage && (
         <div
           className={`dj-action-message ${actionMessage.kind === 'success' ? 'success-message' : 'error-message'}`}
@@ -310,7 +312,7 @@ const ShowBrowser = () => {
       <div className="sort-controls">
         <span className="label-with-help" style={{ display: 'inline-flex' }}>
           <label htmlFor="dj-status-filter">Filter by status:</label>
-          <Tooltip text="Shows You Can Give Away Now: only shows with a pass pair you can give away on air right now. Pairs pre-assigned to other DJs don't count, and neither do shows you already gave a pair away for this DJ shift. Enter your DJ name above so your own pre-assigned pairs and giveaways count. Published Shows: every active show." />
+          <Tooltip text="Shows You Can Give Away Now: only shows with a pass pair you can give away on air right now. Pairs pre-assigned to other DJs don't count, and neither do shows you already gave a pair away for this DJ shift. Published Shows: every active show." />
         </span>
         <select
           id="dj-status-filter"
@@ -370,7 +372,7 @@ const ShowBrowser = () => {
         </div>
       </div>
 
-      {djName.trim() && myAssignedPasses.length > 0 && (
+      {identity && myAssignedPasses.length > 0 && (
         <div className="assigned-shows-section">
           <div className="assigned-shows-header">
             <h3>Your Pre-assigned Shows</h3>

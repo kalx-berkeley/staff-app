@@ -47,6 +47,7 @@ from app.models.venue import Venue
 from app.models.venue_contact import VenueContact
 from app.models.venue_owner import VenueOwner
 from app.pass_giveaway.schemas.pass_schema import GiveawayData
+from app.pass_giveaway.services.on_air_identity import OnAirIdentity
 from app.pass_giveaway.services.pass_service import PassService
 
 # Apache sets the network header and the real client IP; the backend checks both.
@@ -123,8 +124,12 @@ def _with_enabled_flags(routes: set[str]) -> set[str]:
 
 
 @pytest.fixture
-def seeded(db: Session):
-    """One of each record a route might look up by ID, all with ID 1."""
+def seeded(db: Session, on_air):
+    """
+    One of each record a route might look up by ID, all with ID 1. Pass 1 is
+    pre-assigned to the persona on air, so the DJ view can unassign it.
+    """
+    on_air(persona_id=1, name="DJ Guest")
     staff = Staff(email="active@example.com", name="Active Person", phone="555-0100")
     db.add(staff)
     db.flush()
@@ -147,7 +152,16 @@ def seeded(db: Session):
     )
     db.add(show)
     db.flush()
-    db.add(Pass(show_id=show.id, pass_type="pair", status="available"))
+    db.add(
+        Pass(
+            show_id=show.id,
+            pass_type="pair",
+            status="available",
+            preassigned_dj="DJ Guest",
+            preassigned_persona_id=1,
+            preassigned_date=date(2099, 12, 30),
+        )
+    )
     db.commit()
 
 
@@ -278,7 +292,9 @@ def contact_details(db: Session, seeded):
             recipient_name="Winner",
             recipient_phone="510-555-0122",
             recipient_email=WINNER_EMAIL,
-            given_away_by_dj="DJ",
+        ),
+        OnAirIdentity(
+            kind="persona", name="DJ Guest", persona_id=1, persona_name="DJ Guest"
         ),
     )
 
@@ -305,7 +321,10 @@ def test_guests_never_see_hidden_contact_details(
 ):
     leaks = []
     for route, response in _guest_responses(client, headers).items():
-        hidden = STAFF_CONTACTS + [WINNER_EMAIL]
+        hidden = list(STAFF_CONTACTS)
+        # The DJ on air correcting their own winner sees the winner's email
+        if not (headers is DJ_GUEST and route == "GET /api/passes/{pass_id}/winner"):
+            hidden.append(WINNER_EMAIL)
         if winner_phone_routes is not None and route not in winner_phone_routes:
             hidden.append(WINNER_PHONE)
         leaks += [
@@ -365,7 +384,7 @@ def test_signed_in_users_still_see_staff_instructions(
 def test_dj_guests_see_the_winner_email_only_when_correcting_their_winner(
     client: TestClient, contact_details, no_outbound_requests
 ):
-    editing = client.get("/api/passes/1/winner", params={"dj_name": "dj"}, headers=DJ_GUEST)
+    editing = client.get("/api/passes/1/winner", headers=DJ_GUEST)
     passes = client.get("/api/shows/1/passes", headers=DJ_GUEST).json()
 
     assert editing.json()["recipient_email"] == WINNER_EMAIL
@@ -376,8 +395,6 @@ def test_dj_guests_see_the_winner_email_only_when_correcting_their_winner(
 def test_office_guests_cannot_get_a_winner_to_correct(
     client: TestClient, contact_details, no_outbound_requests
 ):
-    response = client.get(
-        "/api/passes/1/winner", params={"dj_name": "DJ"}, headers=OFFICE_GUEST
-    )
+    response = client.get("/api/passes/1/winner", headers=OFFICE_GUEST)
 
     assert response.status_code == 401

@@ -10,14 +10,28 @@ from app.common.areas import PASS_GIVEAWAY_AREA
 from app.models.audit_log import AuditLog
 from app.models.pass_model import Pass
 from app.models.show import Show
+from app.models.specialty_show import SpecialtyShow
 from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
 from app.models.staff_status import StaffStatus
 from app.models.venue import Venue
 from app.pass_giveaway.schemas.pass_schema import GiveawayData
+from app.pass_giveaway.services.on_air_identity import OnAirIdentity
 from app.pass_giveaway.services.pass_service import PassService
 
 DJ_STUDIO = {"X-Forwarded-For": "192.168.1.100"}  # in the default dj_studio_network
+DJ_TEST = OnAirIdentity(
+    kind="persona", name="DJ Test", persona_id=501, persona_name="DJ Test"
+)
+DJ_OTHER = OnAirIdentity(
+    kind="persona", name="DJ Other", persona_id=502, persona_name="DJ Other"
+)
+
+
+@pytest.fixture(autouse=True)
+def dj_test_on_air(on_air):
+    """DJ Test is on air, unless a test says otherwise."""
+    on_air(DJ_TEST)
 
 
 @pytest.fixture
@@ -54,7 +68,7 @@ def show(db: Session, venue):
     return _make_show(db, venue, date(2099, 12, 31))
 
 
-def _give_away(db: Session, show: Show, phone="510-555-0100", dj="DJ Test") -> Pass:
+def _give_away(db: Session, show: Show, phone="510-555-0100", dj=DJ_TEST) -> Pass:
     pass_item = (
         db.query(Pass).filter(Pass.show_id == show.id, Pass.status == "available").first()
     )
@@ -65,8 +79,8 @@ def _give_away(db: Session, show: Show, phone="510-555-0100", dj="DJ Test") -> P
             recipient_name="Jnae Winner",
             recipient_phone=phone,
             recipient_email="jnae@example.com",
-            given_away_by_dj=dj,
         ),
+        dj,
     )
 
 
@@ -80,7 +94,6 @@ def _edit(client: TestClient, pass_id: int, **overrides):
         "recipient_name": "Jane Winner",
         "recipient_phone": "(510) 555-0101",
         "recipient_email": "jane@example.com",
-        "given_away_by_dj": "DJ Test",
         **overrides,
     }
     return client.patch(f"/api/passes/{pass_id}/winner", json=body, headers=DJ_STUDIO)
@@ -104,6 +117,7 @@ def test_correction_is_audit_logged_with_before_and_after(client, db, given_away
     assert entry.area == PASS_GIVEAWAY_AREA
     assert entry.entity_id == given_away.id
     assert entry.details["dj"] == "DJ Test"
+    assert entry.details["persona_id"] == 501
     assert entry.details["before"] == {
         "recipient_name": "Jnae Winner",
         "recipient_phone": "5105550100",
@@ -126,14 +140,40 @@ def test_dj_can_correct_any_number_of_times(client, db, given_away):
     )
 
 
-def test_dj_name_matches_ignoring_case_and_spaces(client, given_away):
-    response = _edit(client, given_away.id, given_away_by_dj="  dj test ")
+def test_a_name_sent_by_the_page_is_ignored(client, on_air, given_away):
+    on_air(DJ_OTHER)
+    response = _edit(client, given_away.id, given_away_by_dj="DJ Test")
 
-    assert response.status_code == 200
+    assert response.status_code == 403
 
 
-def test_another_dj_cannot_correct_the_winner(client, db, given_away):
-    response = _edit(client, given_away.id, given_away_by_dj="DJ Other")
+def test_a_music_show_slot_edits_the_shows_winner(client, db, on_air, show):
+    take_five = SpecialtyShow(name="Take Five")
+    db.add(take_five)
+    db.commit()
+    music = OnAirIdentity(
+        kind="music", name="Take Five", specialty_show_id=take_five.id, persona_id=501
+    )
+    given = _give_away(db, show, dj=music)
+    on_air(music)
+    assert _edit(client, given.id).status_code == 200
+    # The same DJ on their regular shift is someone else
+    on_air(DJ_TEST)
+    assert _edit(client, given.id).status_code == 403
+
+
+def test_an_unattributed_winner_is_corrected_while_no_one_is_on_air(
+    client, db, on_air, show
+):
+    given = _give_away(db, show, dj=None)
+    assert _edit(client, given.id).status_code == 403
+    on_air(None)
+    assert _edit(client, given.id).status_code == 200
+
+
+def test_another_dj_cannot_correct_the_winner(client, db, on_air, given_away):
+    on_air(DJ_OTHER)
+    response = _edit(client, given_away.id)
 
     assert response.status_code == 403
     db.refresh(given_away)
@@ -215,7 +255,6 @@ def test_promotions_staff_off_the_dj_network_cannot_correct(client, db, given_aw
         json={
             "recipient_name": "Jane Winner",
             "recipient_phone": "510-555-0101",
-            "given_away_by_dj": "DJ Test",
         },
         headers={"X-Forwarded-User": staff.email},
     )
@@ -226,7 +265,6 @@ def test_promotions_staff_off_the_dj_network_cannot_correct(client, db, given_aw
 def test_get_winner_returns_the_email_to_the_dj(client, given_away):
     response = client.get(
         f"/api/passes/{given_away.id}/winner",
-        params={"dj_name": "DJ Test"},
         headers={**DJ_STUDIO, "X-DJ-Network": "1"},
     )
 
@@ -234,12 +272,9 @@ def test_get_winner_returns_the_email_to_the_dj(client, given_away):
     assert response.json()["recipient_email"] == "jnae@example.com"
 
 
-def test_get_winner_refuses_another_dj(client, given_away):
-    response = client.get(
-        f"/api/passes/{given_away.id}/winner",
-        params={"dj_name": "DJ Other"},
-        headers=DJ_STUDIO,
-    )
+def test_get_winner_refuses_another_dj(client, on_air, given_away):
+    on_air(DJ_OTHER)
+    response = client.get(f"/api/passes/{given_away.id}/winner", headers=DJ_STUDIO)
 
     assert response.status_code == 403
 
@@ -248,11 +283,7 @@ def test_get_winner_refuses_after_four_hours(client, db, given_away):
     given_away.given_away_at = datetime.now(timezone.utc) - timedelta(hours=5)
     db.commit()
 
-    response = client.get(
-        f"/api/passes/{given_away.id}/winner",
-        params={"dj_name": "DJ Test"},
-        headers=DJ_STUDIO,
-    )
+    response = client.get(f"/api/passes/{given_away.id}/winner", headers=DJ_STUDIO)
 
     assert response.status_code == 403
 
@@ -263,7 +294,7 @@ def limited_venue_with_recent_winner(db: Session, venue):
     venue.win_frequency_days = 30
     db.commit()
     earlier = _make_show(db, venue, date(2099, 12, 24), event_name="Earlier Show")
-    _give_away(db, earlier, phone="510-555-0199", dj="DJ Earlier")
+    _give_away(db, earlier, phone="510-555-0199", dj=DJ_OTHER)
 
 
 def test_new_phone_that_won_recently_logs_an_override(

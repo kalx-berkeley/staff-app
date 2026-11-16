@@ -38,6 +38,7 @@ from app.models.pass_model import Pass
 from app.models.show_attempt import ShowAttempt
 from app.models.specialty_show import SpecialtyShow
 from app.models.specialty_show_dj import SpecialtyShowDJ
+from app.models.spinitron_persona import SpinitronPersona
 from app.models.spinitron_playlist import SpinitronPlaylist
 from app.models.spinitron_show import SpinitronShow
 from app.models.staff import Staff
@@ -98,7 +99,8 @@ class Match:
 class NameDirectory:
     """Everything a name can match, keyed by normalized name."""
 
-    # Persona ID -> name, from Spinitron, staff records and the schedule cache
+    # Persona ID -> name, from Spinitron (live or the nightly copy), staff
+    # records and the schedule cache
     persona_names: dict[int, str]
     # Persona IDs linked to a staff member (any status)
     staff_persona_ids: set[int]
@@ -191,9 +193,10 @@ def build_directory(db: Session, spinitron_personas: dict[int, str]) -> NameDire
     Gather every persona, show and mapping a name can match.
 
     :param db: Database session.
-    :param spinitron_personas: Spinitron's persona directory (ID -> name);
-        may be empty when Spinitron can't be reached, leaving only the
-        personas known from staff records and the schedule cache.
+    :param spinitron_personas: Spinitron's persona directory (ID -> name),
+        read live; may be empty (offline, or in a migration, which can't call
+        Spinitron). The `spinitron_personas` table, which the nightly persona
+        sync fills from the same directory, covers that case.
     :returns: The directory.
     """
     persona_names: dict[int, str] = {}
@@ -209,7 +212,11 @@ def build_directory(db: Session, spinitron_personas: dict[int, str]) -> NameDire
             model.persona_id.isnot(None), model.dj_name.isnot(None)
         ):
             persona_names.setdefault(int(persona_id), name)
-    # Spinitron's own names win over cached ones
+    # Spinitron's own names win over cached ones: the nightly copy of its
+    # directory, then the live one when it was read
+    persona_names.update({
+        int(pid): name for pid, name in db.query(SpinitronPersona.id, SpinitronPersona.name)
+    })
     persona_names.update(spinitron_personas)
 
     shows: dict[str, int] = {}

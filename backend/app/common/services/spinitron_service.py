@@ -73,6 +73,8 @@ class SpinitronSpinItem(TypedDict):
     artist: str
     song: str
     image: Optional[str]
+    # The playlist the spin was logged in, which says who is on air
+    playlist_id: NotRequired[Optional[int]]
 
 
 def dedupe_by_id(*item_lists: List[SpinitronShowItem]) -> List[SpinitronShowItem]:
@@ -436,7 +438,8 @@ class SpinitronService:
 
         :param start: Lower bound of the lookback window (used as the "start"
             query argument, formatted as UTC ISO-8601 with a numeric offset).
-        :returns: List of spin dicts with id, start, artist, song, and image,
+        :returns: List of spin dicts with id, start, artist, song, image and
+            playlist_id,
             most-recent first (Spinitron's own ordering).
         :raises RuntimeError: If the Spinitron API returns an error.
         """
@@ -482,6 +485,11 @@ class SpinitronService:
                             artist=artist,
                             song=(item.get("song") or "").strip(),
                             image=item.get("image") or None,
+                            playlist_id=(
+                                int(item["playlist_id"])
+                                if item.get("playlist_id") is not None
+                                else None
+                            ),
                         )
                     )
 

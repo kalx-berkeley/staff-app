@@ -9,6 +9,11 @@ from fastapi import HTTPException, status
 import logging
 
 from app.common.pacific_time import format_pacific_datetime
+from app.pass_giveaway.services.on_air_identity import (
+    OnAirIdentity,
+    credit,
+    identity_label,
+)
 from app.common.areas import PASS_GIVEAWAY_AREA
 from app.models.show import Show
 from app.models.show_attempt import ShowAttempt
@@ -671,7 +676,7 @@ class ShowService:
                 if w:
                     lines.append(
                         f"  - {w.recipient_name} ({format_phone(w.recipient_phone)})"
-                        f" — given away by {w.given_away_by_dj}"
+                        f" — given away by {p.given_away_by}"
                     )
             lines.append("")
 
@@ -685,7 +690,7 @@ class ShowService:
             lines.append(f"On-air giveaway attempts with no callers ({len(attempts)}):")
             for a in attempts:
                 when = format_pacific_datetime(a.attempted_at)
-                lines.append(f"  - {a.dj_name} at {when}")
+                lines.append(f"  - {a.credited_name} at {when}")
             lines.append("")
 
         lines.append(
@@ -770,14 +775,16 @@ class ShowService:
                 )
 
     @staticmethod
-    def record_attempt(db: Session, show_id: int, dj_name: str) -> ShowAttempt:
+    def record_attempt(
+        db: Session, show_id: int, identity: OnAirIdentity | None
+    ) -> ShowAttempt:
         """
         Record a failed giveaway attempt for a show.
 
         Args:
             db: Database session
             show_id: Show ID
-            dj_name: Name of the DJ who attempted the giveaway
+            identity: Who is on air (`on_air_identity.dj_identity`), or None
 
         Returns:
             Created ShowAttempt record
@@ -793,7 +800,13 @@ class ShowService:
                 detail="Cannot record attempts for closed shows",
             )
 
-        attempt = ShowAttempt(show_id=show_id, dj_name=dj_name)
+        persona_id, specialty_show_id = credit(identity)
+        attempt = ShowAttempt(
+            show_id=show_id,
+            dj_name=identity_label(identity),
+            persona_id=persona_id,
+            specialty_show_id=specialty_show_id,
+        )
         db.add(attempt)
         try:
             db.commit()
@@ -986,7 +999,7 @@ class ShowService:
             lines.append("We also announced the show on-air but didn't get any callers:")
             for a in failed:
                 lines.append(
-                    f"  DJ {a.dj_name} announced the show on"
+                    f"  {a.credited_name} announced the show on"
                     f" {format_pacific_datetime(a.attempted_at)}"
                 )
 

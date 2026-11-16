@@ -2,7 +2,8 @@
 
 from datetime import datetime, date, timezone
 from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, DateTime, Date
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import object_session, relationship
+from app.models.credit import credit_label
 from app.models.guest_fallback import GuestFallback
 from app.database import Base
 
@@ -25,8 +26,15 @@ class Pass(Base):
         String, nullable=False, default="available"
     )  # "available", "given_away", "claimed"
 
-    # For pass pairs given away on-air — who gave it away and when
+    # For pass pairs given away on-air — who gave it away and when. Credited
+    # to the on-air persona, show, or both (a Specialty Music Show and its
+    # DJ); neither is "Unattributed". given_away_by_dj is the old typed name,
+    # kept until phase 4 of the Spinitron identity plan drops it.
     given_away_by_dj = Column(String, nullable=True)
+    given_away_persona_id = Column(Integer, nullable=True)
+    given_away_specialty_show_id = Column(
+        Integer, ForeignKey("specialty_shows.id"), nullable=True
+    )
     given_away_at = Column(DateTime, nullable=True)
 
     # For staff passes claimed
@@ -79,6 +87,9 @@ class Pass(Base):
     preassigned_by = relationship("Staff", foreign_keys=[preassigned_by_staff_id])
     preassigned_specialty_show = relationship(
         "SpecialtyShow", foreign_keys=[preassigned_specialty_show_id]
+    )
+    given_away_specialty_show = relationship(
+        "SpecialtyShow", foreign_keys=[given_away_specialty_show_id]
     )
     primary_pass = relationship(
         "Pass", foreign_keys=[guest_of_pass_id], remote_side="Pass.id"
@@ -174,6 +185,18 @@ class Pass(Base):
     @property
     def show_status(self):
         return self.show.status if self.show else None
+
+    @property
+    def given_away_by(self) -> str | None:
+        """Who a given-away pair is credited to, by current name (see `credit`)."""
+        if self.status != "given_away":
+            return None
+        return credit_label(
+            object_session(self),
+            self.given_away_persona_id,
+            self.given_away_specialty_show_id,
+            self.given_away_by_dj,
+        )
 
     @property
     def preassigned_specialty_show_name(self):

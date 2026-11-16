@@ -16,10 +16,6 @@ vi.mock('./PassGiveawayForm', () => ({
     <div>Giveaway form for pass {pass.id}{viewOnly && ' (view only)'}</div>
   ),
 }));
-vi.mock('../components', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../components')>()),
-  DjNameInput: () => null,
-}));
 // A DJ studio computer by default; a test sets user to view from home.
 const auth = vi.hoisted(() => ({
   user: { email: null, role: 'dj', is_dj_network: true, is_station_office_network: true } as Record<string, unknown> | null,

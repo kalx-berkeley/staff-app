@@ -12,6 +12,7 @@ from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.specialty_show import SpecialtyShow
 from app.models.specialty_show_dj import SpecialtyShowDJ
+from app.models.spinitron_persona import SpinitronPersona
 from app.models.staff import Staff
 from app.models.venue import Venue
 from app.pass_giveaway.services.dj_name_matching import (
@@ -96,6 +97,23 @@ def test_mappings_win_and_can_leave_a_name_unattributed(db: Session, setup):
     assert directory.match("DJ Fooo").persona_id == 1
     # Music show DJs must be personas, even when mapped to a show
     assert directory.match("Take Five", allow_show=False).kind == UNMATCHED
+
+
+def test_offline_matching_uses_the_nightly_persona_directory(db: Session, setup):
+    """Without Spinitron (as in a migration), `spinitron_personas` supplies names."""
+    db.add_all([
+        # A former DJ: on no staff record and not on the cached schedule
+        SpinitronPersona(id=7, name="DJ Gone"),
+        # Renamed since the staff record was synced: the table's name wins
+        SpinitronPersona(id=2, name="DJ Twin Peaks"),
+    ])
+    db.commit()
+    offline = build_directory(db, {})
+    assert offline.match("DJ Gone").persona_id == 7
+    assert offline.match("DJ Twin Peaks").persona_id == 2
+    assert offline.match("DJ Twin").kind == UNMATCHED
+    # The live directory, when read, wins over the nightly copy
+    assert build_directory(db, {7: "DJ Back"}).match("DJ Back").persona_id == 7
 
 
 def test_unmatched_names_suggest_close_ones(db: Session, setup):

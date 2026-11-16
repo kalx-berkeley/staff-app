@@ -29,6 +29,7 @@ from app.models.promoter import Promoter
 from app.models.show import Show
 from app.models.staff import Staff
 from app.models.venue import Venue
+from app.pass_giveaway.services.giveaway_credit import check_credit
 from app.pass_giveaway.services.pass_service import PassService, normalize_phone
 
 ENTERABLE_STATUSES = ("draft", "published")
@@ -40,7 +41,9 @@ class OnAirWinnerData(Protocol):
     recipient_name: str
     recipient_phone: str
     recipient_email: str | None
-    given_away_by_dj: str | None
+    # Who it's credited to (see giveaway_credit); neither is unattributed
+    persona_id: int | None
+    specialty_show_id: int | None
 
 
 class StaffWinnerData(Protocol):
@@ -147,6 +150,7 @@ def validate(
             raise _reject(
                 f"{rules_owner.name} requires an email address for every on-air winner"
             )
+        check_credit(db, winner.persona_id, winner.specialty_show_id)
 
     claimants: list[Staff] = []
     seen: set[int] = set()
@@ -214,9 +218,8 @@ def assign_winners_and_claims(
     with a guest uses two staff passes: their own and a guest hold.
     """
     for pair_pass, data in zip(pair_pool, on_air_winners):
-        dj = (data.given_away_by_dj or "").strip() or "Unknown"
+        credit = check_credit(db, data.persona_id, data.specialty_show_id)
         pair_pass.status = "given_away"
-        pair_pass.given_away_by_dj = dj
         pair_pass.given_away_at = now
         pair_pass.updated_at = now
         db.add(
@@ -227,10 +230,15 @@ def assign_winners_and_claims(
                 recipient_name=data.recipient_name.strip(),
                 recipient_phone=normalize_phone(data.recipient_phone),
                 recipient_email=(data.recipient_email or "").strip() or None,
-                given_away_by_dj=dj,
+                given_away_by_dj=credit.name or "",
+                given_away_persona_id=credit.persona_id,
+                given_away_specialty_show_id=credit.specialty_show_id,
                 created_at=now,
             )
         )
+        pair_pass.given_away_by_dj = credit.name
+        pair_pass.given_away_persona_id = credit.persona_id
+        pair_pass.given_away_specialty_show_id = credit.specialty_show_id
 
     pool = iter(staff_pool)
     for data, staff in zip(staff_winners, claimants):
@@ -296,7 +304,9 @@ def enter(
             details={
                 "event_name": show.event_name,
                 "recipient_name": data.recipient_name.strip(),
-                "given_away_by_dj": (data.given_away_by_dj or "").strip() or "Unknown",
+                "dj": check_credit(db, data.persona_id, data.specialty_show_id).name,
+                "persona_id": data.persona_id,
+                "specialty_show_id": data.specialty_show_id,
             },
         )
     for data, staff in zip(staff_winners, claimants):

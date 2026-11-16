@@ -17,6 +17,8 @@ class SpinitronShow(Base):
     end = Column(DateTime(timezone=True), nullable=False, index=True)
     dj_name = Column(String, nullable=True)
     persona_id = Column(Integer, nullable=True)
+    # e.g. "FREEFORM", a slot that never names a DJ
+    title = Column(String, nullable=True)
     fetched_at = Column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )

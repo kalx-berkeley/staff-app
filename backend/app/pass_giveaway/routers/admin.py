@@ -9,7 +9,7 @@ from pathlib import Path
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -20,6 +20,9 @@ from app.models.staff_department import StaffDepartment
 from app.models.venue import Venue
 from app.models.venue_owner import VenueOwner
 from app.models.show import Show
+from app.pass_giveaway.schemas.pass_schema import Identity
+from app.pass_giveaway.services import giveaway_credit
+from app.pass_giveaway.services.identities import promotions_identities
 from app.pass_giveaway.services.pass_service import PassService
 from app.config import settings
 from app.scheduler import scheduler, schedule_auto_close_job
@@ -469,3 +472,87 @@ async def run_lottery_now(
         )
     except Exception as exc:
         return JobRunResult(success=False, message=str(exc))
+
+
+class GiveawayItem(BaseModel):
+    """A given-away pass pair, and who it's credited to."""
+
+    pass_id: int
+    show_id: int
+    event_name: str
+    venue_name: str
+    show_date: date
+    recipient_name: str | None
+    given_away_at: UtcDatetime | None
+    # The persona's or show's current name, or "Unattributed"
+    credited_to: str
+    persona_id: int | None
+    specialty_show_id: int | None
+
+
+def _giveaway_item(pass_item) -> GiveawayItem:
+    show = pass_item.show
+    return GiveawayItem(
+        pass_id=pass_item.id,
+        show_id=show.id,
+        event_name=show.event_name,
+        venue_name=show.venue.name,
+        show_date=show.show_date,
+        recipient_name=pass_item.recipient_name,
+        given_away_at=pass_item.given_away_at,
+        credited_to=pass_item.given_away_by,
+        persona_id=pass_item.given_away_persona_id,
+        specialty_show_id=pass_item.given_away_specialty_show_id,
+    )
+
+
+@router.get("/giveaways", response_model=list[GiveawayItem])
+def list_giveaways(
+    unattributed: bool = False,
+    days: int = Query(90, ge=1, le=3650),
+    admin: Staff = Depends(get_site_or_promotions_admin),
+    db: Session = Depends(get_db),
+) -> list[GiveawayItem]:
+    """
+    Pass pairs given away in the last *days* days, newest first, for
+    re-crediting (decision 28 of the Spinitron identity plan). With
+    *unattributed*, only those credited to no one.
+    """
+    return [_giveaway_item(p) for p in giveaway_credit.giveaways(db, unattributed, days)]
+
+
+@router.get("/credit-identities", response_model=list[Identity])
+def list_credit_identities(
+    admin: Staff = Depends(get_site_or_promotions_admin),
+    db: Session = Depends(get_db),
+) -> list[Identity]:
+    """What a giveaway can be credited to: current staff personas, then current shows."""
+    return promotions_identities(db)
+
+
+class CreditData(BaseModel):
+    """A persona or a show to credit a giveaway to; neither leaves it unattributed."""
+
+    persona_id: int | None = None
+    specialty_show_id: int | None = None
+
+
+@router.put("/giveaways/{pass_id}/credit", response_model=GiveawayItem)
+def recredit_giveaway(
+    pass_id: int,
+    data: CreditData,
+    admin: Staff = Depends(get_site_or_promotions_admin),
+    db: Session = Depends(get_db),
+) -> GiveawayItem:
+    """Re-credit a giveaway to a persona or a show, recorded in the audit log."""
+    from app.models.pass_model import Pass
+
+    pass_item = db.query(Pass).filter(Pass.id == pass_id).first()
+    if pass_item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pass not found")
+    credit = giveaway_credit.check_credit(db, data.persona_id, data.specialty_show_id)
+    try:
+        giveaway_credit.recredit(db, pass_item, credit, admin.email)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return _giveaway_item(pass_item)

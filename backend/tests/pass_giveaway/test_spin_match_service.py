@@ -90,6 +90,7 @@ class TestGetCachedSpins:
             "artist": "Murcof",
             "song": "Some Song",
             "image": None,
+            "playlist_id": None,
         }]
         assert db.query(SpinitronSpinCache).count() == 1
 
@@ -153,6 +154,7 @@ class TestGetCachedSpins:
             "artist": "Fresh Artist",
             "song": "Some Song",
             "image": None,
+            "playlist_id": None,
         }]
 
 

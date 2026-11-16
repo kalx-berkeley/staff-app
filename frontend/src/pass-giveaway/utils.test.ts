@@ -7,12 +7,14 @@ import {
   canUsePassGiveawayAdmin,
   findRecentDjGiveaway,
   formatShowRating,
+  isPreassignedTo,
   isRecentShow,
   isStagingSublistDjStaff,
   showsPassGiveawayAdminLink,
   venueSortName,
 } from './utils';
 import { formatDateValue } from '../common/utils';
+import { persona, showIdentity } from './dj/testOnAir';
 import type { UserResponse } from '../common/types';
 import type { PassResponse } from './types';
 
@@ -51,45 +53,75 @@ describe('isStagingSublistDjStaff', () => {
   });
 });
 
+const DJ_TEST = persona(1, 'DJ Test');
+const DJ_OTHER = persona(2, 'DJ Other');
+const TAKE_FIVE = showIdentity('music', 7, 'Take Five', { personaId: 1, name: 'DJ Test' });
+const MORNING = showIdentity('talk', 8, 'Morning Report');
+
 describe('findRecentDjGiveaway', () => {
   const now = new Date('2026-10-14T20:00:00Z');
-  const pass = (given_away_by_dj: string | null, given_away_at: string | null) => ({
-    given_away_by_dj,
+  const pass = (personaId: number | null, given_away_at: string | null, showId: number | null = null) => ({
+    given_away_persona_id: personaId,
+    given_away_specialty_show_id: showId,
     given_away_at,
   });
 
-  it('finds a giveaway by the same DJ within the last 4 hours', () => {
-    const passes = [pass('DJ Test', '2026-10-14T17:30:00Z')];
-    expect(findRecentDjGiveaway(passes, 'DJ Test', now)).toBe(passes[0]);
-  });
-
-  it('ignores case and surrounding spaces in the DJ name', () => {
-    const passes = [pass('DJ Test', '2026-10-14T19:00:00Z')];
-    expect(findRecentDjGiveaway(passes, '  dj test ', now)).toBe(passes[0]);
+  it('finds a giveaway credited to who is on air within the last 4 hours', () => {
+    const passes = [pass(1, '2026-10-14T17:30:00Z')];
+    expect(findRecentDjGiveaway(passes, DJ_TEST, now)).toBe(passes[0]);
   });
 
   it('ignores giveaways older than 4 hours', () => {
-    const passes = [pass('DJ Test', '2026-10-14T15:59:00Z')];
-    expect(findRecentDjGiveaway(passes, 'DJ Test', now)).toBeUndefined();
+    const passes = [pass(1, '2026-10-14T15:59:00Z')];
+    expect(findRecentDjGiveaway(passes, DJ_TEST, now)).toBeUndefined();
   });
 
-  it('ignores giveaways by other DJs', () => {
-    const passes = [pass('DJ Other', '2026-10-14T19:00:00Z')];
-    expect(findRecentDjGiveaway(passes, 'DJ Test', now)).toBeUndefined();
+  it('ignores giveaways by other DJs, or the same DJ during a music show', () => {
+    const passes = [pass(2, '2026-10-14T19:00:00Z'), pass(1, '2026-10-14T19:00:00Z', 7)];
+    expect(findRecentDjGiveaway(passes, DJ_TEST, now)).toBeUndefined();
+    expect(findRecentDjGiveaway(passes, TAKE_FIVE, now)).toBe(passes[1]);
   });
 
-  it('finds nothing when no DJ name is entered', () => {
-    const passes = [pass(null, null), pass('DJ Test', '2026-10-14T19:00:00Z')];
-    expect(findRecentDjGiveaway(passes, ' ', now)).toBeUndefined();
+  it('finds nothing when no one is on air', () => {
+    const passes = [pass(null, '2026-10-14T19:00:00Z')];
+    expect(findRecentDjGiveaway(passes, null, now)).toBeUndefined();
+  });
+});
+
+describe('isPreassignedTo', () => {
+  const pass = (personaId: number | null, showId: number | null) => ({
+    preassigned_persona_id: personaId,
+    preassigned_specialty_show_id: showId,
+  });
+
+  it("matches the on-air persona's passes", () => {
+    expect(isPreassignedTo(pass(1, null), DJ_TEST)).toBe(true);
+    expect(isPreassignedTo(pass(2, null), DJ_TEST)).toBe(false);
+    expect(isPreassignedTo(pass(1, null), null)).toBe(false);
+  });
+
+  it("during a music show, matches the show's and its DJ's passes", () => {
+    expect(isPreassignedTo(pass(null, 7), TAKE_FIVE)).toBe(true);
+    expect(isPreassignedTo(pass(1, null), TAKE_FIVE)).toBe(true);
+    expect(isPreassignedTo(pass(null, 9), TAKE_FIVE)).toBe(false);
+  });
+
+  it("during a talk show, matches only the show's passes", () => {
+    expect(isPreassignedTo(pass(null, 8), MORNING)).toBe(true);
+    expect(isPreassignedTo(pass(1, null), { ...MORNING, persona_id: 1 })).toBe(false);
   });
 });
 
 describe('canDjEditWinner', () => {
   const now = new Date('2026-10-14T20:00:00Z');
-  type EditablePass = Pick<PassResponse, 'status' | 'given_away_by_dj' | 'given_away_at'>;
+  type EditablePass = Pick<
+    PassResponse,
+    'status' | 'given_away_persona_id' | 'given_away_specialty_show_id' | 'given_away_at'
+  >;
   const pass = (overrides: Partial<EditablePass> = {}): EditablePass => ({
     status: 'given_away',
-    given_away_by_dj: 'DJ Test',
+    given_away_persona_id: 1,
+    given_away_specialty_show_id: null,
     given_away_at: '2026-10-14T17:30:00Z',
     ...overrides,
   });
@@ -100,36 +132,38 @@ describe('canDjEditWinner', () => {
     ...overrides,
   });
 
-  it('lets the DJ who gave the passes away edit within 4 hours', () => {
-    expect(canDjEditWinner(pass(), show(), 'DJ Test', now)).toBe(true);
+  it('lets who was credited edit within 4 hours', () => {
+    expect(canDjEditWinner(pass(), show(), DJ_TEST, now)).toBe(true);
   });
 
-  it('ignores case and surrounding spaces in the DJ name', () => {
-    expect(canDjEditWinner(pass(), show(), '  dj test ', now)).toBe(true);
+  it('refuses another DJ, or no one on air', () => {
+    expect(canDjEditWinner(pass(), show(), DJ_OTHER, now)).toBe(false);
+    expect(canDjEditWinner(pass(), show(), null, now)).toBe(false);
   });
 
-  it('refuses another DJ or a blank DJ name', () => {
-    expect(canDjEditWinner(pass(), show(), 'DJ Other', now)).toBe(false);
-    expect(canDjEditWinner(pass(), show(), ' ', now)).toBe(false);
+  it('lets an unattributed winner be corrected while no one is on air', () => {
+    const unattributed = pass({ given_away_persona_id: null });
+    expect(canDjEditWinner(unattributed, show(), null, now)).toBe(true);
+    expect(canDjEditWinner(unattributed, show(), DJ_TEST, now)).toBe(false);
   });
 
   it('refuses once 4 hours have passed', () => {
     const old = pass({ given_away_at: '2026-10-14T16:00:00Z' });
-    expect(canDjEditWinner(old, show(), 'DJ Test', now)).toBe(false);
+    expect(canDjEditWinner(old, show(), DJ_TEST, now)).toBe(false);
   });
 
   it('refuses passes that are not given away', () => {
-    expect(canDjEditWinner(pass({ status: 'available' }), show(), 'DJ Test', now)).toBe(false);
+    expect(canDjEditWinner(pass({ status: 'available' }), show(), DJ_TEST, now)).toBe(false);
   });
 
   it('refuses closed shows and shows past their planned close time', () => {
-    expect(canDjEditWinner(pass(), show({ status: 'closed' }), 'DJ Test', now)).toBe(false);
+    expect(canDjEditWinner(pass(), show({ status: 'closed' }), DJ_TEST, now)).toBe(false);
     const closeAt = new Date(now.getTime() - 60 * 1000);
     const pastClose = show({
       planned_close_date: formatDateValue(closeAt),
       planned_close_time: `${String(closeAt.getHours()).padStart(2, '0')}:${String(closeAt.getMinutes()).padStart(2, '0')}:00`,
     });
-    expect(canDjEditWinner(pass(), pastClose, 'DJ Test', now)).toBe(false);
+    expect(canDjEditWinner(pass(), pastClose, DJ_TEST, now)).toBe(false);
   });
 });
 

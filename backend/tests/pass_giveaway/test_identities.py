@@ -439,14 +439,16 @@ def test_dj_lottery_entry_for_a_music_show_keeps_the_member_persona(
 # ── Clothespin ────────────────────────────────────────────────────────────────
 
 
-def test_clothespin_records_the_typed_names_persona(client: TestClient, db: Session, wolf):
+def test_clothespin_records_the_on_air_persona(
+    client: TestClient, db: Session, wolf, on_air
+):
     show = _show(db)
     show.planned_close_date = date.today() + timedelta(days=10)
     db.commit()
+    on_air(persona_id=WOLFIE, name="Wolfie")
 
     response = client.post(
         f"/api/shows/{show.id}/clothespin",
-        json={"dj_name": "wolfie"},
         headers={"X-Forwarded-For": "192.168.1.100"},
     )
 

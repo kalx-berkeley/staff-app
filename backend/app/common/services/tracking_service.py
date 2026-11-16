@@ -35,7 +35,6 @@ RAW_RETENTION_DAYS = 396
 DJ_STUDIO_NETWORK = "dj_studio"
 STATION_OFFICE_NETWORK = "station_office"
 
-UNKNOWN_DJ = "Unknown DJ"
 
 
 def normalize_dj_name(name: Optional[str]) -> Optional[str]:
@@ -126,6 +125,8 @@ def record_event(
     entity_type: Optional[str] = None,
     entity_id: Optional[int] = None,
     dj_name: Optional[str] = None,
+    persona_id: Optional[int] = None,
+    specialty_show_id: Optional[int] = None,
     dimension: Optional[str] = None,
     details: Optional[dict] = None,
 ) -> Optional[AnalyticsEvent]:
@@ -139,6 +140,8 @@ def record_event(
         for impersonation. Defaults to *actor_email*.
     :param actor_email: Who to record as the actor; null for guests.
     :param dj_name: A DJ name, normalized here.
+    :param persona_id: Who was on air: a Spinitron persona,
+    :param specialty_show_id: and/or a specialty show.
     :returns: The new event, or None if nothing was recorded.
     """
     if is_impersonating(db, real_email or actor_email):
@@ -153,6 +156,8 @@ def record_event(
             entity_type=entity_type,
             entity_id=entity_id,
             dj_name=normalize_dj_name(dj_name),
+            persona_id=persona_id,
+            specialty_show_id=specialty_show_id,
             dimension=dimension,
             details=details,
         )
@@ -178,6 +183,9 @@ class EventCount:
     dj_name: Optional[str]
     dimension: Optional[str]
     count: int
+    # Who was on air: a Spinitron persona and/or a specialty show
+    persona_id: Optional[int] = None
+    specialty_show_id: Optional[int] = None
     # Set for raw events only
     occurred_at: Optional[datetime] = None
     ref: Optional[str] = None
@@ -213,6 +221,8 @@ def event_counts(
                 dj_name=e.dj_name,
                 dimension=e.dimension,
                 count=1,
+                persona_id=e.persona_id,
+                specialty_show_id=e.specialty_show_id,
                 occurred_at=as_utc(e.occurred_at),
                 ref=e.ref,
             )
@@ -238,6 +248,8 @@ def event_counts(
                 dj_name=r.dj_name,
                 dimension=r.dimension,
                 count=r.count,
+                persona_id=r.persona_id,
+                specialty_show_id=r.specialty_show_id,
             )
         )
     return rows

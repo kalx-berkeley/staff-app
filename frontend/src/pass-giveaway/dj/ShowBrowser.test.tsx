@@ -3,9 +3,11 @@ import { render, screen, fireEvent, waitFor, within, cleanup } from '@testing-li
 import { renderAndSettle } from '../../test/render';
 import { BrowserRouter } from 'react-router-dom';
 import ShowBrowser from './ShowBrowser';
-import { showsAPI, venuesAPI, passesAPI, autocompleteAPI } from '../api';
+import { showsAPI, venuesAPI, passesAPI } from '../api';
 import type { ShowSummary, PassResponse } from '../types';
-import { DJ_NAME_KEY } from '../components';
+import { persona, withOnAir } from './testOnAir';
+
+const WOLFMAN = persona(9, 'DJ Wolfman');
 
 // Mock the API
 vi.mock('../api', () => ({
@@ -20,19 +22,6 @@ vi.mock('../api', () => ({
     getMyGiveaways: vi.fn(),
     clothespin: vi.fn(),
     removePreassignment: vi.fn(),
-  },
-  autocompleteAPI: {
-    getDJNames: vi.fn(),
-  },
-  specialtyShowsAPI: {
-    list: vi.fn().mockResolvedValue([]),
-  },
-  onAirAPI: {
-    getCurrent: vi.fn().mockResolvedValue({
-      current_dj_name: null,
-      current_show_ends_at: null,
-      next_dj_name: null,
-    }),
   },
 }));
 
@@ -173,7 +162,6 @@ describe('ShowBrowser', () => {
     window.history.replaceState(null, '', '/');
     vi.clearAllMocks();
     vi.mocked(venuesAPI.list).mockResolvedValue([]);
-    vi.mocked(autocompleteAPI.getDJNames).mockResolvedValue([]);
     vi.mocked(passesAPI.getMyGiveaways).mockResolvedValue([]);
     localStorage.clear();
   });
@@ -365,10 +353,9 @@ describe('ShowBrowser', () => {
 
       expect(screen.getByText('Loading shows...')).toBeInTheDocument();
 
-      // Let the DJ name field's own mount-time lookups (autocomplete names,
-      // on-air schedule) and the venue dropdown's fetch settle before the
-      // test ends, so their state updates land inside act().
-      await waitFor(() => expect(autocompleteAPI.getDJNames).toHaveBeenCalled());
+      // Let the venue dropdown's fetch settle before the test ends, so its
+      // state update lands inside act().
+      await waitFor(() => expect(venuesAPI.list).toHaveBeenCalled());
     });
 
     it('should display error message when API call fails', async () => {
@@ -491,6 +478,7 @@ describe('ShowBrowser', () => {
       guest_fallback: 'attend_alone' as const,
       guest_of_pass_id: null,
       preassigned_dj: 'DJ Wolfman',
+      preassigned_persona_id: 9,
       preassigned_date: localToday(),
       preassigned_specialty_show_id: null,
       preassigned_specialty_show_name: null,
@@ -510,14 +498,16 @@ describe('ShowBrowser', () => {
     const clothespinButton = (eventName: string) =>
       screen.queryByRole('button', { name: `Clothespin a pass pair for ${eventName}` });
 
-    // The DJ's pre-assigned passes load 300 ms after the name is set, so wait
-    // for the section to show them before checking anything that depends on them.
+    // DJ Wolfman is on air. Wait for the section to show their pre-assigned
+    // passes before checking anything that depends on them.
     const renderWithDj = async () => {
-      localStorage.setItem(DJ_NAME_KEY, 'DJ Wolfman');
       await renderAndSettle(
-        <BrowserRouter>
-          <ShowBrowser />
-        </BrowserRouter>
+        withOnAir(
+          <BrowserRouter>
+            <ShowBrowser />
+          </BrowserRouter>,
+          WOLFMAN,
+        ),
       );
       await screen.findByText('Your Pre-assigned Shows');
       await screen.findByText('Rock Concert');
@@ -534,13 +524,13 @@ describe('ShowBrowser', () => {
       expect(clothespinButton('Rock Concert')).toBeInTheDocument();
       expect(clothespinButton('Rock Concert')).toHaveAttribute(
         'title',
-        "Reserve one pass pair under your DJ name for today's on-air giveaway"
+        "Reserve one pass pair for today's on-air giveaway, for who is on air"
       );
       // Already reserved for this DJ for today.
       expect(clothespinButton('Jazz Night')).not.toBeInTheDocument();
       // The show's rules don't allow it, or no unclaimed pair is left.
       expect(clothespinButton('Folk Fest')).not.toBeInTheDocument();
-      expect(passesAPI.getMyGiveaways).toHaveBeenCalledWith('DJ Wolfman');
+      expect(passesAPI.getMyGiveaways).toHaveBeenCalledWith();
     });
 
     it('still shows Clothespin when the DJ only has a reservation for another day', async () => {
@@ -552,11 +542,14 @@ describe('ShowBrowser', () => {
       expect(clothespinButton('Jazz Night')).toBeInTheDocument();
     });
 
-    it('hides Clothespin when no DJ name is set', async () => {
+    it('hides Clothespin when no one is on air', async () => {
       await renderAndSettle(
-        <BrowserRouter>
-          <ShowBrowser />
-        </BrowserRouter>
+        withOnAir(
+          <BrowserRouter>
+            <ShowBrowser />
+          </BrowserRouter>,
+          null,
+        ),
       );
       await screen.findByText('Rock Concert');
 
@@ -575,7 +568,7 @@ describe('ShowBrowser', () => {
       expect(await screen.findByRole('status')).toHaveTextContent(
         'Reserved a pass pair for Rock Concert for DJ Wolfman today.'
       );
-      expect(passesAPI.clothespin).toHaveBeenCalledWith(1, 'DJ Wolfman');
+      expect(passesAPI.clothespin).toHaveBeenCalledWith(1);
       await waitFor(() => expect(clothespinButton('Rock Concert')).not.toBeInTheDocument());
       expect(showsAPI.list).toHaveBeenCalledTimes(2);
       // The list refreshed in place, without the loading screen.
@@ -610,7 +603,7 @@ describe('ShowBrowser', () => {
         'Released your pass pair for Jazz Night.'
       );
       expect(confirmSpy).toHaveBeenCalled();
-      expect(passesAPI.removePreassignment).toHaveBeenCalledWith(20, 'DJ Wolfman');
+      expect(passesAPI.removePreassignment).toHaveBeenCalledWith(20);
       await waitFor(() =>
         expect(screen.queryByText('Your Pre-assigned Shows')).not.toBeInTheDocument()
       );
@@ -666,6 +659,7 @@ describe('ShowBrowser', () => {
         preassigned_dj: null,
         preassigned_date: null,
         given_away_by_dj: 'DJ Wolfman',
+        given_away_persona_id: 9,
         given_away_at: new Date(Date.now() - hoursAgo * 60 * 60 * 1000).toISOString(),
       });
 
@@ -795,6 +789,7 @@ describe('ShowBrowser', () => {
         preassigned_dj: null,
         preassigned_date: null,
         given_away_by_dj: 'DJ Wolfman',
+        given_away_persona_id: 9,
         given_away_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
       };
 

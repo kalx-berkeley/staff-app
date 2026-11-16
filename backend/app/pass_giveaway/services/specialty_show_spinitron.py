@@ -2,7 +2,7 @@
 
 import re
 from dataclasses import dataclass
-from typing import List, Optional, Set
+from typing import Dict, List, Optional, Set
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -143,3 +143,16 @@ def specialty_show_ids(db: Session) -> Set[int]:
             .filter(SpecialtyShow.deleted.is_(False))
         )
     }
+
+
+def shows_by_spinitron_id(db: Session) -> Dict[int, SpecialtyShow]:
+    """Spinitron show ID -> the current (not deleted or retired) specialty show."""
+    rows = (
+        db.query(SpecialtyShowSpinitronShow.spinitron_show_id, SpecialtyShow)
+        .join(
+            SpecialtyShow, SpecialtyShow.id == SpecialtyShowSpinitronShow.specialty_show_id
+        )
+        .filter(SpecialtyShow.current_filter())
+        .all()
+    )
+    return {spinitron_id: show for spinitron_id, show in rows}

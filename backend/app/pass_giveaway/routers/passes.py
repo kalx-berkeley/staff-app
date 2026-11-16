@@ -11,7 +11,6 @@ from app.pass_giveaway.schemas.pass_schema import (
     ClaimData,
     GuestAddData,
     GuestNameData,
-    ClothespinData,
     DjLeave,
     DjSuggestion,
     GiveawayData,
@@ -38,6 +37,13 @@ from app.pass_giveaway.services.identities import (
 from app.pass_giveaway.services import tabler_service
 from app.pass_giveaway.services.specialty_show_membership import (
     is_member as is_show_member,
+    member_show_ids,
+)
+from app.pass_giveaway.services.on_air_identity import (
+    OnAirIdentity,
+    credit,
+    dj_identity,
+    identity_label,
 )
 from app.pass_giveaway.services.pass_service import (
     PassService,
@@ -54,7 +60,6 @@ from app.auth import (
     resolve_effective_email,
     get_promotions_staff,
     get_staff_member,
-    get_sublist_dj_staff,
     check_dj_access,
     check_dj_giveaway_access,
     check_station_office_access,
@@ -86,6 +91,33 @@ from app.pass_giveaway.guest_redaction import (
 )
 
 router = APIRouter(prefix="/api", tags=["passes"], route_class=GuestRedactingRoute)
+
+
+def _dj_details(identity: OnAirIdentity | None) -> dict:
+    """Who was on air, for an audit log entry's details."""
+    persona_id, specialty_show_id = credit(identity)
+    return {
+        "dj": identity_label(identity) or None,
+        "persona_id": persona_id,
+        "specialty_show_id": specialty_show_id,
+    }
+
+
+def _preassigned_to(pass_item: Pass, identity: OnAirIdentity | None) -> bool:
+    """Whether *pass_item* is pre-assigned to *identity* (its show, or its persona)."""
+    if identity is None:
+        return False
+    if identity.specialty_show_id is not None:
+        if pass_item.preassigned_specialty_show_id == identity.specialty_show_id:
+            return True
+        if identity.kind == "talk":
+            return False
+    return (
+        identity.persona_id is not None
+        and pass_item.preassigned_specialty_show_id is None
+        and pass_item.preassigned_persona_id == identity.persona_id
+    )
+
 
 # 60 requests per 60 s per IP: allows normal office use while blocking automated scanning
 _phone_search_rate_limit = create_rate_limit_dependency(max_requests=60, window_seconds=60)
@@ -169,19 +201,22 @@ def give_away_pass(
     giveaway_data: GiveawayData,
     dj_access: bool = Depends(check_dj_giveaway_access),
     dj: DjTracking | None = Depends(dj_tracking),
+    identity: OnAirIdentity | None = Depends(dj_identity),
     db: Session = Depends(get_db),
 ):
     """
-    Give away a pass pair.
+    Give away a pass pair, credited to who the schedule says is on air.
 
     Requires DJ studio network access (or, in staging, Sublist DJ staff or
     impersonating the DJ studio network). Promotions staff elsewhere see the
-    DJ giveaway page view only and cannot record a real giveaway.
+    DJ giveaway page view only and cannot record a real giveaway. With no
+    one on air (automation, FREEFORM, a gap) the giveaway is unattributed.
 
     Args:
         pass_id: Pass ID
-        giveaway_data: Giveaway data with recipient and DJ info
+        giveaway_data: Giveaway data with recipient info
         dj_access: DJ access validation
+        identity: Who is on air
 
     Returns:
         Updated pass_item
@@ -194,7 +229,8 @@ def give_away_pass(
             db, pre_pass.show, giveaway_data.recipient_phone
         )
 
-    pass_item = PassService.give_away_pass_pair(db, pass_id, giveaway_data)
+    pass_item = PassService.give_away_pass_pair(db, pass_id, giveaway_data, identity)
+    dj_details = _dj_details(identity)
 
     audit_service.log_event(
         db,
@@ -204,7 +240,7 @@ def give_away_pass(
         entity_type="pass",
         entity_id=pass_item.id,
         details={
-            "dj": giveaway_data.given_away_by_dj,
+            **dj_details,
             "recipient_name": giveaway_data.recipient_name,
             "recipient_phone": giveaway_data.recipient_phone,
             "show_id": pass_item.show_id,
@@ -219,16 +255,11 @@ def give_away_pass(
             actor_role="dj",
             entity_type="pass",
             entity_id=pass_item.id,
-            details={**override_details, "dj": giveaway_data.given_away_by_dj},
+            details={**override_details, **dj_details},
         )
 
     record_visit_outcome(
-        db,
-        dj,
-        giveaway_data.visit_id,
-        pass_item.show_id,
-        "given_away",
-        giveaway_data.given_away_by_dj,
+        db, dj, giveaway_data.visit_id, pass_item.show_id, "given_away", identity
     )
     record_giveaway_after_suggestion(db, dj, pass_item.show_id, pass_item.id)
 
@@ -239,27 +270,27 @@ def give_away_pass(
 @keeps_winner_email
 def get_winner_for_edit(
     pass_id: int,
-    dj_name: str = Query(..., min_length=1, max_length=100),
     dj_access: bool = Depends(check_dj_giveaway_access),
+    identity: OnAirIdentity | None = Depends(dj_identity),
     db: Session = Depends(get_db),
 ):
     """
     Get a pass pair's on-air winner, including their email, for the DJ to correct.
 
     Requires DJ studio network access (or, in staging, Sublist DJ staff), the
-    name of the DJ who gave the passes away, less than 4 hours since the
-    giveaway, and a show that isn't closed. Unlike other guest responses, this
-    one keeps the winner's email, so the edit form can show what was typed.
+    passes to have been credited to who is on air now, less than 4 hours since
+    the giveaway, and a show that isn't closed. Unlike other guest responses,
+    this one keeps the winner's email, so the edit form can show what was typed.
 
     Args:
         pass_id: Pass ID
-        dj_name: The DJ name typed in the DJ view
         dj_access: DJ giveaway access validation
+        identity: Who is on air
 
     Returns:
         The pass, with the winner's details
     """
-    pass_item = PassService.get_winner_for_dj_edit(db, pass_id, dj_name)
+    pass_item = PassService.get_winner_for_dj_edit(db, pass_id, identity)
     return PassResponse.model_validate(pass_item)
 
 
@@ -268,26 +299,28 @@ def update_winner(
     pass_id: int,
     update_data: WinnerUpdateData,
     dj_access: bool = Depends(check_dj_giveaway_access),
+    identity: OnAirIdentity | None = Depends(dj_identity),
     db: Session = Depends(get_db),
 ):
     """
     Correct a pass pair's on-air winner (for example, a typo in their name).
 
-    Has the same requirements as get_winner_for_edit, with the DJ name in
-    update_data.given_away_by_dj. Clearing the email is refused when the venue
+    Has the same requirements as get_winner_for_edit. Clearing the email is
+    refused when the venue
     requires one. A new phone number is checked against the venue's
     win-frequency limit and an override is audit-logged, as for a giveaway.
 
     Args:
         pass_id: Pass ID
-        update_data: The corrected details and the DJ's name
+        update_data: The corrected details
         dj_access: DJ giveaway access validation
+        identity: Who is on air
 
     Returns:
         The updated pass
     """
-    dj_name = update_data.given_away_by_dj.strip()
-    pass_item = PassService.get_winner_for_dj_edit(db, pass_id, dj_name)
+    pass_item = PassService.get_winner_for_dj_edit(db, pass_id, identity)
+    dj_details = _dj_details(identity)
 
     override_details = None
     if normalize_phone(update_data.recipient_phone) != pass_item.recipient_phone:
@@ -305,7 +338,7 @@ def update_winner(
         entity_type="pass",
         entity_id=pass_item.id,
         details={
-            "dj": dj_name,
+            **dj_details,
             "show_id": pass_item.show_id,
             "before": before,
             "after": after,
@@ -320,7 +353,7 @@ def update_winner(
             actor_role="dj",
             entity_type="pass",
             entity_id=pass_item.id,
-            details={**override_details, "dj": dj_name, "winner_edit": True},
+            details={**override_details, **dj_details, "winner_edit": True},
         )
 
     return PassResponse.model_validate(pass_item)
@@ -674,35 +707,19 @@ def remove_guest(
 
 @router.get("/passes/staff/my-giveaways", response_model=list[PassResponse])
 def get_staff_my_giveaways(
-    staff: Staff = Depends(get_sublist_dj_staff),
+    user_info: tuple = Depends(require_promotions_or_staff),
     db: Session = Depends(get_db),
 ):
     """
-    Get Sublist DJ staff member's giveaway history using their own DJ name.
-
-    Requires Sublist DJ status. Uses the staff member's dj_name from their profile.
-
-    Returns:
-        List of passes given away by the staff member's DJ name
+    The signed-in staff member's on-air giveaway history and pre-assigned
+    passes, across every persona of theirs and every Specialty Music Show and
+    Talk & Info Show they belong to (decision 27). Empty for someone with
+    neither.
     """
-    if not staff.dj_name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No DJ name is set on your profile. Contact promotions staff.",
-        )
-    dj_names = [n.strip() for n in staff.dj_name.split(",") if n.strip()]
-    if not dj_names:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No DJ name is set on your profile. Contact promotions staff.",
-        )
-    passes = []
-    seen_ids: set[int] = set()
-    for name in dj_names:
-        for pass_item in PassService.get_dj_history(db, name):
-            if pass_item.id not in seen_ids:
-                seen_ids.add(pass_item.id)
-                passes.append(pass_item)
+    _, staff = user_info
+    passes = PassService.get_identities_history(
+        db, staff_persona_ids(staff), member_show_ids(db, staff)
+    )
     return [PassResponse.model_validate(p) for p in passes]
 
 
@@ -726,23 +743,25 @@ def get_staff_my_claims(
 
 @router.get("/passes/my-giveaways", response_model=list[PassResponse])
 def get_my_giveaways(
-    dj_name: str,
     dj_access: bool = Depends(check_dj_access),
+    identity: OnAirIdentity | None = Depends(dj_identity),
     db: Session = Depends(get_db),
 ):
     """
-    Get DJ's giveaway history.
+    The on-air identity's giveaways and pre-assigned passes (decisions 19 and
+    27): the next identity's after an early switch, and none when no one is
+    on air.
 
     Requires DJ access (DJ studio IP or promotions staff authentication).
 
     Args:
-        dj_name: DJ name to filter by
         dj_access: DJ access validation
+        identity: Who is on air
 
     Returns:
-        List of passes given away by the DJ
+        The passes
     """
-    passes = PassService.get_dj_history(db, dj_name)
+    passes = PassService.get_identity_history(db, identity)
     return [PassResponse.model_validate(pass_item) for pass_item in passes]
 
 
@@ -1173,27 +1192,28 @@ def set_self_preassignment(
 @router.post("/shows/{show_id}/clothespin", response_model=PassResponse)
 def clothespin_pass(
     show_id: int,
-    data: ClothespinData,
     dj_access: bool = Depends(check_dj_giveaway_access),
+    identity: OnAirIdentity | None = Depends(dj_identity),
     db: Session = Depends(get_db),
 ):
     """
-    Reserve one unclaimed pass pair of a show for a DJ for today ("Clothespin").
+    Reserve one unclaimed pass pair of a show for who is on air, for today
+    ("Clothespin").
 
     A shortcut from the DJ shows page for reserving a pair on the staff show
     page. Requires DJ studio network access (or, in staging, Sublist DJ staff),
-    like recording a giveaway. The DJ name comes from the DJ view's name field
-    and must be a current staff member's DJ name or a current specialty show.
+    like recording a giveaway. Who it's for comes from the Spinitron schedule:
+    the on-air show, or the on-air persona of a current staff member.
 
     Args:
         show_id: Show ID
-        data: The DJ name
         dj_access: DJ studio access validation
+        identity: Who is on air
 
     Returns:
         The reserved pass pair
     """
-    pass_item = PassService.clothespin(db, show_id, data.dj_name)
+    pass_item = PassService.clothespin(db, show_id, identity)
 
     audit_details: dict = {
         "dj": pass_item.preassigned_dj,
@@ -1279,9 +1299,9 @@ def check_winner_eligibility(
 @router.delete("/passes/{pass_id}/preassign", response_model=PassResponse)
 def remove_preassignment(
     pass_id: int,
-    dj_name: str | None = Query(default=None),
     x_forwarded_user: str | None = Header(None, alias="X-Forwarded-User"),
     x_forwarded_for: str | None = Header(None, alias="X-Forwarded-For"),
+    identity: OnAirIdentity | None = Depends(dj_identity),
     db: Session = Depends(get_db),
 ):
     """
@@ -1291,8 +1311,8 @@ def remove_preassignment(
     - Promotions staff: may remove any pre-assignment.
     - Active staff: may remove only a pre-assignment where their name (or dj_name)
       matches the preassigned_dj value.
-    - DJ studio network (IP-based, no email auth): may remove only their own
-      pre-assignment; must supply dj_name query param matching preassigned_dj.
+    - DJ studio network (IP-based, no email auth): may remove only a
+      pre-assignment to who is on air (its persona, or its show).
 
     In staging, resolves any active impersonation session first, so a
     promotions staff member impersonating a staff/DJ account is subject to
@@ -1301,9 +1321,9 @@ def remove_preassignment(
 
     Args:
         pass_id: Pass ID
-        dj_name: DJ name for self-unassign from the DJ studio network
         x_forwarded_user: Authenticated user email (set by Apache mod_auth_openidc)
         x_forwarded_for: Client IP (set by proxy)
+        identity: Who is on air, for the DJ studio network
 
     Returns:
         Updated pass_item
@@ -1367,15 +1387,7 @@ def remove_preassignment(
     elif x_forwarded_for:
         client_ip = x_forwarded_for.split(",")[0].strip()
         if is_ip_in_network(client_ip, settings.dj_studio_network):
-            if not dj_name:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                    detail=(
-                        "dj_name query parameter is required for DJ studio network access"
-                    ),
-                )
-            preassigned = pass_pre.preassigned_dj
-            if not preassigned or preassigned.lower() != dj_name.lower():
+            if not _preassigned_to(pass_pre, identity):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="You can only unassign your own pre-assigned passes",
@@ -1406,7 +1418,7 @@ def remove_preassignment(
             "prior_dj": prior_dj,
             "prior_date": str(prior_date) if prior_date else None,
             "show_id": pass_item.show_id,
-            **({"dj_name": dj_name} if actor_role == "dj" else {}),
+            **(_dj_details(identity) if actor_role == "dj" else {}),
         },
     )
 
