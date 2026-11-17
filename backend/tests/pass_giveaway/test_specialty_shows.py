@@ -204,12 +204,8 @@ def test_owners_can_retire_and_other_staff_cant(client: TestClient, promo, db: S
 def test_retired_shows_cant_get_passes_or_suggestions(
     client: TestClient, promo, db: Session
 ):
-    from app.pass_giveaway.services.pass_service import PassService
-
     show = _create(client).json()
-    assert "Take Five" in PassService.get_dj_names_for_autocomplete(db)
     client.post(f"/api/specialty-shows/{show['id']}/retire", headers=PROMO)
-    assert "Take Five" not in PassService.get_dj_names_for_autocomplete(db)
     assert client.get("/api/specialty-shows/mine", headers=PROMO).json() == []
 
 

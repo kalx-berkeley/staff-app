@@ -330,12 +330,3 @@ export const specialtyShowLabel = (category: SpecialtyShowCategory | null | unde
 /** The staff page of one Specialty Music Show or Talk & Info Show. */
 export const specialtyShowPath = (show: { id: number; category?: SpecialtyShowCategory | null }): string =>
   `${SPECIALTY_SHOW_KINDS[show.category ?? 'music'].path}/${show.id}`;
-
-/**
- * Lowercased show name → category, for telling which autocomplete names are
- * Specialty Music Shows or Talk & Info Shows rather than DJs.
- */
-export const specialtyShowCategoriesByName = (
-  shows: { name: string; category?: SpecialtyShowCategory | null }[],
-): Map<string, SpecialtyShowCategory> =>
-  new Map(shows.map((s) => [s.name.toLowerCase(), s.category ?? 'music']));

@@ -37,7 +37,6 @@ from app.pass_giveaway.routers import (
     on_air,
     preferences,
 )
-from app.pass_giveaway.routers import legacy_import as legacy_import_router
 from app.pass_giveaway import analytics as pass_giveaway_analytics
 from app.pass_giveaway import jobs as pass_giveaway_jobs
 from app.pass_giveaway.routers import analytics as pass_giveaway_analytics_router
@@ -52,7 +51,7 @@ from app.scheduler import (
     bootstrap_spinitron_personas_if_empty,
 )
 from app.auth import check_apache_auth_layer
-from app.config import settings
+from app.config import settings, unknown_env_file_keys
 from app.rate_limiter import RateLimitExceeded
 from app.request_logging import (
     APP_LOG_FORMAT,
@@ -184,11 +183,21 @@ def check_network_config(
 
 
 @asynccontextmanager
+def check_env_file() -> None:
+    """Log an error for each .env key that isn't a setting, since it's ignored."""
+    for key in unknown_env_file_keys():
+        logger.error(
+            "Unknown setting %s in .env is ignored. Remove it, or check its spelling.",
+            key,
+        )
+
+
 async def lifespan(app: FastAPI):
     """
     Lifespan context manager for startup and shutdown events.
     """
     # Startup
+    check_env_file()
     check_network_config()
     start_scheduler()
     await bootstrap_users_if_empty()
@@ -337,8 +346,6 @@ if settings.workforms_enabled:
 app.include_router(short_links_admin.router, dependencies=_auth_check)
 # /go/ is proxied by Apache like /api/, so it gets the same check
 app.include_router(short_links_redirect.router, dependencies=_auth_check)
-if settings.legacy_import_enabled:
-    app.include_router(legacy_import_router.router, dependencies=_auth_check)
 
 
 @app.get("/")

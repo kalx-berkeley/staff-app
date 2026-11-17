@@ -75,8 +75,7 @@ saved, and the toggle shows the count: "▶ Enter winners from a previous show
 - Everything is validated before anything is saved, so one bad row saves
   nothing (the show itself included).
 - The checks and pass assignment are in
-  `pass_giveaway/services/entered_winners_service.py`. The legacy import's
-  `_assign_winners_and_claims` uses its `assign_winners_and_claims`.
+  `pass_giveaway/services/entered_winners_service.py`.
 - `GET /api/shows/staff-pass-claimants` (promotions only) lists Active staff
   for the staff picker. The form fetches it only when the section is opened.
 - Closed and deleted shows reject the lists.

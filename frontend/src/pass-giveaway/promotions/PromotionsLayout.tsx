@@ -2,19 +2,13 @@ import { useState, useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../common/contexts/authHooks';
 import { AppNav, BuildInfo, ViewBadge } from '../components';
-import { legacyImportAPI } from '../api';
 import { showsPassGiveawayAdminLink } from '../utils';
 
 const PromotionsLayout = () => {
   const { user } = useAuth();
   const [navOpen, setNavOpen] = useState(false);
-  const [legacyImportEnabled, setLegacyImportEnabled] = useState(false);
   // Admins who aren't promotions staff can use only the Admin page
   const isPromotions = user?.role === 'promotions';
-
-  useEffect(() => {
-    if (isPromotions) legacyImportAPI.checkEnabled().then(setLegacyImportEnabled);
-  }, [isPromotions]);
 
   useEffect(() => {
     if (!navOpen) return;
@@ -74,11 +68,6 @@ const PromotionsLayout = () => {
           {showsPassGiveawayAdminLink(user) && (
             <li>
               <NavLink to="/promotions/admin">Admin</NavLink>
-            </li>
-          )}
-          {isPromotions && legacyImportEnabled && (
-            <li>
-              <NavLink to="/promotions/legacy-import">Legacy Import</NavLink>
             </li>
           )}
         </ul>

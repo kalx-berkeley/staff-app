@@ -36,7 +36,7 @@ ENTERABLE_STATUSES = ("draft", "published")
 
 
 class OnAirWinnerData(Protocol):
-    """An on-air winner's details, from the show form or the legacy import."""
+    """An on-air winner's details, from the show form."""
 
     recipient_name: str
     recipient_phone: str
@@ -47,7 +47,7 @@ class OnAirWinnerData(Protocol):
 
 
 class StaffWinnerData(Protocol):
-    """A staff claim, from the show form or the legacy import."""
+    """A staff claim, from the show form."""
 
     staff_id: int
     has_guest: bool

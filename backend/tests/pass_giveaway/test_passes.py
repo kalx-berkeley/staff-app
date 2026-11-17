@@ -494,78 +494,6 @@ def test_get_dj_history_omits_preassigned_passes_on_unpublished_shows(
     assert history() == []
 
 
-def test_get_dj_autocomplete(client, show, promotions_staff, db, on_air):
-    """Test DJ name autocomplete."""
-    # Give away passes with different DJs
-    passes = (
-        db.query(Pass)
-        .filter(
-            Pass.show_id == show.id,
-            Pass.pass_type == "pair",
-            Pass.status == "available",
-        )
-        .all()
-    )
-
-    on_air(persona_id=601, name="DJ Alpha")
-    client.post(
-        f"/api/passes/{passes[0].id}/giveaway",
-        json={
-            "recipient_name": "John Doe",
-            "recipient_phone": "555-1234",
-        },
-        headers={"X-Forwarded-For": DJ_STUDIO_IP},
-    )
-
-    on_air(persona_id=602, name="DJ Beta")
-    client.post(
-        f"/api/passes/{passes[1].id}/giveaway",
-        json={
-            "recipient_name": "Jane Doe",
-            "recipient_phone": "555-5678",
-        },
-        headers={"X-Forwarded-For": DJ_STUDIO_IP},
-    )
-
-    # Get autocomplete
-    response = client.get(
-        "/api/autocomplete/djs", headers={"X-Forwarded-User": promotions_staff.email}
-    )
-    assert response.status_code == 200
-    dj_names = response.json()
-    assert "DJ Alpha" in dj_names
-    assert "DJ Beta" in dj_names
-    assert len(dj_names) == 2
-
-
-def test_dj_autocomplete_leaves_out_non_dj_show_titles(client, promotions_staff, db):
-    """FREEFORM and OVERNIGHTS are show titles, not DJs, so they're never
-    suggested even if one turns up as a DJ name."""
-    db.add(
-        Staff(email="dj-gamma@test.com", name="Gamma", phone="555-0101", dj_name="DJ Gamma")
-    )
-    db.add(
-        Staff(
-            email="overnights@test.com",
-            name="Overnights",
-            phone="555-0102",
-            dj_name="OVERNIGHTS",
-        )
-    )
-    db.add(
-        Staff(
-            email="freeform@test.com", name="Freeform", phone="555-0103", dj_name="Freeform"
-        )
-    )
-    db.commit()
-
-    response = client.get(
-        "/api/autocomplete/djs", headers={"X-Forwarded-User": promotions_staff.email}
-    )
-    assert response.status_code == 200
-    assert response.json() == ["DJ Gamma"]
-
-
 def test_cannot_give_away_closed_show_pass(client, show, promotions_staff, db):
     """Test that passes cannot be given away for closed shows."""
     # Close the show
@@ -1044,7 +972,7 @@ def test_search_by_phone_dj_network_access(client, show, given_away_pass):
     assert len(response.json()) == 1
 
 
-def test_dj_autocomplete_sublist_dj_staff_staging_access(client, db, monkeypatch):
+def test_dj_view_sublist_dj_staff_staging_access(client, db, monkeypatch, on_air):
     """Staging: an active Sublist DJ staff member can reach a DJ-gated endpoint
     without DJ studio network access, so they can test the DJ view remotely."""
     from app import config
@@ -1058,14 +986,15 @@ def test_dj_autocomplete_sublist_dj_staff_staging_access(client, db, monkeypatch
     db.add(StaffStatus(staff_id=dj_staff.id, status="Sublist DJ"))
     db.commit()
 
+    on_air(None)
     response = client.get(
-        "/api/autocomplete/djs",
+        "/api/passes/my-giveaways",
         headers={"X-Forwarded-User": dj_staff.email},
     )
     assert response.status_code == 200
 
 
-def test_dj_autocomplete_sublist_dj_staff_denied_outside_staging(client, db, monkeypatch):
+def test_dj_view_sublist_dj_staff_denied_outside_staging(client, db, monkeypatch, on_air):
     """Outside staging, an active Sublist DJ staff member does not get DJ
     access purely from their Sublist DJ status."""
     from app import config
@@ -1079,14 +1008,15 @@ def test_dj_autocomplete_sublist_dj_staff_denied_outside_staging(client, db, mon
     db.add(StaffStatus(staff_id=dj_staff.id, status="Sublist DJ"))
     db.commit()
 
+    on_air(None)
     response = client.get(
-        "/api/autocomplete/djs",
+        "/api/passes/my-giveaways",
         headers={"X-Forwarded-User": dj_staff.email},
     )
     assert response.status_code == 401
 
 
-def test_dj_autocomplete_plain_staff_denied_in_staging(client, db, monkeypatch):
+def test_dj_view_plain_staff_denied_in_staging(client, db, monkeypatch, on_air):
     """Staging: a staff member without Sublist DJ status still has no DJ access."""
     from app import config
 
@@ -1098,8 +1028,9 @@ def test_dj_autocomplete_plain_staff_denied_in_staging(client, db, monkeypatch):
     db.add(StaffStatus(staff_id=plain_staff.id, status="Active"))
     db.commit()
 
+    on_air(None)
     response = client.get(
-        "/api/autocomplete/djs",
+        "/api/passes/my-giveaways",
         headers={"X-Forwarded-User": plain_staff.email},
     )
     assert response.status_code == 401

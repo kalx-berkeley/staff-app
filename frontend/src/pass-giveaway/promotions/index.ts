@@ -12,4 +12,3 @@ export { default as PromoterList } from './PromoterList';
 export { default as PromoterForm } from './PromoterForm';
 export { default as PromoterNew } from './PromoterNew';
 export { default as PromoterEdit } from './PromoterEdit';
-export { default as LegacyImport } from './LegacyImport';

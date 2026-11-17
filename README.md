@@ -139,10 +139,6 @@ grouped by area (the pass giveaway first, then the other sub-sites):
   by genre (matching Sublist DJs and their Specialty Music Shows against the show's genres, from
   staff's own genre preferences). Accepting a suggestion with a known date auto-saves and advances to the
   next available pass pair.
-- **Legacy paper-form import** — a self-contained, removable feature (`LEGACY_IMPORT_ENABLED`)
-  for backfilling historical shows during the cutover from the old paper-based process. It creates
-  new shows or adds to existing ones: on-air winners, staff claims and staff pass alternates, with
-  a Release button for each recorded winner and claim.
 
 ### Pass allocation
 

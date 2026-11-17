@@ -37,9 +37,6 @@ vi.mock('./pass-giveaway/api', () => ({
     list: vi.fn().mockResolvedValue([]),
     listMy: vi.fn().mockResolvedValue([]),
   },
-  legacyImportAPI: {
-    checkEnabled: vi.fn().mockResolvedValue(false),
-  },
 }));
 
 describe('App - Role-Based UI Elements', () => {

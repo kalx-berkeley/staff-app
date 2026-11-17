@@ -765,24 +765,6 @@ def get_my_giveaways(
     return [PassResponse.model_validate(pass_item) for pass_item in passes]
 
 
-@router.get("/autocomplete/djs", response_model=list[str])
-def get_dj_autocomplete(
-    dj_access: bool = Depends(check_dj_access), db: Session = Depends(get_db)
-):
-    """
-    Get DJ names for autocomplete.
-
-    Requires DJ access (DJ studio IP or promotions staff authentication).
-
-    Args:
-        dj_access: DJ access validation
-
-    Returns:
-        List of distinct DJ names
-    """
-    return PassService.get_dj_names_for_autocomplete(db)
-
-
 @router.get("/passes/search-by-phone", response_model=list[PassResponse])
 @keeps_winner_contact
 def search_passes_by_phone(

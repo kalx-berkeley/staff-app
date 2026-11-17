@@ -22,7 +22,6 @@ const Admin = lazySection(loadPromotions, 'Admin');
 const PromoterList = lazySection(loadPromotions, 'PromoterList');
 const PromoterNew = lazySection(loadPromotions, 'PromoterNew');
 const PromoterEdit = lazySection(loadPromotions, 'PromoterEdit');
-const LegacyImport = lazySection(loadPromotions, 'LegacyImport');
 
 const loadStaff = () => import('./staff');
 const StaffLayout = lazySection(loadStaff, 'StaffLayout');
@@ -207,7 +206,6 @@ export default function PassGiveawayApp() {
             <Route path="promoters/:id/edit" element={<PromoterEdit />} />
             <Route path="promoters" element={<PromoterList />} />
             <Route path="profile" element={<ProfileSettings section="Promotions" />} />
-            <Route path="legacy-import" element={<LegacyImport />} />
           </Route>
           <Route
             path="admin"

@@ -409,8 +409,6 @@ nothing else deploys alongside the timers.
 - `systemd/README.md`.
 - This repo's `CLAUDE.md`: it lists `scripts/deploy-staging.sh` and
   `.github/workflows/deploy.yml` under deployment.
-- `docs/pass-giveaway/How-to-remove-the-legacy-import-code.md`: it points at
-  the old workflow's `LEGACY_IMPORT_ENABLED` line.
 
 ## Testing
 

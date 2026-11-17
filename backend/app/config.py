@@ -2,14 +2,21 @@
 
 import os
 from typing import Optional
-from pydantic import ConfigDict
-from pydantic_settings import BaseSettings
+from dotenv import dotenv_values
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# The test suite ignores .env so it runs with the same settings locally as in
+# CI, where there is no .env.
+ENV_FILE: Optional[str] = None if os.getenv("TESTING") == "1" else ".env"
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    model_config = ConfigDict(env_file=".env", case_sensitive=False)
+    # Unknown keys are ignored rather than stopping the backend from starting,
+    # so a leftover line in .env can't take a deploy down. main.py logs them
+    # as errors at startup (unknown_env_file_keys).
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
     # Database
     database_url: str = "sqlite:///./staff-app.db"
@@ -123,9 +130,6 @@ class Settings(BaseSettings):
     # Webmaster email address for receiving user feedback
     webmaster_email: Optional[str] = None
 
-    # Legacy paper-form import feature — set to True only during cutover from paper forms
-    legacy_import_enabled: bool = False
-
     # Feature bin (KALX music library new-arrivals) Google Sheet, fetched nightly.
     # Not given a default here since the sheet ID isn't public data and this repo
     # is public — set via the FEATURE_BIN_SHEET_ID/FEATURE_BIN_SHEET_GID env vars.
@@ -143,6 +147,18 @@ class Settings(BaseSettings):
     kalx_live_calendar_id: Optional[str] = None
 
 
-# Global settings instance. The test suite ignores .env so it runs with the same
-# settings locally as in CI, where there is no .env.
-settings = Settings(_env_file=None) if os.getenv("TESTING") == "1" else Settings()
+def unknown_env_file_keys(env_file: Optional[str] = ENV_FILE) -> list[str]:
+    """
+    The keys in a .env file that aren't settings, which the backend ignores.
+
+    :param env_file: The .env file to check, or None for none
+    :returns: The unknown keys, sorted, as written in the file
+    """
+    if env_file is None or not os.path.exists(env_file):
+        return []
+    known = set(Settings.model_fields)
+    return sorted(key for key in dotenv_values(env_file) if key.lower() not in known)
+
+
+# Global settings instance
+settings = Settings(_env_file=ENV_FILE)

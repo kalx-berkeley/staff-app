@@ -23,7 +23,6 @@ vi.mock('./api', () => ({
   },
   showsAPI: { listDeleted: vi.fn().mockResolvedValue([]) },
   venuesAPI: { listDeleted: vi.fn().mockResolvedValue([]) },
-  legacyImportAPI: { checkEnabled: vi.fn().mockResolvedValue(false) },
 }));
 
 // A department head who isn't promotions staff

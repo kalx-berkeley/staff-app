@@ -10,7 +10,6 @@ import { pageContextQuery } from '../common/pageTime';
 import { SWITCH_HEADER, addOnAirHeaders } from './dj/onAirHeaders';
 import type {
   GiveawayCreditItem,
-  AgeRestriction,
   AlternateEntry,
   AlternateJoinRequest,
   AlternateQueue,
@@ -30,7 +29,6 @@ import type {
   LotteryEntryResponse,
   LotteryScheduleItem,
   LotteryStatus,
-  MovieRating,
   MusicBrainzArtist,
   MyAlternateEntry,
   MyIdentity,
@@ -69,7 +67,6 @@ import type {
   VenueCreate,
   VenueResponse,
   VenueUpdate,
-  WheelchairAccessible,
   WinnerEligibility,
   WinnerReleaseData,
   WinnerUpdateData,
@@ -1077,26 +1074,6 @@ export const preferencesAPI = {
 };
 
 /**
- * Autocomplete API methods for providing suggestions.
- */
-export const autocompleteAPI = {
-  /**
-   * Get DJ names for autocomplete.
-   * Returns distinct names of DJs who have given away passes.
-   * 
-   * @returns Promise resolving to array of DJ names
-   */
-  getDJNames: async (): Promise<string[]> => {
-    try {
-      const response = await apiClient.get<string[]>('/autocomplete/djs');
-      return response.data;
-    } catch (error) {
-      return handleAPIError(error);
-    }
-  },
-};
-
-/**
  * On-air DJ schedule API methods, backed by the cached Spinitron schedule.
  */
 export const onAirAPI = {
@@ -1586,91 +1563,6 @@ export const alternatesAPI = {
   getMyEntries: async (): Promise<MyAlternateEntry[]> => {
     try {
       const response = await apiClient.get<MyAlternateEntry[]>('/shows/alternates/my-entries');
-      return response.data;
-    } catch (error) {
-      return handleAPIError(error);
-    }
-  },
-};
-
-/**
- * Legacy paper-form import API — only functional when LEGACY_IMPORT_ENABLED=true on the backend.
- */
-export interface LegacyOnAirWinnerPayload {
-  recipient_name: string;
-  recipient_phone: string;
-  recipient_email: string | null;
-  given_away_by_dj: string | null;
-}
-
-export interface LegacyStaffPassPayload {
-  staff_id: number;
-  has_guest: boolean;
-  guest_name: string | null;
-}
-
-export interface LegacyImportResult {
-  show_id: number;
-  on_air_winners_created: number;
-  staff_passes_claimed: number;
-  alternates_added: number;
-}
-
-export const legacyImportAPI = {
-  checkEnabled: async (): Promise<boolean> => {
-    try {
-      await apiClient.get('/legacy-import/enabled');
-      return true;
-    } catch {
-      return false;
-    }
-  },
-
-  listStaff: async (): Promise<{ id: number; name: string; email: string }[]> => {
-    try {
-      const response = await apiClient.get<{ id: number; name: string; email: string }[]>('/legacy-import/staff');
-      return response.data;
-    } catch (error) {
-      return handleAPIError(error);
-    }
-  },
-
-  importShow: async (data: {
-    event_name: string;
-    genre: string[];
-    venue_id: number;
-    show_date: string;
-    show_time: string | null;
-    show_start_date: string | null;
-    on_air_description: string | null;
-    caller_special_instructions: string | null;
-    age_restriction: AgeRestriction | null;
-    movie_rating: MovieRating | null;
-    wheelchair_accessible: WheelchairAccessible;
-    num_pass_pairs: number;
-    co_announce: boolean;
-    on_air_winners: LegacyOnAirWinnerPayload[];
-    staff_passes: LegacyStaffPassPayload[];
-    alternates: LegacyStaffPassPayload[];
-  }): Promise<LegacyImportResult> => {
-    try {
-      const response = await apiClient.post('/legacy-import/shows', data);
-      return response.data;
-    } catch (error) {
-      return handleAPIError(error);
-    }
-  },
-
-  mergeShow: async (
-    showId: number,
-    data: {
-      on_air_winners: LegacyOnAirWinnerPayload[];
-      staff_passes: LegacyStaffPassPayload[];
-      alternates: LegacyStaffPassPayload[];
-    }
-  ): Promise<LegacyImportResult> => {
-    try {
-      const response = await apiClient.post(`/legacy-import/shows/${showId}/merge`, data);
       return response.data;
     } catch (error) {
       return handleAPIError(error);

@@ -333,6 +333,8 @@ Each environment's settings are in its own `backend/.env`
 (`~/staff-app-production/backend/.env` and `~/staff-app-staging/backend/.env`),
 which you write by hand and keep with mode 600. Deploys never overwrite it: they
 only set its `APP_VERSION` line. After changing a setting, restart that backend.
+The backend ignores any line that isn't one of the settings below, and logs an
+"Unknown setting" error for it at startup.
 
 ```bash
 install -m 600 /dev/null ~/staff-app-production/backend/.env
@@ -352,7 +354,7 @@ nano ~/staff-app-production/backend/.env
 | `EMAIL_FROM_ADDRESS` | Optional; defaults to `noreply@kalx.berkeley.edu` |
 | `EMAIL_FROM_NAME` | Optional; defaults to `KALX Staff App` |
 | `SITE_ADMIN_EMAILS` | Optional extra site admins, comma-separated |
-| `WORKFORMS_ENABLED`, `DIRECTORY_ENABLED`, `LEGACY_IMPORT_ENABLED` | `true` or `false` |
+| `WORKFORMS_ENABLED`, `DIRECTORY_ENABLED` | `true` or `false` |
 | `FEATURE_BIN_SHEET_ID`, `FEATURE_BIN_SHEET_GID`, `KALX_LIVE_CALENDAR_ID` | Optional; see the maintainers for the values |
 | `APP_VERSION` | Leave it out: deploys set it |
 

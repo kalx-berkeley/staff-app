@@ -29,7 +29,6 @@ from app.pass_giveaway.services.on_air_identity import (
     credit,
     identity_label,
 )
-from app.pass_giveaway.services.spinitron_schedule_service import SpinitronScheduleService
 
 import re
 
@@ -699,45 +698,6 @@ class PassService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database error occurred while releasing pass",
             )
-
-    @staticmethod
-    def get_dj_names_for_autocomplete(db: Session) -> list[str]:
-        """
-        Get DJ names for autocomplete.
-
-        Returns the union of:
-        - DJ names from the staff table (sourced from Airtable)
-        - Distinct names of DJs who have given away passes (on_air_winners)
-        - Specialty show names
-
-        Show titles that never name a DJ, like "FREEFORM", are left out.
-
-        Args:
-            db: Database session
-
-        Returns:
-            Sorted, deduplicated list of DJ names
-        """
-        staff_names = {
-            name.strip()
-            for r in db.query(Staff.dj_name).filter(Staff.dj_name.isnot(None)).all()
-            for name in r[0].split(",")
-            if name.strip()
-        }
-        winner_names = {
-            r[0] for r in db.query(OnAirWinner.given_away_by_dj).distinct().all()
-        }
-        specialty_names = {
-            r[0]
-            for r in (
-                db.query(SpecialtyShow.name).filter(SpecialtyShow.current_filter()).all()
-            )
-        }
-        return sorted(
-            name
-            for name in staff_names | winner_names | specialty_names
-            if name and not SpinitronScheduleService.is_non_dj_show_title(name)
-        )
 
     @staticmethod
     def find_dj_leave(db: Session, persona_id: int) -> Staff | None:
