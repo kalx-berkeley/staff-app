@@ -302,6 +302,33 @@ describe('Staff ShowDetail', () => {
       });
     });
 
+    it('offers calendar export for the current user’s claimed pass', async () => {
+      loginAsClaimer();
+      vi.mocked(showsAPI.get).mockResolvedValue(mockShow);
+
+      render(
+        <BrowserRouter>
+          <ShowDetail />
+        </BrowserRouter>
+      );
+
+      const googleCalendarLink = await screen.findByRole('link', { name: /Add to Google Calendar/ });
+      const calendarBox = screen.getByRole('group', { name: 'Add to calendar' });
+      const releaseButton = screen.getByRole('button', { name: /^release$/i });
+      expect(calendarBox).toBeInTheDocument();
+      expect(
+        releaseButton.compareDocumentPosition(calendarBox) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+      const url = new URL(googleCalendarLink.getAttribute('href')!);
+      expect(url.searchParams.get('text')).toBe('Test Concert');
+      expect(url.searchParams.get('location')).toBe('Test Venue, 123 Main St');
+      expect(screen.getByRole('link', { name: /Download \.ics calendar file/ })).toHaveAttribute(
+        'download',
+        'test-concert-2024-12-31.ics'
+      );
+      expect(googleCalendarLink).toHaveAttribute('title', 'Google Calendar (estimated 3-hour duration)');
+    });
+
     it("should not show Release on someone else's claim", async () => {
       mockUseAuth.mockReturnValue({
         user: { email: 'other@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { id: 1, name: 'Other', phone: '555-0000', dj_name: null, is_sublist_dj: false } },

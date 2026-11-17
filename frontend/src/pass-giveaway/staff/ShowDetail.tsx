@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { showsAPI, passesAPI, lotteryAPI, alternatesAPI } from '../api';
-import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, AlternateGuestForm, WaitingGuestsList, GuestFallbackOptions, ClaimGuestActions, TablerPassesSection, ShowInfoCards } from '../components';
+import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, AlternateGuestForm, WaitingGuestsList, GuestFallbackOptions, ClaimGuestActions, TablerPassesSection, ShowInfoCards, AddToCalendar } from '../components';
 import { formatPhone, formatLeave, isOnLeave, leaveCoversShow, formatDateValue } from '../../common/utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
@@ -1322,6 +1322,7 @@ const ShowDetail = () => {
                           {show.status === 'closed' && (
                             <p className="pass-closed-note">Show is closed — cannot release.</p>
                           )}
+                          <AddToCalendar show={show} />
                         </>
                       )}
                     </div>

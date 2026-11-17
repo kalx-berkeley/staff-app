@@ -51,6 +51,64 @@ export function pacificDateString(value: string | Date = new Date()): string {
   return parseInstant(value).toLocaleDateString('en-CA', { timeZone: PACIFIC_TIME_ZONE });
 }
 
+/** Add days to a calendar date without interpreting it in the viewer's time zone. */
+export function addCalendarDays(value: string, days: number): string {
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  const resultYear = date.getUTCFullYear();
+  const resultMonth = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const resultDay = String(date.getUTCDate()).padStart(2, '0');
+  return `${resultYear}-${resultMonth}-${resultDay}`;
+}
+
+function pacificOffsetAt(instantMs: number): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: PACIFIC_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(instantMs));
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  const localAsUtc = Date.UTC(
+    Number(values.year),
+    Number(values.month) - 1,
+    Number(values.day),
+    Number(values.hour),
+    Number(values.minute),
+    Number(values.second),
+  );
+  return localAsUtc - instantMs;
+}
+
+/** Convert a Pacific wall-clock date/time to an instant, accounting for DST. */
+export function pacificWallTimeToInstant(date: string, time: string): Date {
+  const [year, month, day] = date.slice(0, 10).split('-').map(Number);
+  const match = /^(\d{2}):(\d{2})(?::\d{2})?$/.exec(time);
+  if (!match) throw new RangeError(`Invalid Pacific wall-clock time: ${time}`);
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) throw new RangeError(`Invalid Pacific wall-clock time: ${time}`);
+
+  const wallTimeMs = Date.UTC(year, month - 1, day, hour, minute);
+  let guessMs = wallTimeMs;
+  const candidates: number[] = [];
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const candidateMs = wallTimeMs - pacificOffsetAt(guessMs);
+    candidates.push(candidateMs);
+    if (candidateMs === guessMs) return new Date(candidateMs);
+    guessMs = candidateMs;
+  }
+
+  // A wall time in the spring-forward gap does not exist. Move it forward to
+  // the first corresponding time after the gap instead of exporting an invalid
+  // instant. Real event times are normally outside this one-hour window.
+  return new Date(Math.max(...candidates));
+}
+
 /** "Wed, Nov 12, 2026": the default for `formatCalendarDate`. */
 export const CALENDAR_DATE: Intl.DateTimeFormatOptions = {
   weekday: 'short',

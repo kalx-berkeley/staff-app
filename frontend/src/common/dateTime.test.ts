@@ -4,6 +4,8 @@ import {
   formatCalendarDateRange,
   formatPacific,
   formatPacificTime,
+  addCalendarDays,
+  pacificWallTimeToInstant,
   pacificDateString,
   parseInstant,
 } from './dateTime';
@@ -37,6 +39,22 @@ describe('formatPacific', () => {
 describe('pacificDateString', () => {
   it('is the Pacific calendar date, not the UTC one', () => {
     expect(pacificDateString('2026-11-13T03:15:00Z')).toBe('2026-11-12');
+  });
+});
+
+describe('calendar date and Pacific wall time helpers', () => {
+  it('adds days without changing the calendar date by viewer time zone', () => {
+    expect(addCalendarDays('2026-12-31', 1)).toBe('2027-01-01');
+    expect(addCalendarDays('2026-03-01', -1)).toBe('2026-02-28');
+  });
+
+  it('converts Pacific wall time using daylight saving time', () => {
+    expect(pacificWallTimeToInstant('2026-07-05', '19:00').toISOString()).toBe(
+      '2026-07-06T02:00:00.000Z'
+    );
+    expect(pacificWallTimeToInstant('2026-12-05', '19:00').toISOString()).toBe(
+      '2026-12-06T03:00:00.000Z'
+    );
   });
 });
 
