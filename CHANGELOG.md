@@ -6,6 +6,26 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.19.0] - 2026-11-17
+
+### Changed
+
+- Work out who's on air from the Spinitron schedule and recent spins, and show that persona or show on the DJ pages instead of asking for a DJ name. The giveaway page and "Your pre-assigned shows" name who's on air, with "If this isn't you, create your Spinitron playlist", and in the last 10 minutes of a slot offer to switch early to the next DJ or show. A DJ running over keeps the credit until the next DJ logs a track, and a sub takes over once their own playlist has a track. The schedule is also re-synced 10 minutes before each slot ([208bb10](https://github.com/kalx-berkeley/staff-app/commit/208bb10)), ([517b071](https://github.com/kalx-berkeley/staff-app/commit/517b071))
+- Credit giveaways, attempts and reservations made on the DJ pages to the persona or show on air, decided by the server. When no one is on air the page warns but still allows the giveaway, which is recorded as unattributed ([6b63c88](https://github.com/kalx-berkeley/staff-app/commit/6b63c88))
+- Show every giveaway under its persona's or show's current name. Every past giveaway, attempt and KALX Staff Analytics event is linked to a persona or show from its DJ name ([373ef06](https://github.com/kalx-berkeley/staff-app/commit/373ef06))
+- Show the on-air persona's or show's giveaways on the DJ My Passes page, and every persona and show a staff member belongs to on the `/staff` My Passes history, which is now open to talk show members who aren't Sublist DJs ([517b071](https://github.com/kalx-berkeley/staff-app/commit/517b071)), ([a6193dc](https://github.com/kalx-berkeley/staff-app/commit/a6193dc))
+- Group KALX Staff Analytics' DJs tab by persona and by show (a giveaway during a music show counts for the show), with an "Unattributed" row ([a6193dc](https://github.com/kalx-berkeley/staff-app/commit/a6193dc))
+- Pick who gave away a winner entered on the show form from the persona and show list. Leaving it blank records the winner as unattributed instead of "Unknown" ([9eb0d6e](https://github.com/kalx-berkeley/staff-app/commit/9eb0d6e))
+- Match DJ names in `backend/scripts/spinitron_identity_report.py` against the nightly copy of Spinitron's persona directory, so its online and `--offline` reports agree ([1fa0465](https://github.com/kalx-berkeley/staff-app/commit/1fa0465))
+
+### Added
+
+- Add a Giveaway Credit section to Promotions → Admin, which lists recent giveaways (unattributed ones by default) and lets promotions re-credit any of them to a persona or show. Each change is recorded in the audit log ([9eb0d6e](https://github.com/kalx-berkeley/staff-app/commit/9eb0d6e))
+
+### Fixed
+
+- Find the Spinitron persona in Airtable DJ Name links that end at the persona ID, with no trailing slash ([3cc028b](https://github.com/kalx-berkeley/staff-app/commit/3cc028b))
+
 ## [1.18.0] - 2026-11-16
 
 ### Changed
@@ -476,6 +496,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.19.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.18.0...v1.19.0
 [1.18.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.17.0...v1.18.0
 [1.17.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.16.0...v1.17.0
 [1.16.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.15.0...v1.16.0
