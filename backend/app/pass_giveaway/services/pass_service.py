@@ -27,7 +27,6 @@ from app.pass_giveaway.schemas.pass_schema import GiveawayData, WinnerUpdateData
 from app.pass_giveaway.services.on_air_identity import (
     OnAirIdentity,
     credit,
-    identity_label,
 )
 
 import re
@@ -237,8 +236,6 @@ class PassService:
                 )
 
             # Record giveaway on the pass
-            label = identity_label(identity)
-            pass_item.given_away_by_dj = label or None
             pass_item.given_away_persona_id = persona_id
             pass_item.given_away_specialty_show_id = specialty_show_id
             pass_item.given_away_at = datetime.now(timezone.utc)
@@ -253,7 +250,6 @@ class PassService:
                 recipient_name=giveaway_data.recipient_name,
                 recipient_phone=normalize_phone(giveaway_data.recipient_phone),
                 recipient_email=giveaway_data.recipient_email,
-                given_away_by_dj=label,
                 given_away_persona_id=persona_id,
                 given_away_specialty_show_id=specialty_show_id,
             )
@@ -604,7 +600,6 @@ class PassService:
         db.delete(winner)
 
         pass_item.status = "available"
-        pass_item.given_away_by_dj = None
         pass_item.given_away_persona_id = None
         pass_item.given_away_specialty_show_id = None
         pass_item.given_away_at = None
@@ -1466,18 +1461,17 @@ class PassService:
             )
 
         for candidate in pairs:
-            if candidate.preassigned_dj:
+            if candidate.is_preassigned:
                 continue
             updated = (
                 db.query(Pass)
                 .filter(
                     Pass.id == candidate.id,
                     Pass.status == "available",
-                    Pass.preassigned_dj.is_(None),
+                    ~Pass.is_preassigned,
                 )
                 .update(
                     {
-                        Pass.preassigned_dj: official_name,
                         Pass.preassigned_date: today,
                         Pass.preassigned_by_staff_id: None,
                         Pass.preassigned_specialty_show_id: specialty_show_id,
@@ -1502,7 +1496,6 @@ class PassService:
     def set_preassignment(
         db: Session,
         pass_id: int,
-        dj_name: str,
         assignment_date: date,
         preassigned_by_staff_id: int | None = None,
         preassigned_specialty_show_id: int | None = None,
@@ -1517,7 +1510,6 @@ class PassService:
         Args:
             db: Database session
             pass_id: Pass ID
-            dj_name: The persona's or show's name
             assignment_date: Date for the assignment
             preassigned_by_staff_id: Who pre-assigned it
             preassigned_specialty_show_id: The show, for a show's pass
@@ -1569,7 +1561,6 @@ class PassService:
             )
 
         # Set pre-assignment
-        pass_item.preassigned_dj = dj_name
         pass_item.preassigned_date = assignment_date
         pass_item.preassigned_by_staff_id = preassigned_by_staff_id
         pass_item.preassigned_specialty_show_id = preassigned_specialty_show_id
@@ -1619,7 +1610,6 @@ class PassService:
             )
 
         # Clear pre-assignment
-        pass_item.preassigned_dj = None
         pass_item.preassigned_persona_id = None
         pass_item.preassigned_date = None
         pass_item.preassigned_by_staff_id = None
@@ -1646,7 +1636,7 @@ class PassService:
 
         Finds pass pairs on published shows that still have a preassigned DJ
         but whose preassigned date is in the past and haven't been given away.
-        Clears the preassigned_dj and preassigned_date fields so any DJ can
+        Clears the pre-assigned persona or show, and the date, so any DJ can
         give them away on-air.
 
         :param db: Database session
@@ -1663,7 +1653,7 @@ class PassService:
             .filter(
                 Pass.pass_type == "pair",
                 Pass.status == "available",
-                Pass.preassigned_dj.isnot(None),
+                Pass.is_preassigned,
                 Pass.preassigned_date < today,
                 Show.status == "published",
             )
@@ -1672,16 +1662,15 @@ class PassService:
 
         # Snapshot before-state so we can audit after the commit clears the fields.
         expired_info = [
-            (p.id, p.preassigned_dj, str(p.preassigned_date), p.show_id)
+            (p.id, p.preassigned_to, str(p.preassigned_date), p.show_id)
             for p in stale_passes
         ]
 
-        for pass_item in stale_passes:
+        for pass_item, (_, dj, assignment_date, _) in zip(stale_passes, expired_info):
             logger.info(
                 f"Expiring stale preassignment: pass {pass_item.id}, "
-                f"DJ '{pass_item.preassigned_dj}', date {pass_item.preassigned_date}"
+                f"DJ '{dj}', date {assignment_date}"
             )
-            pass_item.preassigned_dj = None
             pass_item.preassigned_persona_id = None
             pass_item.preassigned_date = None
             pass_item.preassigned_by_staff_id = None
@@ -1759,10 +1748,10 @@ class PassService:
             to_remove = -pair_delta
             given_away = [p for p in pair_passes if p.status == "given_away"]
             preassigned = [
-                p for p in pair_passes if p.status == "available" and p.preassigned_dj
+                p for p in pair_passes if p.status == "available" and p.is_preassigned
             ]
             free = [
-                p for p in pair_passes if p.status == "available" and not p.preassigned_dj
+                p for p in pair_passes if p.status == "available" and not p.is_preassigned
             ]
 
             to_delete = []
@@ -1778,7 +1767,7 @@ class PassService:
                 for p in preassigned:
                     if to_remove <= 0:
                         break
-                    affected_djs.append(p.preassigned_dj)
+                    affected_djs.append(p.preassigned_to)
                     to_delete.append(p)
                     to_remove -= 1
 
@@ -1964,47 +1953,6 @@ class PassService:
             return (rank, _as_utc(p.claimed_at), p.id)
 
         return sorted(passes, key=key)
-
-    @staticmethod
-    def get_passes_for_show(
-        db: Session,
-        show_id: int,
-        dj_name: str | None = None,
-        current_date: date | None = None,
-    ) -> list[Pass]:
-        """
-        Get passes for a show, optionally filtered by preassigned DJ.
-
-        When dj_name and current_date are provided, returns:
-        - Passes pre-assigned to that DJ for that date
-        - Passes with no pre-assignment
-        - Passes pre-assigned to that DJ for past dates (assignment expired)
-
-        Args:
-            db: Database session
-            show_id: Show ID
-            dj_name: Optional DJ name to filter by
-            current_date: Optional current date for filtering expired assignments
-
-        Returns:
-            List of passes
-        """
-        query = db.query(Pass).filter(Pass.show_id == show_id)
-
-        if dj_name and current_date:
-            # Filter to show passes available to this DJ on this date
-            query = query.filter(
-                # Either not pre-assigned
-                (Pass.preassigned_dj.is_(None))
-                |
-                # Or pre-assigned to this DJ for today
-                ((Pass.preassigned_dj == dj_name) & (Pass.preassigned_date == current_date))
-                |
-                # Or pre-assigned to this DJ for a past date (expired)
-                ((Pass.preassigned_dj == dj_name) & (Pass.preassigned_date < current_date))
-            )
-
-        return query.all()
 
 
 def _null_safe_eq(column, value):

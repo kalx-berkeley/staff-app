@@ -103,7 +103,7 @@ def free_passes_after_adjustment(
     staff = [p for p in show.passes if p.pass_type == "staff"]
     if num_tabler_passes is None:
         num_tabler_passes = sum(1 for p in show.passes if p.pass_type == "tabler")
-    free_pairs = sum(1 for p in pairs if p.status == "available" and not p.preassigned_dj)
+    free_pairs = sum(1 for p in pairs if p.status == "available" and not p.is_preassigned)
     free_staff = sum(1 for p in staff if p.status == "available")
     pair_delta = num_pass_pairs - len(pairs)
     staff_delta = num_pass_pairs + staff_pass_adjustment - num_tabler_passes - len(staff)
@@ -230,13 +230,11 @@ def assign_winners_and_claims(
                 recipient_name=data.recipient_name.strip(),
                 recipient_phone=normalize_phone(data.recipient_phone),
                 recipient_email=(data.recipient_email or "").strip() or None,
-                given_away_by_dj=credit.name or "",
                 given_away_persona_id=credit.persona_id,
                 given_away_specialty_show_id=credit.specialty_show_id,
                 created_at=now,
             )
         )
-        pair_pass.given_away_by_dj = credit.name
         pair_pass.given_away_persona_id = credit.persona_id
         pair_pass.given_away_specialty_show_id = credit.specialty_show_id
 
@@ -274,7 +272,7 @@ def enter(
     pair_pool = [
         p
         for p in by_id
-        if p.pass_type == "pair" and p.status == "available" and not p.preassigned_dj
+        if p.pass_type == "pair" and p.status == "available" and not p.is_preassigned
     ]
     staff_pool = [p for p in by_id if p.pass_type == "staff" and p.status == "available"]
     now = datetime.now(timezone.utc)

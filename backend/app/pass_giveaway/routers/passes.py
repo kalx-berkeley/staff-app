@@ -1042,7 +1042,6 @@ def set_preassignment(
     pass_item = PassService.set_preassignment(
         db,
         pass_id,
-        name,
         preassignment_data.assignment_date,
         preassigned_by_staff_id=promotions.id,
         preassigned_specialty_show_id=show_id,
@@ -1139,7 +1138,6 @@ def set_self_preassignment(
     pass_item = PassService.set_preassignment(
         db,
         pass_id,
-        reservation.name,
         data.assignment_date,
         preassigned_by_staff_id=staff.id,
         preassigned_specialty_show_id=specialty_show.id if specialty_show else None,
@@ -1198,7 +1196,7 @@ def clothespin_pass(
     pass_item = PassService.clothespin(db, show_id, identity)
 
     audit_details: dict = {
-        "dj": pass_item.preassigned_dj,
+        "dj": pass_item.preassigned_to,
         "assignment_date": str(pass_item.preassigned_date),
         "show_id": pass_item.show_id,
         "source": "clothespin",
@@ -1291,8 +1289,8 @@ def remove_preassignment(
 
     Access rules:
     - Promotions staff: may remove any pre-assignment.
-    - Active staff: may remove only a pre-assignment where their name (or dj_name)
-      matches the preassigned_dj value.
+    - Active staff: may remove only a pre-assignment to one of their personas,
+      or to a show they're a member of.
     - DJ studio network (IP-based, no email auth): may remove only a
       pre-assignment to who is on air (its persona, or its show).
 
@@ -1314,7 +1312,7 @@ def remove_preassignment(
     if not pass_pre:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pass not found")
 
-    prior_dj = pass_pre.preassigned_dj
+    prior_dj = pass_pre.preassigned_to
     prior_date = pass_pre.preassigned_date
     actor_email: str | None = None
     actor_role: str = "dj"
@@ -1334,19 +1332,11 @@ def remove_preassignment(
             actor_role = "promotions"
         else:
             # Regular staff: the pass must be reserved for one of their
-            # personas (or, for an older pre-assignment with no persona, their
-            # name or a DJ name), or for a show they're a member of
-
-            preassigned = pass_pre.preassigned_dj
-            staff_names = {staff_record.name.lower()}
-            staff_names |= {
-                n.strip().lower() for n in (staff_record.dj_name or "").split(",")
-            }
-
-            if pass_pre.preassigned_persona_id is not None:
-                allowed = pass_pre.preassigned_persona_id in staff_persona_ids(staff_record)
-            else:
-                allowed = bool(preassigned) and preassigned.lower() in staff_names
+            # personas, or for a show they're a member of
+            allowed = (
+                pass_pre.preassigned_persona_id is not None
+                and pass_pre.preassigned_persona_id in staff_persona_ids(staff_record)
+            )
             if not allowed and pass_pre.preassigned_specialty_show_id:
                 reserved_show = (
                     db.query(SpecialtyShow)

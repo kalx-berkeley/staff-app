@@ -97,7 +97,7 @@ the tooltip can say "Tracked since Nov 12, 2026".
 | Staff utilization | Claimed staff passes ÷ staff passes, over completed shows. |
 | Utilization balance | On-air % − staff %, in percentage points (Q12). |
 | Attempts vs. giveaways | `show_attempts` count vs. pairs given away, by event time; shown as attempts per giveaway. |
-| Pre-assigned % | Pairs with `preassigned_dj` set ÷ pairs, over shows in scope. |
+| Pre-assigned % | Pairs pre-assigned to a persona or show ÷ pairs, over shows in scope. |
 | Top repeat winners | As in the global list, filtered to the venue's shows. |
 | Same name, different phones | As in the global list, filtered to the venue (Q35). |
 | Who posts shows | Creators of shows in scope with counts, each marked venue owner / promoter owner / neither (Q21). Shows the venue's current owners alongside. |
@@ -117,7 +117,7 @@ attempts per giveaway, sortable. Each row links to the venue page.
 | Metric | Definition |
 |---|---|
 | Giveaway page funnel | The DJ's visits (Q13): % given away, % tried, % neither. "Unknown DJ" is a row of its own. |
-| Passes given away | Pairs given away by the DJ (`given_away_by_dj`), by `given_away_at`. |
+| Passes given away | Pairs credited to the DJ (`given_away_persona_id`, `given_away_specialty_show_id`), by `given_away_at`. |
 | Attempts | `show_attempts` by the DJ, by `attempted_at`. |
 
 ### Global (Overview tab)

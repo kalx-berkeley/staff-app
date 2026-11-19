@@ -136,7 +136,6 @@ class LotteryService:
         db: Session,
         show_id: int,
         staff_id: int,
-        dj_name: str,
         assignment_date: date,
         specialty_show_id: int | None = None,
         persona_id: int | None = None,
@@ -171,7 +170,6 @@ class LotteryService:
         )
         now = datetime.now(timezone.utc)
         if existing:
-            existing.dj_name = dj_name
             existing.persona_id = persona_id
             existing.specialty_show_id = specialty_show_id
             existing.assignment_date = assignment_date
@@ -184,7 +182,6 @@ class LotteryService:
             show_id=show_id,
             entry_type="dj",
             staff_id=staff_id,
-            dj_name=dj_name,
             persona_id=persona_id,
             specialty_show_id=specialty_show_id,
             assignment_date=assignment_date,
@@ -762,7 +759,7 @@ class LotteryService:
                 Pass.show_id == show.id,
                 Pass.pass_type == "pair",
                 Pass.status == "available",
-                Pass.preassigned_dj.is_(None),
+                ~Pass.is_preassigned,
             )
             .all()
         )
@@ -780,11 +777,9 @@ class LotteryService:
 
         for entry, pair_pass in winners:
             if entry.specialty_show_id and entry.specialty_show:
-                pair_pass.preassigned_dj = entry.specialty_show.name
                 pair_pass.preassigned_specialty_show_id = entry.specialty_show_id
                 pair_pass.preassigned_persona_id = None
             else:
-                pair_pass.preassigned_dj = entry.dj_name
                 pair_pass.preassigned_specialty_show_id = None
                 pair_pass.preassigned_persona_id = entry.persona_id
             pair_pass.preassigned_date = entry.assignment_date

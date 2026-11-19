@@ -72,9 +72,7 @@ def _show(db: Session, venue: Venue, show_date: date, name: str = "Show") -> Sho
 
 
 def _win(db: Session, show: Show, phone: str = "5105550100") -> None:
-    p = Pass(
-        show_id=show.id, pass_type="pair", status="given_away", given_away_by_dj="DJ X"
-    )
+    p = Pass(show_id=show.id, pass_type="pair", status="given_away")
     db.add(p)
     db.flush()
     db.add(
@@ -84,7 +82,6 @@ def _win(db: Session, show: Show, phone: str = "5105550100") -> None:
             show_id=show.id,
             recipient_name="Jane Doe",
             recipient_phone=phone,
-            given_away_by_dj="DJ X",
         )
     )
     db.commit()

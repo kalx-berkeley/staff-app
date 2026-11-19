@@ -1273,7 +1273,6 @@ def test_show_detail_completeness(
         show_id=show.id,
         pass_type="pair",
         status="given_away",
-        given_away_by_dj="DJ Cool",
         given_away_persona_id=900,
         given_away_at=datetime(2024, 12, 25, 10, 30),
     )
@@ -1304,14 +1303,12 @@ def test_show_detail_completeness(
         show_id=show.id,
         recipient_name="John Doe",
         recipient_phone="555-1234",
-        given_away_by_dj="DJ Cool",
     )
     db.add(winner)
 
     # Create a failed attempt record
     attempt = ShowAttempt(
         show_id=show.id,
-        dj_name="DJ Retry",
         persona_id=901,
         attempted_at=datetime(2024, 12, 24, 15, 45),
     )
@@ -1391,7 +1388,6 @@ def test_guest_list_email_shows_failed_attempts_in_pacific_time(db: Session, tes
     db.add(
         ShowAttempt(
             show_id=show.id,
-            dj_name="DJ Retry",
             persona_id=901,
             attempted_at=datetime(2026, 11, 13, 3, 15, 42, 123456),
         )

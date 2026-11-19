@@ -12,7 +12,6 @@ from app.common.pacific_time import format_pacific_datetime
 from app.pass_giveaway.services.on_air_identity import (
     OnAirIdentity,
     credit,
-    identity_label,
 )
 from app.common.areas import PASS_GIVEAWAY_AREA
 from app.models.show import Show
@@ -803,7 +802,6 @@ class ShowService:
         persona_id, specialty_show_id = credit(identity)
         attempt = ShowAttempt(
             show_id=show_id,
-            dj_name=identity_label(identity),
             persona_id=persona_id,
             specialty_show_id=specialty_show_id,
         )

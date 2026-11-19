@@ -12,8 +12,10 @@ from app.models.show import Show
 from app.models.specialty_show import SpecialtyShow
 from app.models.spinitron_persona import SpinitronPersona
 from app.models.spinitron_playlist import SpinitronPlaylist
+from app.models.staff import Staff
 from app.models.venue import Venue
 from app.pass_giveaway.services.on_air_identity import SWITCH_HEADER
+from tests.personas import dj_fields
 
 DJ_STUDIO = {"X-Forwarded-For": "192.168.1.100"}
 
@@ -47,7 +49,6 @@ def _pairs(db: Session, show: Show) -> list[Pass]:
 
 
 def _preassign(db: Session, pass_item: Pass, persona_id=None, show_id=None) -> None:
-    pass_item.preassigned_dj = "someone"
     pass_item.preassigned_persona_id = persona_id
     pass_item.preassigned_specialty_show_id = show_id
     pass_item.preassigned_date = date(2099, 12, 30)
@@ -159,9 +160,20 @@ class TestCreditLabel:
         music = SpecialtyShow(name="Take Five")
         db.add(music)
         db.commit()
-        assert credit_label(db, 1, None, "DJ Old") == "DJ Renamed"
-        assert credit_label(db, 2, None, "DJ Old") == "DJ Old"
+        assert credit_label(db, 1, None) == "DJ Renamed"
         assert credit_label(db, 2, None) == "Persona #2"
         assert credit_label(db, None, music.id) == "Take Five"
         assert credit_label(db, 1, music.id) == "Take Five (DJ Renamed)"
-        assert credit_label(db, None, None, "Unknown") == "Unattributed"
+        assert credit_label(db, None, None) == "Unattributed"
+
+    def test_a_persona_not_synced_yet_is_named_from_staff_records(self, db: Session):
+        db.add(
+            Staff(
+                email="new@example.com",
+                name="New",
+                phone="5105550100",
+                **dj_fields("DJ New", ids=[3]),
+            )
+        )
+        db.commit()
+        assert credit_label(db, 3, None) == "DJ New"

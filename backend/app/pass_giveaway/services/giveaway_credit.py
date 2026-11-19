@@ -53,12 +53,10 @@ def apply_credit(pass_item: Pass, credit: Credit) -> None:
     """Credit a given-away pair (and its on-air winner) to *credit* (no commit)."""
     pass_item.given_away_persona_id = credit.persona_id
     pass_item.given_away_specialty_show_id = credit.specialty_show_id
-    pass_item.given_away_by_dj = credit.name
     winner = pass_item.on_air_winner
     if winner is not None:
         winner.given_away_persona_id = credit.persona_id
         winner.given_away_specialty_show_id = credit.specialty_show_id
-        winner.given_away_by_dj = credit.name or ""
 
 
 def giveaways(db: Session, unattributed_only: bool, days: int) -> list[Pass]:

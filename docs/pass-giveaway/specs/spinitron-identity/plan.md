@@ -144,6 +144,33 @@ any release cut after the merge includes it.
      staff member, since talk show members needn't be Sublist DJs.
 5. **4: Drop the text columns.** Decision 32, once phase 3 has settled.
 
+   As built (migration `a1d7e3f9c5b8`):
+   - Dropped `passes.preassigned_dj` and `given_away_by_dj`,
+     `on_air_winners.given_away_by_dj`, and `dj_name` on `show_attempts`,
+     `lottery_entries`, `specialty_show_djs`, `analytics_event` and
+     `analytics_daily_count`. Daily counts that differed only by DJ name are
+     added together. `specialty_show_djs.persona_id` is now required.
+   - The clean-up tooling is gone: `scripts/spinitron_identity_report.py`,
+     `services/dj_name_matching.py` and the `dj_name_mappings` table. Phase
+     3's migration doesn't import them, so it still runs on a new database.
+   - The migration refuses while any record has a name but no persona or
+     show (unless `dj_name_mappings` maps the name to no one), as a safety
+     net; phase 3 left none.
+   - Names come from `credit.credit_label` (`Pass.preassigned_to` and
+     `given_away_by`, `OnAirWinner.given_away_by`, `ShowAttempt.credited_name`,
+     `LotteryEntry.dj_name`, `SpecialtyShowDJ.name`). A persona the nightly
+     sync hasn't stored yet is named from staff records, then "Persona #N".
+   - `Pass.is_preassigned` (persona or show set) replaces the
+     `preassigned_dj IS NULL` checks, in Python and in queries.
+   - The API keeps its field names (`preassigned_dj`, `given_away_by_dj`,
+     `dj_name`), now filled with current names, so the frontend is unchanged
+     except where it still compared names: `/staff` show pages match
+     reservations by persona only, and their "Your Pre-assigned Pass Pair"
+     section (by staff name, which nothing has written since 2b) is gone.
+   - Unchanged, since they aren't stored identity: `staff.dj_name` (from
+     Airtable), and `dj_name` on the cached `spinitron_playlists` and
+     `spinitron_shows`.
+
 ## Facts this plan relies on
 
 - The cached `spinitron_playlists` and `spinitron_shows` tables store only

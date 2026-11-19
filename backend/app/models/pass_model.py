@@ -1,7 +1,8 @@
 """Pass model."""
 
 from datetime import datetime, date, timezone
-from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, DateTime, Date
+from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, DateTime, Date, or_
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import object_session, relationship
 from app.models.credit import credit_label
 from app.models.guest_fallback import GuestFallback
@@ -28,9 +29,7 @@ class Pass(Base):
 
     # For pass pairs given away on-air — who gave it away and when. Credited
     # to the on-air persona, show, or both (a Specialty Music Show and its
-    # DJ); neither is "Unattributed". given_away_by_dj is the old typed name,
-    # kept until phase 4 of the Spinitron identity plan drops it.
-    given_away_by_dj = Column(String, nullable=True)
+    # DJ); neither is "Unattributed".
     given_away_persona_id = Column(Integer, nullable=True)
     given_away_specialty_show_id = Column(
         Integer, ForeignKey("specialty_shows.id"), nullable=True
@@ -42,10 +41,7 @@ class Pass(Base):
     claimed_at = Column(DateTime, nullable=True)
 
     # For pre-assigned pairs (promotions assignment). A pair is pre-assigned
-    # to a Spinitron persona or to a specialty show (one of the two IDs);
-    # preassigned_dj also holds that persona's or show's name, which the DJ
-    # pages still match against typed DJ names until they move to the schedule.
-    preassigned_dj = Column(String, nullable=True)
+    # to a Spinitron persona or to a specialty show (one of the two IDs).
     preassigned_persona_id = Column(Integer, nullable=True)
     preassigned_date = Column(Date, nullable=True)
     preassigned_by_staff_id = Column(Integer, ForeignKey("staff.id"), nullable=True)
@@ -195,7 +191,32 @@ class Pass(Base):
             object_session(self),
             self.given_away_persona_id,
             self.given_away_specialty_show_id,
-            self.given_away_by_dj,
+        )
+
+    @hybrid_property
+    def is_preassigned(self) -> bool:
+        """Whether the pair is pre-assigned to a persona or a show."""
+        return (
+            self.preassigned_persona_id is not None
+            or self.preassigned_specialty_show_id is not None
+        )
+
+    @is_preassigned.expression
+    def is_preassigned(cls):
+        return or_(
+            cls.preassigned_persona_id.isnot(None),
+            cls.preassigned_specialty_show_id.isnot(None),
+        )
+
+    @property
+    def preassigned_to(self) -> str | None:
+        """The current name of the persona or show the pair is pre-assigned to."""
+        if not self.is_preassigned:
+            return None
+        return credit_label(
+            object_session(self),
+            self.preassigned_persona_id,
+            self.preassigned_specialty_show_id,
         )
 
     @property

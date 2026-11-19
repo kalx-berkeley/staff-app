@@ -17,6 +17,7 @@ from app.models.workform_department import DepartmentHead
 from app.common.areas import PASS_GIVEAWAY_AREA
 from app.common.services import audit_service
 from app.pass_giveaway.services.pass_service import PassService
+from tests.personas import add_persona
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -177,7 +178,7 @@ def test_preassignment_expiry_audit(db: Session, published_show):
         .first()
     )
     today = date.today()
-    pair_pass.preassigned_dj = "DJ Stale"
+    pair_pass.preassigned_persona_id = add_persona(db, "DJ Stale")
     pair_pass.preassigned_date = today - timedelta(days=1)
     db.commit()
 
@@ -292,7 +293,6 @@ def test_winner_frequency_warning_audit(
         .first()
     )
     pair_pass.status = "given_away"
-    pair_pass.given_away_by_dj = "DJ Old"
     db.flush()
     db.add(
         OnAirWinner(
@@ -301,7 +301,6 @@ def test_winner_frequency_warning_audit(
             show_id=published_show.id,
             recipient_name="Bob",
             recipient_phone="5559999",
-            given_away_by_dj="DJ Old",
         )
     )
     db.commit()
@@ -387,7 +386,7 @@ def test_preassignment_removal_audit(
         .filter(Pass.show_id == published_show.id, Pass.pass_type == "pair")
         .first()
     )
-    pair_pass.preassigned_dj = "DJ Preset"
+    pair_pass.preassigned_persona_id = add_persona(db, "DJ Preset")
     pair_pass.preassigned_date = date(2025, 6, 1)
     db.commit()
 

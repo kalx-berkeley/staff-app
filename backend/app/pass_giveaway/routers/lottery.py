@@ -218,7 +218,6 @@ def enter_dj_lottery(
         db,
         show_id=show_id,
         staff_id=staff.id,
-        dj_name=dj_name,
         assignment_date=entry_data.assignment_date,
         specialty_show_id=specialty_show.id if specialty_show else None,
         persona_id=reservation.persona_id,

@@ -169,7 +169,6 @@ def _guest_list_show(db: Session, promoter: Promoter | None = None, **venue_kwar
             recipient_name="Caller",
             recipient_phone="5551234567",
             recipient_email="caller@example.com",
-            given_away_by_dj="DJ Test",
         )
     )
     solo = _rep(db, "solo@example.com")

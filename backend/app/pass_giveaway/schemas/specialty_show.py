@@ -83,7 +83,7 @@ class SpecialtyShowDJInfo(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    persona_id: int | None = None
+    persona_id: int
     name: str
 
 
