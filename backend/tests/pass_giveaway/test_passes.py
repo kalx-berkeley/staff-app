@@ -16,7 +16,7 @@ from app.models.specialty_show import SpecialtyShow
 from app.models.specialty_show_dj import SpecialtyShowDJ
 from app.models.staff_genre_preference import StaffGenrePreference
 from app.pass_giveaway.services.pass_service import PassService
-from tests.personas import dj_fields
+from tests.personas import add_persona, dj_fields
 
 # Who the DJ pages credit, unless a test says otherwise
 DJ_TEST_PERSONA_ID = 501
@@ -408,7 +408,6 @@ def test_history_is_the_on_air_identitys_giveaways_and_preassignments(
     given, preassigned = _two_pairs(db, show)
     _give_away_from_studio(client, given)
     preassigned.preassigned_persona_id = DJ_TEST_PERSONA_ID
-    preassigned.preassigned_dj = "DJ Test"
     preassigned.preassigned_date = show.show_date
     db.commit()
 
@@ -473,7 +472,6 @@ def test_get_dj_history_omits_preassigned_passes_on_unpublished_shows(
         )
         .first()
     )
-    pass_item.preassigned_dj = "DJ Test"
     pass_item.preassigned_persona_id = DJ_TEST_PERSONA_ID
     pass_item.preassigned_date = show.show_date
     db.commit()
@@ -753,7 +751,7 @@ def test_expire_stale_preassignment_clears_elapsed_date(db, published_show_with_
     _show, passes = published_show_with_passes
     today = date.today()
     yesterday = today - timedelta(days=1)
-    passes[0].preassigned_dj = "DJ Stale"
+    passes[0].preassigned_persona_id = add_persona(db, "DJ Stale")
     passes[0].preassigned_date = yesterday
     db.commit()
 
@@ -762,7 +760,7 @@ def test_expire_stale_preassignment_clears_elapsed_date(db, published_show_with_
     assert len(result) == 1
     assert result[0].id == passes[0].id
     db.refresh(passes[0])
-    assert passes[0].preassigned_dj is None
+    assert passes[0].preassigned_to is None
     assert passes[0].preassigned_date is None
     assert passes[0].status == "available"
 
@@ -772,7 +770,7 @@ def test_expire_stale_preassignment_ignores_future_date(db, published_show_with_
     _show, passes = published_show_with_passes
     today = date.today()
     tomorrow = today + timedelta(days=1)
-    passes[0].preassigned_dj = "DJ Future"
+    passes[0].preassigned_persona_id = add_persona(db, "DJ Future")
     passes[0].preassigned_date = tomorrow
     db.commit()
 
@@ -780,14 +778,14 @@ def test_expire_stale_preassignment_ignores_future_date(db, published_show_with_
 
     assert len(result) == 0
     db.refresh(passes[0])
-    assert passes[0].preassigned_dj == "DJ Future"
+    assert passes[0].preassigned_to == "DJ Future"
 
 
 def test_expire_stale_preassignment_ignores_today(db, published_show_with_passes):
     """Passes assigned for today are not expired (today has not elapsed)."""
     _show, passes = published_show_with_passes
     today = date.today()
-    passes[0].preassigned_dj = "DJ Today"
+    passes[0].preassigned_persona_id = add_persona(db, "DJ Today")
     passes[0].preassigned_date = today
     db.commit()
 
@@ -795,7 +793,7 @@ def test_expire_stale_preassignment_ignores_today(db, published_show_with_passes
 
     assert len(result) == 0
     db.refresh(passes[0])
-    assert passes[0].preassigned_dj == "DJ Today"
+    assert passes[0].preassigned_to == "DJ Today"
 
 
 def test_expire_stale_preassignment_ignores_given_away(db, published_show_with_passes):
@@ -803,7 +801,7 @@ def test_expire_stale_preassignment_ignores_given_away(db, published_show_with_p
     _show, passes = published_show_with_passes
     today = date.today()
     yesterday = today - timedelta(days=1)
-    passes[0].preassigned_dj = "DJ Done"
+    passes[0].preassigned_persona_id = add_persona(db, "DJ Done")
     passes[0].preassigned_date = yesterday
     passes[0].status = "given_away"
     db.commit()
@@ -812,13 +810,13 @@ def test_expire_stale_preassignment_ignores_given_away(db, published_show_with_p
 
     assert len(result) == 0
     db.refresh(passes[0])
-    assert passes[0].preassigned_dj == "DJ Done"
+    assert passes[0].preassigned_to == "DJ Done"
 
 
 def test_expire_stale_preassignment_ignores_unassigned(db, published_show_with_passes):
-    """Passes with no preassigned_dj are not touched."""
+    """Passes that aren't pre-assigned are not touched."""
     _show, passes = published_show_with_passes
-    # passes have no preassigned_dj by default
+    # passes aren't pre-assigned by default
     result = PassService.expire_stale_preassignments(db, _today=date.today())
     assert len(result) == 0
 
@@ -846,7 +844,7 @@ def test_expire_stale_preassignment_ignores_closed_show(db, venue, promotions_st
         show_id=show.id,
         pass_type="pair",
         status="available",
-        preassigned_dj="DJ Old",
+        preassigned_persona_id=add_persona(db, "DJ Old"),
         preassigned_date=yesterday,
     )
     db.add(p)
@@ -856,7 +854,7 @@ def test_expire_stale_preassignment_ignores_closed_show(db, venue, promotions_st
 
     assert len(result) == 0
     db.refresh(p)
-    assert p.preassigned_dj == "DJ Old"
+    assert p.preassigned_to == "DJ Old"
 
 
 def test_expire_stale_preassignment_ignores_draft_show(db, venue, promotions_staff):
@@ -882,7 +880,7 @@ def test_expire_stale_preassignment_ignores_draft_show(db, venue, promotions_sta
         show_id=show.id,
         pass_type="pair",
         status="available",
-        preassigned_dj="DJ Draft",
+        preassigned_persona_id=add_persona(db, "DJ Draft"),
         preassigned_date=yesterday,
     )
     db.add(p)
@@ -892,7 +890,7 @@ def test_expire_stale_preassignment_ignores_draft_show(db, venue, promotions_sta
 
     assert len(result) == 0
     db.refresh(p)
-    assert p.preassigned_dj == "DJ Draft"
+    assert p.preassigned_to == "DJ Draft"
 
 
 def test_expire_stale_preassignment_clears_multiple(db, published_show_with_passes):
@@ -901,7 +899,7 @@ def test_expire_stale_preassignment_clears_multiple(db, published_show_with_pass
     today = date.today()
     yesterday = today - timedelta(days=1)
     for p in passes:
-        p.preassigned_dj = "DJ Multi"
+        p.preassigned_persona_id = add_persona(db, "DJ Multi")
         p.preassigned_date = yesterday
     db.commit()
 
@@ -910,7 +908,7 @@ def test_expire_stale_preassignment_clears_multiple(db, published_show_with_pass
     assert len(result) == 2
     for p in passes:
         db.refresh(p)
-        assert p.preassigned_dj is None
+        assert p.preassigned_to is None
         assert p.preassigned_date is None
 
 
@@ -1221,11 +1219,7 @@ def test_suggest_by_genre_matches_sublist_dj_and_specialty_show(
     specialty = SpecialtyShow(name="Sunday Jazz Brunch")
     db.add(specialty)
     db.flush()
-    db.add(
-        SpecialtyShowDJ(
-            specialty_show_id=specialty.id, dj_name="Wolfman", persona_id=wolfman_id
-        )
-    )
+    db.add(SpecialtyShowDJ(specialty_show_id=specialty.id, persona_id=wolfman_id))
     db.commit()
 
     response = client.get(

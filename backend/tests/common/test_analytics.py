@@ -78,8 +78,6 @@ def test_window_bounds_are_pacific_midnight():
 
 
 def test_normalization():
-    assert tracking_service.normalize_dj_name("  DJ   Marmot ") == "dj marmot"
-    assert tracking_service.normalize_dj_name("   ") is None
     assert tracking_service.normalize_person_name("Jane  Doe.") == "jane doe"
     assert tracking_service.normalize_phone("+1 (510) 555-1234") == "5105551234"
     assert tracking_service.normalize_phone("510-555-1234") == "5105551234"
@@ -277,7 +275,6 @@ def test_rollup_keeps_who_was_on_air(db: Session):
                 occurred_at=old,
                 event_type="giveaway",
                 area=COMMON_AREA,
-                dj_name="same name",
                 persona_id=persona_id,
                 specialty_show_id=show_id,
             )

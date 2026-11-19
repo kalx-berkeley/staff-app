@@ -168,7 +168,7 @@ def member_persona(db: Session, show: SpecialtyShow, staff: Staff) -> Optional[d
 
     :returns: The first such persona, or None.
     """
-    member_ids = {d.persona_id for d in show.djs if d.persona_id is not None}
+    member_ids = show.dj_persona_ids
     for persona in staff_personas(staff):
         if persona["id"] in member_ids:
             names = persona_names(db, [persona["id"]])

@@ -244,8 +244,10 @@ class PassResponse(BaseModel):
     guest_waiting: bool = False
     guest_position: int | None = None
 
-    # For pre-assigned pairs
-    preassigned_dj: str | None = None
+    # For pre-assigned pairs: the persona's or show's current name
+    preassigned_dj: str | None = Field(
+        None, validation_alias=AliasChoices("preassigned_to", "preassigned_dj")
+    )
     preassigned_persona_id: int | None = None
     preassigned_date: date | None = None
     preassigned_by_staff_id: int | None = None

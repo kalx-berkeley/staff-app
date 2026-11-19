@@ -16,6 +16,7 @@ from app.models.staff_department import StaffDepartment
 from app.models.staff_status import StaffStatus
 from app.models.venue import Venue
 from app.pass_giveaway.services.lottery_service import LotteryService
+from tests.personas import add_persona
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -161,7 +162,7 @@ def _make_dj_entry(
         show_id=show.id,
         entry_type="dj",
         staff_id=staff.id,
-        dj_name=dj_name,
+        persona_id=add_persona(db, dj_name),
         assignment_date=assignment_date or date(2025, 12, 31),
         status="pending",
         entered_at=now,
@@ -721,7 +722,7 @@ class TestDJLotteryScenarios:
             .filter(
                 Pass.show_id == show.id,
                 Pass.pass_type == "pair",
-                Pass.preassigned_dj.isnot(None),
+                Pass.is_preassigned,
             )
             .count()
         )
@@ -730,7 +731,7 @@ class TestDJLotteryScenarios:
             .filter(
                 Pass.show_id == show.id,
                 Pass.pass_type == "pair",
-                Pass.preassigned_dj.is_(None),
+                ~Pass.is_preassigned,
             )
             .count()
         )
@@ -742,7 +743,7 @@ class TestDJLotteryScenarios:
             .filter(
                 Pass.show_id == show.id,
                 Pass.pass_type == "pair",
-                Pass.preassigned_dj == "DJ Joe",
+                Pass.preassigned_persona_id == e_joe.persona_id,
             )
             .first()
         )
@@ -769,7 +770,7 @@ class TestDJLotteryScenarios:
             .filter(
                 Pass.show_id == show.id,
                 Pass.pass_type == "pair",
-                Pass.preassigned_dj == "DJ Joe",
+                Pass.preassigned_persona_id == e_joe.persona_id,
             )
             .first()
         )
@@ -778,7 +779,7 @@ class TestDJLotteryScenarios:
             .filter(
                 Pass.show_id == show.id,
                 Pass.pass_type == "pair",
-                Pass.preassigned_dj == "DJ Alice",
+                Pass.preassigned_persona_id == e_alice.persona_id,
             )
             .first()
         )
@@ -810,7 +811,7 @@ class TestDJLotteryScenarios:
             .filter(
                 Pass.show_id == show.id,
                 Pass.pass_type == "pair",
-                Pass.preassigned_dj.isnot(None),
+                Pass.is_preassigned,
             )
             .count()
         )
@@ -1299,7 +1300,7 @@ class TestDJShowPage:
     def test_winning_dj_pair_appears_preassigned(
         self, client, db, venue, promotions_staff, joe
     ):
-        """After DJ lottery, the winning DJ's pass has preassigned_dj set."""
+        """After DJ lottery, the winning DJ's pass is pre-assigned to them."""
         show = _make_lottery_show(db, venue, num_staff_passes=0, num_pair_passes=2)
         _make_dj_entry(db, show, joe, dj_name="DJ Joe", assignment_date=date(2025, 12, 31))
 

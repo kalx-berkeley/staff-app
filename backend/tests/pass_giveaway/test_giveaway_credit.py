@@ -66,7 +66,6 @@ def giveaways(db: Session) -> dict:
             status="given_away",
             given_away_at=when,
             given_away_persona_id=persona_id,
-            given_away_by_dj="DJ One" if persona_id else None,
         )
         db.add(p)
         db.flush()
@@ -77,7 +76,6 @@ def giveaways(db: Session) -> dict:
                 show_id=show.id,
                 recipient_name=f"Winner {p.id}",
                 recipient_phone="5105550100",
-                given_away_by_dj="DJ One" if persona_id else "",
                 given_away_persona_id=persona_id,
             )
         )

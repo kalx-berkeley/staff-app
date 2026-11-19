@@ -495,7 +495,7 @@ def _wins(db: Session, venue_id: Optional[int] = None) -> list[_Win]:
             venue=w.venue.name if w.venue else "",
             show=w.show.event_name if w.show else "",
             show_date=w.show.show_date if w.show else None,
-            dj=w.given_away_by_dj,
+            dj=w.given_away_by,
             won_at=as_utc(w.created_at),
         )
         for w in q.all()
@@ -878,7 +878,7 @@ def _preassigned(shows: Iterable[Show]) -> tuple[int, int]:
         for p in s.passes:
             if p.pass_type == "pair":
                 pairs += 1
-                if p.preassigned_dj or p.preassigned_specialty_show_id:
+                if p.is_preassigned:
                     pre += 1
     return pre, pairs
 

@@ -407,7 +407,7 @@ def _build_show_response(
             "guest_of_pass_id": pass_item.guest_of_pass_id,
             "guest_waiting": pass_item.guest_waiting,
             "guest_position": pass_item.guest_position,
-            "preassigned_dj": pass_item.preassigned_dj,
+            "preassigned_dj": pass_item.preassigned_to,
             "preassigned_persona_id": pass_item.preassigned_persona_id,
             "preassigned_date": pass_item.preassigned_date,
             "preassigned_specialty_show_id": pass_item.preassigned_specialty_show_id,
@@ -581,7 +581,7 @@ def _precompute_pass_counts(db: Session, show_ids: list[int]) -> dict[int, list[
             Pass.show_id.in_(show_ids),
             Pass.pass_type == "pair",
             Pass.status == "available",
-            Pass.preassigned_dj.is_(None),
+            ~Pass.is_preassigned,
         )
         .group_by(Pass.show_id)
         .all()

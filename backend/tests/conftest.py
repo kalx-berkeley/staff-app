@@ -2,6 +2,7 @@
 
 import os
 import re
+from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -143,12 +144,13 @@ def client(db: Session) -> TestClient:
 
 
 @pytest.fixture
-def on_air(client: TestClient):
+def on_air(client: TestClient, db: Session):
     """
     Set who the DJ pages credit, instead of working it out from the cached
     Spinitron schedule: ``on_air(persona_id=5, name="DJ Test")``, or
     ``on_air(None)`` for no one. Without a call, the schedule decides (and an
-    empty one is no one).
+    empty one is no one). A persona's name is stored in the nightly copy of
+    Spinitron's directory, as the sync would have.
 
     :returns: A setter taking an ``OnAirIdentity`` or its fields, which
         returns the identity it set.
@@ -161,6 +163,21 @@ def on_air(client: TestClient):
             if fields["kind"] == "persona":
                 fields.setdefault("persona_name", fields.get("name"))
             identity = OnAirIdentity(**fields)
+        if identity is not None and identity.persona_id and identity.persona_name:
+            from app.models.spinitron_persona import SpinitronPersona
+
+            row = db.get(SpinitronPersona, identity.persona_id)
+            if row is None:
+                db.add(
+                    SpinitronPersona(
+                        id=identity.persona_id,
+                        name=identity.persona_name,
+                        updated_at=datetime.now(timezone.utc),
+                    )
+                )
+            else:
+                row.name = identity.persona_name
+            db.commit()
         app.dependency_overrides[dj_identity] = lambda: identity
         return identity
 

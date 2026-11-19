@@ -48,9 +48,6 @@ class AnalyticsEvent(Base):
     ref = Column(String(64), nullable=True, index=True)
     entity_type = Column(String, nullable=True)
     entity_id = Column(Integer, nullable=True)
-    # Normalized DJ name (`tracking_service.normalize_dj_name`), until phase
-    # 4 of the Spinitron identity plan
-    dj_name = Column(String, nullable=True)
     # Who was on air: the persona, the show, or both
     persona_id = Column(Integer, nullable=True, index=True)
     specialty_show_id = Column(Integer, nullable=True, index=True)
@@ -78,7 +75,6 @@ class AnalyticsDailyCount(Base):
     network = Column(String, nullable=True)
     entity_type = Column(String, nullable=True)
     entity_id = Column(Integer, nullable=True)
-    dj_name = Column(String, nullable=True)
     persona_id = Column(Integer, nullable=True, index=True)
     specialty_show_id = Column(Integer, nullable=True, index=True)
     dimension = Column(String, nullable=True)
@@ -93,7 +89,6 @@ class AnalyticsDailyCount(Base):
             "network",
             "entity_type",
             "entity_id",
-            "dj_name",
             "persona_id",
             "specialty_show_id",
             "dimension",

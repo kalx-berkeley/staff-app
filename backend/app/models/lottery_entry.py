@@ -2,7 +2,8 @@
 
 from datetime import datetime, timezone
 from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import object_session, relationship
+from app.models.credit import persona_name
 from app.models.guest_fallback import GuestFallback
 from app.database import Base
 
@@ -17,9 +18,8 @@ class LotteryEntry(Base):
     # 'staff' for staff pass entries, 'dj' for on-air pair entries
     entry_type = Column(String, nullable=False)
     staff_id = Column(Integer, ForeignKey("staff.id"), nullable=True, index=True)
-    # DJ entries: the persona entering (null for a talk show entry) and its
-    # name, or the talk show's name
-    dj_name = Column(String, nullable=True)
+    # DJ entries: the persona entering (null for a talk show entry), and the
+    # show it's entering for, if any
     persona_id = Column(Integer, nullable=True)
     specialty_show_id = Column(Integer, ForeignKey("specialty_shows.id"), nullable=True)
     assignment_date = Column(Date, nullable=True)
@@ -69,6 +69,15 @@ class LotteryEntry(Base):
     @property
     def show_venue_name(self) -> str | None:
         return self.show.venue.name if self.show and self.show.venue else None
+
+    @property
+    def dj_name(self) -> str | None:
+        """A DJ entry's persona's current name, or a talk show entry's show name."""
+        if self.persona_id is not None:
+            return persona_name(object_session(self), self.persona_id) or (
+                f"Persona #{self.persona_id}"
+            )
+        return self.specialty_show_name
 
     @property
     def specialty_show_name(self) -> str | None:

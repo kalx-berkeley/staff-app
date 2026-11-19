@@ -2,8 +2,9 @@
 
 from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import object_session, relationship
 from app.database import Base
+from app.models.credit import credit_label
 
 
 class OnAirWinner(Base):
@@ -18,8 +19,6 @@ class OnAirWinner(Base):
     recipient_name = Column(String, nullable=False)
     recipient_phone = Column(String, nullable=False)
     recipient_email = Column(String, nullable=True)
-    # The old typed DJ name, until phase 4 of the Spinitron identity plan
-    given_away_by_dj = Column(String, nullable=False)
     # Who it's credited to: the persona, the show, or both (see Pass)
     given_away_persona_id = Column(Integer, nullable=True)
     given_away_specialty_show_id = Column(
@@ -33,3 +32,12 @@ class OnAirWinner(Base):
     pass_ref = relationship("Pass", back_populates="on_air_winner")
     venue = relationship("Venue", back_populates="on_air_winners")
     show = relationship("Show", back_populates="on_air_winners")
+
+    @property
+    def given_away_by(self) -> str:
+        """Who the giveaway is credited to, by current name (see `credit`)."""
+        return credit_label(
+            object_session(self),
+            self.given_away_persona_id,
+            self.given_away_specialty_show_id,
+        )

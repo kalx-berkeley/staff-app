@@ -14,7 +14,7 @@ from app.models.staff import Staff
 from app.models.staff_department import StaffDepartment
 from app.models.staff_status import StaffStatus
 from app.models.venue import Venue
-from tests.personas import dj_fields, persona_id
+from tests.personas import add_persona, dj_fields, persona_id
 
 DJ_STUDIO = {"X-Forwarded-For": "192.168.1.100"}  # within default dj_studio_network
 
@@ -187,7 +187,7 @@ def test_staging_sublist_dj_can_clothespin(client, show, dj, monkeypatch):
 def test_skips_pairs_reserved_for_other_djs(client, db, show, dj, on_air):
     """Only an unclaimed pair is reserved; once none are left, it's refused."""
     pairs = db.query(Pass).filter(Pass.show_id == show.id, Pass.pass_type == "pair").all()
-    pairs[0].preassigned_dj = "Someone Else"
+    pairs[0].preassigned_persona_id = add_persona(db, "Someone Else")
     pairs[0].preassigned_date = today_pt()
     db.commit()
 
@@ -201,7 +201,7 @@ def test_skips_pairs_reserved_for_other_djs(client, db, show, dj, on_air):
     assert second.json()["detail"] == "No unclaimed pass pairs are left for this show"
 
     db.refresh(pairs[0])
-    assert pairs[0].preassigned_dj == "Someone Else"
+    assert pairs[0].preassigned_to == "Someone Else"
 
 
 def test_refuses_a_second_pair_for_today(client, show, dj):
@@ -215,7 +215,6 @@ def test_refuses_a_second_pair_for_today(client, show, dj):
 def test_a_reservation_for_another_day_does_not_block(client, db, show, dj):
     """A pair the DJ reserved for another date doesn't stop a reservation for today."""
     pair = db.query(Pass).filter(Pass.show_id == show.id, Pass.pass_type == "pair").first()
-    pair.preassigned_dj = "DJ Wolfman"
     pair.preassigned_persona_id = persona_id(dj, "DJ Wolfman")
     pair.preassigned_date = today_pt() + timedelta(days=3)
     db.commit()
@@ -275,7 +274,7 @@ def test_prohibition_window_allows_dates_outside_it(client, db, show, dj):
 def test_show_list_reports_no_unclaimed_pairs(client, db, show, dj):
     """The show list says Clothespin isn't available once every pair is claimed."""
     for pair in db.query(Pass).filter(Pass.show_id == show.id, Pass.pass_type == "pair"):
-        pair.preassigned_dj = "Someone Else"
+        pair.preassigned_persona_id = add_persona(db, "Someone Else")
         pair.preassigned_date = today_pt()
     db.commit()
 

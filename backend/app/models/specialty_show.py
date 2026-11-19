@@ -24,7 +24,7 @@ class SpecialtyShow(Base):
     """
     A named show that can be pre-assigned pass pairs.
 
-    A Specialty Music Show (category "music") has DJ members, by DJ name. A
+    A Specialty Music Show (category "music") has DJ members, by persona. A
     Talk & Information show (category "talk") has staff members instead
     (`TalkShowStaff`). Everything else is shared.
     """
@@ -105,7 +105,7 @@ class SpecialtyShow(Base):
 
     @property
     def dj_persona_ids(self) -> set[int]:
-        return {d.persona_id for d in self.djs if d.persona_id is not None}
+        return {d.persona_id for d in self.djs}
 
     @property
     def is_talk(self) -> bool:

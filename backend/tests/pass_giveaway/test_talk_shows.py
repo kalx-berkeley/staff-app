@@ -197,14 +197,14 @@ def test_staff_members_reserve_passes_without_being_djs(
     )
     assert response.status_code == 200, response.text
     db.refresh(pair)
-    assert pair.preassigned_dj == "Morning Report"
+    assert pair.preassigned_to == "Morning Report"
     assert pair.preassigned_specialty_show_id == talk_show.id
 
     # ...and release them again
     response = client.delete(f"/api/passes/{pair.id}/preassign", headers=NEWS)
     assert response.status_code == 200, response.text
     db.refresh(pair)
-    assert pair.preassigned_dj is None
+    assert pair.preassigned_to is None
 
 
 def test_other_staff_cant_reserve_for_a_talk_show(
@@ -245,11 +245,7 @@ def test_music_show_membership_still_needs_sublist_dj(client: TestClient, db: Se
     music = SpecialtyShow(name="Take Five")
     db.add(music)
     db.flush()
-    db.add(
-        SpecialtyShowDJ(
-            specialty_show_id=music.id, dj_name="DJ Lite", persona_id=dj.spinitron_ids[0]
-        )
-    )
+    db.add(SpecialtyShowDJ(specialty_show_id=music.id, persona_id=dj.spinitron_ids[0]))
     db.commit()
     show, pair = _show_with_pair(db)
     body = {

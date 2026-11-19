@@ -86,9 +86,7 @@ def _specialty(db: Session, name: str, category="music", dj_personas=()) -> Spec
         )
     )
     for persona_id, name in dj_personas:
-        db.add(
-            SpecialtyShowDJ(specialty_show_id=show.id, dj_name=name, persona_id=persona_id)
-        )
+        db.add(SpecialtyShowDJ(specialty_show_id=show.id, persona_id=persona_id))
     db.commit()
     db.refresh(show)
     return show
@@ -225,7 +223,7 @@ def test_promotions_preassign_refuses_a_bad_identity(
 
     assert response.status_code in (400, 422)
     db.refresh(pair)
-    assert pair.preassigned_dj is None
+    assert pair.preassigned_to is None
 
 
 def test_removing_a_preassignment_clears_the_persona(
@@ -405,7 +403,7 @@ def test_dj_lottery_entry_keeps_the_persona_and_the_draw_copies_it(
         LotteryService.run_lottery(db, show.id)
 
     pair = _pair(db, show)
-    assert (pair.preassigned_dj, pair.preassigned_persona_id) == ("Wolfie", WOLFIE)
+    assert (pair.preassigned_to, pair.preassigned_persona_id) == ("Wolfie", WOLFIE)
 
 
 def test_dj_lottery_entry_for_a_music_show_keeps_the_member_persona(
@@ -473,7 +471,7 @@ def test_dj_editor_adds_and_removes_personas(
     assert response.status_code == 200, response.text
     assert response.json()["djs"] == [{"persona_id": WOLFIE, "name": "Wolfie"}]
     row = db.query(SpecialtyShowDJ).one()
-    assert (row.persona_id, row.dj_name) == (WOLFIE, "Wolfie")
+    assert (row.persona_id, row.name) == (WOLFIE, "Wolfie")
 
 
 def test_dj_editor_refuses_a_persona_no_current_staff_member_holds(
@@ -502,24 +500,6 @@ def test_dj_editor_keeps_a_dj_who_is_no_longer_staff(
 
     assert response.status_code == 200, response.text
     assert [d["persona_id"] for d in response.json()["djs"]] == [OLD_NAME, WOLFMAN]
-
-
-def test_dj_editor_keeps_djs_with_no_persona(client: TestClient, db: Session, promo, wolf):
-    music = _specialty(db, "Take Five")
-    db.add(SpecialtyShowDJ(specialty_show_id=music.id, dj_name="Unmatched Name"))
-    db.commit()
-
-    response = client.put(
-        f"/api/specialty-shows/{music.id}",
-        json={"dj_persona_ids": [WOLFMAN]},
-        headers=PROMO,
-    )
-
-    assert response.status_code == 200, response.text
-    assert response.json()["djs"] == [
-        {"persona_id": None, "name": "Unmatched Name"},
-        {"persona_id": WOLFMAN, "name": "DJ Wolfman"},
-    ]
 
 
 def test_dj_options_offer_staff_personas_and_the_shows_own_djs(

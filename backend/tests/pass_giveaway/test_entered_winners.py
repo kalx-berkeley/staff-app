@@ -21,7 +21,7 @@ from app.models.staff_department import StaffDepartment
 from app.models.staff_pass_alternate import StaffPassAlternate
 from app.models.staff_status import StaffStatus
 from app.models.venue import Venue
-from tests.personas import dj_fields
+from tests.personas import add_persona, dj_fields
 
 SEND_EMAIL = "app.common.services.notification_service.send_email"
 SHOW_DATE = "2099-12-31"
@@ -96,7 +96,13 @@ def _existing_show(db: Session, venue: Venue, status: str = "published") -> Show
     )
     db.add(show)
     db.flush()
-    db.add(Pass(show_id=show.id, pass_type="pair", preassigned_dj="DJ Reserved"))
+    db.add(
+        Pass(
+            show_id=show.id,
+            pass_type="pair",
+            preassigned_persona_id=add_persona(db, "DJ Reserved"),
+        )
+    )
     db.add(Pass(show_id=show.id, pass_type="pair"))
     for _ in range(3):
         db.add(Pass(show_id=show.id, pass_type="staff"))
@@ -199,7 +205,6 @@ class TestNewShow:
                 show_id=old.id,
                 recipient_name="Caller One",
                 recipient_phone="5105551234",
-                given_away_by_dj="DJ",
                 created_at=datetime.now(timezone.utc),
             )
         )
@@ -314,7 +319,7 @@ class TestEditShow:
         assert two.status_code == 422
         assert one.status_code == 200, one.text
         reserved, free = _passes(db, show.id, "pair")
-        assert reserved.status == "available" and reserved.preassigned_dj == "DJ Reserved"
+        assert reserved.status == "available" and reserved.preassigned_to == "DJ Reserved"
         assert free.status == "given_away"
 
     def test_raising_the_pass_count_in_the_same_save_makes_room(

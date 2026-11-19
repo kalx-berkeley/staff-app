@@ -25,6 +25,7 @@ from app.models.staff_status import StaffStatus
 from app.models.venue import Venue
 from app.models.venue_owner import VenueOwner
 from app.pass_giveaway.services import tracking
+from tests.personas import add_persona
 
 DJ_GUEST = {"X-DJ-Network": "1", "X-Forwarded-For": "192.168.1.100"}
 OFFICE_GUEST = {"X-Station-Office-Network": "1", "X-Forwarded-For": "192.168.2.50"}
@@ -92,7 +93,6 @@ def _show(
                 show_id=show.id,
                 pass_type="pair",
                 status="given_away" if i < given else "available",
-                given_away_by_dj="DJ Marmot" if i < given else None,
                 given_away_at=NOW - timedelta(days=1) if i < given else None,
             )
         )
@@ -192,9 +192,7 @@ def test_staff_pass_reach_uses_todays_active_staff(client, db, promo, venue):
 
 
 def _win(db, show, name, phone, email=None, days_ago=1):
-    p = Pass(
-        show_id=show.id, pass_type="pair", status="given_away", given_away_by_dj="DJ X"
-    )
+    p = Pass(show_id=show.id, pass_type="pair", status="given_away")
     db.add(p)
     db.flush()
     db.add(
@@ -205,7 +203,6 @@ def _win(db, show, name, phone, email=None, days_ago=1):
             recipient_name=name,
             recipient_phone=phone,
             recipient_email=email,
-            given_away_by_dj="DJ X",
             created_at=NOW - timedelta(days=days_ago),
         )
     )
@@ -370,10 +367,10 @@ def test_visit_outcomes_best_wins(client, db, promo, venue, on_air):
     visits = (
         db.query(AnalyticsEvent).filter(AnalyticsEvent.event_type == "giveaway_visit").all()
     )
-    assert sorted((v.ref, v.dimension, v.dj_name, v.persona_id) for v in visits) == [
-        ("visit-aaaa-1111", "given_away", "dj marmot", 77),
-        ("visit-bbbb-2222", "neither", "dj marmot", 77),
-        ("visit-cccc-3333", "neither", None, None),
+    assert sorted((v.ref, v.dimension, v.persona_id) for v in visits) == [
+        ("visit-aaaa-1111", "given_away", 77),
+        ("visit-bbbb-2222", "neither", 77),
+        ("visit-cccc-3333", "neither", None),
     ]
 
     djs = {r["dj"]: r for r in _tab(client, "djs")["djs"]["rows"]}
@@ -406,14 +403,9 @@ def test_djs_tab_has_a_row_per_persona_and_show(client, db, promo, venue):
     ):
         p.status = "given_away"
         p.given_away_at = NOW - timedelta(days=1)
-        p.given_away_by_dj = "DJ Old Name"
         p.given_away_persona_id = persona_id
         p.given_away_specialty_show_id = show_id
-    db.add(
-        ShowAttempt(
-            show_id=show.id, dj_name="", specialty_show_id=talk.id, attempted_at=NOW
-        )
-    )
+    db.add(ShowAttempt(show_id=show.id, specialty_show_id=talk.id, attempted_at=NOW))
     db.commit()
 
     rows = {r["dj"]: r for r in _tab(client, "djs")["djs"]["rows"]}
@@ -539,7 +531,7 @@ def test_spin_suggestions_actions_and_giveaways(client, db, promo, venue):
 
 def test_venue_page_extras(client, db, promo, venue):
     show = _show(db, venue, -2, pairs=2, given=1, staff=2, claimed=0, lottery_enabled=True)
-    db.add(ShowAttempt(show_id=show.id, dj_name="DJ Marmot", attempted_at=NOW))
+    db.add(ShowAttempt(show_id=show.id, attempted_at=NOW))
     pair = (
         db.query(Pass)
         .filter(
@@ -547,7 +539,7 @@ def test_venue_page_extras(client, db, promo, venue):
         )
         .first()
     )
-    pair.preassigned_dj = "DJ Marmot"
+    pair.preassigned_persona_id = add_persona(db, "DJ Marmot")
     db.commit()
     for event_type in ("alternate_joined", "alternate_joined", "alternate_promoted"):
         log_event(db, event_type, details={"show_id": show.id}, area=PASS_GIVEAWAY_AREA)

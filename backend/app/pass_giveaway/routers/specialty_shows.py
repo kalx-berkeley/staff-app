@@ -86,29 +86,23 @@ def _sync_djs(db: Session, show: SpecialtyShow, persona_ids: list[int]) -> None:
     Replace a music show's DJs with these personas.
 
     A new DJ must be a persona linked to a current staff member. DJs already
-    on the show can stay whoever holds them now. DJs with no persona (old
-    names nothing matched, until phase 3 of the Spinitron identity plan fills
-    them in) are kept, since a persona list can't name them.
+    on the show can stay whoever holds them now.
 
     :raises HTTPException: 400 for a persona that can't be added.
     """
-    existing = {d.persona_id: d for d in show.djs if d.persona_id is not None}
+    existing = {d.persona_id for d in show.djs}
     wanted: list[int] = []
     for persona_id in persona_ids:
         if persona_id not in wanted:
             wanted.append(persona_id)
-    added = {
-        persona_id: staff_persona_name(db, persona_id)
-        for persona_id in wanted
-        if persona_id not in existing
-    }
+    added = [persona_id for persona_id in wanted if persona_id not in existing]
+    for persona_id in added:
+        staff_persona_name(db, persona_id)  # raises 400 for a persona no staff holds
     for dj in list(show.djs):
-        if dj.persona_id is not None and dj.persona_id not in wanted:
+        if dj.persona_id not in wanted:
             db.delete(dj)
-    for persona_id, name in added.items():
-        db.add(
-            SpecialtyShowDJ(specialty_show_id=show.id, dj_name=name, persona_id=persona_id)
-        )
+    for persona_id in added:
+        db.add(SpecialtyShowDJ(specialty_show_id=show.id, persona_id=persona_id))
 
 
 def _sync_staff_members(db: Session, show: SpecialtyShow, emails: list[str]) -> None:

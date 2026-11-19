@@ -201,10 +201,8 @@ const SpecialtyShowDetail = ({ category = 'music' }: SpecialtyShowDetailProps) =
     );
   };
 
-  // The show's DJs by persona; an old entry without one can only be removed
-  const djPersonaIds = show
-    ? show.djs.flatMap((d) => (d.persona_id !== null ? [d.persona_id] : []))
-    : [];
+  // The show's DJs by persona
+  const djPersonaIds = show ? show.djs.map((d) => d.persona_id) : [];
 
   const handleAddDJ = async (persona: Identity | null = djPick) => {
     if (!show || persona?.persona_id == null) return;
@@ -478,14 +476,9 @@ const SpecialtyShowDetail = ({ category = 'music' }: SpecialtyShowDetailProps) =
             </p>
             <ul className="item-list">
               {show.djs.map((dj, index) => (
-                <li key={dj.persona_id ?? `name:${dj.name}`} className="item-list-row">
-                  <span>
-                    {dj.name}
-                    {dj.persona_id === null && (
-                      <span className="field-hint"> (not linked to a Spinitron persona yet)</span>
-                    )}
-                  </span>
-                  {canEdit && dj.persona_id !== null && (
+                <li key={dj.persona_id} className="item-list-row">
+                  <span>{dj.name}</span>
+                  {canEdit && (
                     <button
                       className="btn-small btn-danger"
                       onClick={() => handleRemoveDJ(index)}

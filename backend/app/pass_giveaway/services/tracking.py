@@ -24,7 +24,6 @@ from app.models.staff import Staff
 from app.pass_giveaway.services.on_air_identity import (
     OnAirIdentity,
     credit,
-    identity_label,
 )
 
 GIVEAWAY_VISIT = "giveaway_visit"
@@ -93,10 +92,9 @@ def _visit(db: Session, visit_id: str) -> Optional[AnalyticsEvent]:
 
 
 def _who(identity: Optional[OnAirIdentity]) -> dict:
-    """An event's DJ name, persona and show columns for *identity*."""
+    """An event's persona and show columns for *identity*."""
     persona_id, specialty_show_id = credit(identity)
     return {
-        "dj_name": identity_label(identity),
         "persona_id": persona_id,
         "specialty_show_id": specialty_show_id,
     }
@@ -104,7 +102,6 @@ def _who(identity: Optional[OnAirIdentity]) -> dict:
 
 def _set_who(event: AnalyticsEvent, identity: Optional[OnAirIdentity]) -> None:
     who = _who(identity)
-    event.dj_name = tracking_service.normalize_dj_name(who["dj_name"])
     event.persona_id = who["persona_id"]
     event.specialty_show_id = who["specialty_show_id"]
 

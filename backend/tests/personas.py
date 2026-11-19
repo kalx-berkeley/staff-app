@@ -26,3 +26,20 @@ def dj_fields(*names: str, ids: list[int] | None = None) -> dict:
 def persona_id(staff, name: str) -> int:
     """The ID of *staff*'s persona named *name*."""
     return next(p["id"] for p in staff.dj_personas if p["name"] == name)
+
+
+def add_persona(db, name: str, persona_id: int | None = None) -> int:
+    """
+    Add a persona to the nightly copy of Spinitron's directory, so records
+    credited to it show *name*.
+
+    :returns: Its ID (a fresh unique one when *persona_id* is omitted).
+    """
+    from datetime import datetime, timezone
+
+    from app.models.spinitron_persona import SpinitronPersona
+
+    pid = persona_id if persona_id is not None else next(_ids)
+    db.add(SpinitronPersona(id=pid, name=name, updated_at=datetime.now(timezone.utc)))
+    db.flush()
+    return pid

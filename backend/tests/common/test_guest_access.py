@@ -140,7 +140,6 @@ def seeded(db: Session, on_air):
             show_id=show.id,
             pass_type="pair",
             status="available",
-            preassigned_dj="DJ Guest",
             preassigned_persona_id=1,
             preassigned_date=date(2099, 12, 30),
         )

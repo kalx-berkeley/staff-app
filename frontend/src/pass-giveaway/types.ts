@@ -35,9 +35,9 @@ export interface SpinitronShowInfo {
   url: string;
 }
 
-/** One DJ of a Specialty Music Show. persona_id is null only for old entries. */
+/** One DJ of a Specialty Music Show: a persona and its current name. */
 export interface SpecialtyShowDJInfo {
-  persona_id: number | null;
+  persona_id: number;
   name: string;
 }
 

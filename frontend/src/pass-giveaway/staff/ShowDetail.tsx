@@ -524,18 +524,9 @@ const ShowDetail = () => {
       : alreadyHasStaffPass
         ? 'You already have a staff pass for this show.'
         : undefined;
-  const myName = user?.profile?.name ?? null;
   const mySpecialtyShowIds = new Set(
     myIdentities.flatMap((i) => (i.specialty_show_id != null ? [i.specialty_show_id] : [])),
   );
-  const myPreassignedPasses = myName
-    ? show.passes.filter(
-        (p) =>
-          p.pass_type === 'pair' &&
-          p.status === 'available' &&
-          p.preassigned_dj?.toLowerCase() === myName.toLowerCase()
-      )
-    : [];
   const staffProfile = user?.profile as StaffProfile | undefined;
   // Staff on leave for the whole show can't claim a pass, enter the lottery, or
   // join the alternate list (enforced server-side too).
@@ -563,7 +554,6 @@ const ShowDetail = () => {
     return `The on-air schedule doesn't show ${who} on ${formatDate(date)}. Only ${action} if you're sure that's correct.`;
   };
   const myPersonaIds = staffProfile?.spinitron_ids ?? [];
-  const myDjName = staffProfile?.dj_name ?? null;
   // Sublist DJs, and staff members of a Talk & Info Show, can reserve on-air pass pairs
   const canReserveOnAir = myIdentities.length > 0;
   // The "Reserve for" choices; the first one's value is always '' (the default)
@@ -741,35 +731,6 @@ const ShowDetail = () => {
       <div className="show-detail-content">
         <ShowInfoCards show={show} />
 
-        {myPreassignedPasses.length > 0 && (
-          <div className="pass-claim-section">
-            <h3>Your Pre-assigned Pass Pair{myPreassignedPasses.length > 1 ? 's' : ''}</h3>
-            <p className="pass-available-note">
-              A promotions staff member has reserved a pass pair for you for this show.
-            </p>
-            <div className="passes-list">
-              {myPreassignedPasses.map((pass) => (
-                <div key={pass.id} className="pass-card">
-                  <div className="pass-details">
-                    <p><strong>Pre-assigned to:</strong> {pass.preassigned_dj}</p>
-                    {pass.preassigned_date && (
-                      <p><strong>Date:</strong> {pass.preassigned_date}</p>
-                    )}
-                    <button
-                      onClick={() => handleUnassignSelf(pass.id)}
-                      className="btn-small btn-danger"
-                      disabled={unassignLoading === pass.id}
-                      title="Remove this pre-assignment so the pass becomes available to any DJ."
-                    >
-                      {unassignLoading === pass.id ? 'Removing…' : 'Unassign Me'}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {canReserveOnAir && isVenueOwner && show.status !== 'closed' && (
           <div className="pass-claim-section">
             <h3>Reserve Pass Pair for On-Air Giveaway</h3>
@@ -921,16 +882,9 @@ const ShowDetail = () => {
             ) : (
               <div className="passes-list">
                 {pairPasses.map((pass) => {
-                  // By persona; an older pre-assignment without one, by DJ name
                   const isMyDJPass =
-                    pass.preassigned_persona_id != null
-                      ? myPersonaIds.includes(pass.preassigned_persona_id)
-                      : !!myDjName &&
-                        !!pass.preassigned_dj &&
-                        myDjName
-                          .split(',')
-                          .map((n) => n.trim().toLowerCase())
-                          .includes(pass.preassigned_dj.toLowerCase());
+                    pass.preassigned_persona_id != null &&
+                    myPersonaIds.includes(pass.preassigned_persona_id);
                   const isMySpecialtyShowPass =
                     pass.preassigned_specialty_show_id !== null &&
                     mySpecialtyShowIds.has(pass.preassigned_specialty_show_id!);

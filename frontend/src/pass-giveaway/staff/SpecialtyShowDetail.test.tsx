@@ -102,10 +102,7 @@ describe('SpecialtyShowDetail', () => {
       category: 'music',
       staff_member_emails: [],
       staff_member_details: [],
-      djs: [
-        { persona_id: 11, name: 'DJ Wolfman' },
-        { persona_id: null, name: 'Old Typed Name' },
-      ],
+      djs: [{ persona_id: 11, name: 'DJ Wolfman' }],
     };
 
     beforeEach(() => {
@@ -138,10 +135,9 @@ describe('SpecialtyShowDetail', () => {
       expect(screen.getByRole('button', { name: 'Add DJ' })).toBeDisabled();
     });
 
-    it('removes a DJ by persona, and keeps a DJ with no persona', async () => {
+    it('removes a DJ by persona', async () => {
       await renderAt('/staff/specialty-shows/3');
 
-      expect(screen.getByText('(not linked to a Spinitron persona yet)')).toBeInTheDocument();
       const removes = screen.getAllByRole('button', { name: 'Remove' });
       fireEvent.click(removes[removes.length - 1]);
 

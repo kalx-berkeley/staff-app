@@ -69,7 +69,6 @@ def _reserved(db: Session, show: Show, persona_id=None, show_id=None) -> Pass:
         show_id=show.id,
         pass_type="pair",
         status="available",
-        preassigned_dj="someone",
         preassigned_persona_id=persona_id,
         preassigned_specialty_show_id=show_id,
         preassigned_date=date(2099, 12, 30),
@@ -95,7 +94,7 @@ def test_covers_every_persona_and_show_the_dj_belongs_to(
     other = SpecialtyShow(name="Someone Else's Show")
     db.add_all([music, other])
     db.flush()
-    db.add(SpecialtyShowDJ(specialty_show_id=music.id, dj_name="B", persona_id=2))
+    db.add(SpecialtyShowDJ(specialty_show_id=music.id, persona_id=2))
     db.commit()
 
     mine = [

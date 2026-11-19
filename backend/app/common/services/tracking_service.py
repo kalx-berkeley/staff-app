@@ -36,14 +36,6 @@ DJ_STUDIO_NETWORK = "dj_studio"
 STATION_OFFICE_NETWORK = "station_office"
 
 
-def normalize_dj_name(name: Optional[str]) -> Optional[str]:
-    """Lowercase *name* and collapse its whitespace; None when it's blank."""
-    if not name:
-        return None
-    collapsed = re.sub(r"\s+", " ", name).strip().lower()
-    return collapsed[:100] or None
-
-
 def normalize_person_name(name: Optional[str]) -> str:
     """Lowercase *name*, drop punctuation and collapse whitespace."""
     if not name:
@@ -123,7 +115,6 @@ def record_event(
     ref: Optional[str] = None,
     entity_type: Optional[str] = None,
     entity_id: Optional[int] = None,
-    dj_name: Optional[str] = None,
     persona_id: Optional[int] = None,
     specialty_show_id: Optional[int] = None,
     dimension: Optional[str] = None,
@@ -138,7 +129,6 @@ def record_event(
     :param real_email: The real signed-in user (X-Forwarded-User), checked
         for impersonation. Defaults to *actor_email*.
     :param actor_email: Who to record as the actor; null for guests.
-    :param dj_name: A DJ name, normalized here.
     :param persona_id: Who was on air: a Spinitron persona,
     :param specialty_show_id: and/or a specialty show.
     :returns: The new event, or None if nothing was recorded.
@@ -154,7 +144,6 @@ def record_event(
             ref=ref,
             entity_type=entity_type,
             entity_id=entity_id,
-            dj_name=normalize_dj_name(dj_name),
             persona_id=persona_id,
             specialty_show_id=specialty_show_id,
             dimension=dimension,
@@ -179,7 +168,6 @@ class EventCount:
     network: Optional[str]
     entity_type: Optional[str]
     entity_id: Optional[int]
-    dj_name: Optional[str]
     dimension: Optional[str]
     count: int
     # Who was on air: a Spinitron persona and/or a specialty show
@@ -217,7 +205,6 @@ def event_counts(
                 network=e.network,
                 entity_type=e.entity_type,
                 entity_id=e.entity_id,
-                dj_name=e.dj_name,
                 dimension=e.dimension,
                 count=1,
                 persona_id=e.persona_id,
@@ -244,7 +231,6 @@ def event_counts(
                 network=r.network,
                 entity_type=r.entity_type,
                 entity_id=r.entity_id,
-                dj_name=r.dj_name,
                 dimension=r.dimension,
                 count=r.count,
                 persona_id=r.persona_id,
