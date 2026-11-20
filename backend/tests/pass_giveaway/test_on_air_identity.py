@@ -102,11 +102,21 @@ class TestIdentityOfASlot:
         assert state.current is not None
         assert state.identity is None
 
-    async def test_freeform_and_automation_are_no_one(self, db: Session):
+    async def test_a_freeform_slot_is_its_persona(self, db: Session):
+        # FREEFORM is only Spinitron's title for a regular DJ's unnamed show
         show(db, 20, -30, 30, persona_id=1, title="FREEFORM")
+        assert who(await on_air(db, NOW)) == ("persona", "DJ One", 1, None)
+        playlist(db, 10, -30, 30, persona_id=2, title="FREEFORM")
+        assert who(await on_air(db, NOW)) == ("persona", "DJ Two", 2, None)
+
+    async def test_overnights_is_no_one(self, db: Session):
+        # Its persona is the KALX Overnights placeholder
+        playlist(db, 10, -30, 30, persona_id=PLACEHOLDER, title="OVERNIGHTS")
         state = await on_air(db, NOW)
+        assert state.current is not None
         assert state.identity is None
-        assert state.current.automation is False
+
+    async def test_automation_is_no_one(self, db: Session):
         playlist(db, 10, -30, 30, persona_id=1, automation=True, title="Roboshow")
         state = await on_air(db, NOW)
         assert state.identity is None

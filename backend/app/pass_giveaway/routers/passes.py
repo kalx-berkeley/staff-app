@@ -209,7 +209,7 @@ def give_away_pass(
     Requires DJ studio network access (or, in staging, Sublist DJ staff or
     impersonating the DJ studio network). Promotions staff elsewhere see the
     DJ giveaway page view only and cannot record a real giveaway. With no
-    one on air (automation, FREEFORM, a gap) the giveaway is unattributed.
+    one on air (automation, a placeholder persona, a gap) the giveaway is unattributed.
 
     Args:
         pass_id: Pass ID

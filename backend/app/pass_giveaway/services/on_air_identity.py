@@ -7,10 +7,11 @@ A schedule slot (a cached Spinitron playlist or show) is someone when:
 - its Spinitron show belongs to a Talk & Info Show: that show;
 - its Spinitron show belongs to a Specialty Music Show: that show, together
   with the slot's persona (giveaways credit both);
-- otherwise its persona, unless the slot aired as automation, has a title that
-  never names a DJ (`SPINITRON_NON_DJ_SHOW_TITLES`, such as FREEFORM), or its
-  persona is a placeholder (`SPINITRON_PLACEHOLDER_PERSONA_IDS`). Then it is
-  no one.
+- otherwise its persona, unless the slot aired as automation or its persona
+  is a placeholder (`SPINITRON_PLACEHOLDER_PERSONA_IDS`). Then it is no one.
+
+The slot's title doesn't matter: FREEFORM is only the title Spinitron gives a
+regular DJ's show they haven't named, so a FREEFORM slot is its persona.
 
 Only a playlist's own persona counts; co-hosts listed on a Spinitron show are
 ignored (decision 20).
@@ -51,7 +52,6 @@ from app.models.spinitron_playlist import SpinitronPlaylist
 from app.models.spinitron_show import SpinitronShow
 from app.pass_giveaway.services.spin_match_service import SpinMatchService
 from app.pass_giveaway.services.specialty_show_spinitron import shows_by_spinitron_id
-from app.pass_giveaway.services.spinitron_schedule_service import SpinitronScheduleService
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +176,7 @@ class _Resolver:
                 persona_id=row.persona_id if has_persona else None,
                 persona_name=self._persona_name(row) if has_persona else None,
             )
-        if not has_persona or SpinitronScheduleService.is_non_dj_show_title(row.title):
+        if not has_persona:
             return None
         name = self._persona_name(row)
         return OnAirIdentity(

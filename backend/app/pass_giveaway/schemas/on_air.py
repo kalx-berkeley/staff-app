@@ -27,7 +27,7 @@ class OnAirResponse(BaseModel):
     """Who is on air now and next, from the Spinitron schedule and recent spins."""
 
     # Who giveaways are credited to now; None for no one (automation,
-    # FREEFORM, a placeholder persona, a gap, or Spinitron unavailable)
+    # a placeholder persona, a gap, or Spinitron unavailable)
     current: OnAirIdentity | None = None
     # Whether the current slot is a Spinitron automation playlist (a
     # pre-recorded show, so there's no one live to give away passes), and
