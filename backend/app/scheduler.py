@@ -131,7 +131,7 @@ async def sync_kalx_live():
 async def sync_spinitron_schedule():
     """
     Scheduled task to sync the upcoming Spinitron on-air schedule.
-    Runs every 6 hours.
+    Runs every hour.
     """
     from app.database import SessionLocal
     from app.pass_giveaway.services.spinitron_schedule_service import (
@@ -781,11 +781,11 @@ def start_scheduler():
         replace_existing=True,
     )
 
-    # Add Spinitron on-air schedule sync every 6 hours (offset from the hour to
-    # avoid colliding with the other jobs above)
+    # Add Spinitron on-air schedule sync every hour (at :45, a minute no other
+    # job uses, to avoid colliding with them)
     scheduler.add_job(
         sync_spinitron_schedule,
-        trigger=CronTrigger(hour="*/6", minute=15, timezone=_PT),
+        trigger=CronTrigger(minute=45, timezone=_PT),
         id="spinitron_schedule_sync",
         name="Sync Spinitron on-air schedule",
         replace_existing=True,
@@ -845,7 +845,7 @@ def start_scheduler():
         "Scheduler started - Feature bin sync at 1 AM PT, KALX Live sync at 1:30 AM PT,"
         " Airtable sync at 2 AM PT, stale preassignment expiry at 3 AM PT, unclosed past"
         " show notifications at 4 AM PT, analytics rollup at 4:30 AM PT, Spinitron"
-        " schedule sync every 6 hours"
+        " schedule sync every hour at :45"
         + (", DJ shift sync at 3:30 AM PT" if settings.directory_enabled else "")
         + (
             ", workforms refresh at 2:30 AM PT, workform emails at 9 AM PT"

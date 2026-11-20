@@ -232,7 +232,7 @@ two-month lookback, with no limit on future dates), complete with the performanc
   checks included, but Give Away and Tried only pretend to save.
 - **DJ name autocomplete**, remembered locally and backed by the staff directory plus historical
   on-air winner records.
-- **Spinitron on-air schedule sync** — the app polls Spinitron's schedule API every 6 hours (12-hour
+- **Spinitron on-air schedule sync** — the app polls Spinitron's schedule API every hour (12-hour
   lookahead, also refreshed immediately on startup) and caches who's on air and when each show
   changes over. The DJ Name field auto-fills from this, flags a warning with a one-click fix when
   the entered name doesn't match who's actually scheduled, and auto-advances to the next DJ (with a
