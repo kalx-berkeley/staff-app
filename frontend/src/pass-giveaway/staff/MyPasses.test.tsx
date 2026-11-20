@@ -151,24 +151,58 @@ describe('Staff MyPasses — past shows and winner details', () => {
     vi.mocked(passesAPI.getStaffMyGiveaways).mockResolvedValue([]);
   });
 
-  it('hides passes for shows more than 3 days ago', async () => {
+  const mockOldAndRecentPasses = () => {
     vi.mocked(passesAPI.getStaffMyClaims).mockResolvedValue([
-      makePass({ id: 1, pass_type: 'staff', status: 'claimed', show_event_name: 'Old Claim', show_date: daysFromToday(-4) }),
-      makePass({ id: 2, pass_type: 'staff', status: 'claimed', show_event_name: 'Recent Claim', show_date: daysFromToday(-3) }),
+      makePass({ id: 1, pass_type: 'staff', status: 'claimed', show_event_name: 'Old Claim', show_date: daysFromToday(-8) }),
+      makePass({ id: 2, pass_type: 'staff', status: 'claimed', show_event_name: 'Recent Claim', show_date: daysFromToday(-7) }),
     ]);
     vi.mocked(passesAPI.getStaffMyGiveaways).mockResolvedValue([
       makePass({ id: 3, show_event_name: 'Old Giveaway', show_date: daysFromToday(-10) }),
       makePass({ id: 4, show_event_name: 'New Giveaway', show_date: daysFromToday(2) }),
-      makePass({ id: 5, status: 'available', preassigned_dj: 'DJ Me', show_event_name: 'Old Preassigned', show_date: daysFromToday(-5) }),
+      makePass({ id: 5, status: 'available', preassigned_dj: 'DJ Me', show_event_name: 'Old Preassigned', show_date: daysFromToday(-9) }),
+      makePass({ id: 6, status: 'available', preassigned_dj: 'DJ Me', show_event_name: 'Recent Preassigned', show_date: daysFromToday(-6) }),
+      // A multi-day show's end date is recent, but the pass is for its first day
+      makePass({ id: 7, status: 'available', preassigned_dj: 'DJ Me', show_event_name: 'Old Day Preassigned', show_date: daysFromToday(1), preassigned_date: daysFromToday(-8) }),
     ]);
+  };
+
+  it('hides passes for shows more than 7 days ago', async () => {
+    mockOldAndRecentPasses();
 
     render(<BrowserRouter><MyPasses /></BrowserRouter>);
 
     expect(await screen.findByText('Recent Claim')).toBeInTheDocument();
     expect(await screen.findByText('New Giveaway')).toBeInTheDocument();
+    expect(screen.getByText('Recent Preassigned')).toBeInTheDocument();
     expect(screen.queryByText('Old Claim')).not.toBeInTheDocument();
     expect(screen.queryByText('Old Giveaway')).not.toBeInTheDocument();
     expect(screen.queryByText('Old Preassigned')).not.toBeInTheDocument();
+    expect(screen.queryByText('Old Day Preassigned')).not.toBeInTheDocument();
+  });
+
+  it('shows older passes when asked', async () => {
+    mockOldAndRecentPasses();
+
+    render(<BrowserRouter><MyPasses /></BrowserRouter>);
+
+    fireEvent.click(await screen.findByLabelText('Show shows more than 7 days ago'));
+
+    expect(await screen.findByText('Old Claim')).toBeInTheDocument();
+    expect(screen.getByText('Old Giveaway')).toBeInTheDocument();
+    expect(screen.getByText('Old Preassigned')).toBeInTheDocument();
+    expect(screen.getByText('Old Day Preassigned')).toBeInTheDocument();
+    expect(screen.getByText('Recent Claim')).toBeInTheDocument();
+  });
+
+  it('leaves out the older shows control when nothing is hidden', async () => {
+    vi.mocked(passesAPI.getStaffMyClaims).mockResolvedValue([
+      makePass({ id: 2, pass_type: 'staff', status: 'claimed', show_event_name: 'Recent Claim', show_date: daysFromToday(-7) }),
+    ]);
+
+    render(<BrowserRouter><MyPasses /></BrowserRouter>);
+
+    expect(await screen.findByText('Recent Claim')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/more than 7 days ago/)).not.toBeInTheDocument();
   });
 
   it("doesn't show the winner's name or phone number", async () => {

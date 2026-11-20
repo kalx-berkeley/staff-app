@@ -3,7 +3,12 @@ import { Link } from 'react-router-dom';
 import { passesAPI, lotteryAPI, alternatesAPI } from '../api';
 import type { PassResponse, MyLotteryEntryResponse, MyAlternateEntry } from '../types';
 import type { APIError } from '../../common/types';
-import { KALX_TABLE_NAME, isRecentShow, waitingFallbackNote } from '../utils';
+import {
+  KALX_TABLE_NAME,
+  STAFF_MY_PASSES_PAST_SHOW_DAYS,
+  isRecentShow,
+  waitingFallbackNote,
+} from '../utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { formatCalendarDate, formatPacific } from '../../common/dateTime';
@@ -166,18 +171,43 @@ const MyPasses = () => {
     return map[status] ?? status;
   };
 
-  const recentClaimedPasses = claimedPasses.filter((p) => isRecentShow(p.show_date));
-  const recentPasses = passes.filter((p) => isRecentShow(p.show_date));
+  // Shows more than STAFF_MY_PASSES_PAST_SHOW_DAYS ago are hidden unless
+  // the user asks for them. A pre-assigned pass is dated by the date it's
+  // pre-assigned for, as its card shows.
+  const [showOlder, setShowOlder] = useState(false);
+  const isListed = (date: string | null | undefined) =>
+    showOlder || isRecentShow(date, STAFF_MY_PASSES_PAST_SHOW_DAYS);
+  const passDate = (p: PassResponse) =>
+    p.status === 'available' && p.preassigned_dj ? p.preassigned_date || p.show_date : p.show_date;
+
+  const recentClaimedPasses = claimedPasses.filter((p) => isListed(p.show_date));
+  const recentPasses = passes.filter((p) => isListed(passDate(p)));
   const givenAwayPasses = recentPasses.filter((p) => p.status === 'given_away');
   const preassignedPasses = recentPasses.filter(
     (p) => p.status === 'available' && p.preassigned_dj
   );
+  const hasOlderPasses =
+    claimedPasses.some((p) => !isRecentShow(p.show_date, STAFF_MY_PASSES_PAST_SHOW_DAYS)) ||
+    passes.some((p) => !isRecentShow(passDate(p), STAFF_MY_PASSES_PAST_SHOW_DAYS));
 
   return (
     <div className="my-passes">
       <div className="page-header">
         <h2>My Passes</h2>
       </div>
+
+      {(hasOlderPasses || showOlder) && (
+        <div className="form-group checkbox-group">
+          <label>
+            <input
+              type="checkbox"
+              checked={showOlder}
+              onChange={(e) => setShowOlder(e.target.checked)}
+            />
+            Show shows more than {STAFF_MY_PASSES_PAST_SHOW_DAYS} days ago
+          </label>
+        </div>
+      )}
 
       <div className="passes-list-section">
         <h3 className="passes-section-title">Claimed Staff Passes</h3>
@@ -192,7 +222,11 @@ const MyPasses = () => {
 
         {claimedLoaded && !claimedLoading && recentClaimedPasses.length === 0 && (
           <div className="no-passes">
-            <p>You don't have any claimed staff passes for recent or upcoming shows.</p>
+            <p>
+              {showOlder
+                ? "You don't have any claimed staff passes."
+                : "You don't have any claimed staff passes for recent or upcoming shows."}
+            </p>
           </div>
         )}
 
@@ -440,7 +474,7 @@ const MyPasses = () => {
 
           {loaded && !loading && recentPasses.length === 0 && (
             <div className="no-passes">
-              <p>No recent or upcoming giveaways found{djName ? <> for <strong>{djName}</strong></> : null}.</p>
+              <p>No {showOlder ? '' : 'recent or upcoming '}giveaways found{djName ? <> for <strong>{djName}</strong></> : null}.</p>
             </div>
           )}
 

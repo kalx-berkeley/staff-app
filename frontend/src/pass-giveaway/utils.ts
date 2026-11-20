@@ -98,11 +98,21 @@ export function staffPassesNotYetActive(user: Pick<UserResponse, 'can_claim_staf
 
 export const MY_PASSES_PAST_SHOW_DAYS = 3;
 
-/** Whether a show (`YYYY-MM-DD`) is recent or upcoming enough to list on a My Passes page. */
-export function isRecentShow(showDate: string | null | undefined): boolean {
+// /staff/my-passes lists shows up to this many days ago unless the user asks
+// to see older ones
+export const STAFF_MY_PASSES_PAST_SHOW_DAYS = 7;
+
+/**
+ * Whether a show (`YYYY-MM-DD`) is upcoming or at most *pastDays* days ago,
+ * recent enough to list on a My Passes page.
+ */
+export function isRecentShow(
+  showDate: string | null | undefined,
+  pastDays: number = MY_PASSES_PAST_SHOW_DAYS,
+): boolean {
   if (!showDate) return true;
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - MY_PASSES_PAST_SHOW_DAYS);
+  cutoff.setDate(cutoff.getDate() - pastDays);
   return showDate >= formatDateValue(cutoff);
 }
 

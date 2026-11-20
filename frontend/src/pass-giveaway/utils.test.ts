@@ -187,6 +187,11 @@ describe('isRecentShow', () => {
   it('keeps passes with no show date', () => {
     expect(isRecentShow(null)).toBe(true);
   });
+
+  it('takes a different number of days', () => {
+    expect(isRecentShow(daysFromToday(-7), 7)).toBe(true);
+    expect(isRecentShow(daysFromToday(-8), 7)).toBe(false);
+  });
 });
 
 describe('showsPassGiveawayAdminLink', () => {
