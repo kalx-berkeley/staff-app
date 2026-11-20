@@ -194,20 +194,29 @@ const MyPasses = () => {
     <div className="my-passes">
       <div className="page-header">
         <h2>My Passes</h2>
+        {(hasOlderPasses || showOlder) && (
+          <div className="mine-toggle">
+            <button
+              type="button"
+              className={!showOlder ? 'btn-primary' : 'btn-secondary'}
+              aria-pressed={!showOlder}
+              onClick={() => setShowOlder(false)}
+              title={`Hide shows more than ${STAFF_MY_PASSES_PAST_SHOW_DAYS} days ago`}
+            >
+              Recent &amp; Upcoming
+            </button>
+            <button
+              type="button"
+              className={showOlder ? 'btn-primary' : 'btn-secondary'}
+              aria-pressed={showOlder}
+              onClick={() => setShowOlder(true)}
+              title={`Include shows more than ${STAFF_MY_PASSES_PAST_SHOW_DAYS} days ago`}
+            >
+              All Shows
+            </button>
+          </div>
+        )}
       </div>
-
-      {(hasOlderPasses || showOlder) && (
-        <div className="form-group checkbox-group">
-          <label>
-            <input
-              type="checkbox"
-              checked={showOlder}
-              onChange={(e) => setShowOlder(e.target.checked)}
-            />
-            Show shows more than {STAFF_MY_PASSES_PAST_SHOW_DAYS} days ago
-          </label>
-        </div>
-      )}
 
       <div className="passes-list-section">
         <h3 className="passes-section-title">Claimed Staff Passes</h3>

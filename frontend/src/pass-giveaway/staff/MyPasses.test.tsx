@@ -185,7 +185,7 @@ describe('Staff MyPasses — past shows and winner details', () => {
 
     render(<BrowserRouter><MyPasses /></BrowserRouter>);
 
-    fireEvent.click(await screen.findByLabelText('Show shows more than 7 days ago'));
+    fireEvent.click(await screen.findByRole('button', { name: 'All Shows' }));
 
     expect(await screen.findByText('Old Claim')).toBeInTheDocument();
     expect(screen.getByText('Old Giveaway')).toBeInTheDocument();
@@ -202,7 +202,7 @@ describe('Staff MyPasses — past shows and winner details', () => {
     render(<BrowserRouter><MyPasses /></BrowserRouter>);
 
     expect(await screen.findByText('Recent Claim')).toBeInTheDocument();
-    expect(screen.queryByLabelText(/more than 7 days ago/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'All Shows' })).not.toBeInTheDocument();
   });
 
   it("doesn't show the winner's name or phone number", async () => {
