@@ -24,6 +24,9 @@ PROMOTIONS_DEPARTMENT = "Promotions"
 # Publicity staff the KALX Co-Announce Table at co-announce shows
 PUBLICITY_DEPARTMENT = "Publicity"
 SUBLIST_DJ_STATUS = "Sublist DJ"
+DJ_IN_TRAINING_STATUS = "DJ in training"
+# Statuses that make a staff member a DJ (see _is_sublist_dj)
+DJ_STATUSES = frozenset({SUBLIST_DJ_STATUS, DJ_IN_TRAINING_STATUS})
 
 
 def is_ip_in_network(ip_address: str, network: str) -> bool:
@@ -609,13 +612,15 @@ def check_station_office_access(
 
 def _is_sublist_dj(staff: Staff) -> bool:
     """
-    Return True if a staff member has Sublist DJ status (and is Active).
+    Return True if a staff member is an Active DJ.
+
+    Both the "Sublist DJ" and "DJ in training" statuses count.
 
     :param staff: Staff record
-    :returns: True if staff is an active Sublist DJ
+    :returns: True if staff is Active and has a DJ status
     """
     statuses = _staff_statuses(staff)
-    return SUBLIST_DJ_STATUS in statuses and ACTIVE_STATUS in statuses
+    return bool(DJ_STATUSES & statuses) and ACTIVE_STATUS in statuses
 
 
 def get_sublist_dj_staff(

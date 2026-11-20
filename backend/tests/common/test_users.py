@@ -93,6 +93,36 @@ def test_get_current_user_promotions_who_is_also_sublist_dj(
     assert data["profile"]["is_sublist_dj"] is True
 
 
+def test_get_current_user_dj_in_training_is_sublist_dj(client: TestClient, db: Session):
+    """An Active "DJ in training" counts as a DJ, like a Sublist DJ."""
+    staff = _make_active_staff(db, "trainee@example.com", "Trainee DJ", "555-1234")
+    db.add(StaffStatus(staff_id=staff.id, status="DJ in training"))
+    db.commit()
+
+    response = client.get(
+        "/api/users/me", headers={"X-Forwarded-User": "trainee@example.com"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["role"] == "staff"
+    assert data["profile"]["is_sublist_dj"] is True
+
+
+def test_get_current_user_new_student_sublist_dj_is_not_dj(client: TestClient, db: Session):
+    """A "🆕" (not yet Active) Sublist DJ doesn't get the DJ views."""
+    staff = _make_new_staff(db, "new-dj@example.com", "New DJ", "555-1234")
+    db.add(StaffStatus(staff_id=staff.id, status="Sublist DJ"))
+    db.commit()
+
+    response = client.get(
+        "/api/users/me", headers={"X-Forwarded-User": "new-dj@example.com"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["profile"]["is_sublist_dj"] is False
+
+
 def test_get_current_user_promotions_via_paid_staff_status(client: TestClient, db: Session):
     """'Paid Staff' + 'Active' statuses → role=promotions, regardless of department."""
     staff = Staff(email="paid@example.com", name="Paid Staff User", phone="555-9999")

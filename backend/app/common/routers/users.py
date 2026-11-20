@@ -18,13 +18,12 @@ from app.auth import (
     is_ip_in_network,
     _get_promotions_staff_by_email,
     _is_promotions_staff,
-    _staff_statuses,
     can_claim_staff_passes,
     can_claim_tabler_passes,
     is_current_staff,
     is_promotions_admin,
     is_site_admin,
-    SUBLIST_DJ_STATUS,
+    _is_sublist_dj,
 )
 from app.config import settings
 from app.models.staff import Staff
@@ -193,7 +192,7 @@ def get_current_user(
                 phone=promotions.phone or "",
                 dj_name=promotions.dj_name,
                 spinitron_ids=promotions.spinitron_ids,
-                is_sublist_dj=SUBLIST_DJ_STATUS in _staff_statuses(promotions),
+                is_sublist_dj=_is_sublist_dj(promotions),
                 loa_start=promotions.loa_start,
                 loa_end=promotions.loa_end,
             )
@@ -207,7 +206,7 @@ def get_current_user(
                 phone=staff.phone or "",
                 dj_name=staff.dj_name,
                 spinitron_ids=staff.spinitron_ids,
-                is_sublist_dj=SUBLIST_DJ_STATUS in _staff_statuses(staff),
+                is_sublist_dj=_is_sublist_dj(staff),
                 loa_start=staff.loa_start,
                 loa_end=staff.loa_end,
             )
@@ -276,7 +275,7 @@ def get_user_profile(
             email=profile.email,
             name=profile.name or "",
             phone=profile.phone or "",
-            is_sublist_dj=SUBLIST_DJ_STATUS in _staff_statuses(profile),
+            is_sublist_dj=_is_sublist_dj(profile),
         )
     elif role == "staff":
         profile = UserService.get_or_create_profile(db, email)
@@ -286,7 +285,7 @@ def get_user_profile(
             name=profile.name or "",
             phone=profile.phone or "",
             dj_name=profile.dj_name,
-            is_sublist_dj=SUBLIST_DJ_STATUS in _staff_statuses(profile),
+            is_sublist_dj=_is_sublist_dj(profile),
         )
     else:
         raise HTTPException(
