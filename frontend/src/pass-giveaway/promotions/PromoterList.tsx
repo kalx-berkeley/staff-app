@@ -4,12 +4,19 @@ import { promotersAPI } from '../api';
 import type { PromoterResponse } from '../types';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
+import { useListReturnState, useUrlParams } from '../listUrlState';
+
+// ?q=another
+const URL_DEFAULTS = { q: '' } as const;
 
 const PromoterList = () => {
   usePageTitle('Promoters · Promotions');
   const navigate = useNavigate();
   const [promoters, setPromoters] = useState<PromoterResponse[]>([]);
-  const [filter, setFilter] = useState('');
+  const [params, setParams] = useUrlParams(URL_DEFAULTS);
+  const filter = params.q;
+  const setFilter = (q: string) => setParams({ q });
+  const returnState = useListReturnState();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,7 +61,7 @@ const PromoterList = () => {
     <div className="venue-list">
       <div className="venue-list-header">
         <h2>Promoters</h2>
-        <button onClick={() => navigate('/promotions/promoters/new')} className="btn-primary">
+        <button onClick={() => navigate('/promotions/promoters/new', { state: returnState })} className="btn-primary">
           New Promoter
         </button>
       </div>
@@ -91,7 +98,7 @@ const PromoterList = () => {
                 </p>
               )}
               <button
-                onClick={() => navigate(`/promotions/promoters/${promoter.id}/edit`)}
+                onClick={() => navigate(`/promotions/promoters/${promoter.id}/edit`, { state: returnState })}
                 className="btn-primary"
               >
                 Edit

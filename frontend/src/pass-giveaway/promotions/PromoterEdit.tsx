@@ -4,11 +4,13 @@ import { promotersAPI } from '../api';
 import type { PromoterResponse } from '../types';
 import type { APIError } from '../../common/types';
 import PromoterForm from './PromoterForm';
+import { useReturnToList } from '../listUrlState';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 
 const PromoterEdit = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const returnTo = useReturnToList('/promotions/promoters');
   const [promoter, setPromoter] = useState<PromoterResponse | null>(null);
   usePageTitle(`Edit ${promoter?.name ?? 'Promoter'} · Promotions`);
   const [loading, setLoading] = useState(true);
@@ -34,7 +36,7 @@ const PromoterEdit = () => {
     loadPromoter();
   }, [id]);
 
-  const handleDone = () => navigate('/promotions/promoters');
+  const handleDone = () => navigate(returnTo);
 
   if (loading) {
     return <div className="loading">Loading promoter...</div>;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, fireEvent, within, cleanup } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import VenueList from './VenueList';
 import { venuesAPI } from '../api';
 import { renderAndSettle } from '../../test/render';
@@ -66,5 +66,29 @@ describe('staff VenueList', () => {
       'href',
       '/staff/shows?venue=1',
     );
+  });
+
+  it('keeps the search after opening a venue\'s shows and going back', async () => {
+    const ShowsPage = () => {
+      const navigate = useNavigate();
+      return <button onClick={() => navigate(-1)}>Back</button>;
+    };
+    await renderAndSettle(
+      <MemoryRouter initialEntries={['/staff/venues']}>
+        <Routes>
+          <Route path="/staff/venues" element={<VenueList />} />
+          <Route path="/staff/shows" element={<ShowsPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search venues' }), {
+      target: { value: 'fox' },
+    });
+
+    fireEvent.click(screen.getByRole('link', { name: 'The Fox Theater' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Back' }));
+
+    expect(await screen.findByRole('textbox', { name: 'Search venues' })).toHaveValue('fox');
+    expect(screen.queryByText('Cornerstone')).not.toBeInTheDocument();
   });
 });

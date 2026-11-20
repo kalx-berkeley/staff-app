@@ -1,11 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 import VenueForm from './VenueForm';
+import { useReturnToList } from '../listUrlState';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 
 const VenueNew = () => {
   usePageTitle('New Venue · Promotions');
   const navigate = useNavigate();
-  const handleDone = () => navigate('/promotions/venues');
+  const returnTo = useReturnToList('/promotions/venues');
+  const handleDone = () => navigate(returnTo);
 
   return (
     <VenueForm

@@ -4,11 +4,13 @@ import { venuesAPI } from '../api';
 import type { VenueResponse } from '../types';
 import type { APIError } from '../../common/types';
 import VenueForm from './VenueForm';
+import { useReturnToList } from '../listUrlState';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 
 const VenueEdit = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const returnTo = useReturnToList('/promotions/venues');
   const [venue, setVenue] = useState<VenueResponse | null>(null);
   usePageTitle(`Edit ${venue?.name ?? 'Venue'} · Promotions`);
   const [loading, setLoading] = useState(true);
@@ -36,7 +38,7 @@ const VenueEdit = () => {
     loadVenue();
   }, [id]);
 
-  const handleDone = () => navigate('/promotions/venues');
+  const handleDone = () => navigate(returnTo);
 
   if (loading) {
     return <div className="loading">Loading venue...</div>;

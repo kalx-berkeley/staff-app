@@ -4,6 +4,7 @@ import { venuesAPI } from '../api';
 import { VenueRepList } from '../components';
 import { filterVenues } from '../venueSearch';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
+import { useUrlParams } from '../listUrlState';
 import type { VenueResponse } from '../types';
 import type { APIError } from '../../common/types';
 
@@ -11,10 +12,15 @@ import type { APIError } from '../../common/types';
  * Every venue with its KALX promotions reps, searchable by venue or rep. Each
  * venue's name links to the shows page filtered to that venue.
  */
+// ?q=fox
+const URL_DEFAULTS = { q: '' } as const;
+
 const VenueList = () => {
   usePageTitle('Venues · Staff');
   const [venues, setVenues] = useState<VenueResponse[]>([]);
-  const [query, setQuery] = useState('');
+  const [params, setParams] = useUrlParams(URL_DEFAULTS);
+  const query = params.q;
+  const setQuery = (q: string) => setParams({ q });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

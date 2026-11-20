@@ -6,17 +6,25 @@ import { VenueRepList } from '../components';
 import { filterVenues } from '../venueSearch';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
+import { useListReturnState, useUrlParams } from '../listUrlState';
 
 const VIEW_MODE_KEY = 'kalx_venue_view_mode';
+
+// ?q=fox&mine=0
+const URL_DEFAULTS = { q: '', mine: '1' } as const;
 
 const VenueList = () => {
   usePageTitle('Venues · Promotions');
   const navigate = useNavigate();
   const [venues, setVenues] = useState<VenueResponse[]>([]);
-  const [venueFilter, setVenueFilter] = useState('');
+  const [params, setParams] = useUrlParams(URL_DEFAULTS);
+  const venueFilter = params.q;
+  const setVenueFilter = (q: string) => setParams({ q });
+  const showMineOnly = params.mine !== '0';
+  const setShowMineOnly = (mine: boolean) => setParams({ mine: mine ? '1' : '0' });
+  const returnState = useListReturnState();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showMineOnly, setShowMineOnly] = useState(true);
   const [viewMode, setViewMode] = useState<'card' | 'compact'>(
     (localStorage.getItem(VIEW_MODE_KEY) as 'card' | 'compact') || 'card'
   );
@@ -44,11 +52,11 @@ const VenueList = () => {
   }, [loadVenues]);
 
   const handleCreateClick = () => {
-    navigate('/promotions/venues/new');
+    navigate('/promotions/venues/new', { state: returnState });
   };
 
   const handleEditClick = (venue: VenueResponse) => {
-    navigate(`/promotions/venues/${venue.id}/edit`);
+    navigate(`/promotions/venues/${venue.id}/edit`, { state: returnState });
   };
 
   // The staff shows page, with its venue filter set to this venue.
