@@ -58,6 +58,7 @@ from app.models.spinitron_persona import SpinitronPersona
 from app.models.credit import UNATTRIBUTED
 from app.models.staff import Staff
 from app.models.venue import Venue, venue_sort_key
+from app.pass_giveaway.services.caller_names import group_similar_names
 from app.pass_giveaway.services.tracking import (
     GIVEAWAY_VISIT,
     GUEST_SESSION,
@@ -546,11 +547,13 @@ def _same_name_table(
     win_limits: dict[int, tuple[int, Optional[int]]],
     metric_id: str,
 ) -> dict:
+    normalized = {id(w): normalize_person_name(w.name) for w in wins}
+    groups = group_similar_names(normalized.values())
     by_name: dict[str, list[_Win]] = defaultdict(list)
     for w in wins:
-        key = normalize_person_name(w.name)
+        key = normalized[id(w)]
         if key:
-            by_name[key].append(w)
+            by_name[groups[key]].append(w)
     rows = []
     for ws in by_name.values():
         phones = {w.phone for w in ws if w.phone}
@@ -563,8 +566,13 @@ def _same_name_table(
             if w.email:
                 emails_by_phone[w.email].add(w.phone)
         same_email = any(len(p) > 1 for p in emails_by_phone.values())
+        # The latest spelling of each normalized name, latest first
+        spellings: dict[str, str] = {}
+        for w in reversed(ws):
+            spellings.setdefault(normalized[id(w)], w.name.strip())
         rows.append({
             "name": ws[-1].name,
+            "spellings": ", ".join(spellings.values()) if len(spellings) > 1 else "",
             "phones": len(phones),
             "wins": len(ws),
             "same_venue_in_limit": "Yes" if flagged else "No",
@@ -573,6 +581,7 @@ def _same_name_table(
             "_details": {
                 "columns": [
                     column("won", "Won", "date"),
+                    column("winner", "Name"),
                     column("phone", "Phone", "phone"),
                     column("email", "Email"),
                     column("show", "Show"),
@@ -583,6 +592,7 @@ def _same_name_table(
                 "rows": [
                     {
                         "won": pacific_date(w.won_at).isoformat(),
+                        "winner": w.name,
                         "phone": w.phone,
                         "email": w.email,
                         "show": w.show,
@@ -597,9 +607,10 @@ def _same_name_table(
     rows.sort(key=lambda r: (not r["_flag"], -r["phones"], r["name"].lower()))
     return table(
         metric_id,
-        "Same name, different phone numbers",
+        "Similar names, different phone numbers",
         [
             column("name", "Name"),
+            column("spellings", "Spellings"),
             column("phones", "Phone numbers", "number"),
             column("wins", "Wins", "number"),
             column("same_venue_in_limit", "Same venue or sister venue within limit"),
@@ -607,17 +618,25 @@ def _same_name_table(
         ],
         rows,
         explanation(
-            "On-air winners whose name has two or more different phone numbers. A name is"
-            " listed when it has a win in the window, and is compared with its wins at"
-            " any time. It's highlighted when two of its numbers won at the same venue,"
-            " or at venues sharing a win limit, within that limit (days between show"
-            " dates), which is how someone could get around the limit. The same email"
-            " on different numbers is stronger evidence that it's one person.",
+            "On-air winners whose name, or names spelled almost the same way, have two or"
+            " more different phone numbers. A name is listed when it has a win in the"
+            " window, and is compared with its wins at any time. It's highlighted when two"
+            " of its numbers won at the same venue, or at venues sharing a win limit,"
+            " within that limit (days between show dates), which is how someone could get"
+            " around the limit. The same email on different numbers is stronger evidence"
+            " that it's one person.",
             "When the pass pair was given away (for the window); all wins for comparison",
             includes=(
-                "Names match ignoring case, spacing and punctuation, with no fuzzy"
-                " matching, so two different people with the same name also appear."
-                " Venues with no win limit never highlight a name."
+                "DJs often misspell a caller's name, so names match ignoring case,"
+                " spacing and punctuation when their first and last names each match"
+                " with one typo, or sound alike and are spelled nearly the same, and"
+                " their middle names (if both have any) match, with an initial"
+                ' matching a middle name ("Jon Smith", "John Smtih", "John A. Smith"'
+                ' and "John Allen Smith" are one name, as are "Steven" and "Stephen").'
+                " Spellings lists every spelling grouped together. One typo can't tell"
+                ' "Jane" from "Jake", and two different people can share a name,'
+                " so check the wins before acting on a row. Venues with no win limit"
+                " never highlight a name."
             ),
         ),
         top=TOP_ROWS,

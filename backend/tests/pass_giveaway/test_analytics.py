@@ -245,6 +245,31 @@ def test_same_name_different_phones(client, db, promo, venue):
     assert len(venue_rows) == 2
 
 
+def test_same_name_groups_misspelled_names(client, db, promo, venue):
+    show = _show(db, venue, -1, pairs=0, staff=0)
+    _win(db, show, "Jon Smith", "5105550100", days_ago=3)
+    _win(db, show, "John Smtih", "5105550111", days_ago=2)
+    _win(db, show, "John Smith", "5105550122")
+    _win(db, show, "Jane Smith", "5105550133")
+    _win(db, show, "Steven Park", "5105550144", days_ago=2)
+    _win(db, show, "Stephen R. Park", "5105550155")
+
+    rows = {
+        r["name"]: r for r in _tab(client, "overview")["same_name_different_phones"]["rows"]
+    }
+    assert set(rows) == {"John Smith", "Stephen R. Park"}
+    assert rows["Stephen R. Park"]["spellings"] == "Stephen R. Park, Steven Park"
+    john = rows["John Smith"]
+    assert john["name"] == "John Smith"
+    assert john["phones"] == 3
+    assert john["spellings"] == "John Smith, John Smtih, Jon Smith"
+    assert [d["winner"] for d in john["_details"]["rows"]] == [
+        "Jon Smith",
+        "John Smtih",
+        "John Smith",
+    ]
+
+
 def test_same_name_flags_wins_at_sister_venues(client, db, promo, venue):
     sister = Venue(name="The Fox Annex", address="2 Main St", parent_venue_id=venue.id)
     unrelated = Venue(name="Elsewhere", address="3 Main St", win_frequency_days=30)

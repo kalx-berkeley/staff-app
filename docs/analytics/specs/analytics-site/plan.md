@@ -62,7 +62,7 @@ Terms:
 | Q29 | Top lists show 10 rows with "Show all". DJs and venues with fewer than 3 shows or visits in the window are flagged "low sample" and left out of rankings. |
 | Q30 | Everything ships in one PR, on the `analytics` branch. |
 | Q32 | This spec lives at `docs/analytics/specs/analytics-site/plan.md`. |
-| Q33 | **Same name, different phones**: names are matched exactly after normalizing (case, spaces, punctuation). There's no fuzzy matching. |
+| Q33 | **Same name, different phones**: names are matched after normalizing (case, spaces, punctuation), and similar spellings count as one name, because DJs misspell callers' names (changed 2026-11-20). Two names match when their first words match, their last words match, and their middle words are compatible (one name has none, or each pair matches, an initial matching a middle name that starts with it). Two words match when they're the same, one typo apart (both 3+ letters), or share a Metaphone or NYSIIS code (both 4+ letters) within 2 edits (3 when both are 5+ letters), so "Steven" matches "Stephen" but "Jane" doesn't match "John". Matching is transitive. The rule is in `pass_giveaway/services/caller_names.py`. |
 | Q34 | A name appears when it has at least one on-air win in the window, and it's compared against all of that name's wins at any time. |
 | Q35 | It's shown both globally and per venue. A name is **flagged** when it has two or more different phones at the same venue within that venue's `win_frequency_days`. Venues with no limit never flag. |
 | Q36 | When the same email appears under different phones, it's shown as stronger evidence. There's no "ignore" marking in v1. |
@@ -126,7 +126,7 @@ attempts per giveaway, sortable. Each row links to the venue page.
 |---|---|
 | Top repeat winners | Grouped by normalized phone, with at least one win in the window and 2+ wins in the window. Columns: latest name, phone, wins, venues, dates. |
 | Repeat winner share | On-air wins in the window that went to a phone with more than one win at any time ÷ on-air wins in the window. |
-| Same name, different phones | Normalized names with a win in the window and 2+ distinct normalized phones over all time. Each phone is listed with its wins (date, show, venue, DJ, email). The row is flagged when two of the phones won at the same venue within its `win_frequency_days`. A matching email across phones is shown as "same email". |
+| Same name, different phones | Groups of similar normalized names (Q33) with a win in the window and 2+ distinct normalized phones over all time. The table is titled "Similar names, different phone numbers" and lists the spellings grouped together. Each win is listed (date, name as typed, phone, email, show, venue, DJ). The row is flagged when two of the phones won at the same venue within its `win_frequency_days`. A matching email across phones is shown as "same email". |
 | Top DJs by passes given away | Pairs given away per DJ, by `given_away_at`. |
 | Top DJs by given away + tried | Given away plus `show_attempts`, per DJ. |
 | Top venues by utilization | Three rankings: on-air, staff and combined ((given-away pairs + claimed staff passes) ÷ (pairs + staff passes)). Low-sample venues are excluded (Q29). |
