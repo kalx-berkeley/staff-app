@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { specialtyShowLabel } from '../utils';
 import type { Identity } from '../types';
 
@@ -24,7 +24,7 @@ interface IdentityPickerProps {
  * A type-ahead for picking a DJ persona or a show from a fixed list. Typing
  * filters the list by name (and, for personas, the staff member's name).
  * Only a picked option counts: typed text that doesn't match one leaves the
- * value empty.
+ * value empty, and is cleared when the field loses focus.
  */
 const IdentityPicker = ({
   id,
@@ -43,6 +43,12 @@ const IdentityPicker = ({
     setShownValue(value);
     setText(value?.name ?? '');
   }
+  // The blur timeout reads this, since a click on an option lands after the
+  // blur but before the timeout fires
+  const shownValueRef = useRef(shownValue);
+  useEffect(() => {
+    shownValueRef.current = shownValue;
+  }, [shownValue]);
 
   const query = text.trim().toLowerCase();
   const matches = query
@@ -90,7 +96,14 @@ const IdentityPicker = ({
         onChange={(e) => handleChange(e.target.value)}
         onFocus={() => setOpen(true)}
         onKeyDown={handleKeyDown}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onBlur={() =>
+          setTimeout(() => {
+            setOpen(false);
+            // Text that isn't a picked DJ or show can't be saved, so don't
+            // leave it in the box looking like a choice
+            setText((current) => (shownValueRef.current ? current : ''));
+          }, 150)
+        }
         disabled={disabled}
         placeholder={placeholder}
         aria-label={ariaLabel}
