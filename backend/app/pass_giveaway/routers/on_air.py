@@ -15,7 +15,11 @@ from app.pass_giveaway.schemas.on_air import (
     SpinMatch as SpinMatchSchema,
     SpinMatchShow,
 )
-from app.pass_giveaway.services.on_air_identity import on_air
+from app.pass_giveaway.services.on_air_identity import (
+    OnAirIdentity,
+    dj_identity,
+    on_air,
+)
 from app.pass_giveaway.services.spin_match_service import SpinMatchService
 from app.pass_giveaway.services.tracking import (
     DjTracking,
@@ -59,9 +63,10 @@ async def get_on_air(
 async def get_spin_matches(
     dj_access: bool = Depends(check_dj_access),
     dj: Optional[DjTracking] = Depends(dj_tracking),
+    identity: Optional[OnAirIdentity] = Depends(dj_identity),
     db: Session = Depends(get_db),
 ):
-    """Return current spins that match a show with passes to give away.
+    """Return current spins that match a show the on-air DJ can give passes away for.
 
     Meant to be polled roughly once a minute from the DJ view. Every current
     match is returned on every call — including to every other open DJ tab —
@@ -69,7 +74,7 @@ async def get_spin_matches(
     POST /spin-matches/{spin_id}/dismiss, so the DJ view is responsible for
     not re-displaying a match it's already shown.
     """
-    matches = await SpinMatchService.get_current_matches(db)
+    matches = await SpinMatchService.get_current_matches(db, identity)
     # KALX Staff Analytics counts each match once, the first time it's offered
     record_spin_suggestions(db, dj, [(m.spin_id, m.show.id) for m in matches])
     return [

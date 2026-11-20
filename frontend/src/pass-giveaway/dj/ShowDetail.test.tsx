@@ -6,6 +6,8 @@ import { showsAPI, passesAPI } from '../api';
 import { renderAndSettle } from '../../test/render';
 import type { OnAirIdentity, PassResponse, ShowResponse } from '../types';
 import { persona, withOnAir } from './testOnAir';
+import { setGiveawayOutcome } from './giveawayOutcome';
+import type { GiveawayOutcome } from './PassGiveawayForm';
 
 const DJ_TEST = persona(1, 'DJ Test');
 
@@ -150,11 +152,12 @@ describe('DJ ShowDetail right after a giveaway', () => {
 
   const available = { id: 6, show_id: 1, pass_type: 'pair', status: 'available' } as PassResponse;
 
-  const renderAt = async (state: unknown) => {
+  const renderAt = async (outcome: GiveawayOutcome | null) => {
+    if (outcome) setGiveawayOutcome('1', outcome);
     vi.mocked(showsAPI.get).mockResolvedValue(makeShow([winner(), available], { available_pair_count: 1 }));
     await renderAndSettle(
       withOnAir(
-        <MemoryRouter initialEntries={[{ pathname: '/dj/shows/1', state }]}>
+        <MemoryRouter initialEntries={['/dj/shows/1']}>
           <ShowDetail />
         </MemoryRouter>,
         DJ_TEST,
@@ -164,17 +167,18 @@ describe('DJ ShowDetail right after a giveaway', () => {
   };
 
   it('thanks the DJ and hides the off-the-mic button just after giving away', async () => {
-    await renderAt({ justGaveAway: true });
+    await renderAt('given_away');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Pass pair given away to Jnae Winner. Thanks!');
     expect(screen.queryByRole('button', { name: "I'm off the mic" })).not.toBeInTheDocument();
   });
 
   it('records the attempt without claiming a giveaway just after Tried', async () => {
+    setGiveawayOutcome('1', 'tried');
     vi.mocked(showsAPI.get).mockResolvedValue(makeShow([available], { available_pair_count: 1 }));
     await renderAndSettle(
       withOnAir(
-        <MemoryRouter initialEntries={[{ pathname: '/dj/shows/1', state: { justTried: true } }]}>
+        <MemoryRouter initialEntries={['/dj/shows/1']}>
           <ShowDetail />
         </MemoryRouter>,
         DJ_TEST,

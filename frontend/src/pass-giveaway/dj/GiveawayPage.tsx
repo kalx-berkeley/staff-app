@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { showsAPI } from '../api';
 import PassGiveawayForm from './PassGiveawayForm';
 import { EnrichedShowName, FeatureBinBadge, KalxLiveBadge } from '../components';
@@ -12,12 +12,22 @@ import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
 import { canRecordDjGiveaways, formatShowRating, isMovieShow, isPreassignedTo } from '../utils';
 import { useGiveawayVisit } from '../tracking';
 import { useOnAir } from './onAirContext';
+import { setGiveawayOutcome } from './giveawayOutcome';
 import { formatCalendarDate, formatCalendarDateRange } from '../../common/dateTime';
 
 const GiveawayPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
+  // Back to the show: one page back if the DJ came here from it, so the
+  // giveaway form doesn't stay in history between the show and the page
+  // before it. Otherwise this page is replaced by the show.
+  const openedFromShow = (location.state as { fromShow?: boolean } | null)?.fromShow === true;
+  const backToShow = () => {
+    if (openedFromShow) navigate(-1);
+    else navigate(`/dj/shows/${id}`, { replace: true, state: { firstPage: location.key === 'default' } });
+  };
   // Away from the DJ studio, the page is view only: the form is disabled
   const isViewOnly = !canRecordDjGiveaways(user);
   const [show, setShow] = useState<ShowResponse | null>(null);
@@ -91,7 +101,7 @@ const GiveawayPage = () => {
       <div className="error">
         <p>Error: {error}</p>
         <button onClick={loadShow} className="btn-primary">Retry</button>
-        <button onClick={() => navigate(`/dj/shows/${id}`)} className="btn-secondary">
+        <button onClick={backToShow} className="btn-secondary">
           Back to Show
         </button>
       </div>
@@ -229,11 +239,10 @@ const GiveawayPage = () => {
                 <PassGiveawayForm
                   pass={firstAvailable}
                   venueId={show.venue.id}
-                  onSuccess={(outcome) =>
-                    navigate(`/dj/shows/${id}`, {
-                      state: outcome === 'tried' ? { justTried: true } : { justGaveAway: true },
-                    })
-                  }
+                  onSuccess={(outcome) => {
+                    if (id) setGiveawayOutcome(id, outcome);
+                    backToShow();
+                  }}
                   winFrequencyDays={show.venue.win_frequency_days}
                   winFrequencySharedWith={show.venue.win_frequency_shared_with}
                   requiresEmail={show.guest_list_requirements.requires_email_address}
@@ -267,7 +276,7 @@ const GiveawayPage = () => {
       </div>
 
       <div className="kalx-doc-footer">
-        <button onClick={() => navigate(`/dj/shows/${id}`)} className="btn-secondary">
+        <button onClick={backToShow} className="btn-secondary">
           ← Back to Show
         </button>
       </div>

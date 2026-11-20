@@ -8,15 +8,19 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.dismissed_spin_match import DismissedSpinMatch
+from app.models.on_air_winner import OnAirWinner
 from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.show_band import ShowBand
 from app.models.spinitron_spin_cache import SpinitronSpinCache
 from app.models.venue import Venue
+from app.pass_giveaway.services.on_air_identity import OnAirIdentity
 from app.pass_giveaway.services.spin_match_service import SpinMatchService
 from app.common.services.spinitron_service import SpinitronSpinItem
 
 DJ_STUDIO_IP = "192.168.1.100"  # within default dj_studio_network 192.168.1.0/24
+DJ = OnAirIdentity(kind="persona", name="DJ Test", persona_id=1, persona_name="DJ Test")
+OTHER_PERSONA_ID = 2
 
 
 def _spin(
@@ -24,6 +28,16 @@ def _spin(
 ) -> SpinitronSpinItem:
     return SpinitronSpinItem(
         id=id, start=datetime.now(timezone.utc), artist=artist, song=song, image=image
+    )
+
+
+def _fake_spins(monkeypatch, spins: list[SpinitronSpinItem]) -> None:
+    async def fake_fetch_spins(start):
+        return spins
+
+    monkeypatch.setattr(
+        "app.pass_giveaway.services.spin_match_service.SpinitronService.fetch_spins",
+        fake_fetch_spins,
     )
 
 
@@ -161,7 +175,7 @@ class TestGetCachedSpins:
 class TestGetCurrentMatches:
     async def test_no_ops_when_not_configured(self, db: Session, monkeypatch):
         monkeypatch.setattr(settings, "spinitron_api_key", None)
-        assert await SpinMatchService.get_current_matches(db) == []
+        assert await SpinMatchService.get_current_matches(db, None) == []
 
     async def test_matches_tagged_band(self, db: Session, monkeypatch, test_venue):
         monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
@@ -175,7 +189,7 @@ class TestGetCurrentMatches:
             fake_fetch_spins,
         )
 
-        matches = await SpinMatchService.get_current_matches(db)
+        matches = await SpinMatchService.get_current_matches(db, None)
 
         assert len(matches) == 1
         assert matches[0].spin_id == 101
@@ -201,7 +215,7 @@ class TestGetCurrentMatches:
             fake_fetch_spins,
         )
 
-        first = await SpinMatchService.get_current_matches(db)
+        first = await SpinMatchService.get_current_matches(db, None)
         assert len(first) == 1
 
         # Force a cache refresh so the same spin is fetched from Spinitron
@@ -210,7 +224,7 @@ class TestGetCurrentMatches:
         cache_row.fetched_at = datetime.now(timezone.utc) - timedelta(minutes=5)
         db.commit()
 
-        second = await SpinMatchService.get_current_matches(db)
+        second = await SpinMatchService.get_current_matches(db, None)
         assert len(second) == 1
         assert second[0].spin_id == 101
 
@@ -228,7 +242,7 @@ class TestGetCurrentMatches:
             fake_fetch_spins,
         )
 
-        first = await SpinMatchService.get_current_matches(db)
+        first = await SpinMatchService.get_current_matches(db, None)
         assert len(first) == 1
 
         SpinMatchService.dismiss(db, spin_id=101, show_id=show.id)
@@ -238,7 +252,7 @@ class TestGetCurrentMatches:
         cache_row.fetched_at = datetime.now(timezone.utc) - timedelta(minutes=5)
         db.commit()
 
-        second = await SpinMatchService.get_current_matches(db)
+        second = await SpinMatchService.get_current_matches(db, None)
         assert second == []
 
     async def test_dismissing_one_matched_show_leaves_other_showing(
@@ -256,7 +270,7 @@ class TestGetCurrentMatches:
             fake_fetch_spins,
         )
 
-        first = await SpinMatchService.get_current_matches(db)
+        first = await SpinMatchService.get_current_matches(db, None)
         assert {m.show.id for m in first} == {show_a.id, show_b.id}
 
         SpinMatchService.dismiss(db, spin_id=101, show_id=show_a.id)
@@ -265,7 +279,7 @@ class TestGetCurrentMatches:
         cache_row.fetched_at = datetime.now(timezone.utc) - timedelta(minutes=5)
         db.commit()
 
-        second = await SpinMatchService.get_current_matches(db)
+        second = await SpinMatchService.get_current_matches(db, None)
         assert len(second) == 1
         assert second[0].show.id == show_b.id
 
@@ -305,7 +319,7 @@ class TestGetCurrentMatches:
             fake_fetch_spins,
         )
 
-        assert await SpinMatchService.get_current_matches(db) == []
+        assert await SpinMatchService.get_current_matches(db, None) == []
 
     async def test_unrelated_artist_does_not_match(
         self, db: Session, monkeypatch, test_venue
@@ -321,67 +335,133 @@ class TestGetCurrentMatches:
             fake_fetch_spins,
         )
 
-        assert await SpinMatchService.get_current_matches(db) == []
+        assert await SpinMatchService.get_current_matches(db, None) == []
 
-    async def test_multi_word_artist_matches_via_event_name_fallback(
+    @pytest.mark.parametrize(
+        "event_name, artist",
+        [
+            ("Ana Tijoux w/ openers", "Ana Tijoux"),
+            ("Trough w/ openers", "Trough"),
+        ],
+    )
+    async def test_untagged_show_never_matches_by_event_name(
+        self, db: Session, monkeypatch, test_venue, event_name, artist
+    ):
+        """Only tagged artists match, however close the event name is."""
+        monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
+        _show_with_available_pair(db, test_venue, event_name)
+        _fake_spins(monkeypatch, [_spin(101, artist)])
+
+        assert await SpinMatchService.get_current_matches(db, None) == []
+
+    async def test_tagged_show_does_not_match_on_other_event_name_words(
         self, db: Session, monkeypatch, test_venue
     ):
-        """An untagged show falls back to fuzzy-matching event_name, same as
-        feature_bin_service and kalx_live_service."""
+        """An artist named in the event name but not tagged doesn't match."""
         monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
-        show = _show_with_available_pair(db, test_venue, "Ana Tijoux w/ openers")
-
-        async def fake_fetch_spins(start):
-            return [_spin(101, "Ana Tijoux")]
-
-        monkeypatch.setattr(
-            "app.pass_giveaway.services.spin_match_service.SpinitronService.fetch_spins",
-            fake_fetch_spins,
+        _show_with_available_pair(
+            db, test_venue, "Murcof with Ana Tijoux", band_name="Murcof"
         )
+        _fake_spins(monkeypatch, [_spin(101, "Ana Tijoux")])
 
-        matches = await SpinMatchService.get_current_matches(db)
-        assert len(matches) == 1
-        assert matches[0].show.id == show.id
+        assert await SpinMatchService.get_current_matches(db, None) == []
 
-    async def test_single_word_artist_matches_short_event_name(
+
+class TestOnlyGivableShowsMatch:
+    """A show only matches while whoever is on air could give a pair away."""
+
+    async def _matches(self, db, monkeypatch, identity):
+        monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
+        _fake_spins(monkeypatch, [_spin(101, "Murcof")])
+        return await SpinMatchService.get_current_matches(db, identity)
+
+    def _preassign(self, db, show, persona_id=None, specialty_show_id=None):
+        pair = db.query(Pass).filter(Pass.show_id == show.id).one()
+        pair.preassigned_persona_id = persona_id
+        pair.preassigned_specialty_show_id = specialty_show_id
+        pair.preassigned_date = date.today()
+        db.commit()
+
+    async def test_pair_preassigned_to_another_dj_does_not_match(
         self, db: Session, monkeypatch, test_venue
     ):
-        """Single-word artists get the same event-name fallback added for
-        feature-bin/KALX Live in 53be60b — previously this was skipped
-        entirely for Spinitron spins."""
-        monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
-        show = _show_with_available_pair(db, test_venue, "Trough w/ openers")
+        show = _show_with_available_pair(db, test_venue, "Some Show", band_name="Murcof")
+        self._preassign(db, show, persona_id=OTHER_PERSONA_ID)
 
-        async def fake_fetch_spins(start):
-            return [_spin(101, "Trough")]
+        assert await self._matches(db, monkeypatch, DJ) == []
+        assert await self._matches(db, monkeypatch, None) == []
 
-        monkeypatch.setattr(
-            "app.pass_giveaway.services.spin_match_service.SpinitronService.fetch_spins",
-            fake_fetch_spins,
-        )
-
-        matches = await SpinMatchService.get_current_matches(db)
-        assert len(matches) == 1
-        assert matches[0].show.id == show.id
-
-    async def test_single_word_artist_does_not_match_coincidental_surname(
+    async def test_pair_preassigned_to_the_on_air_dj_matches(
         self, db: Session, monkeypatch, test_venue
     ):
-        """A single-word artist ("Solomon") shouldn't match a long event name
-        that happens to contain that word as part of an unrelated name —
-        same guard as feature_bin_service/kalx_live_service."""
-        monkeypatch.setattr(settings, "spinitron_api_key", "fake-key")
-        _show_with_available_pair(db, test_venue, "Elori Saxl and Henry Solomon")
+        show = _show_with_available_pair(db, test_venue, "Some Show", band_name="Murcof")
+        self._preassign(db, show, persona_id=DJ.persona_id)
 
-        async def fake_fetch_spins(start):
-            return [_spin(101, "Solomon")]
+        matches = await self._matches(db, monkeypatch, DJ)
+        assert [m.show.id for m in matches] == [show.id]
 
-        monkeypatch.setattr(
-            "app.pass_giveaway.services.spin_match_service.SpinitronService.fetch_spins",
-            fake_fetch_spins,
+    async def test_talk_show_host_persona_preassignment_does_not_count(
+        self, db: Session, monkeypatch, test_venue
+    ):
+        """During a talk show only the show's own pre-assigned pairs count."""
+        show = _show_with_available_pair(db, test_venue, "Some Show", band_name="Murcof")
+        self._preassign(db, show, persona_id=DJ.persona_id)
+        talk = OnAirIdentity(
+            kind="talk", name="Talk", persona_id=DJ.persona_id, specialty_show_id=9
         )
 
-        assert await SpinMatchService.get_current_matches(db) == []
+        assert await self._matches(db, monkeypatch, talk) == []
+
+        self._preassign(db, show, specialty_show_id=9)
+        matches = await self._matches(db, monkeypatch, talk)
+        assert [m.show.id for m in matches] == [show.id]
+
+    async def test_planned_close_passed_does_not_match(
+        self, db: Session, monkeypatch, test_venue
+    ):
+        show = _show_with_available_pair(db, test_venue, "Some Show", band_name="Murcof")
+        show.planned_close_date = date(2000, 1, 1)
+        show.planned_close_time = time(12, 0)
+        db.commit()
+
+        assert await self._matches(db, monkeypatch, DJ) == []
+
+    async def test_closed_show_does_not_match(self, db: Session, monkeypatch, test_venue):
+        show = _show_with_available_pair(db, test_venue, "Some Show", band_name="Murcof")
+        show.status = "closed"
+        db.commit()
+
+        assert await self._matches(db, monkeypatch, DJ) == []
+
+    async def test_show_the_dj_just_gave_a_pair_away_for_does_not_match(
+        self, db: Session, monkeypatch, test_venue
+    ):
+        """One pair per show per DJ shift, so a second one can't go on air."""
+        show = _show_with_available_pair(db, test_venue, "Some Show", band_name="Murcof")
+        given = Pass(
+            show_id=show.id,
+            pass_type="pair",
+            status="given_away",
+            given_away_persona_id=DJ.persona_id,
+        )
+        db.add(given)
+        db.flush()
+        db.add(
+            OnAirWinner(
+                pass_id=given.id,
+                venue_id=test_venue.id,
+                show_id=show.id,
+                recipient_name="Winner",
+                recipient_phone="5105550100",
+                given_away_persona_id=DJ.persona_id,
+            )
+        )
+        db.commit()
+
+        assert await self._matches(db, monkeypatch, DJ) == []
+        # Another DJ can still give one away
+        other = OnAirIdentity(kind="persona", name="Other", persona_id=OTHER_PERSONA_ID)
+        assert [m.show.id for m in await self._matches(db, monkeypatch, other)] == [show.id]
 
 
 class TestDismiss:

@@ -20,30 +20,38 @@ an actual DJ seeing the notification, rather than the first poll after a
 match exists — and since dismissal is server-side, it clears the match from
 every open DJ tab on their next poll, not just the tab that dismissed it.
 
-Matching shares its rapidfuzz rules and thresholds with feature_bin_service
-and kalx_live_service (tagged show artists first, event-name fallback with a
-stricter path for single-word names) via fuzzy_artist_match, just in the
-opposite direction: one spin artist against many candidate shows instead of
-many artists against one show.
+A spin only matches a show's tagged artists (ShowBand), never its
+event_name, by the rule shared with feature_bin_service and
+kalx_live_service (see fuzzy_artist_match).
+
+A show is only a candidate while whoever is on air could give away a pair
+for it right now, by the same rule as the DJ show list's "Give Away" button:
+it's published and not past its planned close time, a pair is left that
+isn't pre-assigned to another DJ, and the on-air identity hasn't already
+given away a pair for it within DJ_SHOW_GIVEAWAY_WINDOW.
 """
 
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
 
-from sqlalchemy import func, select
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.config import settings
 from app.models.dismissed_spin_match import DismissedSpinMatch
+from app.models.on_air_winner import OnAirWinner
 from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.spinitron_spin_cache import SpinitronSpinCache
-from app.pass_giveaway.services.fuzzy_artist_match import (
-    is_band_name_match,
-    match_event_names_against_name,
-)
+from app.pass_giveaway.services.fuzzy_artist_match import is_band_name_match
 from app.common.services.spinitron_service import SpinitronService
+
+if TYPE_CHECKING:
+    # on_air_identity imports this module (for recent_spins), and pass_service
+    # imports on_air_identity, so both are imported where they're used.
+    from app.pass_giveaway.services.on_air_identity import OnAirIdentity
 
 logger = logging.getLogger(__name__)
 
@@ -130,43 +138,68 @@ class SpinMatchService:
         return spin_dicts
 
     @staticmethod
-    def _candidate_shows(db: Session) -> list[Show]:
-        """Published shows with at least one available pass pair left to give away."""
-        show_ids_with_pairs = (
-            select(Pass.show_id)
-            .where(Pass.pass_type == "pair", Pass.status == "available")
-            .group_by(Pass.show_id)
-            .having(func.count(Pass.id) > 0)
+    def _candidate_shows(db: Session, identity: "OnAirIdentity | None") -> list[Show]:
+        """Published shows that *identity* could give away a pass pair for right now.
+
+        That takes an available pair that's unassigned or pre-assigned to
+        *identity* (during a talk show, only the show's own; see
+        `isPreassignedTo` in the frontend's utils.ts), a planned close time
+        that hasn't passed, and no pair given away by *identity* for the show
+        within DJ_SHOW_GIVEAWAY_WINDOW. With no one on air, only unassigned
+        pairs count.
+        """
+        from app.pass_giveaway.services.on_air_identity import credit
+        from app.pass_giveaway.services.pass_service import (
+            DJ_SHOW_GIVEAWAY_WINDOW,
+            PassService,
         )
-        return (
+
+        persona_id, specialty_show_id = credit(identity)
+        mine = []
+        if specialty_show_id is not None:
+            mine.append(Pass.preassigned_specialty_show_id == specialty_show_id)
+        if persona_id is not None and identity.kind != "talk":
+            mine.append(
+                Pass.preassigned_specialty_show_id.is_(None)
+                & (Pass.preassigned_persona_id == persona_id)
+            )
+        givable_pair_show_ids = db.query(Pass.show_id).filter(
+            Pass.pass_type == "pair",
+            Pass.status == "available",
+            or_(~Pass.is_preassigned, *mine) if mine else ~Pass.is_preassigned,
+        )
+
+        query = (
             db.query(Show)
             .options(joinedload(Show.bands), joinedload(Show.venue))
-            .filter(Show.status == "published", Show.id.in_(show_ids_with_pairs))
-            .all()
+            .filter(Show.status == "published", Show.id.in_(givable_pair_show_ids))
         )
+        if identity is not None:
+            since = datetime.now(timezone.utc) - DJ_SHOW_GIVEAWAY_WINDOW
+            recently_given = db.query(OnAirWinner.show_id).filter(
+                _null_safe_eq(OnAirWinner.given_away_persona_id, persona_id),
+                _null_safe_eq(OnAirWinner.given_away_specialty_show_id, specialty_show_id),
+                OnAirWinner.created_at >= since,
+            )
+            query = query.filter(~Show.id.in_(recently_given))
+
+        return [show for show in query.all() if not PassService.planned_close_passed(show)]
 
     @staticmethod
     def _matching_shows(artist_name: str, shows: list[Show]) -> list[Show]:
-        """Return candidate shows whose tagged artists (or event name) match *artist_name*."""
-        matched: list[Show] = []
-        event_name_candidates: dict[int, str] = {}
-        for show in shows:
-            band_names = [b.band_name for b in show.bands or [] if b.band_name]
-            if band_names:
-                if any(
-                    is_band_name_match(artist_name, band_name) for band_name in band_names
-                ):
-                    matched.append(show)
-                continue
+        """Return candidate shows with a tagged artist matching *artist_name*.
 
-            if show.event_name:
-                event_name_candidates[show.id] = show.event_name
-
-        if event_name_candidates:
-            matched_ids = match_event_names_against_name(artist_name, event_name_candidates)
-            matched.extend(show for show in shows if show.id in matched_ids)
-
-        return matched
+        A show with no tagged artists never matches.
+        """
+        return [
+            show
+            for show in shows
+            if any(
+                is_band_name_match(artist_name, band.band_name)
+                for band in show.bands or []
+                if band.band_name
+            )
+        ]
 
     @staticmethod
     def _dismissed_pairs(db: Session, spin_ids: list[int]) -> set[tuple[int, int]]:
@@ -185,8 +218,13 @@ class SpinMatchService:
         ).delete()
 
     @staticmethod
-    async def get_current_matches(db: Session) -> list[SpinMatch]:
+    async def get_current_matches(
+        db: Session, identity: "OnAirIdentity | None"
+    ) -> list[SpinMatch]:
         """Return every current spin/show match that hasn't been dismissed.
+
+        Only shows *identity* (who is on air) could give away a pair for now
+        can match (see `_candidate_shows`).
 
         Returned again on every call — including from every other open DJ
         tab — until `dismiss` is called for that exact (spin_id, show_id)
@@ -204,7 +242,7 @@ class SpinMatchService:
         spin_ids = [s["id"] for s in spins]
         dismissed = SpinMatchService._dismissed_pairs(db, spin_ids)
 
-        candidate_shows = SpinMatchService._candidate_shows(db)
+        candidate_shows = SpinMatchService._candidate_shows(db, identity)
         matches: list[SpinMatch] = []
 
         if candidate_shows:
@@ -245,3 +283,7 @@ class SpinMatchService:
                 )
             )
             db.commit()
+
+
+def _null_safe_eq(column, value):
+    return column.is_(None) if value is None else column == value

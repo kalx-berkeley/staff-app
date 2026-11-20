@@ -23,10 +23,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.feature_bin_release import FeatureBinRelease
 from app.models.job_log import JobLog
-from app.pass_giveaway.services.fuzzy_artist_match import (
-    is_band_name_match,
-    match_names_against_event_name,
-)
+from app.pass_giveaway.services.fuzzy_artist_match import is_band_name_match
 
 logger = logging.getLogger(__name__)
 
@@ -196,30 +193,22 @@ class FeatureBinService:
 
     @staticmethod
     def find_matches(index: FeatureBinIndex, show) -> list[FeatureBinRelease]:
-        """Return feature-bin releases matching a show's tagged artists or event name.
+        """Return feature-bin releases matching a show's tagged artists (show.bands).
 
-        Tagged artists (show.bands) are preferred when present; otherwise falls
-        back to fuzzy-matching the whole event_name against feature-bin artists.
+        A show with no tagged artists never matches: its event name often holds
+        other words that an artist's name can coincidentally match.
         """
         if not index.releases:
             return []
 
         band_names = [b.band_name for b in show.bands or [] if b.band_name]
-        if band_names:
-            matched: list[FeatureBinRelease] = []
-            matched_ids: set[int] = set()
-            for band_name in band_names:
-                for release in index.releases:
-                    if release.id in matched_ids:
-                        continue
-                    if is_band_name_match(band_name, release.artist):
-                        matched.append(release)
-                        matched_ids.add(release.id)
-            return matched
-
-        if not show.event_name:
-            return []
-
-        candidates = {release.id: release.artist for release in index.releases}
-        matched_ids = match_names_against_event_name(show.event_name, candidates)
-        return [r for r in index.releases if r.id in matched_ids]
+        matched: list[FeatureBinRelease] = []
+        matched_ids: set[int] = set()
+        for band_name in band_names:
+            for release in index.releases:
+                if release.id in matched_ids:
+                    continue
+                if is_band_name_match(band_name, release.artist):
+                    matched.append(release)
+                    matched_ids.add(release.id)
+        return matched

@@ -198,69 +198,47 @@ class TestFindMatches:
         matches = KalxLiveService.find_matches(index, show)
         assert [a.id for a in matches] == [appearance.id]
 
-    def test_event_name_fuzzy_fallback_when_no_bands(self, db: Session, test_venue):
-        appearance = self._appearance(db, "Warm Spell", date.today())
-        show = self._show(db, test_venue, "Warm Spell w/ Special Guests", None)
+    @pytest.mark.parametrize(
+        "event_name, band_name",
+        [
+            ("Warm Spell w/ Special Guests", "Warm Spell"),
+            ("Trough w/ openers", "Trough"),
+            ("Trough", "Trough"),
+        ],
+    )
+    def test_untagged_show_never_matches_by_event_name(
+        self, db: Session, test_venue, event_name, band_name
+    ):
+        """Only tagged bands match, however close the event name is."""
+        self._appearance(db, band_name, date.today())
+        show = self._show(db, test_venue, event_name, None)
 
         index = KalxLiveService.build_index(db)
-        matches = KalxLiveService.find_matches(index, show)
-        assert [a.id for a in matches] == [appearance.id]
+        assert KalxLiveService.find_matches(index, show) == []
 
-    def test_single_word_band_matches_short_event_name(self, db: Session, test_venue):
-        """A single-word band matches a short event name built from that word
-        plus minimal framing — the realistic case this fallback exists for."""
-        appearance = self._appearance(db, "Trough", date.today())
-        show = self._show(db, test_venue, "Trough w/ openers", None)
-
-        index = KalxLiveService.build_index(db)
-        matches = KalxLiveService.find_matches(index, show)
-        assert [a.id for a in matches] == [appearance.id]
-
-    def test_single_word_band_matches_short_ambiguous_event_name(
+    def test_tagged_show_does_not_match_on_other_event_name_words(
         self, db: Session, test_venue
     ):
-        """Known, accepted limitation: see feature_bin_service's identical
-        test for the full rationale. Documents the trade-off, not a bug."""
-        appearance = self._appearance(db, "Nothing", date.today())
-        show = self._show(db, test_venue, "Wild Nothing", None)
+        """A band named in the event name but not tagged doesn't match."""
+        self._appearance(db, "Henry Solomon", date.today())
+        show = self._show(db, test_venue, "Elori Saxl and Henry Solomon", "Elori Saxl")
 
         index = KalxLiveService.build_index(db)
-        matches = KalxLiveService.find_matches(index, show)
-        assert [a.id for a in matches] == [appearance.id]
+        assert KalxLiveService.find_matches(index, show) == []
 
-    def test_single_word_band_tolerates_minor_typo(self, db: Session, test_venue):
+    def test_single_word_tagged_band_tolerates_minor_typo(self, db: Session, test_venue):
         appearance = self._appearance(db, "Trough", date.today())
-        show = self._show(db, test_venue, "Trogh", None)
+        show = self._show(db, test_venue, "show", "Trogh")
 
         index = KalxLiveService.build_index(db)
         matches = KalxLiveService.find_matches(index, show)
         assert [a.id for a in matches] == [appearance.id]
 
-    def test_single_word_band_does_not_match_dissimilar_short_word(
+    def test_single_word_tagged_band_does_not_match_dissimilar_short_word(
         self, db: Session, test_venue
     ):
         self._appearance(db, "Live", date.today())
-        show = self._show(db, test_venue, "Life", None)
-
-        index = KalxLiveService.build_index(db)
-        assert KalxLiveService.find_matches(index, show) == []
-
-    def test_single_word_band_below_min_length_does_not_match(
-        self, db: Session, test_venue
-    ):
-        self._appearance(db, "Cat", date.today())
-        show = self._show(db, test_venue, "Cat", None)
-
-        index = KalxLiveService.build_index(db)
-        assert KalxLiveService.find_matches(index, show) == []
-
-    def test_single_word_band_does_not_match_coincidental_surname(
-        self, db: Session, test_venue
-    ):
-        """The event-name word-count cap still excludes a single-word band
-        from matching a long event name it happens to appear a fragment of."""
-        self._appearance(db, "Solomon", date.today())
-        show = self._show(db, test_venue, "Elori Saxl and Henry Solomon", None)
+        show = self._show(db, test_venue, "show", "Life")
 
         index = KalxLiveService.build_index(db)
         assert KalxLiveService.find_matches(index, show) == []

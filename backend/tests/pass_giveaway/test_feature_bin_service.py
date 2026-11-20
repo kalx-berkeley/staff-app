@@ -165,10 +165,9 @@ class TestFindMatches:
         matches = FeatureBinService.find_matches(index, show)
         assert [r.id for r in matches] == [release.id]
 
-    def test_event_name_fuzzy_fallback_when_no_bands(self, db: Session, test_venue):
-        release = self._release(db, "Mighty Mighty Bosstones")
+    def _show(self, db: Session, test_venue, event_name: str, band_name: str | None):
         show = Show(
-            event_name="Mighty Mighty Bosstones w/ Special Guests",
+            event_name=event_name,
             venue_id=test_venue.id,
             show_date=date(2024, 12, 31),
             show_time=time(20, 0),
@@ -177,172 +176,66 @@ class TestFindMatches:
             num_pass_pairs=2,
         )
         db.add(show)
+        db.flush()
+        if band_name:
+            db.add(
+                ShowBand(
+                    show_id=show.id,
+                    musicbrainz_id="fake-mbid",
+                    band_name=band_name,
+                    start_pos=0,
+                    end_pos=10,
+                )
+            )
         db.commit()
         db.refresh(show)
+        return show
+
+    @pytest.mark.parametrize(
+        "event_name, artist",
+        [
+            ("Mighty Mighty Bosstones w/ Special Guests", "Mighty Mighty Bosstones"),
+            ("Trough w/ openers", "Trough"),
+            ("Trough", "Trough"),
+        ],
+    )
+    def test_untagged_show_never_matches_by_event_name(
+        self, db: Session, test_venue, event_name, artist
+    ):
+        """Only tagged artists match, however close the event name is."""
+        self._release(db, artist)
+        show = self._show(db, test_venue, event_name, None)
 
         index = FeatureBinService.build_index(db)
-        matches = FeatureBinService.find_matches(index, show)
-        assert [r.id for r in matches] == [release.id]
+        assert FeatureBinService.find_matches(index, show) == []
 
-    def test_single_word_artist_matches_short_event_name(self, db: Session, test_venue):
-        """A single-word artist matches a short event name built from that word
-        plus minimal framing — the realistic case this fallback exists for."""
-        release = self._release(db, "Trough")
-        show = Show(
-            event_name="Trough w/ openers",
-            venue_id=test_venue.id,
-            show_date=date(2024, 12, 31),
-            show_time=time(20, 0),
-            age_restriction="all_ages",
-            wheelchair_accessible="yes",
-            num_pass_pairs=2,
-        )
-        db.add(show)
-        db.commit()
-        db.refresh(show)
-
-        index = FeatureBinService.build_index(db)
-        matches = FeatureBinService.find_matches(index, show)
-        assert [r.id for r in matches] == [release.id]
-
-    def test_single_word_artist_matches_short_ambiguous_event_name(
+    def test_tagged_show_does_not_match_on_other_event_name_words(
         self, db: Session, test_venue
     ):
-        """Known, accepted limitation: within the short-event-name window, a
-        single-word artist can still coincidentally match a different band
-        whose own name happens to contain that word (e.g. artist "Nothing"
-        against a show titled for the unrelated band "Wild Nothing"). This
-        can't be resolved from text alone — tagging the artist on the show
-        is the unambiguous fix, and is always preferred over this fallback.
-        This test documents the trade-off rather than asserting it's wrong.
-        """
-        release = self._release(db, "Nothing")
-        show = Show(
-            event_name="Wild Nothing",
-            venue_id=test_venue.id,
-            show_date=date(2024, 12, 31),
-            show_time=time(20, 0),
-            age_restriction="all_ages",
-            wheelchair_accessible="yes",
-            num_pass_pairs=2,
-        )
-        db.add(show)
-        db.commit()
-        db.refresh(show)
+        """An artist named in the event name but not tagged doesn't match."""
+        self._release(db, "Henry Solomon")
+        show = self._show(db, test_venue, "Elori Saxl and Henry Solomon", "Elori Saxl")
 
         index = FeatureBinService.build_index(db)
-        matches = FeatureBinService.find_matches(index, show)
-        assert [r.id for r in matches] == [release.id]
+        assert FeatureBinService.find_matches(index, show) == []
 
-    def test_single_word_artist_tolerates_minor_typo(self, db: Session, test_venue):
-        """A single-letter-dropped typo ("Trogh" for "Trough") still matches —
-        the single-word path isn't limited to byte-for-byte exact strings."""
+    def test_single_word_tagged_artist_tolerates_minor_typo(self, db: Session, test_venue):
         release = self._release(db, "Trough")
-        show = Show(
-            event_name="Trogh",
-            venue_id=test_venue.id,
-            show_date=date(2024, 12, 31),
-            show_time=time(20, 0),
-            age_restriction="all_ages",
-            wheelchair_accessible="yes",
-            num_pass_pairs=2,
-        )
-        db.add(show)
-        db.commit()
-        db.refresh(show)
+        show = self._show(db, test_venue, "show", "Trogh")
 
         index = FeatureBinService.build_index(db)
         matches = FeatureBinService.find_matches(index, show)
         assert [r.id for r in matches] == [release.id]
 
-    def test_single_word_artist_does_not_match_dissimilar_short_word(
+    def test_single_word_tagged_artist_does_not_match_dissimilar_short_word(
         self, db: Session, test_venue
     ):
-        """ "Live" shouldn't match an event name containing the different word
-        "Life" — short strings need a near-exact match, not just "fuzzy"."""
+        """ "Live" shouldn't match "Life": short names need a near-exact match."""
         self._release(db, "Live")
-        show = Show(
-            event_name="Life",
-            venue_id=test_venue.id,
-            show_date=date(2024, 12, 31),
-            show_time=time(20, 0),
-            age_restriction="all_ages",
-            wheelchair_accessible="yes",
-            num_pass_pairs=2,
-        )
-        db.add(show)
-        db.commit()
-        db.refresh(show)
+        show = self._show(db, test_venue, "show", "Life")
 
         index = FeatureBinService.build_index(db)
         assert FeatureBinService.find_matches(index, show) == []
-
-    def test_single_word_artist_below_min_length_does_not_match(
-        self, db: Session, test_venue
-    ):
-        """A too-short artist name ("Cat") never matches via this fallback,
-        even against an identical event name — too little information in
-        a 3-character word to trust regardless of exactness."""
-        self._release(db, "Cat")
-        show = Show(
-            event_name="Cat",
-            venue_id=test_venue.id,
-            show_date=date(2024, 12, 31),
-            show_time=time(20, 0),
-            age_restriction="all_ages",
-            wheelchair_accessible="yes",
-            num_pass_pairs=2,
-        )
-        db.add(show)
-        db.commit()
-        db.refresh(show)
-
-        index = FeatureBinService.build_index(db)
-        assert FeatureBinService.find_matches(index, show) == []
-
-    def test_single_word_artist_does_not_match_coincidental_surname(
-        self, db: Session, test_venue
-    ):
-        """A single-word artist ("Solomon") shouldn't match an event name that
-        happens to contain that word as part of a different performer's name."""
-        self._release(db, "Solomon")
-        show = Show(
-            event_name="Elori Saxl and Henry Solomon",
-            venue_id=test_venue.id,
-            show_date=date(2024, 12, 31),
-            show_time=time(20, 0),
-            age_restriction="all_ages",
-            wheelchair_accessible="yes",
-            num_pass_pairs=2,
-        )
-        db.add(show)
-        db.commit()
-        db.refresh(show)
-
-        index = FeatureBinService.build_index(db)
-        assert FeatureBinService.find_matches(index, show) == []
-
-    def test_multi_word_artist_still_matches_via_event_name_fallback(
-        self, db: Session, test_venue
-    ):
-        """The single-word exclusion shouldn't break the intended multi-word case."""
-        release = self._release(db, "Henry Solomon")
-        show = Show(
-            event_name="Elori Saxl and Henry Solomon",
-            venue_id=test_venue.id,
-            show_date=date(2024, 12, 31),
-            show_time=time(20, 0),
-            age_restriction="all_ages",
-            wheelchair_accessible="yes",
-            num_pass_pairs=2,
-        )
-        db.add(show)
-        db.commit()
-        db.refresh(show)
-
-        index = FeatureBinService.build_index(db)
-        matches = FeatureBinService.find_matches(index, show)
-        assert [r.id for r in matches] == [release.id]
 
     def test_no_match_returns_empty(self, db: Session, test_venue):
         self._release(db, "Completely Unrelated Artist")

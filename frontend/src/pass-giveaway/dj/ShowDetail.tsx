@@ -8,30 +8,46 @@ import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, KALX_CALL_IN_PHONE, KALX_CALL_IN_PHONE_LETTERS, canDjEditWinner, findRecentDjGiveaway, formatShowRating, isMovieShow, isPreassignedTo } from '../utils';
 import { useOnAir } from './onAirContext';
 import WinnerEditForm from './WinnerEditForm';
+import { clearGiveawayOutcome, peekGiveawayOutcome } from './giveawayOutcome';
 import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
 import type { ShowResponse, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 import { formatCalendarDate, formatCalendarDateRange, formatPacific } from '../../common/dateTime';
 
+/**
+ * The DJ show page, remounted for each show. Going from one show straight to
+ * another (the spin-match toast's "Go to show", or Back afterwards) would
+ * otherwise keep the last show's state: its just-gave-away flag, the warnings
+ * the DJ clicked through and the winner being edited.
+ */
 const ShowDetail = () => {
+  const { id } = useParams<{ id: string }>();
+  return <ShowDetailPage key={id} />;
+};
+
+const ShowDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  // Set by GiveawayPage after a successful giveaway. The DJ has just used their
-  // one pair for this show, so the "I'm off the mic" button would only
-  // confuse them. Read once, then cleared
-  // from history so a reload or a later visit shows the page as usual.
-  // GiveawayPage sets justTried instead after Tried: nobody called in, so the
-  // pass is still available and the off-the-mic button stays.
+  // Set by GiveawayPage after a successful giveaway (see giveawayOutcome.ts).
+  // The DJ has just used their one pair for this show, so the "I'm off the
+  // mic" button would only confuse them. After Tried, nobody called in, so
+  // the pass is still available and the off-the-mic button stays.
   const [{ justGaveAway, justTried }] = useState(() => {
-    const state = location.state as { justGaveAway?: boolean; justTried?: boolean } | null;
-    return { justGaveAway: state?.justGaveAway === true, justTried: state?.justTried === true };
+    const outcome = peekGiveawayOutcome(id);
+    return { justGaveAway: outcome === 'given_away', justTried: outcome === 'tried' };
   });
   useEffect(() => {
-    if (justGaveAway || justTried) navigate(location.pathname, { replace: true, state: null });
-    // Only on mount: clearing the state must not re-run when location changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    clearGiveawayOutcome();
   }, []);
+  // One page back, to wherever the DJ came from. If this tab opened on this
+  // page, there's nowhere in the app to go back to, so go to the shows list.
+  const goBack = () => {
+    const firstPage =
+      location.key === 'default' || (location.state as { firstPage?: boolean } | null)?.firstPage;
+    if (firstPage) navigate('/dj/shows');
+    else navigate(-1);
+  };
   const [show, setShow] = useState<ShowResponse | null>(null);
   usePageTitle(`${show?.event_name ?? 'Show'} · DJ`);
   const [loading, setLoading] = useState(true);
@@ -123,8 +139,8 @@ const ShowDetail = () => {
       <div className="error">
         <p>Error: {error}</p>
         <button onClick={loadShow} className="btn-primary">Retry</button>
-        <button onClick={() => navigate('/dj/shows')} className="btn-secondary">
-          Back to Shows
+        <button onClick={goBack} className="btn-secondary">
+          Back
         </button>
       </div>
     );
@@ -350,7 +366,7 @@ const ShowDetail = () => {
           </p>
           <button
             className="btn-primary btn-winner-huge"
-            onClick={() => navigate(`/dj/shows/${id}/giveaway`)}
+            onClick={() => navigate(`/dj/shows/${id}/giveaway`, { state: { fromShow: true } })}
           >
             I'm off the mic
           </button>
@@ -412,8 +428,8 @@ const ShowDetail = () => {
       </div>
 
       <div className="kalx-doc-footer">
-        <button onClick={() => navigate('/dj/shows')} className="btn-secondary">
-          ← Back to Shows
+        <button onClick={goBack} className="btn-secondary">
+          ← Back
         </button>
       </div>
     </div>

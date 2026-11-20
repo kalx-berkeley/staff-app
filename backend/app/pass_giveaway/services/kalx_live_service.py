@@ -22,10 +22,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.job_log import JobLog
 from app.models.kalx_live_appearance import KalxLiveAppearance
-from app.pass_giveaway.services.fuzzy_artist_match import (
-    is_band_name_match,
-    match_names_against_event_name,
-)
+from app.pass_giveaway.services.fuzzy_artist_match import is_band_name_match
 
 logger = logging.getLogger(__name__)
 
@@ -167,12 +164,12 @@ class KalxLiveService:
 
     @staticmethod
     def find_matches(index: KalxLiveIndex, show) -> list[KalxLiveAppearance]:
-        """Return KALX Live! appearances matching a show's tagged artists or event name.
+        """Return KALX Live! appearances matching a show's tagged artists (show.bands).
 
-        Tagged artists (show.bands) are preferred when present; otherwise
-        falls back to fuzzy-matching the whole event_name against KALX Live!
-        band names. Only appearances within the recency window (recent past
-        or any future date) are considered.
+        A show with no tagged artists never matches: its event name often holds
+        other words that a band's name can coincidentally match. Only
+        appearances within the recency window (recent past or any future date)
+        are considered.
         """
         cutoff = date.today() - _PAST_WINDOW
         candidates = [a for a in index.appearances if a.event_date >= cutoff]
@@ -180,21 +177,13 @@ class KalxLiveService:
             return []
 
         band_names = [b.band_name for b in show.bands or [] if b.band_name]
-        if band_names:
-            matched: list[KalxLiveAppearance] = []
-            matched_ids: set[int] = set()
-            for band_name in band_names:
-                for appearance in candidates:
-                    if appearance.id in matched_ids:
-                        continue
-                    if is_band_name_match(band_name, appearance.band_name):
-                        matched.append(appearance)
-                        matched_ids.add(appearance.id)
-            return matched
-
-        if not show.event_name:
-            return []
-
-        name_candidates = {a.id: a.band_name for a in candidates}
-        matched_ids = match_names_against_event_name(show.event_name, name_candidates)
-        return [a for a in candidates if a.id in matched_ids]
+        matched: list[KalxLiveAppearance] = []
+        matched_ids: set[int] = set()
+        for band_name in band_names:
+            for appearance in candidates:
+                if appearance.id in matched_ids:
+                    continue
+                if is_band_name_match(band_name, appearance.band_name):
+                    matched.append(appearance)
+                    matched_ids.add(appearance.id)
+        return matched
