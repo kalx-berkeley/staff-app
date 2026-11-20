@@ -452,7 +452,8 @@ def release_claim(
     Requires staff member or promotions staff authentication. Staff members
     may only release their own claim; promotions staff may release any claim,
     and site admins (checked against the real signed-in user) may release
-    anyone's tabler pass. Show must not be closed.
+    anyone's tabler pass. Show must not be closed. When a tabler releases
+    their own tabler pass, the Publicity department heads are emailed.
 
     Args:
         pass_id: Pass ID
@@ -498,7 +499,14 @@ def release_claim(
             "pass_type": pass_item.pass_type,
         },
     )
-    # A tabler hears about it when someone else releases their pass.
+    # The Publicity heads hear when a tabler releases their own pass, and a
+    # tabler hears about it when someone else releases it.
+    if (
+        pass_item.pass_type == "tabler"
+        and prior_staff is not None
+        and prior_staff.id == user.id
+    ):
+        tabler_service.email_publicity_heads(db, prior_staff, pass_item.show, claimed=False)
     if (
         pass_item.pass_type == "tabler"
         and prior_staff is not None
@@ -554,7 +562,8 @@ def claim_tabler_pass(
     Current staff (Active or 🆕) in the Publicity department can at any time,
     and other Active staff once the tabler passes are open to all
     (``Show.tabler_open_days`` before the planned close). First come, first
-    served, even on lottery shows, and never with a +1 guest.
+    served, even on lottery shows, and never with a +1 guest. The Publicity
+    department heads are emailed.
     """
     role, user = user_info
     show = _get_show_or_404(db, show_id)
@@ -574,6 +583,7 @@ def claim_tabler_pass(
         entity_id=pass_item.id,
         details={"staff_id": user.id, "show_id": show.id, "pass_type": "tabler"},
     )
+    tabler_service.email_publicity_heads(db, user, show, claimed=True)
     return PassResponse.model_validate(pass_item)
 
 

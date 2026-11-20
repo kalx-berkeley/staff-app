@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.common.areas import PASS_GIVEAWAY_AREA
 from app.common.pacific_time import PACIFIC
 from app.models.audit_log import AuditLog
+from app.models.notification_preferences import NotificationPreferences
 from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.staff import Staff
@@ -487,6 +488,99 @@ def test_other_staff_cant_release_tabler_pass(client, db, promo, venue, pub, pub
     resp = client.delete(f"/api/passes/{pass_id}/claim", headers=_h(pub2))
     assert resp.status_code == 403
     assert _tabler_releases(db) == []
+
+
+# ── Publicity department heads ────────────────────────────────────────────────
+
+
+def _make_publicity_head(db: Session, name: str, record_id: str) -> Staff:
+    staff = _make_staff(db, name, "Publicity")
+    staff.airtable_record_id = record_id
+    db.add(DepartmentHead(department="Publicity", staff_airtable_record_id=record_id))
+    db.commit()
+    return staff
+
+
+@pytest.fixture
+def pub_head(db: Session):
+    return _make_publicity_head(db, "Paula", "recPAULA")
+
+
+def _sent_to(send) -> list[str]:
+    return [c.kwargs["to_email"] for c in send.call_args_list]
+
+
+def test_publicity_heads_emailed_when_tabler_claims(
+    client, db, promo, venue, pub, pub_head
+):
+    second = _make_publicity_head(db, "Pia", "recPIA")
+    data = _create(client, promo, venue)
+    _publish(db, data["id"])
+    with patch(SEND_EMAIL) as send:
+        assert _claim_tabler(client, data["id"], pub).status_code == 200
+    assert sorted(_sent_to(send)) == sorted([pub_head.email, second.email])
+    kwargs = send.call_args.kwargs
+    assert kwargs["subject"] == "Penny claimed a tabler pass: Table Show"
+    assert "Penny has claimed a tabler pass" in kwargs["body_text"]
+    assert "1 of 2 tabler passes claimed." in kwargs["body_text"]
+    assert kwargs["area"] == PASS_GIVEAWAY_AREA
+
+
+def test_publicity_heads_emailed_when_tabler_releases(
+    client, db, promo, venue, pub, pub_head
+):
+    data = _create(client, promo, venue)
+    _publish(db, data["id"])
+    with patch(SEND_EMAIL):
+        pass_id = _claim_tabler(client, data["id"], pub).json()["id"]
+    with patch(SEND_EMAIL) as send:
+        resp = client.delete(f"/api/passes/{pass_id}/claim", headers=_h(pub))
+    assert resp.status_code == 200
+    assert _sent_to(send) == [pub_head.email]
+    kwargs = send.call_args.kwargs
+    assert kwargs["subject"] == "Penny released a tabler pass: Table Show"
+    assert "0 of 2 tabler passes claimed." in kwargs["body_text"]
+
+
+def test_publicity_head_not_emailed_about_own_claim(client, db, promo, venue, pub_head):
+    data = _create(client, promo, venue)
+    _publish(db, data["id"])
+    with patch(SEND_EMAIL) as send:
+        assert _claim_tabler(client, data["id"], pub_head).status_code == 200
+    send.assert_not_called()
+
+
+def test_only_publicity_heads_emailed(client, db, promo, venue, pub, head):
+    """A head of another department isn't told."""
+    data = _create(client, promo, venue)
+    _publish(db, data["id"])
+    with patch(SEND_EMAIL) as send:
+        assert _claim_tabler(client, data["id"], pub).status_code == 200
+    send.assert_not_called()
+
+
+def test_publicity_head_with_email_off_not_emailed(client, db, promo, venue, pub, pub_head):
+    db.add(NotificationPreferences(staff_id=pub_head.id, email_enabled=False))
+    db.commit()
+    data = _create(client, promo, venue)
+    _publish(db, data["id"])
+    with patch(SEND_EMAIL) as send:
+        assert _claim_tabler(client, data["id"], pub).status_code == 200
+    send.assert_not_called()
+
+
+def test_publicity_heads_not_emailed_when_others_release(
+    client, db, promo, venue, pub, pub_head
+):
+    """Promotions releasing a tabler's pass emails the tabler, not the heads."""
+    data = _create(client, promo, venue)
+    _publish(db, data["id"])
+    with patch(SEND_EMAIL):
+        pass_id = _claim_tabler(client, data["id"], pub).json()["id"]
+    with patch(SEND_EMAIL) as send:
+        resp = client.delete(f"/api/passes/{pass_id}/claim", headers=_h(promo))
+    assert resp.status_code == 200
+    assert _sent_to(send) == [pub.email]
 
 
 def test_my_claims_include_tabler_pass(client, db, promo, venue, pub):

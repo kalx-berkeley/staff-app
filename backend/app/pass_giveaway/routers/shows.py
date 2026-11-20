@@ -1154,9 +1154,7 @@ def _check_tabler_open_days(
         return
     error = tabler_service.open_days_error(days, close_date)
     if error:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=error
-        )
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=error)
 
 
 @router.put("/{show_id}", response_model=ShowResponse)

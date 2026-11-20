@@ -16,7 +16,12 @@ from datetime import date, datetime, timedelta, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.auth import can_claim_staff_passes, can_claim_tabler_passes, is_current_staff
+from app.auth import (
+    PUBLICITY_DEPARTMENT,
+    can_claim_staff_passes,
+    can_claim_tabler_passes,
+    is_current_staff,
+)
 from app.common.pacific_time import PACIFIC
 from app.common.services.leave_service import ensure_not_on_leave_for_show
 from app.models.lottery_entry import LotteryEntry
@@ -24,6 +29,7 @@ from app.models.pass_model import STAFF_CLAIM_PASS_TYPES, Pass
 from app.models.show import Show
 from app.models.staff import Staff
 from app.models.staff_pass_alternate import StaffPassAlternate
+from app.models.workform_department import DepartmentHead
 
 TABLER = "tabler"
 DEFAULT_TABLER_PASSES = 2
@@ -433,6 +439,63 @@ def email_released_by_other(db: Session, staff: Staff, show: Show, *, by: str) -
         f" {AlternateService._show_desc(show)}, so you're no longer on the guest"
         f" list for the {TABLE_NAME}.",
     )
+
+
+def publicity_heads(db: Session) -> list[Staff]:
+    """The current staff who head the Publicity department, sorted by name."""
+    record_ids = [
+        h.staff_airtable_record_id
+        for h in db.query(DepartmentHead).filter(
+            DepartmentHead.department == PUBLICITY_DEPARTMENT
+        )
+    ]
+    if not record_ids:
+        return []
+    heads = (
+        db.query(Staff)
+        .filter(Staff.airtable_record_id.in_(record_ids))
+        .order_by(Staff.name)
+        .all()
+    )
+    return [h for h in heads if is_current_staff(h)]
+
+
+def email_publicity_heads(db: Session, tabler: Staff, show: Show, *, claimed: bool) -> None:
+    """
+    Tell the Publicity department heads that *tabler* claimed or released their
+    own tabler pass. A head who is the tabler isn't told about themselves.
+
+    :param claimed: True for a claim, False for a release.
+    """
+    from app.pass_giveaway.services.alternate_service import AlternateService
+
+    heads = [h for h in publicity_heads(db) if h.id != tabler.id]
+    if not heads:
+        return
+    taken = (
+        db.query(Pass)
+        .filter(Pass.show_id == show.id, Pass.pass_type == TABLER, Pass.status == "claimed")
+        .count()
+    )
+    total = show.num_tabler_passes
+    who = tabler.name or tabler.email
+    verb = "claimed" if claimed else "released"
+    for head in heads:
+        AlternateService._email(
+            db,
+            head,
+            subject=f"{who} {verb} a tabler pass: {show.event_name}",
+            lines=[
+                (
+                    f"{who} has {verb} a tabler pass for"
+                    f" {AlternateService._show_desc(show)}, for the {TABLE_NAME}."
+                ),
+                "",
+                f"{taken} of {total} tabler pass{'' if total == 1 else 'es'} claimed.",
+                "",
+                AlternateService._show_url(show),
+            ],
+        )
 
 
 def log_count_lowered(
