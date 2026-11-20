@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../common/contexts/authHooks';
+import { DATE_TIME, formatPacific } from '../common/dateTime';
 import type { APIError } from '../common/types';
 import { adminAPI } from './api';
 import type { JobRunResult, JobStatus } from './types';
 import { formatFutureTime, formatRelativeTime } from './utils';
+
+// The exact time behind a relative "3 hours ago" / "in 2 hours", shown on hover.
+const exactTime = (isoString: string | null): string | undefined =>
+  isoString ? formatPacific(isoString, { ...DATE_TIME, weekday: 'short', timeZoneName: 'short' }) : undefined;
 
 const errorDetail = (err: unknown, fallback: string): string => {
   const detail = (err as APIError).detail;
@@ -76,8 +81,12 @@ export default function JobsSection() {
                     {job.name}
                     <div className="staff-admin-job-area">{job.area}</div>
                   </td>
-                  <td className="audit-log-time">{formatRelativeTime(job.last_run_at)}</td>
-                  <td className="audit-log-time">{formatFutureTime(job.next_run_at)}</td>
+                  <td className="audit-log-time" title={exactTime(job.last_run_at)}>
+                    {formatRelativeTime(job.last_run_at)}
+                  </td>
+                  <td className="audit-log-time" title={exactTime(job.next_run_at)}>
+                    {formatFutureTime(job.next_run_at)}
+                  </td>
                   {canRun && (
                     <>
                       <td>
