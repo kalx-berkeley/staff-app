@@ -1046,6 +1046,7 @@ const ShowDetail = () => {
           mode="staff"
           myEmail={myEmail}
           canClaim={user?.can_claim_tabler_passes ?? false}
+          canClaimWhenOpenToAll={user?.can_claim_staff_passes ?? false}
           canReleaseAny={user?.is_site_admin ?? false}
           blockedReason={
             holdsStaffPass

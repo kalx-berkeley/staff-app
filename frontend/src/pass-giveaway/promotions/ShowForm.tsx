@@ -5,7 +5,7 @@ import { Tooltip, BandAnnotator, DatePicker, DescriptionCheckFeedback, useDescri
 import { formatPhone } from '../../common/utils';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import type { ShowCreate, ShowUpdate, ShowBand, MusicBrainzArtist, VenueResponse, AgeRestriction, MovieRating, PassResponse, PromoterResponse, PassAdjustmentResult, VenueType, WheelchairAccessible } from '../types';
-import { DEFAULT_TABLER_PASSES, KALX_TABLE_NAME, MAX_STAFF_PASSES, MOVIE_RATING_LABELS } from '../utils';
+import { DEFAULT_TABLER_OPEN_DAYS, DEFAULT_TABLER_PASSES, KALX_TABLE_NAME, MAX_STAFF_PASSES, MOVIE_RATING_LABELS } from '../utils';
 import type { APIError, ValidationError } from '../../common/types';
 import EnteredWinnersSection from './EnteredWinnersSection';
 import {
@@ -16,7 +16,7 @@ import {
 } from './enteredWinners';
 import type { OnAirWinnerRow, StaffWinnerRow } from './enteredWinners';
 import { addDays, daysBetween, describeDayOffset, formatClockTime } from './splitShow';
-import { formatCalendarDate } from '../../common/dateTime';
+import { formatCalendarDate, pacificDateString } from '../../common/dateTime';
 
 interface DeleteConfirmModalProps {
   eventName: string;
@@ -270,6 +270,35 @@ const ShowForm = () => {
   const tablerPassesLowered =
     coAnnounce && tablerPassesChosen && storedTablerPasses > totalStaffPasses;
   const [tablerConflict, setTablerConflict] = useState<{ tablers: string[]; publish: boolean } | null>(null);
+  // Days before the close that tabler passes open to all Active staff. Limited
+  // to the days until the close; the default follows the close until it's typed.
+  const [storedTablerOpenDays, setStoredTablerOpenDays] = useState<number>(DEFAULT_TABLER_OPEN_DAYS);
+  const [tablerOpenDaysTyped, setTablerOpenDaysTyped] = useState(false);
+  // The saved show's co-announce, days and close, so an edit that changes none
+  // of them keeps a stored value that's now over the limit
+  const [savedTablerSettings, setSavedTablerSettings] = useState<{
+    coAnnounce: boolean;
+    days: number;
+    closeDate: string;
+    closeTime: string;
+  } | null>(null);
+  const maxTablerOpenDays = plannedCloseDate
+    ? Math.max(0, daysBetween(pacificDateString(), plannedCloseDate))
+    : null;
+  const tablerSettingsUnchanged =
+    savedTablerSettings !== null &&
+    savedTablerSettings.coAnnounce &&
+    savedTablerSettings.closeDate === plannedCloseDate &&
+    savedTablerSettings.closeTime === plannedCloseTime;
+  const tablerOpenDays =
+    tablerOpenDaysTyped || tablerSettingsUnchanged || maxTablerOpenDays === null
+      ? storedTablerOpenDays
+      : Math.min(storedTablerOpenDays, maxTablerOpenDays);
+  const tablerOpenDaysOverLimit =
+    coAnnounce &&
+    maxTablerOpenDays !== null &&
+    tablerOpenDays > maxTablerOpenDays &&
+    !(tablerSettingsUnchanged && tablerOpenDays === savedTablerSettings?.days);
   const [lotteryEnabled, setLotteryEnabled] = useState(false);
   const [lotteryWindowHours, setLotteryWindowHours] = useState('24');
   const [djPreassignProhibitionDays, setDjPreassignProhibitionDays] = useState('');
@@ -390,6 +419,13 @@ const ShowForm = () => {
           if (show.co_announce) {
             setTablerPasses(show.num_tabler_passes ?? 0);
           }
+          setStoredTablerOpenDays(show.tabler_open_days ?? DEFAULT_TABLER_OPEN_DAYS);
+          setSavedTablerSettings({
+            coAnnounce: show.co_announce ?? false,
+            days: show.tabler_open_days ?? DEFAULT_TABLER_OPEN_DAYS,
+            closeDate: show.planned_close_date ?? '',
+            closeTime: show.planned_close_time ?? '',
+          });
           setLotteryEnabled(show.lottery_enabled ?? false);
           setLotteryWindowHours(String(show.lottery_window_hours ?? 24));
           setDjPreassignProhibitionDays(
@@ -663,6 +699,10 @@ const ShowForm = () => {
       }
     }
 
+    if (tablerOpenDaysOverLimit && maxTablerOpenDays !== null) {
+      newErrors.tabler_open_days = `Can be at most ${maxTablerOpenDays} day${maxTablerOpenDays === 1 ? '' : 's'} (the close is ${maxTablerOpenDays} day${maxTablerOpenDays === 1 ? '' : 's'} away)`;
+    }
+
     if (canEnterWinners) {
       const winnersError = enteredWinnersError(
         enteredOnAir,
@@ -724,6 +764,7 @@ const ShowForm = () => {
           auto_close: autoClose,
           co_announce: coAnnounce,
           num_tabler_passes: tablerPasses,
+          tabler_open_days: coAnnounce ? tablerOpenDays : undefined,
           lottery_enabled: lotteryEnabled,
           lottery_window_hours: parseInt(lotteryWindowHours) || 24,
           dj_preassign_prohibition_days: djPreassignProhibitionDays.trim()
@@ -764,6 +805,7 @@ const ShowForm = () => {
           auto_close: autoClose,
           co_announce: coAnnounce,
           num_tabler_passes: tablerPasses,
+          tabler_open_days: coAnnounce ? tablerOpenDays : undefined,
           lottery_enabled: lotteryEnabled,
           lottery_window_hours: parseInt(lotteryWindowHours) || 24,
           dj_preassign_prohibition_days: djPreassignProhibitionDays.trim()
@@ -1267,6 +1309,32 @@ const ShowForm = () => {
               Pass Adjustment under Advanced.
               {tablerPassesLowered &&
                 ` Lowered to ${tablerPasses} because the show has only ${totalStaffPasses} staff pass${totalStaffPasses === 1 ? '' : 'es'}.`}
+            </span>
+            <label htmlFor="tabler_open_days" style={{ marginTop: '0.75rem' }}>
+              Open to all Active staff (days before the close)
+            </label>
+            <input
+              type="number"
+              id="tabler_open_days"
+              min={0}
+              value={tablerOpenDays}
+              onChange={(e) => {
+                const n = parseInt(e.target.value);
+                setStoredTablerOpenDays(Number.isNaN(n) ? 0 : Math.max(0, n));
+                setTablerOpenDaysTyped(true);
+              }}
+              className={errors.tabler_open_days ? 'input-error' : ''}
+              disabled={submitting}
+              style={{ maxWidth: '6rem' }}
+            />
+            {errors.tabler_open_days && (
+              <span className="field-error">{errors.tabler_open_days}</span>
+            )}
+            <span className="field-hint" style={{ display: 'block', marginTop: '0.25rem' }}>
+              Until then, only Publicity members can claim them. 0 keeps them for Publicity
+              until the close.
+              {maxTablerOpenDays !== null &&
+                ` At most ${maxTablerOpenDays}, the days until the close.`}
             </span>
             {isEditing && tablerPasses < claimedTablers && (
               <span className="field-hint" style={{ display: 'block', marginTop: '0.25rem' }}>

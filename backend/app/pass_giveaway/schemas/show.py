@@ -168,6 +168,15 @@ class ShowCreate(BaseModel):
             " Co-Announce Table (co-announce shows only; defaults to 2)"
         ),
     )
+    tabler_open_days: int | None = Field(
+        None,
+        ge=0,
+        description=(
+            "Days before the planned close that the tabler passes open to all Active"
+            " staff, not only Publicity (co-announce shows; defaults to 7, or fewer"
+            " when the close is nearer)"
+        ),
+    )
     lottery_enabled: bool = Field(
         False, description="Enable lottery for staff claims and DJ pre-assignments"
     )
@@ -237,6 +246,35 @@ class ShowCreate(BaseModel):
                 "There aren't enough staff passes for the tabler passes and the staff"
                 " winners you entered"
             )
+        return self
+
+    @model_validator(mode="after")
+    def validate_tabler_open_days(self) -> "ShowCreate":
+        if not self.co_announce:
+            if self.tabler_open_days is None:
+                from app.pass_giveaway.services.tabler_service import (
+                    DEFAULT_TABLER_OPEN_DAYS,
+                )
+
+                self.tabler_open_days = DEFAULT_TABLER_OPEN_DAYS
+            return self
+        from app.pass_giveaway.services import tabler_service
+
+        if self.planned_close_date is None or self.planned_close_time is None:
+            raise ValueError(
+                "planned_close_date and planned_close_time are required for a"
+                " co-announce show"
+            )
+        if self.tabler_open_days is None:
+            self.tabler_open_days = min(
+                tabler_service.DEFAULT_TABLER_OPEN_DAYS,
+                tabler_service.max_open_days(self.planned_close_date),
+            )
+        error = tabler_service.open_days_error(
+            self.tabler_open_days, self.planned_close_date
+        )
+        if error:
+            raise ValueError(error)
         return self
 
     @model_validator(mode="after")
@@ -417,6 +455,15 @@ class ShowUpdate(BaseModel):
         description=(
             "Staff passes set aside as tabler passes for Publicity at the KALX"
             " Co-Announce Table (co-announce shows only)"
+        ),
+    )
+    tabler_open_days: int | None = Field(
+        None,
+        ge=0,
+        description=(
+            "Days before the planned close that the tabler passes open to all Active"
+            " staff, not only Publicity (co-announce shows). Limited to the days until"
+            " the close, checked only when it or the close changes"
         ),
     )
     confirm_release_tablers: bool = Field(
@@ -603,6 +650,14 @@ class ShowResponse(BaseModel):
     num_tabler_passes: int = 0
     available_tabler_count: int = Field(
         default=0, description="Number of unclaimed tabler passes"
+    )
+    tabler_open_days: int = 7
+    tabler_open_to_all_at: UtcDatetime | None = Field(
+        default=None,
+        description=(
+            "When the tabler passes open to all Active staff, not only Publicity"
+            " (co-announce shows with a planned close)"
+        ),
     )
     tablers: list["TablerResponse"] = Field(
         default_factory=list, description="Who holds the show's tabler passes"

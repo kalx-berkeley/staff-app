@@ -192,4 +192,93 @@ describe('TablerPassesSection', () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
     expect(await screen.findByLabelText(/give a tabler pass to/i)).toHaveValue('');
   });
+
+  describe('opening to all Active staff', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const later = new Date(Date.now() + 3 * DAY).toISOString();
+    const earlier = new Date(Date.now() - DAY).toISOString();
+
+    it('says when they open, and keeps them for Publicity until then', async () => {
+      await renderAndSettle(
+        <TablerPassesSection
+          show={makeShow([tablerPass({ id: 11 })], {
+            tabler_open_days: 7,
+            tabler_open_to_all_at: later,
+          })}
+          mode="staff"
+          myEmail="sam@kalx.test"
+          canClaimWhenOpenToAll
+          onChanged={vi.fn()}
+        />,
+      );
+      expect(screen.getByText(/^Open to all Active staff from /)).toBeInTheDocument();
+      expect(screen.getByText(/until then, only publicity members can claim/i)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /claim a tabler pass/i })).not.toBeInTheDocument();
+    });
+
+    it('lets Active staff claim once open', async () => {
+      vi.mocked(passesAPI.claimTablerPass).mockResolvedValue({} as PassResponse);
+      const onChanged = vi.fn();
+      await renderAndSettle(
+        <TablerPassesSection
+          show={makeShow([tablerPass({ id: 11 })], {
+            tabler_open_days: 7,
+            tabler_open_to_all_at: earlier,
+          })}
+          mode="staff"
+          myEmail="sam@kalx.test"
+          canClaimWhenOpenToAll
+          onChanged={onChanged}
+        />,
+      );
+      expect(screen.getByText('Open to all Active staff.')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /claim a tabler pass/i }));
+      await waitFor(() => expect(passesAPI.claimTablerPass).toHaveBeenCalledWith(1));
+      await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    });
+
+    it("doesn't let 🆕 staff outside Publicity claim once open", async () => {
+      await renderAndSettle(
+        <TablerPassesSection
+          show={makeShow([tablerPass({ id: 11 })], {
+            tabler_open_days: 7,
+            tabler_open_to_all_at: earlier,
+          })}
+          mode="staff"
+          myEmail="nico@kalx.test"
+          onChanged={vi.fn()}
+        />,
+      );
+      expect(screen.getByText(/only active staff can claim/i)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /claim a tabler pass/i })).not.toBeInTheDocument();
+    });
+
+    it('shows the opening on the promotions page, but not with 0 days', async () => {
+      const { unmount } = await renderAndSettle(
+        <TablerPassesSection
+          show={makeShow([tablerPass({ id: 11 })], {
+            tabler_open_days: 7,
+            tabler_open_to_all_at: later,
+          })}
+          mode="promotions"
+          myEmail="pat@kalx.test"
+          onChanged={vi.fn()}
+        />,
+      );
+      expect(screen.getByText(/^Open to all Active staff from /)).toBeInTheDocument();
+      unmount();
+      await renderAndSettle(
+        <TablerPassesSection
+          show={makeShow([tablerPass({ id: 11 })], {
+            tabler_open_days: 0,
+            tabler_open_to_all_at: later,
+          })}
+          mode="promotions"
+          myEmail="pat@kalx.test"
+          onChanged={vi.fn()}
+        />,
+      );
+      expect(screen.queryByText(/open to all active staff/i)).not.toBeInTheDocument();
+    });
+  });
 });

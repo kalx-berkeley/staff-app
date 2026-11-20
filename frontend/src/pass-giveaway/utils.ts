@@ -83,6 +83,9 @@ export const KALX_TABLE_NAME = 'KALX Co-Announce Table';
 /** How many tabler passes a show gets when Co-Announce is first checked. */
 export const DEFAULT_TABLER_PASSES = 2;
 
+/** Days before the planned close that tabler passes open to all Active staff, by default. */
+export const DEFAULT_TABLER_OPEN_DAYS = 7;
+
 /** The most staff passes a show can have (matches the backend). */
 export const MAX_STAFF_PASSES = 15;
 

@@ -23,7 +23,7 @@ Design agreed 2026-11-11.
 | 4 | Lowering the count, or turning Co-Announce off, after tabler passes are claimed | Allowed after a confirmation dialog that names who will lose their pass. Those claims are released and each person is emailed. |
 | 5 | Unclaimed tabler passes | They stay until promotions lowers the count by hand. Nothing releases them automatically. |
 | 6 | Tabler pass plus another pass for the same show | Not allowed. One pass per person per show: a tabler pass rules out a staff pass, a lottery entry and an alternate list spot for the same show, and the other way around. The page tells them to release the other one first. |
-| 7 | Who can claim | Anyone with the Airtable department "Publicity" who is current staff (Active or 🆕, `auth.is_current_staff`). Tabling is a job, not a perk, so 🆕 students can do it. |
+| 7 | Who can claim | (Changed by decision 25.) Anyone with the Airtable department "Publicity" who is current staff (Active or 🆕, `auth.is_current_staff`). Tabling is a job, not a perk, so 🆕 students can do it. |
 | 8 | How claiming works | Always first come, first served, never in the lottery, even on lottery shows. Claims use the same close cutoff as staff passes (`PassService._validate_show_claimable`). A tabler can release their own pass until the cutoff, and it goes back to being an open tabler pass. |
 | 9 | Promotions show page | A tabler section that lists the claims. Promotions can release a claim or assign any current staff member (Active or 🆕, not only Publicity). |
 | 10 | Guest list | "1 pass for Name (KALX Co-Announce Table)", with the same phone and email rules as staff passes. This applies to the venue email (`ShowService._build_guest_list_text`) and to the guest list on the promotions show page. |
@@ -198,6 +198,33 @@ reject someone who already holds a tabler pass for the show (decision 6).
 - Frontend: the form's count input, help text and confirmation; the staff
   page's section for Publicity, non-Publicity and the holder; the promotions
   section. Follow the act() rules in `CLAUDE.md`.
+
+## Opening tabler passes to all Active staff
+
+Added 2026-11-20. A co-announce show's tabler passes open to all Active
+staff, not only Publicity, some days before the planned close. This changes
+decision 7.
+
+| # | Question | Decision |
+|---|---|---|
+| 23 | What the countdown starts from | The planned close (`planned_close_date` + `planned_close_time`), the claim cutoff. |
+| 24 | Shows with no planned close | A co-announce show needs a planned close date and time. The backend refuses to create or save one without it. |
+| 25 | Who can claim once open | Active staff (`auth.can_claim_staff_passes`). 🆕 staff outside Publicity can't. Current Publicity staff (Active or 🆕) can claim at any time until the close, as before. |
+| 26 | Keeping them for Publicity | 0 days, whose opening is the close itself. There is no "never" setting. |
+| 27 | Existing shows | `shows.tabler_open_days` (Integer, not null, server default 7). Every show stores it, and shows that aren't co-announce ignore it. |
+| 28 | Announcing the opening | No email and no badge. The staff and promotions show pages say "Open to all Active staff from Fri, Dec 4, 12:00 PM", then "Open to all Active staff." |
+| 29 | Split shows | Never co-announce, so not handled. |
+| 30 | How the opening is counted | Pacific calendar days before the close date, at the close's clock time (`tabler_service.open_to_all_at`). |
+| 31 | Limits | 0 up to the close date minus today's Pacific date (`tabler_service.max_open_days`). Picking the most can open them right away, which is fine. |
+| 32 | Claims when the opening moves later | They stay, with no email and no confirmation. |
+| 33 | Default when the close is near | The form starts at the smaller of 7 and the limit and follows the close date until promotions types a value. The backend does the same when the value isn't sent, including when Co-Announce is turned on in an edit. |
+| 34 | A stored value now over the limit | Only checked when the save changes the days, the close or Co-Announce, so other edits late in a show's life still save. Otherwise the error is "Can be at most N days (the close is N days away)". |
+
+`ShowResponse` has `tabler_open_days` and `tabler_open_to_all_at` (UTC; null
+without co-announce or a planned close). The staff show page lets someone
+claim when `can_claim_tabler_passes`, or when `can_claim_staff_passes` and
+`tabler_open_to_all_at` has passed; `tabler_service.can_claim` is the backend
+check behind `POST /api/shows/{id}/tabler-passes/claim`.
 
 ## Out of scope
 

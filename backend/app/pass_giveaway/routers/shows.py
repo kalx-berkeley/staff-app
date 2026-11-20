@@ -1,7 +1,7 @@
 """Show API endpoints."""
 
 import logging
-from datetime import date
+from datetime import date, time
 from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -483,6 +483,8 @@ def _build_show_response(
         "num_staff_passes": show.num_staff_passes,
         "num_tabler_passes": show.num_tabler_passes,
         "available_tabler_count": available_tabler_count,
+        "tabler_open_days": show.tabler_open_days,
+        "tabler_open_to_all_at": tabler_service.open_to_all_at(show),
         "tablers": tablers,
         "promotions_contacts": _build_promotions_contacts(show),
         "guest_list_requirements": {
@@ -1110,6 +1112,53 @@ def _apply_tabler_count(db: Session, show: Show, target: int, actor_email: str) 
     db.refresh(show)
 
 
+def _check_tabler_open_days(
+    existing: Show,
+    show_data: ShowUpdate,
+    close_date: date | None,
+    close_time: time | None,
+) -> None:
+    """
+    Check the opening of a co-announce show's tabler passes to all Active staff.
+
+    A co-announce show needs a planned close. The days are limited to the days
+    until the close, but only checked when this save changes them, the close or
+    Co-Announce, so other edits late in a show's life still save. Turning
+    Co-Announce on without sending the days lowers the stored days to the limit.
+    """
+    if close_date is None or close_time is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                "planned_close_date and planned_close_time are required for a"
+                " co-announce show"
+            ),
+        )
+    turning_on = not existing.co_announce
+    if show_data.tabler_open_days is None and turning_on:
+        show_data.tabler_open_days = min(
+            existing.tabler_open_days, tabler_service.max_open_days(close_date)
+        )
+    days = (
+        show_data.tabler_open_days
+        if show_data.tabler_open_days is not None
+        else existing.tabler_open_days
+    )
+    changed = (
+        turning_on
+        or days != existing.tabler_open_days
+        or close_date != existing.planned_close_date
+        or close_time != existing.planned_close_time
+    )
+    if not changed:
+        return
+    error = tabler_service.open_days_error(days, close_date)
+    if error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=error
+        )
+
+
 @router.put("/{show_id}", response_model=ShowResponse)
 def update_show(
     show_id: int,
@@ -1193,6 +1242,8 @@ def update_show(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Only co-announce shows have tabler passes",
         )
+    if merged_co_announce:
+        _check_tabler_open_days(existing, show_data, merged_close_date, merged_close_time)
     tabler_target = tabler_service.target_count(
         co_announce=merged_co_announce,
         requested=show_data.num_tabler_passes,
@@ -1258,6 +1309,7 @@ def update_show(
         "auto_close",
         "co_announce",
         "num_tabler_passes",
+        "tabler_open_days",
     ]
     before = {f: str(getattr(existing, f)) for f in _tracked_fields}
 

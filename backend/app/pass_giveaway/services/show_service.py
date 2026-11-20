@@ -113,6 +113,7 @@ class ShowService:
                 planned_close_time=show_data.planned_close_time,
                 auto_close=show_data.auto_close,
                 co_announce=show_data.co_announce,
+                tabler_open_days=show_data.tabler_open_days,
                 lottery_enabled=show_data.lottery_enabled,
                 lottery_window_hours=show_data.lottery_window_hours,
                 dj_preassign_prohibition_days=show_data.dj_preassign_prohibition_days,
@@ -270,6 +271,8 @@ class ShowService:
                 show.auto_close = show_data.auto_close
             if "co_announce" in show_data.model_fields_set:
                 show.co_announce = show_data.co_announce
+            if show_data.tabler_open_days is not None:
+                show.tabler_open_days = show_data.tabler_open_days
             if "lottery_enabled" in show_data.model_fields_set:
                 show.lottery_enabled = show_data.lottery_enabled
             if "lottery_window_hours" in show_data.model_fields_set:

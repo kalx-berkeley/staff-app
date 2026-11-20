@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.common.areas import PASS_GIVEAWAY_AREA
+from app.common.pacific_time import PACIFIC
 from app.models.audit_log import AuditLog
 from app.models.pass_model import Pass
 from app.models.show import Show
@@ -19,6 +20,10 @@ from app.models.workform_department import DepartmentHead
 from app.pass_giveaway.services.show_service import ShowService
 
 SEND_EMAIL = "app.common.services.notification_service.send_email"
+
+
+def _pacific_today() -> date:
+    return datetime.now(PACIFIC).date()
 
 
 @pytest.fixture
@@ -97,6 +102,9 @@ def _show_body(venue: Venue, **overrides) -> dict:
         "wheelchair_accessible": "yes",
         "num_pass_pairs": 3,
         "co_announce": True,
+        # Far enough off that the tabler passes aren't open to all staff yet
+        "planned_close_date": str(_pacific_today() + timedelta(days=20)),
+        "planned_close_time": "12:00:00",
     }
     body.update(overrides)
     return body
@@ -239,6 +247,140 @@ def test_non_publicity_staff_cant_claim(client, db, promo, venue, plain):
     _publish(db, data["id"])
     resp = _claim_tabler(client, data["id"], plain)
     assert resp.status_code == 403
+
+
+def test_co_announce_show_needs_a_planned_close(client, promo, venue):
+    body = _show_body(venue, planned_close_date=None, planned_close_time=None)
+    resp = client.post("/api/shows", json=body, headers=_h(promo))
+    assert resp.status_code == 422
+    assert "required for a co-announce show" in resp.text
+
+
+def test_tabler_passes_open_to_all_seven_days_before_close(client, promo, venue):
+    data = _create(client, promo, venue)
+    assert data["tabler_open_days"] == 7
+    close = datetime.combine(
+        _pacific_today() + timedelta(days=20) - timedelta(days=7),
+        datetime.strptime("12:00", "%H:%M").time(),
+        tzinfo=PACIFIC,
+    )
+    opens = datetime.fromisoformat(data["tabler_open_to_all_at"])
+    assert opens == close
+
+
+def test_default_open_days_is_lowered_to_days_until_close(client, promo, venue):
+    data = _create(
+        client,
+        promo,
+        venue,
+        planned_close_date=str(_pacific_today() + timedelta(days=3)),
+    )
+    assert data["tabler_open_days"] == 3
+
+
+def test_open_days_cant_exceed_days_until_close(client, promo, venue):
+    body = _show_body(venue, tabler_open_days=21)
+    resp = client.post("/api/shows", json=body, headers=_h(promo))
+    assert resp.status_code == 422
+    assert "at most 20 days" in resp.text
+    assert _create(client, promo, venue, tabler_open_days=20)["tabler_open_days"] == 20
+
+
+def test_active_staff_can_claim_once_open_to_all(client, db, promo, venue, plain):
+    data = _create(client, promo, venue, tabler_open_days=20)
+    _publish(db, data["id"])
+    assert _claim_tabler(client, data["id"], plain).status_code == 200
+
+
+def test_new_student_outside_publicity_cant_claim_when_open(client, db, promo, venue):
+    newbie = _make_staff(db, "Nico", status="🆕")
+    data = _create(client, promo, venue, tabler_open_days=20)
+    _publish(db, data["id"])
+    resp = _claim_tabler(client, data["id"], newbie)
+    assert resp.status_code == 403
+    assert "Only Active staff" in resp.text
+
+
+def test_new_student_in_publicity_can_claim_when_open(client, db, promo, venue):
+    newbie = _make_staff(db, "Nova", "Publicity", status="🆕")
+    data = _create(client, promo, venue, tabler_open_days=20)
+    _publish(db, data["id"])
+    assert _claim_tabler(client, data["id"], newbie).status_code == 200
+
+
+def test_refusal_says_when_tabler_passes_open(client, db, promo, venue, plain):
+    data = _create(client, promo, venue)
+    _publish(db, data["id"])
+    resp = _claim_tabler(client, data["id"], plain)
+    assert resp.status_code == 403
+    assert "when they open to all Active staff" in resp.text
+
+
+def test_edit_checks_open_days_only_when_changed(client, db, promo, venue):
+    data = _create(client, promo, venue)
+    # Time passes: the close is now 3 days away, under the stored 7
+    show = db.query(Show).filter(Show.id == data["id"]).first()
+    show.show_date = _pacific_today() + timedelta(days=10)
+    show.planned_close_date = _pacific_today() + timedelta(days=3)
+    db.commit()
+    resp = client.put(
+        f"/api/shows/{data['id']}",
+        json={"event_name": "Renamed", "tabler_open_days": 7},
+        headers=_h(promo),
+    )
+    assert resp.status_code == 200, resp.text
+    resp = client.put(
+        f"/api/shows/{data['id']}",
+        json={"tabler_open_days": 6},
+        headers=_h(promo),
+    )
+    assert resp.status_code == 422
+    assert "at most 3 days" in resp.text
+    resp = client.put(
+        f"/api/shows/{data['id']}",
+        json={"planned_close_date": str(_pacific_today() + timedelta(days=4))},
+        headers=_h(promo),
+    )
+    assert resp.status_code == 422
+    assert "at most 4 days" in resp.text
+
+
+def test_edit_co_announce_needs_a_planned_close(client, db, promo, venue):
+    data = _create(client, promo, venue)
+    resp = client.put(
+        f"/api/shows/{data['id']}",
+        json={"planned_close_date": None, "planned_close_time": None},
+        headers=_h(promo),
+    )
+    assert resp.status_code == 422
+    assert "required for a co-announce show" in resp.text
+
+
+def test_turning_on_co_announce_lowers_open_days_to_limit(client, db, promo, venue):
+    data = _create(
+        client,
+        promo,
+        venue,
+        co_announce=False,
+        planned_close_date=str(_pacific_today() + timedelta(days=2)),
+    )
+    assert data["tabler_open_days"] == 7
+    resp = client.put(
+        f"/api/shows/{data['id']}", json={"co_announce": True}, headers=_h(promo)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["tabler_open_days"] == 2
+
+
+def test_claims_stay_when_opening_moves_later(client, db, promo, venue, plain):
+    data = _create(client, promo, venue, tabler_open_days=20)
+    _publish(db, data["id"])
+    assert _claim_tabler(client, data["id"], plain).status_code == 200
+    resp = client.put(
+        f"/api/shows/{data['id']}", json={"tabler_open_days": 0}, headers=_h(promo)
+    )
+    assert resp.status_code == 200, resp.text
+    assert [t["staff_id"] for t in resp.json()["tablers"]] == [plain.id]
 
 
 def test_one_tabler_pass_per_person(client, db, promo, venue, pub):

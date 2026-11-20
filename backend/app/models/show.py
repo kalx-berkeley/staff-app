@@ -75,6 +75,9 @@ class Show(Base):
     # How many of the staff passes are tabler passes (pass_type "tabler") for
     # Publicity at the KALX Co-Announce Table. Always 0 when co_announce is off.
     num_tabler_passes = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    # How many days before the planned close the tabler passes open to all
+    # Active staff, not only Publicity. Ignored when co_announce is off.
+    tabler_open_days = Column(Integer, nullable=False, default=7, server_default=text("7"))
     lottery_enabled = Column(Boolean, nullable=False, default=False, server_default=false())
     lottery_window_hours = Column(
         Integer, nullable=False, default=24, server_default=text("24")

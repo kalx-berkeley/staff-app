@@ -441,6 +441,8 @@ export interface ShowCreate {
   co_announce?: boolean;
   /** Staff passes set aside for Publicity at the KALX Co-Announce Table. */
   num_tabler_passes?: number;
+  /** Days before the planned close that tabler passes open to all Active staff. */
+  tabler_open_days?: number;
   lottery_enabled?: boolean;
   lottery_window_hours?: number;
   dj_preassign_prohibition_days?: number | null;
@@ -487,6 +489,7 @@ export interface ShowUpdate {
   auto_close?: boolean;
   co_announce?: boolean;
   num_tabler_passes?: number;
+  tabler_open_days?: number;
   /** Confirms a save that releases claimed tabler passes. */
   confirm_release_tablers?: boolean;
   lottery_enabled?: boolean;
@@ -711,6 +714,10 @@ export interface ShowResponse {
   /** How many of the staff passes are tabler passes for the KALX Co-Announce Table. */
   num_tabler_passes: number;
   available_tabler_count: number;
+  /** Days before the planned close that tabler passes open to all Active staff. */
+  tabler_open_days: number;
+  /** When tabler passes open to all Active staff, not only Publicity (UTC). */
+  tabler_open_to_all_at: string | null;
   tablers: Tabler[];
   promotions_contacts: PromotionsContact[];
   guest_list_requirements: GuestListRequirements;

@@ -6,6 +6,7 @@ import PersonAutocomplete from '../../common/components/PersonAutocomplete';
 import { extractPersonEmail } from '../../common/components/personUtils';
 import Tooltip from './Tooltip';
 import { KALX_TABLE_NAME } from '../utils';
+import { formatPacific, parseInstant } from '../../common/dateTime';
 
 interface TablerPassesSectionProps {
   show: ShowResponse;
@@ -13,8 +14,10 @@ interface TablerPassesSectionProps {
   mode: 'promotions' | 'staff';
   /** The signed-in user's email, to find their own tabler pass. */
   myEmail: string | null;
-  /** Whether the user is in Publicity and can claim a tabler pass (staff mode). */
+  /** Whether the user is in Publicity and can claim a tabler pass at any time (staff mode). */
   canClaim?: boolean;
+  /** Whether the user is Active staff, who can claim once tabler passes open to all (staff mode). */
+  canClaimWhenOpenToAll?: boolean;
   /** Whether the user is a site admin, who can release anyone's tabler pass (staff mode). */
   canReleaseAny?: boolean;
   /** Why the user can't claim one right now, e.g. they hold a staff pass (staff mode). */
@@ -23,6 +26,15 @@ interface TablerPassesSectionProps {
   onChanged: () => Promise<void> | void;
 }
 
+/** "Fri, Dec 4, 12:00 PM" */
+const OPENS_FORMAT = {
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+} as const;
+
 const errorText = (err: unknown, fallback: string): string => {
   const detail = (err as APIError)?.detail;
   return typeof detail === 'string' ? detail : fallback;
@@ -30,15 +42,17 @@ const errorText = (err: unknown, fallback: string): string => {
 
 /**
  * The tabler passes of a co-announce show: staff passes set aside for
- * Publicity members at the KALX Co-Announce Table. Everyone sees who's tabling;
- * only Publicity members can claim, promotions can release and assign, and
- * site admins can release.
+ * Publicity members at the KALX Co-Announce Table. Everyone sees who's tabling.
+ * Publicity members can claim, and so can all Active staff once the passes
+ * open to all (`tabler_open_days` before the close). Promotions can release
+ * and assign, and site admins can release.
  */
 const TablerPassesSection = ({
   show,
   mode,
   myEmail,
   canClaim = false,
+  canClaimWhenOpenToAll = false,
   canReleaseAny = false,
   blockedReason = null,
   onChanged,
@@ -57,6 +71,11 @@ const TablerPassesSection = ({
     ? claimed.find((p) => p.staff_email?.toLowerCase() === myEmail.toLowerCase()) ?? null
     : null;
   const isOpen = show.status !== 'closed' && show.status !== 'deleted';
+  // With 0 days the opening is the close, so they never open to all
+  const opensToAllAt =
+    show.tabler_open_to_all_at && show.tabler_open_days > 0 ? show.tabler_open_to_all_at : null;
+  const openToAll = opensToAllAt !== null && Date.now() >= parseInstant(opensToAllAt).getTime();
+  const canClaimNow = canClaim || (canClaimWhenOpenToAll && openToAll);
 
   const run = async (action: () => Promise<unknown>, fallback: string) => {
     setBusy(true);
@@ -140,8 +159,16 @@ const TablerPassesSection = ({
         <p className="field-hint">No one has claimed a tabler pass yet.</p>
       )}
 
+      {isOpen && opensToAllAt && (
+        <p className="field-hint tabler-open-to-all">
+          {openToAll
+            ? 'Open to all Active staff.'
+            : `Open to all Active staff from ${formatPacific(opensToAllAt, OPENS_FORMAT)}.`}
+        </p>
+      )}
+
       {mode === 'staff' && isOpen && !myPass && (
-        canClaim ? (
+        canClaimNow ? (
           blockedReason ? (
             <p className="field-hint">{blockedReason}</p>
           ) : openCount > 0 ? (
@@ -158,7 +185,13 @@ const TablerPassesSection = ({
             <p className="field-hint">All the tabler passes have been claimed.</p>
           )
         ) : (
-          <p className="field-hint">Only Publicity members can claim tabler passes.</p>
+          <p className="field-hint">
+            {openToAll
+              ? 'Only Active staff can claim tabler passes.'
+              : opensToAllAt
+                ? 'Until then, only Publicity members can claim tabler passes.'
+                : 'Only Publicity members can claim tabler passes.'}
+          </p>
         )
       )}
 

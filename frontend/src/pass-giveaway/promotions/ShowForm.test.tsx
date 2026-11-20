@@ -4,6 +4,8 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ShowForm from './ShowForm';
 import { showsAPI, venuesAPI, venuesMyAPI } from '../api';
 import type { DescriptionAnalysis, PassResponse, ShowResponse, VenueResponse } from '../types';
+import { addDays } from './splitShow';
+import { pacificDateString } from '../../common/dateTime';
 
 // Mock the API
 vi.mock('../api', () => ({
@@ -262,6 +264,8 @@ describe('ShowForm', () => {
         num_staff_passes: 1,
         num_tabler_passes: 0,
         available_tabler_count: 0,
+        tabler_open_days: 7,
+        tabler_open_to_all_at: null,
         tablers: [],
         promotions_contacts: [],
         guest_list_requirements: { requires_phone_number: false, email_address_requirement: 'none', requires_email_address: false, staff_guest_requires_name: false },
@@ -1166,6 +1170,54 @@ describe('ShowForm', () => {
       expect(showsAPI.update).toHaveBeenLastCalledWith(
         5,
         expect.objectContaining({ num_tabler_passes: 0, confirm_release_tablers: true }),
+      );
+    });
+
+    it('saves the days before the close that tabler passes open to all staff', async () => {
+      vi.mocked(showsAPI.get).mockResolvedValue(coAnnounceShow({ tabler_open_days: 7 }));
+      vi.mocked(showsAPI.update).mockResolvedValue(coAnnounceShow({ tabler_open_days: 10 }));
+      renderShowForm('/promotions/shows/5/edit');
+      await waitFor(() => expect(screen.queryByText('Loading...')).not.toBeInTheDocument());
+
+      const input = screen.getByLabelText(/open to all active staff/i);
+      expect(input).toHaveValue(7);
+      fireEvent.change(input, { target: { value: '10' } });
+      fireEvent.click(screen.getByRole('button', { name: /update show/i }));
+      await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/promotions/shows'));
+      expect(showsAPI.update).toHaveBeenLastCalledWith(
+        5,
+        expect.objectContaining({ tabler_open_days: 10 }),
+      );
+    });
+
+    it('keeps a stored value over the limit unless it or the close changes', async () => {
+      const today = pacificDateString();
+      vi.mocked(showsAPI.get).mockResolvedValue(
+        coAnnounceShow({
+          show_date: addDays(today, 5),
+          planned_close_date: addDays(today, 3),
+          tabler_open_days: 7,
+        }),
+      );
+      vi.mocked(showsAPI.update).mockResolvedValue(coAnnounceShow());
+      renderShowForm('/promotions/shows/5/edit');
+      await waitFor(() => expect(screen.queryByText('Loading...')).not.toBeInTheDocument());
+
+      const input = screen.getByLabelText(/open to all active staff/i);
+      expect(input).toHaveValue(7);
+      fireEvent.change(input, { target: { value: '6' } });
+      fireEvent.click(screen.getByRole('button', { name: /update show/i }));
+      expect(
+        await screen.findByText('Can be at most 3 days (the close is 3 days away)'),
+      ).toBeInTheDocument();
+      expect(showsAPI.update).not.toHaveBeenCalled();
+
+      fireEvent.change(input, { target: { value: '7' } });
+      fireEvent.click(screen.getByRole('button', { name: /update show/i }));
+      await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/promotions/shows'));
+      expect(showsAPI.update).toHaveBeenLastCalledWith(
+        5,
+        expect.objectContaining({ tabler_open_days: 7 }),
       );
     });
   });

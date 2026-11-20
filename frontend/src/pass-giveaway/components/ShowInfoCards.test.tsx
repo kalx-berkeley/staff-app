@@ -23,6 +23,8 @@ const baseShow: ShowResponse = {
   num_staff_passes: 2,
   num_tabler_passes: 0,
   available_tabler_count: 0,
+  tabler_open_days: 7,
+  tabler_open_to_all_at: null,
   tablers: [],
   promotions_contacts: [],
   guest_list_requirements: { requires_phone_number: false, email_address_requirement: 'none', requires_email_address: false, staff_guest_requires_name: false },

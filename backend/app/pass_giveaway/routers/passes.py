@@ -65,7 +65,6 @@ from app.auth import (
     check_station_office_access,
     is_ip_in_network,
     is_current_staff,
-    can_claim_tabler_passes,
     is_site_admin,
     require_authentication,
     _is_promotions_staff,
@@ -528,6 +527,21 @@ def _get_show_or_404(db: Session, show_id: int) -> Show:
     return show
 
 
+def _tabler_claim_refusal(show: Show) -> str:
+    """Why someone outside Publicity can't claim one of the show's tabler passes."""
+    from app.common.pacific_time import format_pacific_datetime
+
+    opens = tabler_service.open_to_all_at(show)
+    if opens is not None and not tabler_service.is_open_to_all(show):
+        return (
+            "Only Publicity members can claim tabler passes until"
+            f" {format_pacific_datetime(opens)}, when they open to all Active staff"
+        )
+    if opens is not None:
+        return "Only Active staff can claim tabler passes"
+    return "Only Publicity members can claim tabler passes"
+
+
 @router.post("/shows/{show_id}/tabler-passes/claim", response_model=PassResponse)
 def claim_tabler_pass(
     show_id: int,
@@ -537,16 +551,18 @@ def claim_tabler_pass(
     """
     Claim one of a co-announce show's tabler passes for the KALX Co-Announce Table.
 
-    Only current staff (Active or 🆕) in the Publicity department can. First
-    come, first served, even on lottery shows, and never with a +1 guest.
+    Current staff (Active or 🆕) in the Publicity department can at any time,
+    and other Active staff once the tabler passes are open to all
+    (``Show.tabler_open_days`` before the planned close). First come, first
+    served, even on lottery shows, and never with a +1 guest.
     """
     role, user = user_info
-    if not can_claim_tabler_passes(user):
+    show = _get_show_or_404(db, show_id)
+    if not tabler_service.can_claim(show, user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Publicity members can claim tabler passes",
+            detail=_tabler_claim_refusal(show),
         )
-    show = _get_show_or_404(db, show_id)
     pass_item = tabler_service.claim(db, show, user, by_self=True)
     audit_service.log_event(
         db,

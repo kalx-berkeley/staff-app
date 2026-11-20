@@ -11,12 +11,13 @@ an alternate list or a lottery. The design is in
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.auth import is_current_staff
+from app.auth import can_claim_staff_passes, can_claim_tabler_passes, is_current_staff
+from app.common.pacific_time import PACIFIC
 from app.common.services.leave_service import ensure_not_on_leave_for_show
 from app.models.lottery_entry import LotteryEntry
 from app.models.pass_model import STAFF_CLAIM_PASS_TYPES, Pass
@@ -27,6 +28,70 @@ from app.models.staff_pass_alternate import StaffPassAlternate
 TABLER = "tabler"
 DEFAULT_TABLER_PASSES = 2
 TABLE_NAME = "KALX Co-Announce Table"
+# Days before the planned close that tabler passes open to all Active staff
+DEFAULT_TABLER_OPEN_DAYS = 7
+
+
+def max_open_days(close_date: date, today: date | None = None) -> int:
+    """
+    The most days before the close that tabler passes may open: the close date
+    minus today's Pacific date, and never below 0.
+    """
+    if today is None:
+        today = datetime.now(PACIFIC).date()
+    return max(0, (close_date - today).days)
+
+
+def open_days_error(days: int, close_date: date | None) -> str | None:
+    """Why *days* isn't allowed for a show closing on *close_date*, or None."""
+    if days < 0:
+        return "Tabler passes can't open after the close"
+    if close_date is None:
+        return None
+    limit = max_open_days(close_date)
+    if days > limit:
+        return (
+            f"Tabler passes can open at most {limit} day{'' if limit == 1 else 's'}"
+            f" before the close (the close is {limit} day{'' if limit == 1 else 's'}"
+            " away)"
+        )
+    return None
+
+
+def open_to_all_at(show: Show) -> datetime | None:
+    """
+    When the show's tabler passes open to all Active staff, in UTC: the planned
+    close minus ``tabler_open_days`` Pacific calendar days, at the close's clock
+    time. None when the show isn't co-announce or has no planned close.
+    """
+    if not show.co_announce or not (show.planned_close_date and show.planned_close_time):
+        return None
+    days = show.tabler_open_days if show.tabler_open_days is not None else 0
+    opens = datetime.combine(
+        show.planned_close_date - timedelta(days=days),
+        show.planned_close_time,
+        tzinfo=PACIFIC,
+    )
+    return opens.astimezone(timezone.utc)
+
+
+def is_open_to_all(show: Show, now: datetime | None = None) -> bool:
+    """Whether Active staff outside Publicity can claim the show's tabler passes now."""
+    opens = open_to_all_at(show)
+    if opens is None:
+        return False
+    return (now or datetime.now(timezone.utc)) >= opens
+
+
+def can_claim(show: Show, staff: Staff | None) -> bool:
+    """
+    Whether *staff* may claim one of the show's tabler passes for themselves:
+    current Publicity staff at any time, and other Active staff once the tabler
+    passes are open to all.
+    """
+    if can_claim_tabler_passes(staff):
+        return True
+    return can_claim_staff_passes(staff) and is_open_to_all(show)
 
 
 def _as_utc(dt: datetime | None) -> datetime:
