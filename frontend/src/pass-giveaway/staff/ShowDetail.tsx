@@ -908,7 +908,7 @@ const ShowDetail = () => {
                             </p>
                             {pass.preassigned_date && (
                               <p>
-                                <strong>Date:</strong> {pass.preassigned_date}
+                                <strong>Date:</strong> {formatDate(pass.preassigned_date)}
                               </p>
                             )}
                             <button
@@ -1024,6 +1024,7 @@ const ShowDetail = () => {
                           {pass.status === 'available' && isOtherPass ? (
                             <p className="pass-unavailable-note">
                               Pre-assigned to {pass.preassigned_dj}
+                              {pass.preassigned_date && <> for {formatDate(pass.preassigned_date)}</>}
                             </p>
                           ) : (
                             <p className="pass-unavailable-note">

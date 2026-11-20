@@ -1142,6 +1142,25 @@ describe('Staff ShowDetail', () => {
       await renderAndSettle(<BrowserRouter><ShowDetail /></BrowserRouter>);
 
       expect(await screen.findByRole('button', { name: 'Release Reservation' })).toBeInTheDocument();
+      expect(screen.getByText('Tuesday, December 8, 2099')).toBeInTheDocument();
+    });
+
+    it("shows the DJ and date of a pass pair reserved by someone else", async () => {
+      loginAsDj();
+      vi.mocked(passesAPI.getMyPreassignIdentities).mockResolvedValue(identities);
+      vi.mocked(showsAPI.get).mockResolvedValue({
+        ...mockShow,
+        passes: [{
+          ...availablePass, id: 3, pass_type: 'pair', preassigned_dj: 'DJ Someone Else',
+          preassigned_persona_id: 999, preassigned_date: '2099-12-08',
+        }],
+      });
+
+      await renderAndSettle(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      expect(
+        await screen.findByText('Pre-assigned to DJ Someone Else for Tuesday, December 8, 2099'),
+      ).toBeInTheDocument();
     });
   });
 });
