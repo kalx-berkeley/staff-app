@@ -46,6 +46,8 @@ async def get_on_air(
     current, upcoming = state.current, state.next
     return OnAirResponse(
         current=_identity(state.identity),
+        current_automation=current.automation if current else False,
+        current_title=current.title if current else None,
         current_ends_at=current.end if current else None,
         next=_identity(upcoming.identity if upcoming else None),
         next_starts_at=upcoming.start if upcoming else None,

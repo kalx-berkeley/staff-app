@@ -88,6 +88,10 @@ class Slot:
     end: datetime
     identity: Optional[OnAirIdentity]
     playlist_id: Optional[int] = None
+    # Spinitron's title for the slot
+    title: Optional[str] = None
+    # An automation playlist: a pre-recorded show, so no one is live
+    automation: bool = False
 
 
 @dataclass
@@ -187,6 +191,8 @@ class _Resolver:
             end=_utc(row.end),
             identity=self.identity(row),
             playlist_id=row.id if isinstance(row, SpinitronPlaylist) else None,
+            title=row.title,
+            automation=isinstance(row, SpinitronPlaylist) and bool(row.automation),
         )
 
 

@@ -29,6 +29,11 @@ class OnAirResponse(BaseModel):
     # Who giveaways are credited to now; None for no one (automation,
     # FREEFORM, a placeholder persona, a gap, or Spinitron unavailable)
     current: OnAirIdentity | None = None
+    # Whether the current slot is a Spinitron automation playlist (a
+    # pre-recorded show, so there's no one live to give away passes), and
+    # Spinitron's title for it, so the page can say so
+    current_automation: bool = False
+    current_title: str | None = None
     # When the current slot ends, so the page can look again then
     current_ends_at: UtcDatetime | None = None
     # The next slot, when its start is known

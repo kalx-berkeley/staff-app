@@ -66,6 +66,13 @@ const OnAirBanner = () => {
             you, create your Spinitron playlist.
           </p>
         </>
+      ) : info?.current_automation ? (
+        <div className="dj-on-air-warning" role="alert">
+          Spinitron lists {info.current_title ? <strong>{info.current_title}</strong> : 'this slot'}{' '}
+          as a pre-recorded show (automation), so there&apos;s no DJ on air to give away
+          passes. A giveaway will be recorded as unattributed and pre-assigned passes
+          won&apos;t show. If you&apos;re live on air, create your Spinitron playlist.
+        </div>
       ) : (
         <div className="dj-on-air-warning" role="alert">
           No DJ is on air in the Spinitron schedule right now, so a giveaway will be
