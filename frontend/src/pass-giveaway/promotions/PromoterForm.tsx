@@ -19,6 +19,9 @@ const emptyContact = (): PromoterContactCreate => ({
   phone: null,
 });
 
+const contactHasText = (c: PromoterContactCreate) =>
+  [c.name, c.title, c.email, c.phone].some((v) => (v ?? '').trim() !== '');
+
 const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }: PromoterFormProps) => {
   const [name, setName] = useState('');
   const [showSourcingInstructions, setShowSourcingInstructions] = useState('');
@@ -33,7 +36,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
   const [newOwnerInput, setNewOwnerInput] = useState('');
   const [promotionsStaff, setPromotionsStaff] = useState<PromotionsStaffOption[]>([]);
   const [emailToName, setEmailToName] = useState<Record<string, string>>({});
-  const [contacts, setContacts] = useState<PromoterContactCreate[]>([]);
+  const [contacts, setContacts] = useState<PromoterContactCreate[]>([emptyContact()]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -59,7 +62,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
               email: c.email ?? null,
               phone: c.phone ?? null,
             }))
-          : []
+          : [emptyContact()]
       );
     }
   }, [promoter]);
@@ -97,7 +100,8 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
   };
 
   const handleRemoveContact = (idx: number) => {
-    setContacts(contacts.filter((_, i) => i !== idx));
+    const remaining = contacts.filter((_, i) => i !== idx);
+    setContacts(remaining.length > 0 ? remaining : [emptyContact()]);
   };
 
   const handleContactChange = (idx: number, field: keyof PromoterContactCreate, value: string) => {
@@ -140,7 +144,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
           hold_close_notifications: holdCloseNotifications,
           track_pass_call_in: trackPassCallIn,
           owner_emails: ownerEmails,
-          contacts,
+          contacts: contacts.filter(contactHasText),
         };
         await promotersAPI.update(promoter.id, updateData);
       } else {
@@ -154,7 +158,7 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
           hold_close_notifications: holdCloseNotifications,
           track_pass_call_in: trackPassCallIn,
           owner_emails: ownerEmails,
-          contacts,
+          contacts: contacts.filter(contactHasText),
         };
         await promotersAPI.create(createData);
       }
@@ -412,24 +416,28 @@ const PromoterForm = ({ promoter, onClose, onSuccess, onDelete, asPage = false }
                 disabled={submitting}
               />
             </div>
-            <button
-              type="button"
-              onClick={() => handleRemoveContact(idx)}
-              className="btn-secondary btn-small"
-              disabled={submitting}
-            >
-              Remove
-            </button>
+            {(contacts.length > 1 || contactHasText(contact)) && (
+              <button
+                type="button"
+                onClick={() => handleRemoveContact(idx)}
+                className="btn-secondary btn-small"
+                disabled={submitting}
+              >
+                Remove
+              </button>
+            )}
           </div>
         ))}
-        <button
-          type="button"
-          onClick={handleAddContact}
-          className="btn-secondary btn-small"
-          disabled={submitting}
-        >
-          Add Contact
-        </button>
+        {contactHasText(contacts[0]) && (
+          <button
+            type="button"
+            onClick={handleAddContact}
+            className="btn-secondary btn-small"
+            disabled={submitting}
+          >
+            + Add Another Contact
+          </button>
+        )}
       </fieldset>
 
       <div className="form-actions">

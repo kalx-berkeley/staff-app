@@ -29,6 +29,9 @@ const emptyContact = (): VenueContactCreate => ({
   phone: null,
 });
 
+const contactHasText = (c: VenueContactCreate) =>
+  [c.name, c.title, c.email, c.phone].some((v) => (v ?? '').trim() !== '');
+
 const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: VenueFormProps) => {
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
@@ -91,7 +94,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   const [newOwnerInput, setNewOwnerInput] = useState('');
   const [promotionsStaff, setPromotionsStaff] = useState<PromotionsStaffOption[]>([]);
   const [emailToName, setEmailToName] = useState<Record<string, string>>({});
-  const [contacts, setContacts] = useState<VenueContactCreate[]>([]);
+  const [contacts, setContacts] = useState<VenueContactCreate[]>([emptyContact()]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -151,7 +154,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
               email: c.email ?? null,
               phone: c.phone ?? null,
             }))
-          : []
+          : [emptyContact()]
       );
       setPromoterId(venue.promoter_id ?? null);
       setShowsHaveExternalPromoter(venue.shows_have_external_promoter ?? false);
@@ -220,7 +223,8 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   };
 
   const handleRemoveContact = (idx: number) => {
-    setContacts(contacts.filter((_, i) => i !== idx));
+    const remaining = contacts.filter((_, i) => i !== idx);
+    setContacts(remaining.length > 0 ? remaining : [emptyContact()]);
   };
 
   const handleContactChange = (idx: number, field: keyof VenueContactCreate, value: string) => {
@@ -322,7 +326,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           shows_have_external_promoter: showsHaveExternalPromoter,
           show_name_with_logo: showNameWithLogo,
           owner_emails: ownerEmails,
-          contacts,
+          contacts: contacts.filter(contactHasText),
         };
         savedVenue = await venuesAPI.update(venue.id, updateData);
       } else {
@@ -355,7 +359,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           promoter_id: promoterId,
           shows_have_external_promoter: showsHaveExternalPromoter,
           owner_emails: ownerEmails,
-          contacts,
+          contacts: contacts.filter(contactHasText),
         };
         savedVenue = await venuesAPI.create(createData);
       }
@@ -1159,24 +1163,28 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
                     disabled={submitting}
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveContact(idx)}
-                  className="btn-danger btn-small"
-                  disabled={submitting}
-                >
-                  Remove
-                </button>
+                {(contacts.length > 1 || contactHasText(contact)) && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveContact(idx)}
+                    className="btn-danger btn-small"
+                    disabled={submitting}
+                  >
+                    Remove
+                  </button>
+                )}
               </div>
             ))}
-            <button
-              type="button"
-              onClick={handleAddContact}
-              className="btn-secondary btn-small"
-              disabled={submitting}
-            >
-              + Add Contact
-            </button>
+            {contactHasText(contacts[0]) && (
+              <button
+                type="button"
+                onClick={handleAddContact}
+                className="btn-secondary btn-small"
+                disabled={submitting}
+              >
+                + Add Another Contact
+              </button>
+            )}
           </div>
 
           <div className="form-actions">

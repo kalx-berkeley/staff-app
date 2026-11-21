@@ -808,6 +808,61 @@ describe('VenueForm', () => {
     });
   });
 
+  describe('Venue Contacts', () => {
+    it('shows the first contact\'s fields with no add button until something is typed', async () => {
+      render(<VenueForm venue={makeVenue()} onClose={mockOnClose} onSuccess={mockOnSuccess} />);
+      await act(async () => {});
+
+      expect(screen.getAllByPlaceholderText('Name')).toHaveLength(1);
+      expect(screen.queryByRole('button', { name: /add another contact/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
+
+      fireEvent.change(screen.getByPlaceholderText('Name'), { target: { value: 'Pat' } });
+      fireEvent.click(screen.getByRole('button', { name: '+ Add Another Contact' }));
+
+      expect(screen.getAllByPlaceholderText('Name')).toHaveLength(2);
+    });
+
+    it('shows the add button for a venue that already has contacts', async () => {
+      render(
+        <VenueForm
+          venue={makeVenue({ contacts: [{ id: 1, name: 'Pat', title: null, email: null, phone: null }] })}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+      await act(async () => {});
+
+      expect(screen.getByPlaceholderText('Name')).toHaveValue('Pat');
+      expect(screen.getByRole('button', { name: '+ Add Another Contact' })).toBeInTheDocument();
+    });
+
+    it('keeps blank contacts out of what it saves', async () => {
+      vi.mocked(venuesAPI.update).mockResolvedValue(makeVenue());
+
+      render(<VenueForm venue={makeVenue()} onClose={mockOnClose} onSuccess={mockOnSuccess} />);
+      await act(async () => {});
+
+      fireEvent.click(screen.getByRole('button', { name: /update/i }));
+
+      await waitFor(() => {
+        expect(venuesAPI.update).toHaveBeenCalledWith(1, expect.objectContaining({ contacts: [] }));
+      });
+      await waitFor(() => expect(mockOnSuccess).toHaveBeenCalled());
+    });
+
+    it('leaves empty fields when the only contact is removed', async () => {
+      render(<VenueForm venue={makeVenue()} onClose={mockOnClose} onSuccess={mockOnSuccess} />);
+      await act(async () => {});
+
+      fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'pat@example.com' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+
+      expect(screen.getByPlaceholderText('Email')).toHaveValue('');
+      expect(screen.queryByRole('button', { name: /add another contact/i })).not.toBeInTheDocument();
+    });
+  });
+
   describe('Error Display', () => {
     it('should display API error message', async () => {
       vi.mocked(venuesAPI.create).mockRejectedValue({
