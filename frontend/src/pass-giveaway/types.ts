@@ -781,6 +781,8 @@ export interface ShowSummary {
   unassigned_pair_count: number;
   /** Whether a DJ can Clothespin (reserve for today) a pass pair from the DJ view. */
   clothespin_available: boolean;
+  planned_close_date: string | null;
+  planned_close_time: string | null;
   /** The planned close time has passed: no claims or giveaways, even before the show is closed. */
   planned_close_passed: boolean;
   co_announce: boolean;

@@ -9,10 +9,12 @@ import type {
   OnAirIdentity,
   PassResponse,
   ShowResponse,
+  ShowSummary,
   SpecialtyShowCategory,
   VenueType,
   WheelchairAccessible,
 } from './types';
+import type { ShowSort } from './showListUrlState';
 
 // Staging-only: lets a staff member with active Sublist DJ status access the
 // DJ view, ahead of this being rolled out to production.
@@ -346,6 +348,31 @@ export function venueSortName(name: string): string {
 // Compares venue names for sorting, ignoring a leading "The " and case.
 export function compareVenueNames(a: string, b: string): number {
   return venueSortName(a).localeCompare(venueSortName(b), undefined, { sensitivity: 'base' });
+}
+
+/**
+ * Order two shows for a shows page's "Sort by". The close date sort puts
+ * shows with no planned close last, and breaks ties by show date.
+ */
+export function compareShows(a: ShowSummary, b: ShowSummary, sort: ShowSort): number {
+  if (sort === 'date') return a.show_date.localeCompare(b.show_date);
+  if (sort === 'band') return a.event_name.localeCompare(b.event_name);
+  if (sort === 'published') {
+    if (!a.published_at && !b.published_at) return 0;
+    if (!a.published_at) return 1;
+    if (!b.published_at) return -1;
+    return b.published_at.localeCompare(a.published_at);
+  }
+  if (sort === 'close') {
+    if (a.planned_close_date !== b.planned_close_date) {
+      if (!a.planned_close_date) return 1;
+      if (!b.planned_close_date) return -1;
+      return a.planned_close_date.localeCompare(b.planned_close_date);
+    }
+    const byTime = (a.planned_close_time ?? '').localeCompare(b.planned_close_time ?? '');
+    return byTime || a.show_date.localeCompare(b.show_date);
+  }
+  return compareVenueNames(a.venue.name, b.venue.name);
 }
 
 /** Join names as "A", "A and B" or "A, B and C". */

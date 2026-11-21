@@ -3,6 +3,7 @@ import {
   addressHasStateOrZip,
   canDjEditWinner,
   canRecordDjGiveaways,
+  compareShows,
   compareVenueNames,
   canUsePassGiveawayAdmin,
   findRecentDjGiveaway,
@@ -16,7 +17,7 @@ import {
 import { formatDateValue } from '../common/utils';
 import { persona, showIdentity } from './dj/testOnAir';
 import type { UserResponse } from '../common/types';
-import type { PassResponse } from './types';
+import type { PassResponse, ShowSummary } from './types';
 
 describe('isStagingSublistDjStaff', () => {
   const baseUser: UserResponse = {
@@ -323,5 +324,35 @@ describe('venue name sorting', () => {
       'Greek Theatre',
       'Theater Rhinoceros',
     ]);
+  });
+});
+
+describe('compareShows', () => {
+  const show = (
+    id: number,
+    show_date: string,
+    planned_close_date: string | null,
+    planned_close_time: string | null = null,
+  ) => ({ id, show_date, planned_close_date, planned_close_time }) as ShowSummary;
+
+  it('sorts by close date and time, soonest first, with no close date last', () => {
+    const shows = [
+      show(1, '2026-12-10', null),
+      show(2, '2026-12-09', '2026-12-05', '17:00:00'),
+      show(3, '2026-12-01', '2026-12-05', '12:00:00'),
+      show(4, '2026-12-20', '2026-11-30', '18:00:00'),
+      show(5, '2026-12-02', null),
+    ];
+    expect([...shows].sort((a, b) => compareShows(a, b, 'close')).map((s) => s.id)).toEqual([
+      4, 3, 2, 5, 1,
+    ]);
+  });
+
+  it('breaks close date ties by show date', () => {
+    const shows = [
+      show(1, '2026-12-10', '2026-12-05', '12:00:00'),
+      show(2, '2026-12-08', '2026-12-05', '12:00:00'),
+    ];
+    expect([...shows].sort((a, b) => compareShows(a, b, 'close')).map((s) => s.id)).toEqual([2, 1]);
   });
 });

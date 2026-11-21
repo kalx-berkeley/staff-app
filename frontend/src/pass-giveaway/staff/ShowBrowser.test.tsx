@@ -37,6 +37,8 @@ const show = (overrides: Partial<ShowSummary>): ShowSummary => ({
   guest_hold_staff_count: 0,
   unassigned_pair_count: 3,
   clothespin_available: true,
+  planned_close_date: null,
+  planned_close_time: null,
   planned_close_passed: false,
   co_announce: false,
   published_at: null,

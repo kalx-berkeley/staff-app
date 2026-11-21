@@ -8,9 +8,9 @@ import { pacificDateString } from '../common/dateTime';
 // Anything at its default is left out of the URL. "from" defaults to 30 days
 // ago, so an empty "from=" means no start date.
 
-export type ShowSort = 'date' | 'band' | 'venue' | 'published';
+export type ShowSort = 'date' | 'band' | 'venue' | 'published' | 'close';
 
-export const SHOW_SORTS: readonly ShowSort[] = ['date', 'band', 'venue', 'published'];
+export const SHOW_SORTS: readonly ShowSort[] = ['date', 'band', 'venue', 'published', 'close'];
 
 /** The search bar's filters: free text, venue and genre. */
 export interface ShowSearchFilters {

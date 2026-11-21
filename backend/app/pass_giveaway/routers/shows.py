@@ -639,6 +639,8 @@ def _build_show_summary(
             unclaimed_pair_count > 0
             and PassService.clothespin_blocker(show, today_pt()) is None
         ),
+        "planned_close_date": show.planned_close_date,
+        "planned_close_time": show.planned_close_time,
         "planned_close_passed": PassService.planned_close_passed(show),
         "co_announce": show.co_announce,
         "published_at": show.published_at,

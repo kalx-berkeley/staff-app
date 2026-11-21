@@ -7,7 +7,7 @@ import SearchBar from './SearchBar';
 import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker } from '../components';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { useRestoreScrollOnBack } from '../../common/hooks/useRestoreScrollOnBack';
-import { compareVenueNames } from '../utils';
+import { compareShows } from '../utils';
 import { formatCalendarDate, formatCalendarDateRange } from '../../common/dateTime';
 import { useShowListFilters, type ShowListFilterOptions, type ShowSort } from '../showListUrlState';
 
@@ -114,17 +114,7 @@ const ShowList = () => {
   const formatDateRange = (startDateStr: string, endDateStr: string): string =>
     formatCalendarDateRange(startDateStr, endDateStr);
 
-  const sortedShows = [...filteredShows].sort((a, b) => {
-    if (sortBy === 'date') return a.show_date.localeCompare(b.show_date);
-    if (sortBy === 'band') return a.event_name.localeCompare(b.event_name);
-    if (sortBy === 'published') {
-      if (!a.published_at && !b.published_at) return 0;
-      if (!a.published_at) return 1;
-      if (!b.published_at) return -1;
-      return b.published_at.localeCompare(a.published_at);
-    }
-    return compareVenueNames(a.venue.name, b.venue.name);
-  });
+  const sortedShows = [...filteredShows].sort((a, b) => compareShows(a, b, sortBy));
 
   return (
     <div className="show-list" ref={scrollRootRef}>
@@ -178,6 +168,7 @@ const ShowList = () => {
           <option value="band">Band name</option>
           <option value="venue">Venue name</option>
           <option value="published">Published (newest first)</option>
+          <option value="close">Close date (soonest first)</option>
         </select>
 
         <span style={{ marginLeft: '1rem' }}>

@@ -7,7 +7,7 @@ import type { ShowSummary, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { useRestoreScrollOnBack } from '../../common/hooks/useRestoreScrollOnBack';
-import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, WHEELCHAIR_ACCESSIBLE_LABELS, compareVenueNames, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
+import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, WHEELCHAIR_ACCESSIBLE_LABELS, compareShows, findRecentDjGiveaway, formatShowRating, isMovieShow } from '../utils';
 import { formatCalendarDate, formatCalendarDateRange } from '../../common/dateTime';
 import { useShowListFilters, type ShowListFilterOptions, type ShowSort } from '../showListUrlState';
 import { useOnAir } from './onAirContext';
@@ -279,17 +279,7 @@ const ShowBrowser = () => {
   const statusFiltered =
     statusFilter === 'can-give-away' ? filteredShows.filter(canGiveAwayNow) : filteredShows;
 
-  const sortedShows = [...statusFiltered].sort((a, b) => {
-    if (sortBy === 'date') return a.show_date.localeCompare(b.show_date);
-    if (sortBy === 'band') return a.event_name.localeCompare(b.event_name);
-    if (sortBy === 'published') {
-      if (!a.published_at && !b.published_at) return 0;
-      if (!a.published_at) return 1;
-      if (!b.published_at) return -1;
-      return b.published_at.localeCompare(a.published_at);
-    }
-    return compareVenueNames(a.venue.name, b.venue.name);
-  });
+  const sortedShows = [...statusFiltered].sort((a, b) => compareShows(a, b, sortBy));
 
   return (
     <div className="show-browser" ref={scrollRootRef}>

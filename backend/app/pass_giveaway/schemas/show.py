@@ -765,6 +765,8 @@ class ShowSummary(BaseModel):
             " unclaimed pair is left and the show's rules allow it"
         ),
     )
+    planned_close_date: date | None = None
+    planned_close_time: time | None = None
     planned_close_passed: bool = Field(
         default=False,
         description=(

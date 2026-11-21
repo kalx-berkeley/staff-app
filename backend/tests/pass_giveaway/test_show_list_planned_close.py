@@ -71,3 +71,15 @@ def test_planned_close_time_passed(client, db, show):
     summary = _summary(client, show.id)
     assert summary["status"] == "published"
     assert summary["planned_close_passed"] is True
+
+
+def test_summary_includes_planned_close(client, db, show):
+    """The list gives the planned close date and time, for sorting by close date."""
+    summary = _summary(client, show.id)
+    assert summary["planned_close_date"] is None
+    assert summary["planned_close_time"] is None
+
+    _set_planned_close(db, show, datetime(2030, 3, 4, 17, 30, tzinfo=_LA))
+    summary = _summary(client, show.id)
+    assert summary["planned_close_date"] == "2030-03-04"
+    assert summary["planned_close_time"] == "17:30:00"
