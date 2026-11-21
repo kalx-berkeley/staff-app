@@ -6,6 +6,38 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.20.0] - 2026-11-21
+
+### Changed
+
+- Drop the typed DJ names from passes, on-air winners, attempts, lottery entries, Specialty Music Show DJs and analytics, now that each is credited to a persona or show. The name matching and `backend/scripts/spinitron_identity_report.py` go too ([9d27689](https://github.com/kalx-berkeley/staff-app/commit/9d27689))
+- Match spins, feature-bin releases and KALX Live! bands against a show's tagged bands only, never its show name, so the DJ show page only pops up matches the on-air DJ can give passes away for. Back on the DJ show page returns to the page the DJ came from, and one show's page state no longer carries over to the next ([3ad315e](https://github.com/kalx-berkeley/staff-app/commit/3ad315e))
+- Open co-announce tabler passes to all Active staff a set number of days before the close (7 by default, set on the show form) ([0c4355c](https://github.com/kalx-berkeley/staff-app/commit/0c4355c))
+- Treat "DJ in training" staff as DJs, like Sublist DJs ([4e4c9a8](https://github.com/kalx-berkeley/staff-app/commit/4e4c9a8))
+- Hide shows more than 7 days ago on `/staff` My Passes, with a My/All button pair to show them ([acb825b](https://github.com/kalx-berkeley/staff-app/commit/acb825b)), ([95c8e34](https://github.com/kalx-berkeley/staff-app/commit/95c8e34))
+- Say when the on-air slot is a pre-recorded show, instead of that no DJ is in the schedule ([775680c](https://github.com/kalx-berkeley/staff-app/commit/775680c))
+- Sync the Spinitron on-air schedule every hour instead of every 6 hours ([d944927](https://github.com/kalx-berkeley/staff-app/commit/d944927))
+- Group similar spellings of a caller's name in KALX Staff Analytics' on-air winner metrics ([c322796](https://github.com/kalx-berkeley/staff-app/commit/c322796))
+- Keep the venue and promoter lists' filters in the URL, so Back restores them ([257edd9](https://github.com/kalx-berkeley/staff-app/commit/257edd9))
+- Clear typed text in the DJ/show picker that isn't a real DJ or show ([d39e836](https://github.com/kalx-berkeley/staff-app/commit/d39e836))
+- Log an error for each unknown `.env` setting at startup instead of failing to start ([feb334b](https://github.com/kalx-berkeley/staff-app/commit/feb334b))
+
+### Added
+
+- Keep staff who must be under 21 on the show date from claiming staff or tabler passes, entering the lottery, joining the alternate list or bringing a +1 guest to 21+ shows, and warn staff who might be. The birth year comes from Airtable and is never shown. The staff show list badges affected shows, and staff already holding a pass get a warning to release it ([ecbd409](https://github.com/kalx-berkeley/staff-app/commit/ecbd409))
+- Email the Publicity department heads when a tabler claims or releases their tabler pass ([4a0f3d1](https://github.com/kalx-berkeley/staff-app/commit/4a0f3d1))
+- Let promotions sort the shows list by close date ([4ec65e0](https://github.com/kalx-berkeley/staff-app/commit/4ec65e0))
+- Show the reservation date on reserved on-air pass pairs ([2631072](https://github.com/kalx-berkeley/staff-app/commit/2631072))
+- Show the exact time when hovering a scheduled job's Last Run or Next Run in KALX Staff Admin ([868739a](https://github.com/kalx-berkeley/staff-app/commit/868739a))
+
+### Removed
+
+- Remove Legacy Import, and the DJ name autocomplete it was the last user of ([feb334b](https://github.com/kalx-berkeley/staff-app/commit/feb334b))
+
+### Fixed
+
+- Credit a FREEFORM playlist to its persona on the DJ pages, instead of treating it as no one on air, which left those DJs unattributed and hid their pre-assigned passes ([3ddd68a](https://github.com/kalx-berkeley/staff-app/commit/3ddd68a))
+
 ## [1.19.0] - 2026-11-17
 
 ### Changed
@@ -496,6 +528,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.20.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.19.0...v1.20.0
 [1.19.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.18.0...v1.19.0
 [1.18.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.17.0...v1.18.0
 [1.17.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.16.0...v1.17.0
