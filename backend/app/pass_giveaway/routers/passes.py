@@ -35,6 +35,7 @@ from app.pass_giveaway.services.identities import (
     staff_persona_name,
 )
 from app.pass_giveaway.services import tabler_service
+from app.pass_giveaway.services import age_check
 from app.pass_giveaway.services.specialty_show_membership import (
     is_member as is_show_member,
     member_show_ids,
@@ -619,7 +620,9 @@ def assign_tabler_pass(
     )
     if staff.id != promotions.id:
         tabler_service.email_assigned(db, staff, show)
-    return PassResponse.model_validate(pass_item)
+    response = PassResponse.model_validate(pass_item)
+    response.staff_age_check = age_check.check(show, staff)
+    return response
 
 
 def _require_own_pass(pass_item: Pass, user, message: str) -> None:

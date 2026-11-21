@@ -7,6 +7,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 from app.common.schemas.types import UtcDatetime
 from app.models.guest_fallback import GuestFallback
 from app.pass_giveaway.schemas.guest_fallback import GuestFallbackChoice
+from app.pass_giveaway.services.age_check import AgeCheck
 
 
 class WinnerReleaseData(BaseModel):
@@ -234,6 +235,10 @@ class PassResponse(BaseModel):
     staff_on_leave: bool = False
     staff_loa_start: date | None = None
     staff_loa_end: date | None = None
+    # Set only in the response to promotions assigning a tabler pass: whether
+    # the staff member might be under 21 on the date of a 21+ show
+    # (app/pass_giveaway/services/age_check.py). Never the birth year.
+    staff_age_check: AgeCheck | None = None
 
     # Staff +1 guest fields
     has_guest: bool = False

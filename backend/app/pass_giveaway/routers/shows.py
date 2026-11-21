@@ -40,6 +40,7 @@ from app.pass_giveaway.services.tracking import (
 from app.pass_giveaway.services.pass_service import PassService
 from app.pass_giveaway.services import artist_info_service
 from app.pass_giveaway.services import tabler_service
+from app.pass_giveaway.services import age_check
 from app.pass_giveaway.services import entered_winners_service
 from app.common.services.leave_service import today_pt
 from app.pass_giveaway.services.lottery_service import LotteryService
@@ -60,6 +61,7 @@ from app.auth import (
     check_dj_giveaway_access,
     _get_promotions_staff_by_email,
     require_authentication,
+    get_staff_member,
 )
 from app.models.staff import Staff
 from app.models.staff_status import StaffStatus
@@ -938,6 +940,35 @@ def list_staff_pass_claimants(
     )
     staff_members = db.query(Staff).filter(status_filter).order_by(Staff.name).all()
     return [{"id": s.id, "name": s.name, "email": s.email} for s in staff_members]
+
+
+@router.get("/my-age-checks", response_model=dict[int, age_check.AgeCheck])
+def get_my_age_checks(
+    staff: Staff = Depends(get_staff_member),
+    db: Session = Depends(get_db),
+):
+    """
+    The upcoming 21+ shows the signed-in staff member is, or might be, too young for.
+
+    Maps show ID to "under_21" (they can't get a pass) or "maybe_under_21"
+    (they're warned to make sure they're 21 by the show date), going by their
+    Airtable birth year. Shows they're old enough for are left out. Only the
+    result is sent, never the birth year. Declared before `/{show_id}` so it
+    isn't swallowed by that route.
+    """
+    if staff.birth_year is None:
+        return {}
+    shows = (
+        db.query(Show)
+        .filter(
+            Show.age_restriction == age_check.AGE_21_PLUS,
+            Show.status.in_(["published", "closed"]),
+            Show.show_date >= today_pt(),
+        )
+        .all()
+    )
+    checks = {show.id: age_check.check(show, staff) for show in shows}
+    return {show_id: result for show_id, result in checks.items() if result}
 
 
 @router.get("/deleted", response_model=list[ShowResponse])

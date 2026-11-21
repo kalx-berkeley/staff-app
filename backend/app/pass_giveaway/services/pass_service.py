@@ -11,6 +11,7 @@ import logging
 from app.common.areas import PASS_GIVEAWAY_AREA
 from app.config import settings
 from app.models.guest_fallback import GuestFallback
+from app.pass_giveaway.services import age_check
 from app.pass_giveaway.services.close_digest import CloseDigest
 from app.models.pass_model import Pass
 from app.models.show import Show
@@ -1057,6 +1058,7 @@ class PassService:
                         detail=f"Staff member with id {staff_id} not found",
                     )
                 ensure_not_on_leave_for_show(staff, show)
+                age_check.ensure_not_under_21(show, staff)
 
                 # A staff member may hold at most one staff or tabler pass per show.
                 existing_claim = tabler_service.held_pass(db, pass_item.show_id, staff_id)
@@ -1247,6 +1249,7 @@ class PassService:
             )
         if pass_item.staff:
             ensure_not_on_leave_for_show(pass_item.staff, show)
+            age_check.ensure_not_under_21(show, pass_item.staff)
         if pass_item.has_guest or pass_item.guest_waiting:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

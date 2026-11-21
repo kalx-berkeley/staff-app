@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 from app.common.areas import PASS_GIVEAWAY_AREA
 from app.config import settings
 from app.models.guest_fallback import GuestFallback
+from app.pass_giveaway.services import age_check
 from app.pass_giveaway.services.close_digest import CloseDigest
 from app.models.notification_preferences import NotificationPreferences
 from app.models.pass_model import STAFF_CLAIM_PASS_TYPES, Pass
@@ -306,6 +307,7 @@ class AlternateService:
         # Same close-time rules as a direct claim.
         PassService._validate_show_claimable(show)
         ensure_not_on_leave_for_show(staff, show)
+        age_check.ensure_not_under_21(show, staff)
 
         tabler_service.ensure_holds_no_tabler_pass(db, show.id, staff.id, "You have")
         if AlternateService._has_claim(db, show.id, staff.id):

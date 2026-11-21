@@ -1,6 +1,8 @@
 import type { UserResponse } from '../common/types';
 import { formatDateValue } from '../common/utils';
+import { formatCalendarDate } from '../common/dateTime';
 import type {
+  AgeCheck,
   AgeRestriction,
   GuestFallback,
   MovieRating,
@@ -76,6 +78,39 @@ export const seatedFallbackNote = (fallback: GuestFallback): string => {
 /** The number on-air listeners call to win passes, and its letters version. */
 export const KALX_CALL_IN_PHONE = '(510) 642-5259';
 export const KALX_CALL_IN_PHONE_LETTERS = '(510) 642-KALX';
+
+/** A show's first day, "YYYY-MM-DD": its start date for a multi-day show. */
+const firstShowDay = (show: { show_date: string; show_start_date?: string | null }): string =>
+  show.show_start_date ?? show.show_date;
+
+/** The show list badge for a 21+ show the signed-in staff member is, or might be, too young for. */
+export const AGE_CHECK_BADGES: Record<AgeCheck, string> = {
+  under_21: '21+: you\'re under 21',
+  maybe_under_21: '21+: check your age',
+};
+
+/**
+ * What to tell the signed-in staff member about a 21+ show they're too young
+ * for (`AgeCheck`, from `showsAPI.getMyAgeChecks`), going by their birth year.
+ * `under_21` matches the backend's refusal (app/pass_giveaway/services/age_check.py).
+ */
+export const ageCheckMessage = (
+  check: AgeCheck,
+  show: { show_date: string; show_start_date?: string | null },
+): string => {
+  const day = formatCalendarDate(firstShowDay(show), {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  return check === 'under_21'
+    ? `This show is 21+. Going by the birth year in your staff record, you'll be under 21 on ${day}, so you can't get a pass for it.`
+    : `This show is 21+. Going by the birth year in your staff record, you might be under 21 on ${day}. Make sure you'll be 21 or over that day: the venue will check your ID.`;
+};
+
+/** The reminder on a 21+ show's +1 guest forms, or null for other shows. */
+export const guestAgeNote = (show: { age_restriction?: string | null }): string | null =>
+  show.age_restriction === '21+' ? 'This show is 21+, so your guest must be 21 or over too.' : null;
 
 /** The table Publicity staff at co-announce shows, using tabler passes. */
 export const KALX_TABLE_NAME = 'KALX Co-Announce Table';

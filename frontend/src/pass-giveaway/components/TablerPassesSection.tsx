@@ -59,6 +59,8 @@ const TablerPassesSection = ({
 }: TablerPassesSectionProps) => {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  // After assigning a tabler who might be under 21 on the date of a 21+ show
+  const [ageNotice, setAgeNotice] = useState<string | null>(null);
   const [assignInput, setAssignInput] = useState('');
   const [staffList, setStaffList] = useState<StaffPassClaimant[] | null>(null);
 
@@ -80,6 +82,7 @@ const TablerPassesSection = ({
   const run = async (action: () => Promise<unknown>, fallback: string) => {
     setBusy(true);
     setActionError(null);
+    setAgeNotice(null);
     try {
       await action();
       await onChanged();
@@ -115,8 +118,13 @@ const TablerPassesSection = ({
       return;
     }
     run(async () => {
-      await passesAPI.assignTablerPass(show.id, staff.id);
+      const assigned = await passesAPI.assignTablerPass(show.id, staff.id);
       setAssignInput('');
+      if (assigned.staff_age_check === 'maybe_under_21') {
+        setAgeNotice(
+          `This show is 21+, and going by the birth year in their staff record, ${staff.name ?? staff.email} might be under 21 on the show date. Their email asks them to make sure they'll be 21 or over by then.`,
+        );
+      }
     }, 'Failed to assign the tabler pass');
   };
 
@@ -215,6 +223,11 @@ const TablerPassesSection = ({
         </div>
       )}
 
+      {ageNotice && (
+        <p className="field-warning" role="alert">
+          {ageNotice}
+        </p>
+      )}
       {actionError && <p className="field-error">{actionError}</p>}
     </div>
   );

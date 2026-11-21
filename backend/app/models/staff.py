@@ -62,6 +62,11 @@ class Staff(Base):
     # Airtable: "DJ Quiz", the years (e.g. [2025, 2026]) whose DJ Quiz the
     # staff member has completed, sorted. Null when there are none.
     dj_quiz_years = Column(JSON, nullable=True)
+    # Airtable: "Birth year", e.g. 2005. Null when blank or not a plausible
+    # year. Private: no API response or page shows it; it's only used to
+    # check the age of staff asking for passes to 21+ shows
+    # (app/pass_giveaway/services/age_check.py).
+    birth_year = Column(Integer, nullable=True)
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )

@@ -7,9 +7,12 @@ import type { ShowSummary } from '../types';
 import type { APIError } from '../../common/types';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { useRestoreScrollOnBack } from '../../common/hooks/useRestoreScrollOnBack';
-import { WHEELCHAIR_ACCESSIBLE_LABELS, compareVenueNames, formatShowRating, isMovieShow } from '../utils';
+import { AGE_CHECK_BADGES, WHEELCHAIR_ACCESSIBLE_LABELS, ageCheckMessage, compareVenueNames, formatShowRating, isMovieShow } from '../utils';
 import { formatCalendarDate, formatCalendarDateRange } from '../../common/dateTime';
 import { useShowListFilters, type ShowListFilterOptions, type ShowSort } from '../showListUrlState';
+import { useMyAgeChecks } from '../useMyAgeChecks';
+import { useAuth } from '../../common/contexts/authHooks';
+import type { AgeCheck } from '../types';
 
 const VIEW_MODE_KEY = 'kalx_staff_view_mode';
 
@@ -30,8 +33,21 @@ const FILTER_OPTIONS: ShowListFilterOptions<StatusFilter> = {
   defaultStatus: 'published',
 };
 
+/** A 21+ show the signed-in staff member is, or might be, too young for. */
+const AgeCheckBadge = ({ check, show }: { check: AgeCheck | undefined; show: ShowSummary }) =>
+  check ? (
+    <span
+      className={`age-check-badge${check === 'under_21' ? ' age-check-badge-under-21' : ''}`}
+      title={ageCheckMessage(check, show)}
+    >
+      {AGE_CHECK_BADGES[check]}
+    </span>
+  ) : null;
+
 const ShowBrowser = () => {
   usePageTitle('Shows · Staff');
+  const { user } = useAuth();
+  const ageChecks = useMyAgeChecks(!!user?.profile);
   const [rawShows, setRawShows] = useState<ShowSummary[]>([]);
   const [allShows, setAllShows] = useState<ShowSummary[]>([]);
   const [filteredShows, setFilteredShows] = useState<ShowSummary[]>([]);
@@ -256,6 +272,11 @@ const ShowBrowser = () => {
                       {show.co_announce && (
                         <span className="co-announce-badge" style={{ marginLeft: '0.5rem' }}>📢 Co-Announce</span>
                       )}
+                      {ageChecks[show.id] && (
+                        <span style={{ marginLeft: '0.5rem' }}>
+                          <AgeCheckBadge check={ageChecks[show.id]} show={show} />
+                        </span>
+                      )}
                       {show.in_feature_bin && (
                         <span style={{ marginLeft: '0.5rem' }}>
                           <FeatureBinBadge releases={show.feature_bin_releases} />
@@ -303,6 +324,7 @@ const ShowBrowser = () => {
                     <h3 style={{ margin: 0 }}><EnrichedShowName eventName={show.event_name} bands={show.bands ?? []} onGenreClick={addGenre} /></h3>
                     {isClosed && <span className="status-badge status-closed">Closed</span>}
                     {show.co_announce && <span className="co-announce-badge">📢 Co-Announce</span>}
+                    <AgeCheckBadge check={ageChecks[show.id]} show={show} />
                     {show.in_feature_bin && <FeatureBinBadge releases={show.feature_bin_releases} />}
                     {show.on_kalx_live && <KalxLiveBadge appearances={show.kalx_live_appearances} />}
                   </div>

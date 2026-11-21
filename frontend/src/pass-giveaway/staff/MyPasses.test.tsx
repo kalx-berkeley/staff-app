@@ -2,13 +2,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import MyPasses from './MyPasses';
-import { alternatesAPI, passesAPI } from '../api';
+import { alternatesAPI, passesAPI, showsAPI } from '../api';
 import type { MyAlternateEntry, PassResponse } from '../types';
 import { formatDateValue } from '../../common/utils';
 
 const auth = vi.hoisted(() => ({ isSublistDj: false }));
 
 vi.mock('../api', () => ({
+  showsAPI: {
+    getMyAgeChecks: vi.fn().mockResolvedValue({}),
+  },
   passesAPI: {
     getStaffMyClaims: vi.fn().mockResolvedValue([]),
     getStaffMyGiveaways: vi.fn().mockResolvedValue([]),
@@ -236,5 +239,32 @@ describe('Staff MyPasses — past shows and winner details', () => {
 
     await waitFor(() => expect(passesAPI.getStaffMyGiveaways).toHaveBeenCalled());
     expect(screen.queryByText('My Giveaway History')).not.toBeInTheDocument();
+  });
+});
+
+describe('Staff MyPasses — 21+ shows', () => {
+  beforeEach(() => {
+    vi.mocked(alternatesAPI.getMyEntries).mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.mocked(passesAPI.getStaffMyClaims).mockResolvedValue([]);
+    vi.mocked(showsAPI.getMyAgeChecks).mockResolvedValue({});
+  });
+
+  it('warns on passes for 21+ shows the staff member is, or might be, too young for', async () => {
+    vi.mocked(passesAPI.getStaffMyClaims).mockResolvedValue([
+      makePass({ id: 1, show_id: 10, pass_type: 'staff', status: 'claimed', show_event_name: 'Too Young', show_date: daysFromToday(5) }),
+      makePass({ id: 2, show_id: 20, pass_type: 'tabler', status: 'claimed', show_event_name: 'Maybe', show_date: daysFromToday(5) }),
+      makePass({ id: 3, show_id: 30, pass_type: 'staff', status: 'claimed', show_event_name: 'Fine', show_date: daysFromToday(5) }),
+    ]);
+    vi.mocked(showsAPI.getMyAgeChecks).mockResolvedValue({ 10: 'under_21', 20: 'maybe_under_21' });
+
+    render(<BrowserRouter><MyPasses /></BrowserRouter>);
+
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts).toHaveLength(2);
+    expect(alerts[0]).toHaveTextContent("you'll be under 21 on the show date. Please release your pass.");
+    expect(alerts[1]).toHaveTextContent("Make sure you'll be 21 or over on the show date");
   });
 });

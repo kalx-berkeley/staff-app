@@ -80,6 +80,27 @@ def _dj_quiz_years(value: Any) -> List[int]:
     return sorted(years)
 
 
+def _birth_year(value: Any) -> Optional[int]:
+    """
+    The year in the "Birth year" field (a number or text), or None if blank or
+    not a plausible birth year.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)) and float(value).is_integer():
+        year = int(value)
+    elif isinstance(value, str) and re.fullmatch(r"\d{4}", value.strip()):
+        year = int(value.strip())
+    else:
+        if value not in (None, ""):
+            logger.warning('Ignoring a "Birth year" from Airtable that isn\'t a year')
+        return None
+    if not 1900 <= year <= date.today().year:
+        logger.warning('Ignoring an implausible "Birth year" from Airtable')
+        return None
+    return year
+
+
 def _extract_spinitron_ids(raw: str) -> List[int]:
     """Extract Spinitron persona IDs from Spinitron DJ profile URLs in a markdown string."""
     return [int(m.group(1)) for m in _SPINITRON_URL_RE.finditer(raw)]
@@ -392,6 +413,7 @@ class UserService:
         surname = _text_field(fields, "Surname") or None
         dj_quiz_years = _dj_quiz_years(fields.get("DJ Quiz"))
         pronouns = _text_field(fields, "Pronouns") or None
+        birth_year = _birth_year(fields.get("Birth year"))
         loa_start = _date_field(fields, "LOA start")
         loa_end = _date_field(fields, "LOA end")
         phone = (fields.get("Phone") or "").strip()
@@ -483,6 +505,9 @@ class UserService:
                         "before": existing_staff.titles_and_roles,
                         "after": titles_and_roles,
                     }
+                if existing_staff.birth_year != birth_year:
+                    # Birth years are private, so the audit log doesn't record them
+                    changed["birth_year"] = "changed"
                 for field, value in (("loa_start", loa_start), ("loa_end", loa_end)):
                     before = getattr(existing_staff, field)
                     if before != value:
@@ -496,6 +521,7 @@ class UserService:
                 existing_staff.surname = surname
                 existing_staff.dj_quiz_years = dj_quiz_years or None
                 existing_staff.pronouns = pronouns
+                existing_staff.birth_year = birth_year
                 existing_staff.phone = phone
                 existing_staff.titles_and_roles = titles_and_roles
                 existing_staff.loa_start = loa_start
@@ -514,6 +540,7 @@ class UserService:
                     surname=surname,
                     dj_quiz_years=dj_quiz_years or None,
                     pronouns=pronouns,
+                    birth_year=birth_year,
                     phone=phone,
                     titles_and_roles=titles_and_roles,
                     loa_start=loa_start,

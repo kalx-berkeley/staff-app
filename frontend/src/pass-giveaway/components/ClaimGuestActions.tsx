@@ -9,6 +9,8 @@ interface ClaimGuestActionsProps {
   /** Free staff passes right now, which decides whether a new guest can be seated. */
   availableCount: number;
   requireGuestName: boolean;
+  /** A reminder shown when adding a guest, e.g. that a 21+ show's guests must be 21+. */
+  guestNote?: string | null;
   /** Adding a guest follows the same rules as claiming, so it can be turned off. */
   canAddGuest: boolean;
   /** Called after a change, with a message to show. */
@@ -27,6 +29,7 @@ const ClaimGuestActions = ({
   pass,
   availableCount,
   requireGuestName,
+  guestNote = null,
   canAddGuest,
   onChanged,
 }: ClaimGuestActionsProps) => {
@@ -92,6 +95,7 @@ const ClaimGuestActions = ({
         <p className="guest-claim-info">
           A guest added now goes behind any guests already waiting for a pass.
         </p>
+        {guestNote && <p className="field-hint">{guestNote}</p>}
         {nameField}
         <GuestFallbackOptions
           name={`add-guest-fallback-${pass.id}`}

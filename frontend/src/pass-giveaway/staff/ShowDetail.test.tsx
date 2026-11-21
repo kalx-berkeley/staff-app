@@ -11,6 +11,7 @@ import type { UserResponse } from '../../common/types';
 vi.mock('../api', () => ({
   showsAPI: {
     get: vi.fn(),
+    getMyAgeChecks: vi.fn(),
   },
   passesAPI: {
     claim: vi.fn(),
@@ -158,6 +159,7 @@ describe('Staff ShowDetail', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(passesAPI.getMyPreassignIdentities).mockResolvedValue([]);
+    vi.mocked(showsAPI.getMyAgeChecks).mockResolvedValue({});
     mockUseAuth.mockReturnValue({ user: null, loading: false, error: null, refetchUser: vi.fn() });
   });
 
@@ -570,6 +572,85 @@ describe('Staff ShowDetail', () => {
 
       expect(await screen.findByRole('button', { name: /^claim$/i })).not.toBeDisabled();
       expect(screen.queryByText(/on leave of absence/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('21+ shows and birth years', () => {
+    const loginAsSomeoneElse = () =>
+      mockUseAuth.mockReturnValue({
+        user: { email: 'someone-else@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { id: 1, name: 'Someone Else', phone: '555-0000', dj_name: null, is_sublist_dj: false } },
+        loading: false,
+        error: null,
+        refetchUser: vi.fn(),
+      });
+
+    it('replaces the Claim buttons with why for staff who must be under 21', async () => {
+      loginAsSomeoneElse();
+      vi.mocked(showsAPI.getMyAgeChecks).mockResolvedValue({ 1: 'under_21' });
+      vi.mocked(showsAPI.get).mockResolvedValue(mockShow);
+
+      await renderAndSettle(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      expect(
+        await screen.findByText(
+          "This show is 21+. Going by the birth year in your staff record, you'll be under 21 on Dec 31, 2024, so you can't get a pass for it."
+        )
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^claim$/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /claim with \+1 guest/i })).not.toBeInTheDocument();
+    });
+
+    it('warns staff who might be under 21 but lets them claim', async () => {
+      loginAsSomeoneElse();
+      vi.mocked(showsAPI.getMyAgeChecks).mockResolvedValue({ 1: 'maybe_under_21' });
+      vi.mocked(showsAPI.get).mockResolvedValue(mockShow);
+
+      await renderAndSettle(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        "you might be under 21 on Dec 31, 2024. Make sure you'll be 21 or over that day"
+      );
+      expect(screen.getByRole('button', { name: /^claim$/i })).not.toBeDisabled();
+    });
+
+    it('asks staff under 21 who already have a pass to release it', async () => {
+      loginAsClaimer();
+      vi.mocked(showsAPI.getMyAgeChecks).mockResolvedValue({ 1: 'under_21' });
+      vi.mocked(showsAPI.get).mockResolvedValue(mockShow);
+
+      await renderAndSettle(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        "you'll be under 21 on Dec 31, 2024, so you can't get a pass for it. Please release yours."
+      );
+      expect(screen.getByRole('button', { name: /release/i })).toBeInTheDocument();
+    });
+
+    it("says nothing when the show isn't one they're too young for", async () => {
+      loginAsSomeoneElse();
+      vi.mocked(showsAPI.getMyAgeChecks).mockResolvedValue({ 99: 'under_21' });
+      vi.mocked(showsAPI.get).mockResolvedValue(mockShow);
+
+      await renderAndSettle(<BrowserRouter><ShowDetail /></BrowserRouter>);
+
+      expect(await screen.findByRole('button', { name: /^claim$/i })).not.toBeDisabled();
+      expect(screen.queryByText(/under 21/)).not.toBeInTheDocument();
+    });
+
+    it("reminds staff that a 21+ show's +1 guest must be 21+ too", async () => {
+      loginAsSomeoneElse();
+      vi.mocked(showsAPI.get).mockResolvedValue({
+        ...mockShow,
+        passes: [availablePass, { ...availablePass, id: 3 }],
+        available_staff_count: 2,
+      });
+
+      await renderAndSettle(<BrowserRouter><ShowDetail /></BrowserRouter>);
+      fireEvent.click((await screen.findAllByRole('button', { name: /claim with \+1 guest/i }))[0]);
+
+      expect(
+        await screen.findByText('This show is 21+, so your guest must be 21 or over too.')
+      ).toBeInTheDocument();
     });
   });
 

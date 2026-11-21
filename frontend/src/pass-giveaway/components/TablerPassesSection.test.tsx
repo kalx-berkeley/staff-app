@@ -193,6 +193,34 @@ describe('TablerPassesSection', () => {
     expect(await screen.findByLabelText(/give a tabler pass to/i)).toHaveValue('');
   });
 
+  it('tells promotions when the staff member they assigned might be under 21', async () => {
+    vi.mocked(showsAPI.listStaffPassClaimants).mockResolvedValue([
+      { id: 8, name: 'Sam Staff', email: 'sam@kalx.test' },
+    ]);
+    vi.mocked(passesAPI.assignTablerPass).mockResolvedValue({
+      ...pennyPass,
+      staff_age_check: 'maybe_under_21',
+    });
+    await renderAndSettle(
+      <TablerPassesSection
+        show={makeShow([tablerPass({ id: 11 })])}
+        mode="promotions"
+        myEmail="pat@kalx.test"
+        onChanged={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    const input = screen.getByLabelText(/give a tabler pass to/i);
+    fireEvent.focus(input);
+    await waitFor(() => expect(showsAPI.listStaffPassClaimants).toHaveBeenCalled());
+    fireEvent.change(input, { target: { value: 'sam@kalx.test' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Sam Staff might be under 21 on the show date',
+    );
+  });
+
   describe('opening to all Active staff', () => {
     const DAY = 24 * 60 * 60 * 1000;
     const later = new Date(Date.now() + 3 * DAY).toISOString();

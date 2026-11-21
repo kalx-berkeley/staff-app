@@ -141,6 +141,8 @@ export const WaitingGuestsList = ({
 interface AlternateGuestFormProps {
   idPrefix: string;
   requireGuestName: boolean;
+  /** A reminder shown when waiting with a guest, e.g. that a 21+ show's guests must be 21+. */
+  guestNote?: string | null;
   initial?: AlternateJoinRequest;
   submitLabel: string;
   busy: boolean;
@@ -155,6 +157,7 @@ interface AlternateGuestFormProps {
 export const AlternateGuestForm = ({
   idPrefix,
   requireGuestName,
+  guestNote = null,
   initial,
   submitLabel,
   busy,
@@ -212,6 +215,7 @@ export const AlternateGuestForm = ({
             Staff always come before +1 guests, so your guest only gets a pass if nobody else
             is waiting when yours opens up.
           </p>
+          {guestNote && <p className="field-hint">{guestNote}</p>}
           {requireGuestName && (
             <div className="form-group">
               <label htmlFor={`${idPrefix}-guest-name`}>Guest name (required by this venue):</label>

@@ -814,6 +814,13 @@ export interface WinnerUpdateData {
   recipient_email: string | null;
 }
 
+/**
+ * Whether the signed-in staff member is too young for a 21+ show, going by
+ * their birth year: "under_21" (they can't get a pass) or "maybe_under_21"
+ * (they're warned). The birth year itself is never sent.
+ */
+export type AgeCheck = 'under_21' | 'maybe_under_21';
+
 export interface PassResponse {
   id: number;
   show_id: number;
@@ -838,6 +845,8 @@ export interface PassResponse {
   claimed_at: string | null; // ISO datetime string
   // Set when the claimant's leave of absence covers the whole show
   staff_on_leave?: boolean;
+  /** Only in the response to promotions assigning a tabler pass. */
+  staff_age_check?: AgeCheck | null;
   staff_loa_start?: string | null;
   staff_loa_end?: string | null;
 

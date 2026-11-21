@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { passesAPI, lotteryAPI, alternatesAPI } from '../api';
-import type { PassResponse, MyLotteryEntryResponse, MyAlternateEntry } from '../types';
+import type { AgeCheck, PassResponse, MyLotteryEntryResponse, MyAlternateEntry } from '../types';
 import type { APIError } from '../../common/types';
 import {
   KALX_TABLE_NAME,
@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { formatCalendarDate, formatPacific } from '../../common/dateTime';
+import { useMyAgeChecks } from '../useMyAgeChecks';
 
 const formatDateTime = (dateTimeStr: string) =>
   formatPacific(dateTimeStr, {
@@ -32,9 +33,23 @@ const formatDate = (dateStr: string) =>
     day: 'numeric',
   });
 
+/**
+ * The warning on a pass, lottery entry or alternate list spot for a 21+ show
+ * the staff member is, or might be, too young for. *undo* says how to give it up.
+ */
+const AgeWarning = ({ check, undo }: { check: AgeCheck | undefined; undo: string }) =>
+  check ? (
+    <p className="field-warning" role="alert">
+      {check === 'under_21'
+        ? `This show is 21+, and going by the birth year in your staff record, you'll be under 21 on the show date. Please ${undo}.`
+        : "This show is 21+. Make sure you'll be 21 or over on the show date: the venue will check your ID."}
+    </p>
+  ) : null;
+
 const MyPasses = () => {
   usePageTitle('My Passes · Staff');
   const { user } = useAuth();
+  const ageChecks = useMyAgeChecks(!!user?.profile);
 
   const profile = user?.profile;
   const isSublistDj = !!(profile && 'is_sublist_dj' in profile && profile.is_sublist_dj);
@@ -296,6 +311,7 @@ const MyPasses = () => {
                       </div>
                     )}
                   </div>
+                  <AgeWarning check={ageChecks[pass.show_id]} undo="release your pass" />
                 </div>
 
                 <div className="show-card-footer">
@@ -378,6 +394,9 @@ const MyPasses = () => {
                       <span className="info-value">{formatDateTime(entry.entered_at)}</span>
                     </div>
                   </div>
+                  {entry.entry_type === 'staff' && (
+                    <AgeWarning check={ageChecks[entry.show_id]} undo="withdraw your entry" />
+                  )}
                 </div>
 
                 <div className="show-card-footer">
@@ -446,6 +465,9 @@ const MyPasses = () => {
                       </div>
                     )}
                   </div>
+                  {!entry.outcome_pending && (
+                    <AgeWarning check={ageChecks[entry.show_id]} undo="leave the alternate list" />
+                  )}
                 </div>
 
                 <div className="show-card-footer">

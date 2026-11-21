@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.common.areas import PASS_GIVEAWAY_AREA
 from app.models.guest_fallback import GuestFallback
+from app.pass_giveaway.services import age_check
 from app.pass_giveaway.services.close_digest import CloseDigest
 from app.models.lottery_entry import LotteryEntry
 from app.models.notification_preferences import NotificationPreferences
@@ -86,6 +87,7 @@ class LotteryService:
         staff = db.query(Staff).filter(Staff.id == staff_id).first()
         if staff:
             ensure_not_on_leave_for_show(staff, show)
+            age_check.ensure_not_under_21(show, staff)
         from app.pass_giveaway.services import tabler_service
 
         tabler_service.ensure_holds_no_tabler_pass(db, show.id, staff_id, "You have")

@@ -5,15 +5,17 @@ import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, 
 import { formatPhone, formatLeave, isOnLeave, leaveCoversShow, formatDateValue } from '../../common/utils';
 import { useAuth } from '../../common/contexts/authHooks';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { STAFF_PASSES_NOT_YET_ACTIVE, seatedFallbackNote, specialtyShowLabel, staffPassesNotYetActive, waitingFallbackNote } from '../utils';
+import { STAFF_PASSES_NOT_YET_ACTIVE, ageCheckMessage, guestAgeNote, seatedFallbackNote, specialtyShowLabel, staffPassesNotYetActive, waitingFallbackNote } from '../utils';
 import type { ShowResponse, ClaimData, LotteryStatus, MyIdentity, IdentityChoice, AlternateQueue, AlternateJoinRequest, GuestFallback } from '../types';
 import type { StaffProfile, APIError } from '../../common/types';
 import { formatCalendarDate, formatPacific } from '../../common/dateTime';
+import { useMyAgeChecks } from '../useMyAgeChecks';
 
 const ShowDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const ageChecks = useMyAgeChecks(!!user?.profile);
   const [show, setShow] = useState<ShowResponse | null>(null);
   usePageTitle(`${show?.event_name ?? 'Show'} · Staff`);
   const [loading, setLoading] = useState(true);
@@ -528,12 +530,19 @@ const ShowDetail = () => {
     myIdentities.flatMap((i) => (i.specialty_show_id != null ? [i.specialty_show_id] : [])),
   );
   const staffProfile = user?.profile as StaffProfile | undefined;
-  // Staff on leave for the whole show can't claim a pass, enter the lottery, or
+  // Staff on leave for the whole show, or under 21 on the date of a 21+ show
+  // (going by their birth year), can't claim a pass, enter the lottery, or
   // join the alternate list (enforced server-side too).
   const leaveBlocksPasses = leaveCoversShow(staffProfile, show);
-  const leaveBlockMessage = staffProfile
+  const myAgeCheck = ageChecks[show.id] ?? null;
+  const under21 = myAgeCheck === 'under_21';
+  const passesBlocked = leaveBlocksPasses || under21;
+  const passesBlockedMessage = leaveBlocksPasses && staffProfile
     ? `You're on leave of absence ${formatLeave(staffProfile)}, so you can't claim passes for this show.`
-    : '';
+    : under21
+      ? ageCheckMessage('under_21', show)
+      : '';
+  const guestNote = guestAgeNote(show);
   /**
    * A warning about reserving for *reserveFor* on *date*, or null: you're on
    * leave (not for a show, which has others), or the schedule has you
@@ -593,9 +602,22 @@ const ShowDetail = () => {
     !myAlternateEntry &&
     show.status === 'published' &&
     !lotteryActive &&
-    !leaveBlocksPasses;
+    !passesBlocked;
   const releaseCandidateName = alternateQueue?.next_candidate_name ?? null;
   const myDJEntry = lotteryStatus?.my_dj_entry ?? null;
+  // A 21+ show they might be too young for, or are too young for but already
+  // have a pass, lottery entry or alternate list spot for (kept, not released)
+  const ageWarning = !myAgeCheck
+    ? null
+    : myAgeCheck === 'maybe_under_21'
+      ? ageCheckMessage('maybe_under_21', show)
+      : alreadyHasStaffPass
+        ? `${ageCheckMessage('under_21', show)} Please release yours.`
+        : myStaffEntry
+          ? `${ageCheckMessage('under_21', show)} Please withdraw your lottery entry.`
+          : myAlternateEntry
+            ? `${ageCheckMessage('under_21', show)} Please leave the alternate list.`
+            : null;
 
   const claimWithGuestButton = (passId: number) => (
     <button
@@ -621,6 +643,7 @@ const ShowDetail = () => {
         bumped. You'll be notified immediately if that happens, and again when
         the show closes to confirm whether your guest can attend.
       </p>
+      {guestNote && <p className="field-hint">{guestNote}</p>}
       {show.guest_list_requirements.staff_guest_requires_name && (
         <div className="form-group">
           <label htmlFor="guest-name">Guest name (required by this venue):</label>
@@ -730,6 +753,12 @@ const ShowDetail = () => {
 
       <div className="show-detail-content">
         <ShowInfoCards show={show} />
+
+        {ageWarning && (
+          <div className="field-warning" role="alert">
+            {ageWarning}
+          </div>
+        )}
 
         {canReserveOnAir && isVenueOwner && show.status !== 'closed' && (
           <div className="pass-claim-section">
@@ -1055,8 +1084,8 @@ const ShowDetail = () => {
                 ? "You've entered the staff pass lottery for this show. Withdraw to claim a tabler pass instead."
                 : myAlternateEntry
                   ? "You're on the alternate list for this show. Leave it to claim a tabler pass instead."
-                  : leaveBlocksPasses
-                    ? leaveBlockMessage
+                  : passesBlocked
+                    ? passesBlockedMessage
                     : null
           }
           onChanged={() => loadShow(true)}
@@ -1078,8 +1107,8 @@ const ShowDetail = () => {
             </p>
           )}
 
-          {leaveBlocksPasses && !alreadyHasStaffPass && (
-            <p className="field-hint">{leaveBlockMessage}</p>
+          {passesBlocked && !alreadyHasStaffPass && (
+            <p className="field-hint">{passesBlockedMessage}</p>
           )}
 
           {notYetActive && <p className="field-hint">{STAFF_PASSES_NOT_YET_ACTIVE}</p>}
@@ -1147,6 +1176,7 @@ const ShowDetail = () => {
                 </fieldset>
                 {lotteryHasGuest && (
                   <>
+                    {guestNote && <p className="field-hint">{guestNote}</p>}
                     {show.guest_list_requirements.staff_guest_requires_name && (
                       <div className="form-group">
                         <label htmlFor="lottery-guest-name">Guest name (required by this venue):</label>
@@ -1186,7 +1216,7 @@ const ShowDetail = () => {
                   </button>
                 </div>
               </div>
-            ) : leaveBlocksPasses ? null : (
+            ) : passesBlocked ? null : (
               <button
                 onClick={() => setShowStaffLotteryForm(true)}
                 className="btn-small btn-primary"
@@ -1258,7 +1288,8 @@ const ShowDetail = () => {
                           pass={pass}
                           availableCount={availableStaffCount}
                           requireGuestName={show.guest_list_requirements.staff_guest_requires_name}
-                          canAddGuest={!lotteryActive && !leaveBlocksPasses && !notYetActive}
+                          guestNote={guestNote}
+                          canAddGuest={!lotteryActive && !passesBlocked && !notYetActive}
                           onChanged={async (message) => {
                             showEphemeralSuccess(message);
                             await loadShow(true);
@@ -1298,7 +1329,7 @@ const ShowDetail = () => {
                       <p className={show.status === 'closed' ? 'pass-unavailable-note' : 'pass-available-note'}>
                         {show.status === 'closed' ? 'Unavailable' : 'Available'}
                       </p>
-                      {show.status !== 'closed' && !leaveBlocksPasses && (
+                      {show.status !== 'closed' && !passesBlocked && (
                         guestClaimPassId === pass.id ? (
                           renderGuestClaimForm(pass.id)
                         ) : (
@@ -1327,7 +1358,7 @@ const ShowDetail = () => {
                     <p className={show.status === 'closed' ? 'pass-unavailable-note' : 'pass-available-note'}>
                       {show.status === 'closed' ? 'Unavailable' : 'Available'}
                     </p>
-                    {show.status !== 'closed' && !lotteryActive && !leaveBlocksPasses && (
+                    {show.status !== 'closed' && !lotteryActive && !passesBlocked && (
                       <>
                         {guestClaimPassId === pass.id ? (
                           renderGuestClaimForm(pass.id)
@@ -1372,6 +1403,7 @@ const ShowDetail = () => {
                 <AlternateGuestForm
                   idPrefix="alternate-join"
                   requireGuestName={show.guest_list_requirements.staff_guest_requires_name}
+                  guestNote={guestNote}
                   submitLabel="Join Alternate List"
                   busy={alternateActionLoading}
                   onSubmit={handleJoinAlternates}
@@ -1409,6 +1441,7 @@ const ShowDetail = () => {
                 <AlternateGuestForm
                   idPrefix="alternate-edit"
                   requireGuestName={show.guest_list_requirements.staff_guest_requires_name}
+                  guestNote={guestNote}
                   initial={{
                     has_guest: entry.has_guest,
                     guest_name: entry.guest_name,

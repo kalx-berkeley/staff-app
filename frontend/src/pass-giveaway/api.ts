@@ -9,6 +9,7 @@ import apiClient, { handleAPIError } from '../common/api';
 import { pageContextQuery } from '../common/pageTime';
 import { SWITCH_HEADER, addOnAirHeaders } from './dj/onAirHeaders';
 import type {
+  AgeCheck,
   GiveawayCreditItem,
   AlternateEntry,
   AlternateJoinRequest,
@@ -150,6 +151,19 @@ export const showsAPI = {
       const response = await apiClient.get<StaffPassClaimant[]>('/shows/staff-pass-claimants', {
         params: includeNew ? { include_new: true } : undefined,
       });
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /**
+   * The upcoming 21+ shows the signed-in staff member is, or might be, too
+   * young for, by show ID. Shows they're old enough for are left out.
+   */
+  getMyAgeChecks: async (): Promise<Record<number, AgeCheck>> => {
+    try {
+      const response = await apiClient.get<Record<number, AgeCheck>>('/shows/my-age-checks');
       return response.data;
     } catch (error) {
       return handleAPIError(error);

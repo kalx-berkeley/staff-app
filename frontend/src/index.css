@@ -2774,6 +2774,25 @@ fieldset.radio-group legend {
   white-space: nowrap;
 }
 
+/* A 21+ show the signed-in staff member is (under-21) or might be too young for */
+.age-check-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  white-space: nowrap;
+}
+
+.age-check-badge.age-check-badge-under-21 {
+  background-color: #fef2f2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
 /* Label + inline tooltip wrapper */
 .label-with-help {
   display: flex;

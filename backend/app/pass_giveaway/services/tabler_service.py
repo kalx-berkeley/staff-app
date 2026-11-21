@@ -24,6 +24,7 @@ from app.auth import (
 )
 from app.common.pacific_time import PACIFIC
 from app.common.services.leave_service import ensure_not_on_leave_for_show
+from app.pass_giveaway.services import age_check
 from app.models.lottery_entry import LotteryEntry
 from app.models.pass_model import STAFF_CLAIM_PASS_TYPES, Pass
 from app.models.show import Show
@@ -372,6 +373,7 @@ def claim(db: Session, show: Show, staff: Staff, *, by_self: bool) -> Pass:
             detail=f"{staff.name} isn't current staff, so can't get a tabler pass",
         )
     ensure_not_on_leave_for_show(staff, show)
+    age_check.ensure_not_under_21(show, staff, you=by_self)
     _ensure_free_to_table(db, show, staff, you=by_self)
     open_pass = (
         db.query(Pass)
@@ -398,14 +400,21 @@ def claim(db: Session, show: Show, staff: Staff, *, by_self: bool) -> Pass:
     return open_pass
 
 
-def _email(db: Session, staff: Staff, show: Show, subject: str, first_line: str) -> None:
+def _email(
+    db: Session,
+    staff: Staff,
+    show: Show,
+    subject: str,
+    first_line: str,
+    extra_lines: list[str] | None = None,
+) -> None:
     from app.pass_giveaway.services.alternate_service import AlternateService
 
     AlternateService._email(
         db,
         staff,
         subject=subject,
-        lines=[first_line, "", AlternateService._show_url(show)],
+        lines=[first_line, *(extra_lines or []), "", AlternateService._show_url(show)],
     )
 
 
@@ -419,6 +428,11 @@ def email_assigned(db: Session, staff: Staff, show: Show) -> None:
         f"You have a tabler pass: {show.event_name}",
         "KALX Promotions has given you a tabler pass for"
         f" {AlternateService._show_desc(show)}, to help at the {TABLE_NAME}.",
+        (
+            ["", age_check.MAYBE_UNDER_21_WARNING]
+            if age_check.check(show, staff) == age_check.MAYBE_UNDER_21
+            else None
+        ),
     )
 
 

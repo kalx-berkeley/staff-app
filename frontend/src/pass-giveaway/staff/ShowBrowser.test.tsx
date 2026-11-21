@@ -6,8 +6,12 @@ import ShowBrowser from './ShowBrowser';
 import { showsAPI } from '../api';
 import type { ShowSummary } from '../types';
 
+vi.mock('../../common/contexts/authHooks', () => ({
+  useAuth: () => ({ user: { email: 'me@example.com', role: 'staff', profile: { name: 'Me' } } }),
+}));
+
 vi.mock('../api', () => ({
-  showsAPI: { list: vi.fn() },
+  showsAPI: { list: vi.fn(), getMyAgeChecks: vi.fn().mockResolvedValue({}) },
   venuesAPI: { list: vi.fn().mockResolvedValue([]) },
 }));
 
@@ -161,5 +165,31 @@ describe('Staff ShowBrowser filters in the URL', () => {
     expect(screen.getByLabelText('Search')).toHaveValue('Closed');
     expect(screen.getByLabelText('Genre')).toHaveValue('Rock');
     expect(screen.getByLabelText('To:')).toHaveValue('12/31/2031');
+  });
+});
+
+describe('Staff ShowBrowser 21+ badges', () => {
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/');
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.mocked(showsAPI.list).mockResolvedValue([
+      show({ id: 1, event_name: 'Has Passes' }),
+      show({ id: 2, event_name: 'Maybe Show' }),
+      show({ id: 3, event_name: 'Fine Show' }),
+    ]);
+  });
+
+  it('marks 21+ shows the staff member is, or might be, too young for', async () => {
+    vi.mocked(showsAPI.getMyAgeChecks).mockResolvedValue({ 1: 'under_21', 2: 'maybe_under_21' });
+
+    await renderBrowser();
+
+    expect(await screen.findByText("21+: you're under 21")).toHaveAttribute(
+      'title',
+      expect.stringContaining("you'll be under 21 on Dec 31, 2030"),
+    );
+    expect(screen.getByText('21+: check your age')).toBeInTheDocument();
+    expect(screen.getAllByText(/^21\+: /)).toHaveLength(2);
   });
 });
