@@ -59,6 +59,13 @@ from app.models.credit import UNATTRIBUTED
 from app.models.staff import Staff
 from app.models.venue import Venue, venue_sort_key
 from app.pass_giveaway.services.caller_names import group_similar_names
+from app.pass_giveaway.services.linked_callers import (
+    RESOLVED,
+    STATUS_LABELS,
+    LinkState,
+    bypasses_win_limit,
+    venue_win_limits,
+)
 from app.pass_giveaway.services.tracking import (
     GIVEAWAY_VISIT,
     GUEST_SESSION,
@@ -127,9 +134,14 @@ _DJ_NAMES = (
     ' while no one was on air is "Unattributed".'
 )
 _WINNERS = (
-    "Winners are matched by phone number, digits only and without a leading 1. The"
-    " name shown is the most recent one used with that number."
+    "Winners are matched by phone number, digits only and without a leading 1. Phone"
+    " numbers linked as one caller in Promotions → Admin (Linked Callers) count as one"
+    " winner. The name and phone shown are the most recent ones used."
 )
+
+# Where a winner's name links to: their group in Promotions → Admin's Linked
+# Callers section (linked callers decision 17)
+LINKED_CALLERS_LINK = "/pass-giveaway/promotions/admin?caller={name}#linked-callers"
 
 
 # ---------------------------------------------------------------------------
@@ -503,19 +515,22 @@ def _wins(db: Session, venue_id: Optional[int] = None) -> list[_Win]:
     ]
 
 
-def _repeat_winners_table(wins: list[_Win], window: Window, metric_id: str) -> dict:
-    by_phone: dict[str, list[_Win]] = defaultdict(list)
+def _repeat_winners_table(
+    wins: list[_Win], window: Window, state: LinkState, metric_id: str
+) -> dict:
+    by_person: dict[str, list[_Win]] = defaultdict(list)
     for w in wins:
         if window.contains(w.won_at) and w.phone:
-            by_phone[w.phone].append(w)
+            by_person[state.person_key(w.phone)].append(w)
     rows = []
-    for phone, ws in by_phone.items():
+    for ws in by_person.values():
         if len(ws) < 2:
             continue
         ws.sort(key=lambda w: w.won_at)
         rows.append({
             "name": ws[-1].name,
-            "phone": phone,
+            "phone": ws[-1].phone,
+            "phones": len({w.phone for w in ws}),
             "wins": len(ws),
             "venues": ", ".join(sorted({w.venue for w in ws})),
             "dates": ", ".join(pacific_date(w.won_at).isoformat() for w in ws),
@@ -525,15 +540,18 @@ def _repeat_winners_table(wins: list[_Win], window: Window, metric_id: str) -> d
         metric_id,
         "Top repeat on-air winners",
         [
-            column("name", "Name"),
+            column("name", "Name", link=LINKED_CALLERS_LINK, external=True),
             column("phone", "Phone", "phone"),
+            column("phones", "Phone numbers", "number"),
             column("wins", "Wins", "number"),
             column("venues", "Venues"),
             column("dates", "Dates won"),
         ],
         rows,
         explanation(
-            "Phone numbers with two or more on-air wins in the window, most wins first.",
+            "Winners (a phone number, or the numbers of a linked caller) with two or more"
+            " on-air wins in the window, most wins first. Phone numbers counts a linked"
+            " caller's numbers that won in the window.",
             "When the pass pair was given away",
             includes=_WINNERS,
         ),
@@ -545,6 +563,7 @@ def _same_name_table(
     wins: list[_Win],
     window: Window,
     win_limits: dict[int, tuple[int, Optional[int]]],
+    state: LinkState,
     metric_id: str,
 ) -> dict:
     normalized = {id(w): normalize_person_name(w.name) for w in wins}
@@ -560,7 +579,8 @@ def _same_name_table(
         if len(phones) < 2 or not any(window.contains(w.won_at) for w in ws):
             continue
         ws.sort(key=lambda w: w.won_at)
-        flagged = _bypasses_win_limit(ws, win_limits)
+        flagged = bypasses_win_limit(ws, win_limits)
+        status = state.status(phones, {normalized[id(w)] for w in ws})
         emails_by_phone: dict[str, set[str]] = defaultdict(set)
         for w in ws:
             if w.email:
@@ -577,7 +597,9 @@ def _same_name_table(
             "wins": len(ws),
             "same_venue_in_limit": "Yes" if flagged else "No",
             "same_email": "Yes" if same_email else "No",
-            "_flag": flagged,
+            "status": STATUS_LABELS[status],
+            # Only while it still needs reviewing (linked callers decision 13)
+            "_flag": flagged and status not in RESOLVED,
             "_details": {
                 "columns": [
                     column("won", "Won", "date"),
@@ -609,12 +631,13 @@ def _same_name_table(
         metric_id,
         "Similar names, different phone numbers",
         [
-            column("name", "Name"),
+            column("name", "Name", link=LINKED_CALLERS_LINK, external=True),
             column("spellings", "Spellings"),
             column("phones", "Phone numbers", "number"),
             column("wins", "Wins", "number"),
             column("same_venue_in_limit", "Same venue or sister venue within limit"),
             column("same_email", "Same email on different numbers"),
+            column("status", "Status"),
         ],
         rows,
         explanation(
@@ -623,8 +646,11 @@ def _same_name_table(
             " window, and is compared with its wins at any time. It's highlighted when two"
             " of its numbers won at the same venue, or at venues sharing a win limit,"
             " within that limit (days between show dates), which is how someone could get"
-            " around the limit. The same email on different numbers is stronger evidence"
-            " that it's one person.",
+            " around the limit, until its numbers are linked, dismissed as different people"
+            " or its name marked too common in Promotions → Admin (Linked Callers; the name"
+            " links there). Status says which: Linked (all its numbers are one caller),"
+            " Partly linked, Dismissed, Common name or Unreviewed. The same email on"
+            " different numbers is stronger evidence that it's one person.",
             "When the pass pair was given away (for the window); all wins for comparison",
             includes=(
                 "DJs often misspell a caller's name, so names match ignoring case,"
@@ -643,66 +669,24 @@ def _same_name_table(
     )
 
 
-def _bypasses_win_limit(
-    ws: list[_Win], win_limits: dict[int, tuple[int, Optional[int]]]
-) -> bool:
-    """
-    Whether two different phones won within one win limit.
-
-    Args:
-        ws: One name's wins
-        win_limits: Venue ID → (the ID of the venue whose limit applies, that
-            limit). Venues sharing a limit are compared as one venue.
-    """
-    by_family: dict[int, list[_Win]] = defaultdict(list)
-    limits: dict[int, Optional[int]] = {}
-    for w in ws:
-        family_id, limit = win_limits.get(w.venue_id, (w.venue_id, None))
-        by_family[family_id].append(w)
-        limits[family_id] = limit
-    for family_id, vws in by_family.items():
-        limit = limits[family_id]
-        if not limit:
-            continue
-        for i, a in enumerate(vws):
-            for b in vws[i + 1:]:  # fmt: skip
-                if (
-                    a.phone != b.phone
-                    and a.show_date
-                    and b.show_date
-                    and abs((a.show_date - b.show_date).days) < limit
-                ):
-                    return True
-    return False
-
-
-def _repeat_share(wins: list[_Win], window: Window) -> dict:
-    all_time = Counter(w.phone for w in wins if w.phone)
+def _repeat_share(wins: list[_Win], window: Window, state: LinkState) -> dict:
+    all_time = Counter(state.person_key(w.phone) for w in wins if w.phone)
     in_window = [w for w in wins if window.contains(w.won_at) and w.phone]
-    repeat = sum(1 for w in in_window if all_time[w.phone] > 1)
+    repeat = sum(1 for w in in_window if all_time[state.person_key(w.phone)] > 1)
     return stat(
         "repeat_winner_share",
         "Wins going to repeat winners",
         ratio(repeat, len(in_window)),
         "percent",
         explanation(
-            "On-air wins in the window that went to a phone number with more than one win"
-            " at any time ÷ on-air wins in the window.",
+            "On-air wins in the window that went to a winner (a phone number, or the"
+            " numbers of a linked caller) with more than one win at any time ÷ on-air wins"
+            " in the window.",
             "When the pass pair was given away",
             includes=_WINNERS,
         ),
         note=f"{repeat} of {len(in_window)} wins",
     )
-
-
-def _venue_win_limits(db: Session) -> dict[int, tuple[int, Optional[int]]]:
-    """Venue ID → (the ID of the venue whose win limit applies, that limit)."""
-    rows = db.query(Venue.id, Venue.parent_venue_id, Venue.win_frequency_days).all()
-    own = {venue_id: days for venue_id, _, days in rows}
-    return {
-        venue_id: (parent_id, own.get(parent_id)) if parent_id else (venue_id, days)
-        for venue_id, parent_id, days in rows
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -915,6 +899,7 @@ def build_overview(db: Session, window: Window, params: Params) -> list[dict]:
     attempts = _attempts_in_window(db, window)
     names = _dj_display_names(db)
     wins = _wins(db)
+    links = LinkState.load(db)
     visits = _visits(db, window)
     visits_since = tracking_service.data_since(db, [GIVEAWAY_VISIT])
 
@@ -962,9 +947,11 @@ def build_overview(db: Session, window: Window, params: Params) -> list[dict]:
             [("All visits", _funnel(visits))],
             visits_since,
         ),
-        _repeat_winners_table(wins, window, "top_repeat_winners"),
-        _repeat_share(wins, window),
-        _same_name_table(wins, window, _venue_win_limits(db), "same_name_different_phones"),
+        _repeat_winners_table(wins, window, links, "top_repeat_winners"),
+        _repeat_share(wins, window, links),
+        _same_name_table(
+            wins, window, venue_win_limits(db), links, "same_name_different_phones"
+        ),
     ]
 
     given_by_dj = Counter(_given_by(p) for p in giveaways)
@@ -1430,6 +1417,7 @@ def build_venue(db: Session, window: Window, params: Params) -> list[dict]:
     joined, promoted = _alternates(db, {s.id for s in shows})
     limits = _win_limit_events(db, window)[venue_id]
     wins = _wins(db, venue_id)
+    links = LinkState.load(db)
 
     return [
         stat(
@@ -1511,11 +1499,12 @@ def build_venue(db: Session, window: Window, params: Params) -> list[dict]:
             [("This venue", _funnel(venue_visits))],
             tracking_service.data_since(db, [GIVEAWAY_VISIT]),
         ),
-        _repeat_winners_table(wins, window, "venue_repeat_winners"),
+        _repeat_winners_table(wins, window, links, "venue_repeat_winners"),
         _same_name_table(
             wins,
             window,
             {venue.id: (venue.id, venue.effective_win_frequency_days)},
+            links,
             "venue_same_name",
         ),
         _who_posts_table(db, shows, venue),

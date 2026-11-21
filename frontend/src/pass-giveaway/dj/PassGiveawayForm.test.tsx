@@ -376,5 +376,28 @@ describe('PassGiveawayForm', () => {
       const warning = await screen.findByText(/already won passes to/i);
       expect(warning).toHaveTextContent('already won passes to Elmwood Show at Elmwood (show date: 2026-06-01)');
     });
+
+    it('says when the earlier win was under a linked number, without showing it', async () => {
+      vi.mocked(venuePassesAPI.checkWinner).mockResolvedValue({
+        eligible: false,
+        last_win_show: 'Radiohead',
+        last_win_date: '2026-06-15',
+        last_win_venue: 'The Arena',
+        days_since: 5,
+        required_days: 30,
+        linked_number: true,
+      });
+      render(
+        <PassGiveawayForm pass={mockPass} venueId={2} onSuccess={mockOnSuccess} winFrequencyDays={30} />
+      );
+      const phone = screen.getByLabelText(/winner phone/i);
+      fireEvent.change(phone, { target: { value: '2128888888' } });
+      fireEvent.blur(phone);
+
+      const warning = await screen.findByText(/already won passes to/i);
+      expect(warning).toHaveTextContent(
+        'That win was under another phone number linked to this caller.'
+      );
+    });
   });
 });

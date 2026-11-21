@@ -1293,6 +1293,8 @@ def check_winner_eligibility(
             "last_win_date": conflict["last_win_date"],
             "last_win_venue_id": conflict["last_win_venue_id"],
             "last_win_venue": conflict["last_win_venue"],
+            "matched_phone": conflict["matched_phone"],
+            "linked_number": conflict["linked_number"],
         },
     )
     return {
@@ -1302,6 +1304,8 @@ def check_winner_eligibility(
         "last_win_venue": conflict["last_win_venue"],
         "days_since": conflict["days_since_last_win"],
         "required_days": conflict["required_days"],
+        # Never the other number itself: guests can reach this page
+        "linked_number": conflict["linked_number"],
     }
 
 

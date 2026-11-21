@@ -13,6 +13,7 @@ from app.config import settings
 from app.models.guest_fallback import GuestFallback
 from app.pass_giveaway.services import age_check
 from app.pass_giveaway.services.close_digest import CloseDigest
+from app.pass_giveaway.services.linked_callers import linked_phones
 from app.models.pass_model import Pass
 from app.models.show import Show
 from app.models.staff import Staff
@@ -284,7 +285,8 @@ class PassService:
         Find a previous win that breaks the show's venue's win-frequency limit.
 
         The limit is the venue's own, or the one it shares with its parent
-        venue. Wins at every venue sharing that limit count.
+        venue. Wins at every venue sharing that limit count, under the phone
+        number or any number linked to it (`linked_callers`).
 
         Args:
             db: Database session
@@ -305,7 +307,7 @@ class PassService:
             .join(Show, Show.id == OnAirWinner.show_id)
             .filter(
                 OnAirWinner.venue_id.in_(venue.family_venue_ids),
-                OnAirWinner.recipient_phone == normalize_phone(phone),
+                OnAirWinner.recipient_phone.in_(linked_phones(db, phone)),
             )
         )
         if exclude_pass_id is not None:
@@ -325,6 +327,10 @@ class PassService:
             return None
         return {
             "recipient_phone": phone,
+            # The number the earlier win was under, and whether it's another
+            # number linked to this caller (linked callers decision 7)
+            "matched_phone": previous.recipient_phone,
+            "linked_number": previous.recipient_phone != normalize_phone(phone),
             "days_since_last_win": days_between,
             "required_days": limit,
             "last_win_show": prev_show.event_name,

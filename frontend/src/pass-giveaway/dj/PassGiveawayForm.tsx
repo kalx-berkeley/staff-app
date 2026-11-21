@@ -195,6 +195,9 @@ const PassGiveawayForm = ({ pass, venueId, onSuccess, winFrequencyDays, winFrequ
                   (show date: {winEligibility.last_win_date}),
                   which is only {winEligibility.days_since} day{winEligibility.days_since !== 1 ? 's' : ''} before this show.
                   The venue requires at least {winEligibility.required_days} days between show dates.
+                  {winEligibility.linked_number && (
+                    <> That win was under another phone number linked to this caller.</>
+                  )}
                   <label className="override-label">
                     <input
                       type="checkbox"

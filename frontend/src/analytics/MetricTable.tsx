@@ -7,8 +7,11 @@ import type { MetricColumn, MetricRow } from './types';
 /** Numbers line up on the right, text on the left. */
 const isNumeric = (column: MetricColumn) => column.format !== 'text' && column.format !== 'date';
 
-const fillLink = (template: string, row: MetricRow) =>
-  template.replace(/\{(\w+)\}/g, (_, key: string) => String(row[key] ?? ''));
+const fillLink = (template: string, row: MetricRow, encode = false) =>
+  template.replace(/\{(\w+)\}/g, (_, key: string) => {
+    const value = String(row[key] ?? '');
+    return encode ? encodeURIComponent(value) : value;
+  });
 
 function Cell({ column, row }: { column: MetricColumn; row: MetricRow }) {
   const { search } = useLocation();
@@ -16,6 +19,9 @@ function Cell({ column, row }: { column: MetricColumn; row: MetricRow }) {
   const text = formatValue(value, column.format);
   if (column.format === 'points' && typeof value === 'number') {
     return <BalanceBar value={value} />;
+  }
+  if (column.link && column.external && value !== null && value !== undefined) {
+    return <a href={fillLink(column.link, row, true)}>{text}</a>;
   }
   if (column.link && value !== null && value !== undefined) {
     return (

@@ -26,6 +26,7 @@ from app.workforms.routers import review as workforms_review
 from app.workforms.routers import workforms
 from app.workforms import jobs as workforms_jobs
 from app.pass_giveaway.routers import (
+    callers,
     venues,
     shows,
     passes,
@@ -330,6 +331,7 @@ app.include_router(preferences.router, dependencies=_auth_check)
 app.include_router(shows.router, dependencies=_auth_check)
 app.include_router(passes.router, dependencies=_auth_check)
 app.include_router(admin.router, dependencies=_auth_check)
+app.include_router(callers.router, dependencies=_auth_check)
 app.include_router(promoters.router, dependencies=_auth_check)
 app.include_router(lottery.router, dependencies=_auth_check)
 app.include_router(alternates.router, dependencies=_auth_check)

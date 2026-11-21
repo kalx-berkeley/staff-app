@@ -27,6 +27,8 @@ export interface MetricColumn {
   format: MetricFormat;
   /** A path in the analytics site with {field} placeholders filled from the row. */
   link: string | null;
+  /** The link is elsewhere on the site (e.g. /pass-giveaway/...), not in the analytics site. */
+  external?: boolean;
 }
 
 export interface MetricRow {

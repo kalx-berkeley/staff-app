@@ -947,6 +947,77 @@ export interface WinnerEligibility {
   days_since?: number;
   required_days?: number;
   reason?: string | null;
+  /** The earlier win was under another phone number linked to this caller. */
+  linked_number?: boolean;
+}
+
+// Linked callers (Promotions → Admin;
+// docs/pass-giveaway/specs/linked-callers/plan.md)
+
+export type CallerSuggestionStatus =
+  | 'linked'
+  | 'partly_linked'
+  | 'dismissed'
+  | 'common'
+  | 'unreviewed';
+
+export interface CallerPhone {
+  /** Digits only, as stored on the winner. */
+  phone: string;
+  /** Each spelling it won under, latest first. */
+  names: string[];
+  wins: number;
+  last_won_at: string | null;
+  caller_id: number | null;
+}
+
+export interface CallerSuggestionWin {
+  pass_id: number;
+  won_at: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  show_id: number;
+  show: string;
+  show_date: string | null;
+  venue: string;
+}
+
+export interface CallerSuggestion {
+  key: string;
+  name: string;
+  spellings: string[];
+  status: CallerSuggestionStatus;
+  status_label: string;
+  /** Two of its numbers won within a venue's win limit. */
+  flagged: boolean;
+  /** Its spellings marked too common. */
+  common_names: string[];
+  phones: CallerPhone[];
+  /** Latest first. */
+  wins: CallerSuggestionWin[];
+}
+
+export interface LinkedCaller {
+  id: number;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+  phones: CallerPhone[];
+}
+
+export interface CallerLinkPreview {
+  /** Every number that would end up together. */
+  phones: string[];
+  /** The callers it would merge or add to. */
+  caller_ids: number[];
+  already_linked: boolean;
+}
+
+export interface CommonCallerName {
+  name: string;
+  marked_by: string | null;
+  marked_at: string;
 }
 
 // Notification preferences

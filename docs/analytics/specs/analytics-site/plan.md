@@ -124,9 +124,9 @@ attempts per giveaway, sortable. Each row links to the venue page.
 
 | Metric | Definition |
 |---|---|
-| Top repeat winners | Grouped by normalized phone, with at least one win in the window and 2+ wins in the window. Columns: latest name, phone, wins, venues, dates. |
+| Top repeat winners | Grouped by normalized phone, or by linked caller when the phones are linked (docs/pass-giveaway/specs/linked-callers/plan.md), with 2+ wins in the window. Columns: latest name (linking to Linked Callers in Promotions → Admin), latest phone, phone numbers, wins, venues, dates. The repeat winner share counts linked callers the same way. |
 | Repeat winner share | On-air wins in the window that went to a phone with more than one win at any time ÷ on-air wins in the window. |
-| Same name, different phones | Groups of similar normalized names (Q33) with a win in the window and 2+ distinct normalized phones over all time. The table is titled "Similar names, different phone numbers" and lists the spellings grouped together. Each win is listed (date, name as typed, phone, email, show, venue, DJ). The row is flagged when two of the phones won at the same venue within its `win_frequency_days`. A matching email across phones is shown as "same email". |
+| Same name, different phones | Groups of similar normalized names (Q33) with a win in the window and 2+ distinct normalized phones over all time. The table is titled "Similar names, different phone numbers" and lists the spellings grouped together. Each win is listed (date, name as typed, phone, email, show, venue, DJ). The row is flagged when two of the phones won at the same venue within its `win_frequency_days`. A matching email across phones is shown as "same email". A Status column (Linked, Partly linked, Dismissed, Common name, Unreviewed) comes from Linked Callers, only unresolved rows are flagged, and the name links to that group in Promotions → Admin. |
 | Top DJs by passes given away | Pairs given away per DJ, by `given_away_at`. |
 | Top DJs by given away + tried | Given away plus `show_attempts`, per DJ. |
 | Top venues by utilization | Three rankings: on-air, staff and combined ((given-away pairs + claimed staff passes) ÷ (pairs + staff passes)). Low-sample venues are excluded (Q29). |

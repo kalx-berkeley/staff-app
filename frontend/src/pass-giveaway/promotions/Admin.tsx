@@ -7,6 +7,7 @@ import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { subsiteForPath } from '../../subsites';
 import { formatPacific } from '../../common/dateTime';
 import GiveawayCreditSection from './GiveawayCreditSection';
+import LinkedCallersSection from './LinkedCallersSection';
 
 const Admin = () => {
   usePageTitle('Admin · Promotions');
@@ -176,6 +177,8 @@ const Admin = () => {
       )}
 
       <GiveawayCreditSection />
+
+      <LinkedCallersSection />
 
       <section className="admin-section">
         <h3>Auto-close Schedules</h3>

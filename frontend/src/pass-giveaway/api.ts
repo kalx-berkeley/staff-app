@@ -71,6 +71,11 @@ import type {
   WinnerEligibility,
   WinnerReleaseData,
   WinnerUpdateData,
+  CallerLinkPreview,
+  CallerPhone,
+  CallerSuggestion,
+  CommonCallerName,
+  LinkedCaller,
 } from './types';
 
 // Name the DJ studio guest on the backend's log lines, and tell it about an
@@ -1235,6 +1240,129 @@ export const adminAPI = {
         `/pass-giveaway/admin/lottery-schedules/${showId}/run`,
       );
       return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+};
+
+const CALLERS = '/pass-giveaway/admin/callers';
+
+/** Linked callers in Promotions → Admin (docs/pass-giveaway/specs/linked-callers/plan.md). */
+export const callersAPI = {
+  /** With `name`, only that name's group, whatever its status. */
+  getSuggestions: async (resolved: boolean, name?: string): Promise<CallerSuggestion[]> => {
+    try {
+      const response = await apiClient.get<CallerSuggestion[]>(`${CALLERS}/suggestions`, {
+        params: { resolved, name: name || undefined },
+      });
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  list: async (): Promise<LinkedCaller[]> => {
+    try {
+      const response = await apiClient.get<LinkedCaller[]>(CALLERS);
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  search: async (q: string): Promise<CallerPhone[]> => {
+    try {
+      const response = await apiClient.get<CallerPhone[]>(`${CALLERS}/search`, { params: { q } });
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  preview: async (phones: string[]): Promise<CallerLinkPreview> => {
+    try {
+      const response = await apiClient.post<CallerLinkPreview>(`${CALLERS}/preview`, { phones });
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  link: async (phones: string[], note: string): Promise<LinkedCaller> => {
+    try {
+      const response = await apiClient.post<LinkedCaller>(CALLERS, { phones, note: note || null });
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  updateNote: async (callerId: number, note: string): Promise<LinkedCaller> => {
+    try {
+      const response = await apiClient.patch<LinkedCaller>(`${CALLERS}/${callerId}`, { note });
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  /** Null when that left the caller with one number, which deletes it. */
+  unlinkPhone: async (callerId: number, phone: string): Promise<LinkedCaller | null> => {
+    try {
+      const response = await apiClient.delete<LinkedCaller | null>(
+        `${CALLERS}/${callerId}/phones/${encodeURIComponent(phone)}`,
+      );
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  unlink: async (callerId: number): Promise<void> => {
+    try {
+      await apiClient.delete(`${CALLERS}/${callerId}`);
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  dismiss: async (phones: string[]): Promise<void> => {
+    try {
+      await apiClient.post(`${CALLERS}/dismissals`, { phones });
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  undoDismissal: async (phones: string[]): Promise<void> => {
+    try {
+      await apiClient.post(`${CALLERS}/dismissals/undo`, { phones });
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  getCommonNames: async (): Promise<CommonCallerName[]> => {
+    try {
+      const response = await apiClient.get<CommonCallerName[]>(`${CALLERS}/common-names`);
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  markCommon: async (name: string): Promise<void> => {
+    try {
+      await apiClient.post(`${CALLERS}/common-names`, { name });
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  unmarkCommon: async (name: string): Promise<void> => {
+    try {
+      await apiClient.delete(`${CALLERS}/common-names/${encodeURIComponent(name)}`);
     } catch (error) {
       return handleAPIError(error);
     }

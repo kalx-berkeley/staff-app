@@ -46,12 +46,20 @@ def explanation(
     }
 
 
-def column(key: str, label: str, fmt: str = "text", link: Optional[str] = None) -> dict:
+def column(
+    key: str,
+    label: str,
+    fmt: str = "text",
+    link: Optional[str] = None,
+    external: bool = False,
+) -> dict:
     """
     A table column. *link* is a path inside the analytics site with
     ``{field}`` placeholders filled from the row, e.g. ``/venues/{venue_id}``.
+    With *external*, it's a path elsewhere on the site, e.g.
+    ``/pass-giveaway/...``, and the placeholders' values are URL-encoded.
     """
-    return {"key": key, "label": label, "format": fmt, "link": link}
+    return {"key": key, "label": label, "format": fmt, "link": link, "external": external}
 
 
 def stat(

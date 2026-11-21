@@ -11,6 +11,12 @@ from app.common.services.analytics_window import today_pacific
 from app.common.services.audit_service import log_event
 from app.config import settings
 from app.models.analytics_event import AnalyticsEvent
+from app.models.on_air_caller import (
+    CommonCallerName,
+    DismissedCallerPair,
+    OnAirCaller,
+    OnAirCallerPhone,
+)
 from app.models.on_air_winner import OnAirWinner
 from app.models.pass_model import Pass
 from app.models.spinitron_persona import SpinitronPersona
@@ -287,6 +293,68 @@ def test_same_name_flags_wins_at_sister_venues(client, db, promo, venue):
     assert rows["Jane Doe"]["_flag"] is True
     # Different venues with separate limits
     assert rows["Bob Smith"]["_flag"] is False
+
+
+def _link(db, *phones):
+    caller = OnAirCaller()
+    db.add(caller)
+    db.flush()
+    for phone in phones:
+        db.add(OnAirCallerPhone(phone=phone, caller_id=caller.id))
+    db.commit()
+
+
+def test_linked_caller_counts_as_one_repeat_winner(client, db, promo, venue):
+    show = _show(db, venue, -1, pairs=0, staff=0)
+    _win(db, show, "Jane Doe", "5105550100", days_ago=2)
+    _win(db, show, "Jane Doe", "5105550111")
+    _win(db, show, "Someone", "5105550199")
+    m = _tab(client, "overview")
+    assert m["top_repeat_winners"]["rows"] == []
+    assert m["repeat_winner_share"]["value"] == 0
+
+    _link(db, "5105550100", "5105550111")
+    m = _tab(client, "overview")
+    rows = m["top_repeat_winners"]["rows"]
+    assert len(rows) == 1
+    assert rows[0]["wins"] == 2
+    assert rows[0]["phones"] == 2
+    assert rows[0]["phone"] == "5105550111"
+    assert m["repeat_winner_share"]["value"] == pytest.approx(2 / 3)
+    venue_rows = _tab(client, "venue", f"&venue_id={venue.id}")["venue_repeat_winners"][
+        "rows"
+    ]
+    assert len(venue_rows) == 1
+
+
+def test_same_name_status_and_highlight(client, db, promo, venue):
+    show = _show(db, venue, -1, pairs=0, staff=0)
+    _win(db, show, "Jane Doe", "5105550100", days_ago=2)
+    _win(db, show, "Jane Doe", "5105550111")
+    _win(db, show, "Bob Smith", "5105550122", days_ago=2)
+    _win(db, show, "Bob Smith", "5105550133")
+    _win(db, show, "Bob Smith", "5105550144")
+    _win(db, show, "Ann Lee", "5105550155", days_ago=2)
+    _win(db, show, "Ann Lee", "5105550166")
+    _win(db, show, "Cy Young", "5105550177", days_ago=2)
+    _win(db, show, "Cy Young", "5105550188")
+    _link(db, "5105550100", "5105550111")
+    _link(db, "5105550122", "5105550133")
+    db.add(DismissedCallerPair(phone_a="5105550155", phone_b="5105550166"))
+    db.add(CommonCallerName(name="cy young"))
+    db.commit()
+
+    metric = _tab(client, "overview")["same_name_different_phones"]
+    rows = {r["name"]: r for r in metric["rows"]}
+    assert rows["Jane Doe"]["status"] == "Linked"
+    assert rows["Bob Smith"]["status"] == "Partly linked"
+    assert rows["Ann Lee"]["status"] == "Dismissed"
+    assert rows["Cy Young"]["status"] == "Common name"
+    # Only the unresolved group stays highlighted
+    assert {n for n, r in rows.items() if r["_flag"]} == {"Bob Smith"}
+    name_column = metric["columns"][0]
+    assert name_column["external"] is True
+    assert name_column["link"].startswith("/pass-giveaway/promotions/admin?caller={name}")
 
 
 # ---------------------------------------------------------------------------
