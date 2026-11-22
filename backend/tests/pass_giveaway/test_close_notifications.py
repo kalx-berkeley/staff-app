@@ -376,6 +376,26 @@ class TestAutoClose:
         )
         assert "No notifications have been sent" not in rep_email["body_text"]
 
+    def test_logs_the_close(self, db, venue, show):
+        self._auto_close(db, show)
+
+        (entry,) = _close_log(db, show)
+        assert entry.actor_role == "system"
+        assert entry.actor_email is None
+        assert entry.details == {"event_name": show.event_name}
+
+
+def _close_log(db: Session, show: Show) -> list[AuditLog]:
+    return (
+        db.query(AuditLog)
+        .filter(
+            AuditLog.event_type == "show_closed",
+            AuditLog.entity_type == "show",
+            AuditLog.entity_id == show.id,
+        )
+        .all()
+    )
+
 
 class TestButton:
     def test_sends_the_held_emails_once(self, client, db, promo, host, alternate, show):
@@ -645,6 +665,15 @@ class TestRestart:
 
         db.refresh(show)
         assert show.status == "closed"
+        (entry,) = _close_log(db, show)
+        assert entry.actor_role == "system"
+
+    def test_reopened_after_close_time_isnt_logged(self, db, venue):
+        show = self._past_close_show(db, venue, reopened_at=datetime.now(timezone.utc))
+
+        self._restart(db)
+
+        assert _close_log(db, show) == []
 
     def test_reopen_records_the_time(self, client, promo, host, alternate, show, db):
         _close(client, promo, show)

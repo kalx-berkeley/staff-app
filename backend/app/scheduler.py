@@ -486,11 +486,22 @@ def _close_automatically(db, show_id: int) -> None:
 
 
 def _finish_auto_close(db, show, digest) -> None:
-    """Run the close side effects, then email the reps, who hear if emails are held."""
+    """Log the close, run its side effects, then email the reps (told of held emails)."""
+    from app.common.areas import PASS_GIVEAWAY_AREA
+    from app.common.services import audit_service
     from app.pass_giveaway.routers.shows import run_close_side_effects
     from app.pass_giveaway.services.show_service import ShowService
 
     db.refresh(show)
+    audit_service.log_event(
+        db,
+        event_type="show_closed",
+        area=PASS_GIVEAWAY_AREA,
+        actor_role="system",
+        entity_type="show",
+        entity_id=show.id,
+        details={"event_name": show.event_name},
+    )
     run_close_side_effects(db, show, digest)
     ShowService._notify_venue_owners_of_auto_close(db, show)
 
