@@ -6,6 +6,22 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.21.0] - 2026-11-22
+
+### Changed
+
+- Show the first contact's fields on the venue and promoter forms without clicking Add Contact ([2c306ae](https://github.com/kalx-berkeley/staff-app/commit/2c306ae))
+- Refresh the DJ show list, show page and giveaway page every minute while they're showing and when the DJ comes back to the tab, so a tab left open notices when a show closes ([7dff130](https://github.com/kalx-berkeley/staff-app/commit/7dff130))
+
+### Added
+
+- Let promotions link an on-air caller's phone numbers in a new Linked Callers section on Promotions → Admin, which suggests similar-name winners with different numbers and links, merges, unlinks or dismisses them, all recorded in the audit log. The venue win-frequency check covers every linked number, the DJ warning says when the earlier win was under a linked number without showing it, and KALX Staff Analytics counts a linked caller as one repeat winner ([5516e15](https://github.com/kalx-berkeley/staff-app/commit/5516e15))
+- Record auto-closed shows in the audit log ([8ae84d7](https://github.com/kalx-berkeley/staff-app/commit/8ae84d7))
+
+### Fixed
+
+- Tell DJs "Don't announce this show on air" on the DJ show and giveaway pages for a show that's closed or past its planned close time, in place of "I'm off the mic", the winner form and Tried. DJs could reach these pages from an old tab, Back or the greyed-out View button, announce passes and only find out on Tried. Tried is now also refused after the planned close time, like giveaways ([7dff130](https://github.com/kalx-berkeley/staff-app/commit/7dff130))
+
 ## [1.20.0] - 2026-11-21
 
 ### Changed
@@ -528,6 +544,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.21.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.20.0...v1.21.0
 [1.20.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.19.0...v1.20.0
 [1.19.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.18.0...v1.19.0
 [1.18.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.17.0...v1.18.0
