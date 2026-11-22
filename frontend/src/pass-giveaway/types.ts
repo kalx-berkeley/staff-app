@@ -728,6 +728,8 @@ export interface ShowResponse {
   available_staff_count: number;
   planned_close_date: string | null;
   planned_close_time: string | null;
+  /** The planned close time has passed, so passes can't be claimed or given away. */
+  planned_close_passed: boolean;
   auto_close: boolean;
   /** The close emails to staff and alternates are held, waiting for the button. */
   close_notifications_pending: boolean;

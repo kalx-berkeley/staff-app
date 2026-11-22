@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within, cleanup } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within, cleanup } from '@testing-library/react';
 import { renderAndSettle } from '../../test/render';
 import { BrowserRouter } from 'react-router-dom';
 import ShowBrowser from './ShowBrowser';
@@ -195,6 +195,26 @@ describe('ShowBrowser', () => {
       // Draft and closed shows should not be visible
       expect(screen.queryByText('Draft Show')).not.toBeInTheDocument();
       expect(screen.queryByText('Closed Show')).not.toBeInTheDocument();
+    });
+
+    it('drops a show that closed when the DJ comes back to a tab left open', async () => {
+      vi.mocked(showsAPI.list).mockResolvedValue(mockShows);
+      await renderAndSettle(
+        <BrowserRouter>
+          <ShowBrowser />
+        </BrowserRouter>
+      );
+      expect(await screen.findByText('Rock Concert')).toBeInTheDocument();
+
+      vi.mocked(showsAPI.list).mockResolvedValue(
+        mockShows.map((show) => (show.id === 1 ? { ...show, status: 'closed' } : show)),
+      );
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      await waitFor(() => expect(screen.queryByText('Rock Concert')).not.toBeInTheDocument());
+      expect(screen.getByText('Jazz Night')).toBeInTheDocument();
     });
 
     it("hides shows with no pass pairs (a split show's staff show)", async () => {

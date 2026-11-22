@@ -792,7 +792,7 @@ class ShowService:
             Created ShowAttempt record
 
         Raises:
-            HTTPException: If show not found or show is closed
+            HTTPException: If show not found, closed or past its planned close
         """
         show = ShowService.get_show(db, show_id)
 
@@ -800,6 +800,14 @@ class ShowService:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot record attempts for closed shows",
+            )
+        if PassService.planned_close_passed(show):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Cannot record attempts: the planned close time for this show"
+                    " has passed"
+                ),
             )
 
         persona_id, specialty_show_id = credit(identity)

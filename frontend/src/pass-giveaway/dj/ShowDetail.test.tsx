@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent } from '@testing-library/react';
+import { act, screen, fireEvent } from '@testing-library/react';
 import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import ShowDetail from './ShowDetail';
 import { showsAPI, passesAPI } from '../api';
@@ -256,5 +256,94 @@ describe('DJ ShowDetail with pairs pre-assigned to other DJs', () => {
     await renderWith([pair({ preassigned_dj: 'DJ Test', preassigned_persona_id: 1, preassigned_specialty_show_id: null })]);
     expect(await screen.findByText('Venue:')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('DJ ShowDetail for a show whose giveaway has closed', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  const available = { id: 6, show_id: 1, pass_type: 'pair', status: 'available' } as PassResponse;
+
+  const renderShow = async (overrides: Partial<ShowResponse>) => {
+    vi.mocked(showsAPI.get).mockResolvedValue(
+      makeShow([available], { available_pair_count: 1, ...overrides }),
+    );
+    await renderAndSettle(
+      withOnAir(
+        <BrowserRouter>
+          <ShowDetail />
+        </BrowserRouter>,
+        DJ_TEST,
+      ),
+    );
+  };
+
+  it('tells the DJ not to announce a closed show, with no off-the-mic button', async () => {
+    await renderShow({ status: 'closed' });
+
+    const notice = await screen.findByRole('alert');
+    expect(notice).toHaveTextContent("Don't announce this show on air");
+    expect(notice).toHaveTextContent('The pass giveaway for Test Band has closed.');
+    expect(screen.getByRole('button', { name: '← Pick a different show' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: "I'm off the mic" })).not.toBeInTheDocument();
+    // Nor the on-air instructions, which read as if the passes can be announced
+    expect(screen.queryByText(/to win\./)).not.toBeInTheDocument();
+    // The show details are still there to look at
+    expect(screen.getByText('Venue:')).toBeInTheDocument();
+    // Unawarded pairs are still "available" in the data, but not to give away
+    expect(screen.getByText(/Pass Pairs — giveaway closed/)).toBeInTheDocument();
+    expect(screen.queryByText(/1 of 1 available/)).not.toBeInTheDocument();
+  });
+
+  it('says when the planned close time passed for a show not yet closed', async () => {
+    await renderShow({
+      planned_close_passed: true,
+      planned_close_date: '2026-11-21',
+      planned_close_time: '19:00:00',
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The pass giveaway for Test Band closed at 7:00 PM on Saturday, November 21.',
+    );
+    expect(screen.queryByRole('button', { name: "I'm off the mic" })).not.toBeInTheDocument();
+  });
+
+  it('shows the closed notice instead of the pre-assigned warning', async () => {
+    vi.mocked(showsAPI.get).mockResolvedValue(
+      makeShow([{ ...available, preassigned_dj: 'DJ Other' }], {
+        available_pair_count: 1,
+        status: 'closed',
+      }),
+    );
+    await renderAndSettle(
+      withOnAir(
+        <BrowserRouter>
+          <ShowDetail />
+        </BrowserRouter>,
+        DJ_TEST,
+      ),
+    );
+
+    const notice = await screen.findByRole('alert');
+    expect(notice).toHaveTextContent("Don't announce this show on air");
+    expect(screen.queryByText(/pre-assigned to another DJ/)).not.toBeInTheDocument();
+  });
+
+  it('notices the show closed when the DJ comes back to a tab left open', async () => {
+    await renderShow({});
+    expect(await screen.findByRole('button', { name: "I'm off the mic" })).toBeInTheDocument();
+
+    vi.mocked(showsAPI.get).mockResolvedValue(
+      makeShow([available], { available_pair_count: 1, status: 'closed' }),
+    );
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Don't announce this show on air");
+    expect(screen.queryByRole('button', { name: "I'm off the mic" })).not.toBeInTheDocument();
   });
 });

@@ -146,6 +146,7 @@ const makeShow = (passes: PassResponse[]): ShowResponse => ({
   available_staff_count: 0,
   planned_close_date: null,
   planned_close_time: null,
+  planned_close_passed: false,
   auto_close: false,
   close_notifications_pending: false,
   close_notifications_sent_at: null,

@@ -2,7 +2,8 @@
 
 Once a show's planned close time passes, passes can't be claimed or given away,
 even if the show hasn't been closed yet. The staff and DJ show pages use the
-flag to leave such shows out of their "available" filters.
+flag to leave such shows out of their "available" filters, and the DJ show
+and giveaway pages use it to tell the DJ not to announce the show.
 """
 
 from datetime import datetime, time, timedelta
@@ -83,3 +84,46 @@ def test_summary_includes_planned_close(client, db, show):
     summary = _summary(client, show.id)
     assert summary["planned_close_date"] == "2030-03-04"
     assert summary["planned_close_time"] == "17:30:00"
+
+
+def _detail(client, show_id: int) -> dict:
+    response = client.get(f"/api/shows/{show_id}", headers=DJ_STUDIO)
+    assert response.status_code == 200
+    return response.json()
+
+
+def test_show_detail_says_whether_the_planned_close_time_passed(client, db, show):
+    """The single show response has the flag too, for the DJ show and giveaway pages."""
+    assert _detail(client, show.id)["planned_close_passed"] is False
+
+    _set_planned_close(db, show, datetime.now(_LA) - timedelta(hours=1))
+    detail = _detail(client, show.id)
+    assert detail["status"] == "published"
+    assert detail["planned_close_passed"] is True
+
+
+def _attempt(client, show_id: int):
+    return client.post(f"/api/shows/{show_id}/attempt", json={}, headers=DJ_STUDIO)
+
+
+def test_attempt_refused_after_the_planned_close_time(client, db, show):
+    """Tried is refused once the planned close time passes, like a giveaway."""
+    _set_planned_close(db, show, datetime.now(_LA) - timedelta(hours=1))
+    response = _attempt(client, show.id)
+    assert response.status_code == 400
+    assert "planned close time" in response.json()["detail"]
+
+
+def test_attempt_allowed_before_the_planned_close_time(client, db, show):
+    """Tried still works while the planned close time is ahead."""
+    _set_planned_close(db, show, datetime.now(_LA) + timedelta(hours=1))
+    assert _attempt(client, show.id).status_code == 200
+
+
+def test_attempt_refused_for_a_closed_show(client, db, show):
+    """Tried is refused for a closed show."""
+    show.status = "closed"
+    db.commit()
+    response = _attempt(client, show.id)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Cannot record attempts for closed shows"

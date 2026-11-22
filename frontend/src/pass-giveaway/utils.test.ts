@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   addressHasStateOrZip,
   canDjEditWinner,
+  isDjGiveawayClosed,
   canRecordDjGiveaways,
   compareShows,
   compareVenueNames,
@@ -354,5 +355,23 @@ describe('compareShows', () => {
       show(2, '2026-12-08', '2026-12-05', '12:00:00'),
     ];
     expect([...shows].sort((a, b) => compareShows(a, b, 'close')).map((s) => s.id)).toEqual([2, 1]);
+  });
+});
+
+describe('isDjGiveawayClosed', () => {
+  it('is open for a published show before its planned close time', () => {
+    expect(isDjGiveawayClosed({ status: 'published', planned_close_passed: false })).toBe(false);
+  });
+
+  it('is closed for a closed show', () => {
+    expect(isDjGiveawayClosed({ status: 'closed', planned_close_passed: false })).toBe(true);
+  });
+
+  it('is closed for a draft show', () => {
+    expect(isDjGiveawayClosed({ status: 'draft', planned_close_passed: false })).toBe(true);
+  });
+
+  it('is closed once the planned close time passes, though still published', () => {
+    expect(isDjGiveawayClosed({ status: 'published', planned_close_passed: true })).toBe(true);
   });
 });

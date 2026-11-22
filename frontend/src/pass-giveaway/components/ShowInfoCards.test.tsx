@@ -35,6 +35,7 @@ const baseShow: ShowResponse = {
   available_staff_count: 1,
   planned_close_date: null,
   planned_close_time: null,
+  planned_close_passed: false,
   auto_close: false,
   close_notifications_pending: false,
   close_notifications_sent_at: null,

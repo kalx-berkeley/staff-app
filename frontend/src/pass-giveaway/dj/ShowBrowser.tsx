@@ -11,6 +11,7 @@ import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, WHEELCHAIR_ACCESSIBLE_LABELS, compareSho
 import { formatCalendarDate, formatCalendarDateRange } from '../../common/dateTime';
 import { useShowListFilters, type ShowListFilterOptions, type ShowSort } from '../showListUrlState';
 import { useOnAir } from './onAirContext';
+import { useRefreshWhileVisible } from './useRefreshWhileVisible';
 
 const VIEW_MODE_KEY = 'kalx_dj_view_mode';
 
@@ -94,6 +95,14 @@ const ShowBrowser = () => {
     loadShows();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo]);
+
+  // A tab left open on this list must drop shows that closed and grey out
+  // shows whose planned close time passed (planned_close_passed is worked
+  // out when the list is fetched), along with their pre-assigned passes
+  useRefreshWhileVisible(() => {
+    setAssignedRefresh((n) => n + 1);
+    void loadShows({ silent: true });
+  });
 
   useEffect(() => {
     setAllShows(rawShows);

@@ -5,11 +5,13 @@ import { EnrichedShowName, FeatureBinBadge, KalxLiveBadge } from '../components'
 import MarkdownContent from '../../common/components/MarkdownContent';
 import { formatPhone } from '../../common/utils';
 import { usePageTitle } from '../../common/hooks/usePageTitle';
-import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, KALX_CALL_IN_PHONE, KALX_CALL_IN_PHONE_LETTERS, canDjEditWinner, findRecentDjGiveaway, formatShowRating, isMovieShow, isPreassignedTo } from '../utils';
+import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, KALX_CALL_IN_PHONE, KALX_CALL_IN_PHONE_LETTERS, canDjEditWinner, findRecentDjGiveaway, formatShowRating, isDjGiveawayClosed, isMovieShow, isPreassignedTo } from '../utils';
 import { useOnAir } from './onAirContext';
 import WinnerEditForm from './WinnerEditForm';
 import { clearGiveawayOutcome, peekGiveawayOutcome } from './giveawayOutcome';
 import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
+import GiveawayClosedNotice from './GiveawayClosedNotice';
+import { useShowCloseRecheck } from './useRefreshWhileVisible';
 import type { ShowResponse, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 import { formatCalendarDate, formatCalendarDateRange, formatPacific } from '../../common/dateTime';
@@ -79,6 +81,8 @@ const ShowDetailPage = () => {
   useEffect(() => {
     loadShow();
   }, [loadShow]);
+  // A tab left open on this page must notice when the show closes
+  useShowCloseRecheck(id, setShow);
 
   const formatDate = (dateStr: string) =>
     formatCalendarDate(dateStr, {
@@ -158,7 +162,11 @@ const ShowDetailPage = () => {
   // the backend refuses a second pair for the show this DJ shift.
   const recentDjGiveaway: Pick<PassResponse, 'given_away_at' | 'recipient_name'> | undefined =
     findRecentDjGiveaway(givenAwayPasses, identity);
-  const canGiveAway = availablePasses.length > 0 && !justGaveAway && !recentDjGiveaway;
+  // Closed, or past its planned close time: nothing to give away, whatever
+  // the passes' statuses say, and the DJ mustn't announce it
+  const giveawayClosed = isDjGiveawayClosed(show);
+  const canGiveAway =
+    !giveawayClosed && availablePasses.length > 0 && !justGaveAway && !recentDjGiveaway;
   // Every pair left is pre-assigned to another DJ, so giving one away on air
   // takes it from them. The DJ must click through a warning first.
   const othersPreassignedPasses = availablePasses.filter(
@@ -182,7 +190,7 @@ const ShowDetailPage = () => {
   // The DJ came here with "View" because they already gave away a pair this
   // shift, so there's no "I'm off the mic" button. Make sure they know before
   // they announce these passes and take calls they can't give a pair to.
-  if (recentDjGiveaway && !justGaveAway && !acknowledgedRecentGiveaway) {
+  if (!giveawayClosed && recentDjGiveaway && !justGaveAway && !acknowledgedRecentGiveaway) {
     const givenAt = recentDjGiveaway.given_away_at ? new Date(recentDjGiveaway.given_away_at) : null;
     const availableAgainAt = givenAt
       ? new Date(givenAt.getTime() + DJ_SHOW_GIVEAWAY_WINDOW_HOURS * 60 * 60 * 1000)
@@ -261,7 +269,9 @@ const ShowDetailPage = () => {
   return (
     <div className="dj-show-document">
 
-      <div className="kalx-doc-instructions">
+      {giveawayClosed && <GiveawayClosedNotice show={show} />}
+
+      {!giveawayClosed && <div className="kalx-doc-instructions">
         <p>
           Giveaways must be value neutral. Give only factual information about
           shows and don't offer any "opinions" on shows.
@@ -274,7 +284,7 @@ const ShowDetailPage = () => {
           Listeners call <strong>{KALX_CALL_IN_PHONE}</strong> or{' '}
           <strong>{KALX_CALL_IN_PHONE_LETTERS}</strong> to win.
         </p>
-      </div>
+      </div>}
 
       <div className="kalx-doc-show-info">
         <h1 className="kalx-show-name">
@@ -375,7 +385,10 @@ const ShowDetailPage = () => {
 
       <div className="kalx-doc-passes">
         <h3 className="kalx-passes-title">
-          Pass Pairs &mdash; {show.available_pair_count} of {passPairs.length} available
+          Pass Pairs &mdash;{' '}
+          {giveawayClosed
+            ? 'giveaway closed'
+            : `${show.available_pair_count} of ${passPairs.length} available`}
         </h3>
 
         {passPairs.length === 0 && (

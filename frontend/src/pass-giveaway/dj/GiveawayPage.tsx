@@ -9,7 +9,9 @@ import { useAuth } from '../../common/contexts/authHooks';
 import type { ShowResponse, PassResponse } from '../types';
 import type { APIError } from '../../common/types';
 import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
-import { canRecordDjGiveaways, formatShowRating, isMovieShow, isPreassignedTo } from '../utils';
+import GiveawayClosedNotice from './GiveawayClosedNotice';
+import { useShowCloseRecheck } from './useRefreshWhileVisible';
+import { canRecordDjGiveaways, formatShowRating, isDjGiveawayClosed, isMovieShow, isPreassignedTo } from '../utils';
 import { useGiveawayVisit } from '../tracking';
 import { useOnAir } from './onAirContext';
 import { setGiveawayOutcome } from './giveawayOutcome';
@@ -58,6 +60,8 @@ const GiveawayPage = () => {
   useEffect(() => {
     loadShow();
   }, [loadShow]);
+  // A tab left open on this page must notice when the show closes
+  useShowCloseRecheck(id, setShow);
 
   const formatDate = (dateStr: string) =>
     formatCalendarDate(dateStr, {
@@ -110,6 +114,20 @@ const GiveawayPage = () => {
 
   if (!show) {
     return <div className="error">Show not found</div>;
+  }
+
+  // Closed, or past its planned close time: no winner form and no Tried
+  if (isDjGiveawayClosed(show)) {
+    return (
+      <div className="dj-show-document">
+        <GiveawayClosedNotice show={show} />
+        <div className="kalx-doc-footer">
+          <button onClick={backToShow} className="btn-secondary">
+            ← Back to Show
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const passPairs = show.passes.filter((p) => p.pass_type === 'pair');

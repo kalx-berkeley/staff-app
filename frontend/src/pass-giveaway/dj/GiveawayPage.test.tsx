@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import GiveawayPage from './GiveawayPage';
 import { showsAPI } from '../api';
@@ -39,7 +39,7 @@ const pass = (id: number, overrides: Partial<PassResponse> = {}) =>
     ...overrides,
   }) as PassResponse;
 
-const makeShow = (passes: PassResponse[]) =>
+const makeShow = (passes: PassResponse[], overrides: Partial<ShowResponse> = {}) =>
   ({
     id: 1,
     event_name: 'Test Band',
@@ -56,6 +56,7 @@ const makeShow = (passes: PassResponse[]) =>
     passes,
     attempts: [],
     available_pair_count: passes.filter((p) => p.status === 'available').length,
+    ...overrides,
   }) as unknown as ShowResponse;
 
 const renderPage = async (show: ShowResponse) => {
@@ -127,5 +128,35 @@ describe('DJ GiveawayPage', () => {
 
     expect(await screen.findByText('Giveaway form for pass 1')).toBeInTheDocument();
     expect(screen.queryByText(/more pass pair/)).not.toBeInTheDocument();
+  });
+
+  it('has no winner form or Tried for a closed show, only the notice', async () => {
+    await renderPage(makeShow([pass(1)], { status: 'closed' }));
+
+    const notice = await screen.findByRole('alert');
+    expect(notice).toHaveTextContent("Don't announce this show on air");
+    expect(notice).toHaveTextContent('The pass giveaway for Test Band has closed.');
+    expect(screen.queryByText(/Giveaway form for pass/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '← Back to Show' })).toBeInTheDocument();
+  });
+
+  it('has no winner form once the planned close time has passed', async () => {
+    await renderPage(makeShow([pass(1)], { planned_close_passed: true }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Don't announce this show on air");
+    expect(screen.queryByText(/Giveaway form for pass/)).not.toBeInTheDocument();
+  });
+
+  it('takes the form away when the show closes while the page is open', async () => {
+    await renderPage(makeShow([pass(1)]));
+    expect(await screen.findByText('Giveaway form for pass 1')).toBeInTheDocument();
+
+    vi.mocked(showsAPI.get).mockResolvedValue(makeShow([pass(1)], { status: 'closed' }));
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Don't announce this show on air");
+    expect(screen.queryByText(/Giveaway form for pass/)).not.toBeInTheDocument();
   });
 });

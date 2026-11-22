@@ -684,6 +684,13 @@ class ShowResponse(BaseModel):
     )
     planned_close_date: date | None
     planned_close_time: time | None
+    planned_close_passed: bool = Field(
+        default=False,
+        description=(
+            "Whether the show's planned close time has passed, after which passes"
+            " can't be claimed or given away even before the show is closed"
+        ),
+    )
     auto_close: bool
     close_notifications_pending: bool = False
     close_notifications_sent_at: UtcDatetime | None = None

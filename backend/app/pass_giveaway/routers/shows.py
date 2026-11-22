@@ -498,6 +498,7 @@ def _build_show_response(
         "status": show.status,
         "planned_close_date": show.planned_close_date,
         "planned_close_time": show.planned_close_time,
+        "planned_close_passed": PassService.planned_close_passed(show),
         "auto_close": show.auto_close,
         "close_notifications_pending": show.close_notifications_pending,
         "close_notifications_sent_at": show.close_notifications_sent_at,

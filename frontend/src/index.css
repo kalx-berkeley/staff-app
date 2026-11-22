@@ -2177,6 +2177,24 @@ fieldset.radio-group legend {
   margin-top: 1rem;
 }
 
+/* Tops the DJ show and giveaway pages when the show's giveaway has closed */
+.dj-giveaway-closed {
+  background: #f8d7da;
+  border: 2px solid var(--danger-color);
+  border-radius: 4px;
+  padding: 1rem 1.25rem;
+  margin: 1rem 0;
+  font-size: 1.1rem;
+}
+
+.dj-giveaway-closed h2 {
+  margin: 0 0 0.5rem;
+}
+
+.dj-giveaway-closed p {
+  margin: 0.5rem 0;
+}
+
 /* Winner CTA — now floated above the pass list */
 .kalx-winner-cta {
   margin: 1rem 0;

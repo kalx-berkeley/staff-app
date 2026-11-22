@@ -216,6 +216,16 @@ export function findRecentDjGiveaway<
   );
 }
 
+// Whether the show's passes can no longer be given away on air: it's closed
+// (or not published), or its planned close time has passed. The backend
+// refuses giveaways and Tried then, so the DJ pages tell the DJ not to
+// announce it.
+export function isDjGiveawayClosed(
+  show: Pick<ShowResponse, 'status' | 'planned_close_passed'>,
+): boolean {
+  return show.status !== 'published' || show.planned_close_passed === true;
+}
+
 // Whether who is on air may still correct this pass pair's winner: it was
 // credited to them (or to no one, while no one is on air), within
 // DJ_SHOW_GIVEAWAY_WINDOW_HOURS, and the show isn't closed or past its
