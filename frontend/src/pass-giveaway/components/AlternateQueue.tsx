@@ -232,11 +232,10 @@ export const AlternateGuestForm = ({
           )}
           <GuestFallbackOptions
             name={`${idPrefix}-guest-fallback`}
-            legend="If there isn't a pass for my guest:"
+            context="alternate"
             value={guestFallback}
             onChange={setGuestFallback}
             disabled={busy}
-            forAlternate
           />
         </>
       )}

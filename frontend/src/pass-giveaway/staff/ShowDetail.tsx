@@ -638,10 +638,10 @@ const ShowDetail = () => {
   const renderGuestClaimForm = (passId: number) => (
     <div className="guest-claim-form">
       <p className="guest-claim-info">
-        You're claiming this pass with a +1 guest. Your guest's spot is not
-        guaranteed — if another staff member claims a pass, your guest may be
-        bumped. You'll be notified immediately if that happens, and again when
-        the show closes to confirm whether your guest can attend.
+        You're claiming this pass with a +1 guest. Your guest's spot isn't
+        guaranteed: if another staff member claims a pass after the rest are
+        gone, your guest may be bumped. Choose below what happens if they
+        are.
       </p>
       {guestNote && <p className="field-hint">{guestNote}</p>}
       {show.guest_list_requirements.staff_guest_requires_name && (
@@ -659,7 +659,7 @@ const ShowDetail = () => {
       )}
       <GuestFallbackOptions
         name="guest-fallback"
-        legend="If my guest can't attend:"
+        context="claim"
         value={guestFallback}
         onChange={setGuestFallback}
         waitOnly={!hasSpareGuestPass}
@@ -1200,7 +1200,7 @@ const ShowDetail = () => {
                     )}
                     <GuestFallbackOptions
                       name="lottery-guest-fallback"
-                      legend="If there aren't enough passes for my guest to attend:"
+                      context="lottery"
                       value={lotteryGuestFallback}
                       onChange={setLotteryGuestFallback}
                     />

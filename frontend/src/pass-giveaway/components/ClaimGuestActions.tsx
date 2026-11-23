@@ -99,7 +99,7 @@ const ClaimGuestActions = ({
         {nameField}
         <GuestFallbackOptions
           name={`add-guest-fallback-${pass.id}`}
-          legend="If my guest can't attend:"
+          context="claim"
           value={fallback}
           onChange={setFallback}
           disabled={busy}

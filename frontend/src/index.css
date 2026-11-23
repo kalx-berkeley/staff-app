@@ -6357,6 +6357,14 @@ body.staging-active .workforms-review-detail {
 }
 
 /* The choice of what happens if a +1 guest has no pass */
+.guest-fallback-summary {
+  margin: 0 0 1rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--primary-color);
+  background: var(--light-bg);
+  font-size: 0.9rem;
+}
+
 .guest-fallback-group {
   margin-bottom: 0.6rem;
   padding: 0.6rem 0.75rem;

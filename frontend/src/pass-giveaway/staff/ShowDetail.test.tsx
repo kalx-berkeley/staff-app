@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { renderAndSettle } from '../../test/render';
 import { BrowserRouter } from 'react-router-dom';
 import ShowDetail from './ShowDetail';
@@ -411,7 +411,7 @@ describe('Staff ShowDetail', () => {
         name: /claim with \+1 guest/i,
       });
       fireEvent.click(claimWithGuest);
-      fireEvent.click(screen.getByRole('radio', { name: /release my pass too/i }));
+      fireEvent.click(screen.getByRole('radio', { name: /release my pass if my guest/i }));
       fireEvent.click(screen.getByRole('button', { name: /^claim with \+1$/i }));
 
       expect(
@@ -967,7 +967,7 @@ describe('Staff ShowDetail', () => {
       const myPass = { ...claimedPass, staff_email: 'me@example.com', staff_name: 'Me' };
       const showPage = () => renderAndSettle(<BrowserRouter><ShowDetail /></BrowserRouter>);
 
-      it('offers all four options in two groups with shared tradeoffs when a spare pass is free', async () => {
+      it('asks two questions, with tradeoffs on the second, when a spare pass is free', async () => {
         vi.mocked(showsAPI.get).mockResolvedValue({
           ...fullShow,
           passes: [availablePass, { ...availablePass, id: 3 }],
@@ -978,18 +978,23 @@ describe('Staff ShowDetail', () => {
         fireEvent.click(screen.getAllByRole('button', { name: /claim with \+1 guest/i })[0]);
 
         expect(screen.getAllByRole('radio')).toHaveLength(4);
-        expect(screen.getByRole('radio', { name: /still attend without them/i })).toBeChecked();
-        expect(screen.getByRole('radio', { name: /release my pass too/i })).toBeInTheDocument();
-        expect(screen.getByRole('radio', { name: /and i'll attend either way/i })).toBeInTheDocument();
-        expect(screen.getByRole('radio', { name: /but release my pass/i })).toBeInTheDocument();
-        expect(screen.getAllByText(/^Pro:/)).toHaveLength(2);
-        expect(screen.getAllByText(/^Con:/)).toHaveLength(2);
-        for (const name of [/still attend without them/i, /release my pass too/i]) {
-          expect(screen.getByRole('radio', { name })).toHaveAccessibleDescription(/know immediately/i);
-        }
-        for (const name of [/and i'll attend either way/i, /but release my pass/i]) {
-          expect(screen.getByRole('radio', { name })).toHaveAccessibleDescription(/until the show closes/i);
-        }
+        const attends = screen.getByRole('group', { name: /will you go to the show if your guest can't/i });
+        expect(within(attends).getByRole('radio', { name: /yes, i'll go without them/i })).toBeChecked();
+        expect(within(attends).getByRole('radio', { name: /release my pass if my guest/i })).not.toBeChecked();
+        const bumped = screen.getByRole('group', { name: /bumps your guest/i });
+        const notify = within(bumped).getByRole('radio', { name: /let me know right away/i });
+        const wait = within(bumped).getByRole('radio', { name: /put my guest on the alternate list/i });
+        expect(notify).toBeChecked();
+        expect(notify).toHaveAccessibleDescription(/instead of waiting until the show closes/i);
+        expect(wait).toHaveAccessibleDescription(/won't know whether your guest can go until the show closes/i);
+        expect(screen.getByText(/we'll email you right away and you'll go without them/i)).toBeInTheDocument();
+
+        fireEvent.click(wait);
+        fireEvent.click(within(attends).getByRole('radio', { name: /release my pass if my guest/i }));
+        expect(wait).toBeChecked();
+        expect(
+          screen.getByText(/they go on the alternate list\. If they still don't have a pass when the show closes, your pass is released too/i)
+        ).toBeInTheDocument();
       });
 
       it('offers only the waiting options when no spare pass is free', async () => {
@@ -1005,11 +1010,11 @@ describe('Staff ShowDetail', () => {
         fireEvent.click(screen.getByRole('button', { name: /claim with \+1 guest/i }));
 
         expect(screen.getAllByRole('radio')).toHaveLength(2);
-        expect(screen.getAllByText(/^Pro:/)).toHaveLength(1);
+        expect(screen.queryByText(/^Pro:/)).not.toBeInTheDocument();
         expect(screen.getByText(/no pass free for your guest right now/i)).toBeInTheDocument();
-        expect(screen.getByRole('radio', { name: /and i'll attend either way/i })).toBeChecked();
+        expect(screen.getByRole('radio', { name: /yes, i'll go without them/i })).toBeChecked();
 
-        fireEvent.click(screen.getByRole('radio', { name: /but release my pass/i }));
+        fireEvent.click(screen.getByRole('radio', { name: /release my pass if my guest/i }));
         fireEvent.click(screen.getByRole('button', { name: /^claim with \+1$/i }));
 
         expect(await screen.findByText(/your guest is on the alternate list/i)).toBeInTheDocument();
