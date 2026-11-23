@@ -1,10 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { venuesAPI, promotersAPI } from '../api';
-import { Tooltip, PersonAutocomplete, extractPersonEmail, EmailAddressRequirementField, HoldCloseNotificationsHint, DescriptionCheckFeedback, useDescriptionCheck } from '../components';
-import type { EmailAddressRequirement, VenueResponse, VenueCreate, VenueUpdate, VenueContactCreate, AgeRestriction, MovieRating, PromoterResponse, PromotionsStaffOption, VenueType, WheelchairAccessible } from '../types';
+import { Tooltip, DescriptionCheckFeedback, useDescriptionCheck } from '../components';
+import type { VenueResponse, VenueCreate, VenueUpdate, AgeRestriction, MovieRating, PromoterResponse, VenueType, WheelchairAccessible } from '../types';
 import { MOVIE_RATING_LABELS, VENUE_TYPE_LABELS, addressHasStateOrZip } from '../utils';
 import type { APIError, ValidationError } from '../../common/types';
 import { describeDayOffset } from './splitShow';
+import EntityFormPage from './shared/EntityFormPage';
+import GuestListRequirementsFields from './shared/GuestListRequirementsFields';
+import PromotionsRepsField from './shared/PromotionsRepsField';
+import ContactsField from './shared/ContactsField';
+import {
+  DEFAULT_GUEST_LIST_REQUIREMENTS,
+  NEW_CONTACT_ROWS,
+  contactRowsFrom,
+  contactsToSave,
+  guestListRequirementsFrom,
+} from './shared/formValues';
 
 const venueLogoUrl = (id: number) => `/api/venues/${id}/logo`;
 // The backend scales uploaded logos to fit within this size (venues.py _LOGO_MAX_PX).
@@ -19,20 +30,9 @@ interface VenueFormProps {
   onClose: () => void;
   onSuccess: () => void;
   onDelete?: () => void;
-  asPage?: boolean;
 }
 
-const emptyContact = (): VenueContactCreate => ({
-  name: null,
-  title: null,
-  email: null,
-  phone: null,
-});
-
-const contactHasText = (c: VenueContactCreate) =>
-  [c.name, c.title, c.email, c.phone].some((v) => (v ?? '').trim() !== '');
-
-const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: VenueFormProps) => {
+const VenueForm = ({ venue, onClose, onSuccess, onDelete }: VenueFormProps) => {
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [showSourcingInstructions, setShowSourcingInstructions] = useState('');
@@ -47,12 +47,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   const [defaultMovieRating, setDefaultMovieRating] = useState<'' | MovieRating>('');
   const [defaultNumPassPairs, setDefaultNumPassPairs] = useState('');
   const [defaultStaffPassAdjustment, setDefaultStaffPassAdjustment] = useState(0);
-  const [requiresPhoneNumber, setRequiresPhoneNumber] = useState(false);
-  const [emailAddressRequirement, setEmailAddressRequirement] =
-    useState<EmailAddressRequirement>('none');
-  const [staffGuestRequiresName, setStaffGuestRequiresName] = useState(false);
-  const [holdCloseNotifications, setHoldCloseNotifications] = useState(false);
-  const [trackPassCallIn, setTrackPassCallIn] = useState(false);
+  const [guestList, setGuestList] = useState(DEFAULT_GUEST_LIST_REQUIREMENTS);
   const [defaultLotteryEnabled, setDefaultLotteryEnabled] = useState(false);
   const [defaultLotteryWindowHours, setDefaultLotteryWindowHours] = useState('24');
   const [defaultDjPreassignProhibitionDays, setDefaultDjPreassignProhibitionDays] = useState('');
@@ -91,15 +86,10 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   const [showsHaveExternalPromoter, setShowsHaveExternalPromoter] = useState(false);
   const [promotersList, setPromotersList] = useState<PromoterResponse[]>([]);
   const [ownerEmails, setOwnerEmails] = useState<string[]>([]);
-  const [newOwnerInput, setNewOwnerInput] = useState('');
-  const [promotionsStaff, setPromotionsStaff] = useState<PromotionsStaffOption[]>([]);
-  const [emailToName, setEmailToName] = useState<Record<string, string>>({});
-  const [contacts, setContacts] = useState<VenueContactCreate[]>([emptyContact()]);
+  const [contacts, setContacts] = useState(NEW_CONTACT_ROWS);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [hasLogo, setHasLogo] = useState(false);
   const [showNameWithLogo, setShowNameWithLogo] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -126,11 +116,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
       setDefaultMovieRating(venue.default_movie_rating ?? '');
       setDefaultNumPassPairs(venue.default_num_pass_pairs != null ? String(venue.default_num_pass_pairs) : '');
       setDefaultStaffPassAdjustment(venue.default_staff_pass_adjustment ?? 0);
-      setRequiresPhoneNumber(venue.requires_phone_number ?? false);
-      setEmailAddressRequirement(venue.email_address_requirement ?? 'none');
-      setStaffGuestRequiresName(venue.staff_guest_requires_name ?? false);
-      setHoldCloseNotifications(venue.hold_close_notifications ?? false);
-      setTrackPassCallIn(venue.track_pass_call_in ?? false);
+      setGuestList(guestListRequirementsFrom(venue));
       setDefaultLotteryEnabled(venue.default_lottery_enabled ?? false);
       setDefaultLotteryWindowHours(String(venue.default_lottery_window_hours ?? 24));
       setDefaultDjPreassignProhibitionDays(
@@ -146,16 +132,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
       setStaffPassDayOffset(venue.staff_pass_day_offset ? String(venue.staff_pass_day_offset) : '');
       setRarelyUsedOpen(!!venue.staff_pass_day_offset);
       setOwnerEmails(venue.owner_emails || []);
-      setContacts(
-        venue.contacts.length > 0
-          ? venue.contacts.map((c) => ({
-              name: c.name ?? null,
-              title: c.title ?? null,
-              email: c.email ?? null,
-              phone: c.phone ?? null,
-            }))
-          : [emptyContact()]
-      );
+      setContacts(contactRowsFrom(venue.contacts));
       setPromoterId(venue.promoter_id ?? null);
       setShowsHaveExternalPromoter(venue.shows_have_external_promoter ?? false);
       setHasLogo(venue.has_logo);
@@ -169,12 +146,6 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
   }, [venue]);
 
   useEffect(() => {
-    venuesAPI.listPromotionsStaff().then((staff) => {
-      setPromotionsStaff(staff);
-      const map: Record<string, string> = {};
-      staff.forEach((s) => { map[s.email] = s.name; });
-      setEmailToName(map);
-    }).catch(() => {});
     promotersAPI.list().then(setPromotersList).catch(() => {});
     venuesAPI.list().then(setAllVenues).catch(() => {});
   }, []);
@@ -206,33 +177,6 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleAddOwner = (rawInput: string) => {
-    const email = extractPersonEmail(rawInput);
-    if (email && !ownerEmails.includes(email)) {
-      setOwnerEmails([...ownerEmails, email]);
-    }
-    setNewOwnerInput('');
-  };
-
-  const handleRemoveOwner = (email: string) => {
-    setOwnerEmails(ownerEmails.filter((e) => e !== email));
-  };
-
-  const handleAddContact = () => {
-    setContacts([...contacts, emptyContact()]);
-  };
-
-  const handleRemoveContact = (idx: number) => {
-    const remaining = contacts.filter((_, i) => i !== idx);
-    setContacts(remaining.length > 0 ? remaining : [emptyContact()]);
-  };
-
-  const handleContactChange = (idx: number, field: keyof VenueContactCreate, value: string) => {
-    setContacts(
-      contacts.map((c, i) => (i === idx ? { ...c, [field]: value || null } : c))
-    );
-  };
-
   const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -249,22 +193,6 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
     setPendingLogoDelete(true);
     setLogoSize(null);
     setLogoKey((k) => k + 1);
-  };
-
-  const handleDelete = async () => {
-    if (!venue) return;
-    setDeleting(true);
-    setApiError(null);
-    try {
-      await venuesAPI.delete(venue.id);
-      onDelete?.();
-    } catch (err) {
-      const error = err as APIError;
-      setShowDeleteConfirm(false);
-      setApiError(typeof error.detail === 'string' ? error.detail : 'Failed to delete venue');
-    } finally {
-      setDeleting(false);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -309,11 +237,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           default_movie_rating: defaultMovieRatingValue,
           default_num_pass_pairs: defaultNumPassPairsValue,
           default_staff_pass_adjustment: defaultStaffPassAdjustment,
-          requires_phone_number: requiresPhoneNumber,
-          email_address_requirement: emailAddressRequirement,
-          staff_guest_requires_name: staffGuestRequiresName,
-          hold_close_notifications: holdCloseNotifications,
-          track_pass_call_in: trackPassCallIn,
+          ...guestList,
           default_lottery_enabled: defaultLotteryEnabled,
           default_lottery_window_hours: defaultLotteryEnabled ? (parseInt(defaultLotteryWindowHours) || 24) : 24,
           default_dj_preassign_prohibition_days: defaultDjPreassignProhibitionDaysValue,
@@ -326,7 +250,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           shows_have_external_promoter: showsHaveExternalPromoter,
           show_name_with_logo: showNameWithLogo,
           owner_emails: ownerEmails,
-          contacts: contacts.filter(contactHasText),
+          contacts: contactsToSave(contacts),
         };
         savedVenue = await venuesAPI.update(venue.id, updateData);
       } else {
@@ -343,11 +267,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           default_movie_rating: defaultMovieRatingValue,
           default_num_pass_pairs: defaultNumPassPairsValue,
           default_staff_pass_adjustment: defaultStaffPassAdjustment,
-          requires_phone_number: requiresPhoneNumber,
-          email_address_requirement: emailAddressRequirement,
-          staff_guest_requires_name: staffGuestRequiresName,
-          hold_close_notifications: holdCloseNotifications,
-          track_pass_call_in: trackPassCallIn,
+          ...guestList,
           default_lottery_enabled: defaultLotteryEnabled,
           default_lottery_window_hours: defaultLotteryEnabled ? (parseInt(defaultLotteryWindowHours) || 24) : 24,
           default_dj_preassign_prohibition_days: defaultDjPreassignProhibitionDaysValue,
@@ -359,7 +279,7 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           promoter_id: promoterId,
           shows_have_external_promoter: showsHaveExternalPromoter,
           owner_emails: ownerEmails,
-          contacts: contacts.filter(contactHasText),
+          contacts: contactsToSave(contacts),
         };
         savedVenue = await venuesAPI.create(createData);
       }
@@ -390,50 +310,28 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
     }
   };
 
-  const deleteConfirmModal = showDeleteConfirm && venue && (
-    <div className="modal-overlay">
-      <div className="modal-content">
-        <div className="modal-header">
-          <h3>Delete Venue</h3>
-        </div>
-        <div className="modal-body">
-          <p>
-            Are you sure you want to delete <strong>{venue.name}</strong>?
-          </p>
-          <p>
-            This venue will be hidden from all lists and dropdowns. It can be restored later
-            from the Admin page.
-          </p>
-          <p className="field-hint">
-            Note: venues with published shows must have those shows closed before deletion.
-          </p>
-        </div>
-        <div className="form-actions">
-          <button
-            type="button"
-            onClick={() => setShowDeleteConfirm(false)}
-            className="btn-secondary"
-            disabled={deleting}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleDelete}
-            className="btn-danger"
-            disabled={deleting}
-          >
-            {deleting ? 'Deleting...' : 'Delete Venue'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  const form = (
-    <form onSubmit={handleSubmit} className="venue-form">
-      {apiError && <div className="error-message">{apiError}</div>}
-
+  return (
+    <EntityFormPage
+      noun="Venue"
+      savedName={venue?.name ?? null}
+      apiError={apiError}
+      submitting={submitting}
+      onSubmit={handleSubmit}
+      onCancel={onClose}
+      onDelete={
+        venue
+          ? async () => {
+              await venuesAPI.delete(venue.id);
+              onDelete?.();
+            }
+          : undefined
+      }
+      deleteNote={
+        <p className="field-hint">
+          Note: venues with published shows must have those shows closed before deletion.
+        </p>
+      }
+    >
           <div className="form-group">
             <label htmlFor="venue-name">
               Venue Name <span className="required">*</span>
@@ -945,74 +843,19 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
           </div>
           </fieldset>
 
-          <div className="form-section">
-            <h4>Guest List Requirements (optional)</h4>
-            <p className="field-hint">
-              These settings control what information appears in the guest list when a show at this venue closes,
-              unless the show has a promoter, whose own settings apply instead.
-              They're all optional. Leave every box unchecked if the venue doesn't need any of them.
-            </p>
-            <div className="form-group form-group-checkbox">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={requiresPhoneNumber}
-                  onChange={(e) => setRequiresPhoneNumber(e.target.checked)}
-                  disabled={submitting}
-                />
-                {' '}Include winner's phone number in guest list
-              </label>
-            </div>
-            <EmailAddressRequirementField
-              idPrefix="venue"
-              value={emailAddressRequirement}
-              onChange={setEmailAddressRequirement}
-              disabled={submitting}
-            />
-            <div className="form-group form-group-checkbox">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={staffGuestRequiresName}
-                  onChange={(e) => setStaffGuestRequiresName(e.target.checked)}
-                  disabled={submitting}
-                />
-                {' '}Require staff guests to be listed by name
-              </label>
-              <span className="field-hint">
-                When checked, staff members bringing a +1 guest must provide the guest's name,
-                and the guest list will show the guest's name as a separate entry. When unchecked,
-                the list shows "John Doe and a guest" without requiring the guest's name.
-              </span>
-            </div>
-            <div className="form-group form-group-checkbox">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={holdCloseNotifications}
-                  onChange={(e) => setHoldCloseNotifications(e.target.checked)}
-                  disabled={submitting}
-                />
-                {' '}Wait for me to send close notifications
-              </label>
-              <HoldCloseNotificationsHint />
-            </div>
-            <div className="form-group form-group-checkbox">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={trackPassCallIn}
-                  onChange={(e) => setTrackPassCallIn(e.target.checked)}
-                  disabled={submitting}
-                />
-                {' '}Track when I've called in the passes
-              </label>
-              <span className="field-hint">
-                Closed shows get a Mark Passes Called In button next to the guest list, so you can keep
-                track of which ones you've sent to the venue.
-              </span>
-            </div>
-          </div>
+          <GuestListRequirementsFields
+            idPrefix="venue"
+            intro={
+              <>
+                These settings control what information appears in the guest list when a show at this
+                venue closes, unless the show has a promoter, whose own settings apply instead.
+                They're all optional. Leave every box unchecked if the venue doesn't need any of them.
+              </>
+            }
+            value={guestList}
+            onChange={setGuestList}
+            disabled={submitting}
+          />
 
           <div className="form-section">
             <div className="label-with-help">
@@ -1084,162 +927,21 @@ const VenueForm = ({ venue, onClose, onSuccess, onDelete, asPage = false }: Venu
             )}
           </div>
 
-          <div className="form-section">
-            <h4>KALX Promotions Reps</h4>
-            <p className="field-hint">
-              Promotions staff with access to manage this venue. Type a name or email address.
-            </p>
-            <div className="tag-input-row">
-              <PersonAutocomplete
-                value={newOwnerInput}
-                onChange={setNewOwnerInput}
-                onSubmit={handleAddOwner}
-                options={promotionsStaff}
-                placeholder="Add rep by name or email..."
-                disabled={submitting}
-                style={{ flex: 1 }}
-              />
-              <button
-                type="button"
-                onClick={() => handleAddOwner(newOwnerInput)}
-                className="btn-secondary btn-small"
-                disabled={submitting || !newOwnerInput.trim()}
-              >
-                Add
-              </button>
-            </div>
-            {ownerEmails.length > 0 && (
-              <ul className="tag-list">
-                {ownerEmails.map((email) => (
-                  <li key={email} className="tag-item">
-                    <span>
-                      <a href={`mailto:${email}`}>{emailToName[email] || email}</a>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveOwner(email)}
-                      className="tag-remove"
-                      disabled={submitting}
-                    >
-                      ×
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <PromotionsRepsField
+            hint="Promotions staff with access to manage this venue. Type a name or email address."
+            ownerEmails={ownerEmails}
+            onChange={setOwnerEmails}
+            disabled={submitting}
+          />
 
-          <div className="form-section">
-            <h4>Venue Contacts</h4>
-            {contacts.map((contact, idx) => (
-              <div key={idx} className="contact-row">
-                <div className="contact-fields">
-                  <input
-                    type="text"
-                    placeholder="Name"
-                    value={contact.name || ''}
-                    onChange={(e) => handleContactChange(idx, 'name', e.target.value)}
-                    disabled={submitting}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Title"
-                    value={contact.title || ''}
-                    onChange={(e) => handleContactChange(idx, 'title', e.target.value)}
-                    disabled={submitting}
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email"
-                    value={contact.email || ''}
-                    onChange={(e) => handleContactChange(idx, 'email', e.target.value)}
-                    disabled={submitting}
-                  />
-                  <input
-                    type="tel"
-                    placeholder="Phone"
-                    value={contact.phone || ''}
-                    onChange={(e) => handleContactChange(idx, 'phone', e.target.value)}
-                    disabled={submitting}
-                  />
-                </div>
-                {(contacts.length > 1 || contactHasText(contact)) && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveContact(idx)}
-                    className="btn-danger btn-small"
-                    disabled={submitting}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            ))}
-            {contactHasText(contacts[0]) && (
-              <button
-                type="button"
-                onClick={handleAddContact}
-                className="btn-secondary btn-small"
-                disabled={submitting}
-              >
-                + Add Another Contact
-              </button>
-            )}
-          </div>
-
-          <div className="form-actions">
-            {venue && (
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(true)}
-                className="btn-danger"
-                disabled={submitting || deleting}
-              >
-                Delete Venue
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn-secondary"
-              disabled={submitting || deleting}
-            >
-              Cancel
-            </button>
-            <button type="submit" className="btn-primary" disabled={submitting || deleting}>
-              {submitting ? 'Saving...' : venue ? 'Update' : 'Create'}
-            </button>
-          </div>
-    </form>
-  );
-
-  if (asPage) {
-    return (
-      <>
-        <div className="venue-form-page">
-          <h2>{venue ? 'Edit Venue' : 'Create New Venue'}</h2>
-          {form}
-        </div>
-        {deleteConfirmModal}
-      </>
-    );
-  }
-
-  return (
-    <>
-      <div className="modal-overlay">
-        <div className="modal-content modal-content-wide">
-          <div className="modal-header">
-            <h3>{venue ? 'Edit Venue' : 'Create New Venue'}</h3>
-            <button onClick={onClose} className="btn-close" disabled={submitting}>
-              ×
-            </button>
-          </div>
-          {form}
-        </div>
-      </div>
-      {deleteConfirmModal}
-    </>
+          <ContactsField
+            title="Venue Contacts"
+            hint="Contact people at this venue (for reference)."
+            contacts={contacts}
+            onChange={setContacts}
+            disabled={submitting}
+          />
+    </EntityFormPage>
   );
 };
 

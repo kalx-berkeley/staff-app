@@ -1,65 +1,16 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 import { promotersAPI } from '../api';
-import type { PromoterResponse } from '../types';
-import type { APIError } from '../../common/types';
 import PromoterForm from './PromoterForm';
-import { useReturnToList } from '../listUrlState';
-import { usePageTitle } from '../../common/hooks/usePageTitle';
+import EntityEditPage from './shared/EntityEditPage';
 
-const PromoterEdit = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const returnTo = useReturnToList('/promotions/promoters');
-  const [promoter, setPromoter] = useState<PromoterResponse | null>(null);
-  usePageTitle(`Edit ${promoter?.name ?? 'Promoter'} · Promotions`);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadPromoter = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await promotersAPI.get(Number(id));
-        setPromoter(data);
-      } catch (err) {
-        const apiError = err as APIError;
-        setError(
-          typeof apiError.detail === 'string' ? apiError.detail : 'Failed to load promoter'
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadPromoter();
-  }, [id]);
-
-  const handleDone = () => navigate(returnTo);
-
-  if (loading) {
-    return <div className="loading">Loading promoter...</div>;
-  }
-
-  if (error || !promoter) {
-    return (
-      <div className="error">
-        <p>Error: {error ?? 'Promoter not found'}</p>
-        <button onClick={handleDone}>Back to Promoters</button>
-      </div>
-    );
-  }
-
-  return (
-    <PromoterForm
-      promoter={promoter}
-      asPage={true}
-      onClose={handleDone}
-      onSuccess={handleDone}
-      onDelete={handleDone}
-    />
-  );
-};
+const PromoterEdit = () => (
+  <EntityEditPage
+    noun="Promoter"
+    listPath="/promotions/promoters"
+    load={promotersAPI.get}
+    renderForm={(promoter, done) => (
+      <PromoterForm promoter={promoter} onClose={done} onSuccess={done} onDelete={done} />
+    )}
+  />
+);
 
 export default PromoterEdit;

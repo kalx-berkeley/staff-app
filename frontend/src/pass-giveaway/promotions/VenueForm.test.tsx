@@ -133,18 +133,6 @@ describe('VenueForm', () => {
       expect(mockOnClose).toHaveBeenCalledTimes(1);
     });
 
-    it('should call onClose when close (×) button is clicked', async () => {
-      render(
-        <VenueForm venue={null} onClose={mockOnClose} onSuccess={mockOnSuccess} />
-      );
-      await act(async () => {});
-
-      const closeButton = screen.getByRole('button', { name: '×' });
-      fireEvent.click(closeButton);
-
-      expect(mockOnClose).toHaveBeenCalledTimes(1);
-    });
-
     it('should disable buttons while submitting', async () => {
       let resolveCreate: (venue: VenueResponse) => void;
       vi.mocked(venuesAPI.create).mockImplementation(

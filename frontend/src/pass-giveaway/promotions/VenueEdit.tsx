@@ -1,67 +1,16 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 import { venuesAPI } from '../api';
-import type { VenueResponse } from '../types';
-import type { APIError } from '../../common/types';
 import VenueForm from './VenueForm';
-import { useReturnToList } from '../listUrlState';
-import { usePageTitle } from '../../common/hooks/usePageTitle';
+import EntityEditPage from './shared/EntityEditPage';
 
-const VenueEdit = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const returnTo = useReturnToList('/promotions/venues');
-  const [venue, setVenue] = useState<VenueResponse | null>(null);
-  usePageTitle(`Edit ${venue?.name ?? 'Venue'} · Promotions`);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadVenue = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await venuesAPI.get(Number(id));
-        setVenue(data);
-      } catch (err) {
-        const apiError = err as APIError;
-        setError(
-          typeof apiError.detail === 'string'
-            ? apiError.detail
-            : 'Failed to load venue'
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadVenue();
-  }, [id]);
-
-  const handleDone = () => navigate(returnTo);
-
-  if (loading) {
-    return <div className="loading">Loading venue...</div>;
-  }
-
-  if (error || !venue) {
-    return (
-      <div className="error">
-        <p>Error: {error ?? 'Venue not found'}</p>
-        <button onClick={handleDone}>Back to Venues</button>
-      </div>
-    );
-  }
-
-  return (
-    <VenueForm
-      venue={venue}
-      asPage={true}
-      onClose={handleDone}
-      onSuccess={handleDone}
-      onDelete={handleDone}
-    />
-  );
-};
+const VenueEdit = () => (
+  <EntityEditPage
+    noun="Venue"
+    listPath="/promotions/venues"
+    load={venuesAPI.get}
+    renderForm={(venue, done) => (
+      <VenueForm venue={venue} onClose={done} onSuccess={done} onDelete={done} />
+    )}
+  />
+);
 
 export default VenueEdit;

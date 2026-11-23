@@ -12,7 +12,6 @@ const VenueNew = () => {
   return (
     <VenueForm
       venue={null}
-      asPage={true}
       onClose={handleDone}
       onSuccess={handleDone}
     />

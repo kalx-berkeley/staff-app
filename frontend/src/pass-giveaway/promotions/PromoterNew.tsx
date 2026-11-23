@@ -12,7 +12,6 @@ const PromoterNew = () => {
   return (
     <PromoterForm
       promoter={null}
-      asPage={true}
       onClose={handleDone}
       onSuccess={handleDone}
     />
