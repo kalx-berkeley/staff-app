@@ -914,6 +914,50 @@ describe('ShowForm', () => {
   });
 
   describe('Genre', () => {
+    const cinema: VenueResponse = { ...mockVenues[1], id: 3, name: 'Cinema C', venue_type: 'movie_theater' };
+
+    it('replaces the genres with film when a movie theater is picked', async () => {
+      vi.mocked(venuesMyAPI.listMy).mockResolvedValue([...mockVenues, cinema]);
+      renderShowForm();
+
+      const genreInput = await screen.findByLabelText(/genre/i);
+      fireEvent.change(genreInput, { target: { value: 'rock, punk' } });
+      fireEvent.blur(genreInput);
+      expect(await screen.findByRole('button', { name: 'Remove rock' })).toBeInTheDocument();
+
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), { target: { value: '3' } });
+      expect(await screen.findByRole('button', { name: 'Remove film' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove rock' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove punk' })).not.toBeInTheDocument();
+
+      // Staff can change the genre afterwards
+      fireEvent.click(screen.getByRole('button', { name: 'Remove film' }));
+      fireEvent.change(genreInput, { target: { value: 'documentary' } });
+      fireEvent.blur(genreInput);
+      expect(await screen.findByRole('button', { name: 'Remove documentary' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove film' })).not.toBeInTheDocument();
+    });
+
+    it('starts as film when the only venue is a movie theater', async () => {
+      vi.mocked(venuesMyAPI.listMy).mockResolvedValue([cinema]);
+      renderShowForm();
+
+      expect(await screen.findByRole('button', { name: 'Remove film' })).toBeInTheDocument();
+    });
+
+    it('leaves the genres alone when a music venue is picked', async () => {
+      renderShowForm();
+
+      const genreInput = await screen.findByLabelText(/genre/i);
+      fireEvent.change(genreInput, { target: { value: 'rock' } });
+      fireEvent.blur(genreInput);
+      expect(await screen.findByRole('button', { name: 'Remove rock' })).toBeInTheDocument();
+
+      fireEvent.change(screen.getByRole('combobox', { name: /Venue/ }), { target: { value: '1' } });
+      expect(await screen.findByRole('button', { name: 'Remove rock' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove film' })).not.toBeInTheDocument();
+    });
+
     it('explains that any genre can be typed and commas separate them', async () => {
       renderShowForm();
 

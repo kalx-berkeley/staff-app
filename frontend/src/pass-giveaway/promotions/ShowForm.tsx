@@ -194,6 +194,9 @@ const TablerReleaseModal = ({ tablers, onConfirm, onCancel }: TablerReleaseModal
   </div>
 );
 
+// Genres are stored lower case, so this shows as "film"
+const MOVIE_THEATER_GENRE = 'film';
+
 const ShowForm = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -361,6 +364,9 @@ const ShowForm = () => {
             setWheelchairAccessible(only.default_wheelchair_accessible);
           }
           setVenueType(only.venue_type ?? 'music');
+          if (only.venue_type === 'movie_theater') {
+            setGenres([MOVIE_THEATER_GENRE]);
+          }
           if (only.default_age_restriction) {
             setAgeRestriction(only.default_age_restriction);
           }
@@ -544,6 +550,11 @@ const ShowForm = () => {
         setWheelchairAccessible(selected.default_wheelchair_accessible);
       }
       setVenueType(selected?.venue_type ?? 'music');
+      // A new show at a movie theater starts as a film, whatever genres were
+      // picked before. Staff can still change them afterwards.
+      if (!isEditing && selected?.venue_type === 'movie_theater') {
+        setGenres([MOVIE_THEATER_GENRE]);
+      }
       if (selected?.default_age_restriction) {
         setAgeRestriction(selected.default_age_restriction);
       }
