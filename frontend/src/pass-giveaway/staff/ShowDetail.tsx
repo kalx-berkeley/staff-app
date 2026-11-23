@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { showsAPI, passesAPI, lotteryAPI, alternatesAPI } from '../api';
 import { Tooltip, EnrichedShowName, FeatureBinBadge, KalxLiveBadge, DatePicker, AlternateQueueList, AlternateGuestForm, WaitingGuestsList, GuestFallbackOptions, ClaimGuestActions, TablerPassesSection, ShowInfoCards } from '../components';
 import { formatPhone, formatLeave, isOnLeave, leaveCoversShow, formatDateValue } from '../../common/utils';
@@ -742,6 +742,13 @@ const ShowDetail = () => {
           </div>
         )}
       </div>
+
+      {alreadyHasStaffPass && (
+        <p className="info-message" role="note">
+          You have a {holdsTablerPass ? 'tabler' : 'staff'} pass for this show.{' '}
+          <Link to="/staff/my-passes">See it and your other passes in My Passes</Link>.
+        </p>
+      )}
 
       {successMessage && (
         <div className="success-message">{successMessage}</div>

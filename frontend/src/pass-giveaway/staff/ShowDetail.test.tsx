@@ -521,6 +521,66 @@ describe('Staff ShowDetail', () => {
       ).toBeInTheDocument();
     });
 
+    it('links to My Passes when the current user has a staff pass for this show', async () => {
+      loginAsClaimer();
+      vi.mocked(showsAPI.get).mockResolvedValue(mockShow);
+
+      await renderAndSettle(
+        <BrowserRouter>
+          <ShowDetail />
+        </BrowserRouter>
+      );
+
+      expect(await screen.findByRole('note')).toHaveTextContent(
+        /you have a staff pass for this show/i
+      );
+      expect(screen.getByRole('link', { name: /my passes/i })).toHaveAttribute(
+        'href',
+        '/staff/my-passes'
+      );
+    });
+
+    it('links to My Passes when the current user has a tabler pass for this show', async () => {
+      loginAsClaimer();
+      vi.mocked(showsAPI.get).mockResolvedValue({
+        ...mockShow,
+        passes: [availablePass, { ...claimedPass, pass_type: 'tabler' as const }],
+      });
+
+      await renderAndSettle(
+        <BrowserRouter>
+          <ShowDetail />
+        </BrowserRouter>
+      );
+
+      expect(await screen.findByRole('note')).toHaveTextContent(
+        /you have a tabler pass for this show/i
+      );
+      expect(screen.getByRole('link', { name: /my passes/i })).toHaveAttribute(
+        'href',
+        '/staff/my-passes'
+      );
+    });
+
+    it("doesn't link to My Passes when the current user has no pass for this show", async () => {
+      mockUseAuth.mockReturnValue({
+        user: { email: 'someone-else@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { id: 1, name: 'Someone Else', phone: '555-0000', dj_name: null, is_sublist_dj: false } },
+        loading: false,
+        error: null,
+        refetchUser: vi.fn(),
+      });
+      vi.mocked(showsAPI.get).mockResolvedValue(mockShow);
+
+      await renderAndSettle(
+        <BrowserRouter>
+          <ShowDetail />
+        </BrowserRouter>
+      );
+
+      await screen.findByRole('button', { name: /^claim$/i });
+      expect(screen.queryByRole('link', { name: /my passes/i })).not.toBeInTheDocument();
+    });
+
     it('leaves Claim enabled for a user with no existing pass on this show', async () => {
       mockUseAuth.mockReturnValue({
         user: { email: 'someone-else@example.com', role: 'staff', is_dj_network: false, is_station_office_network: false, profile: { id: 1, name: 'Someone Else', phone: '555-0000', dj_name: null, is_sublist_dj: false } },
