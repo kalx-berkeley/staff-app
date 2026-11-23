@@ -2152,7 +2152,8 @@ fieldset.radio-group legend {
 }
 
 /* Covers the show details when every pair left is pre-assigned to another DJ */
-.dj-preassigned-gate {
+.dj-preassigned-gate,
+.dj-tried-prompt {
   background: #fff3cd;
   border: 2px solid var(--warning-color);
   border-radius: 4px;
@@ -2161,16 +2162,19 @@ fieldset.radio-group legend {
   font-size: 1.1rem;
 }
 
-.dj-preassigned-gate h2 {
+.dj-preassigned-gate h2,
+.dj-tried-prompt h2 {
   margin: 0 0 0.5rem;
 }
 
 .dj-preassigned-gate p,
-.dj-preassigned-gate ul {
+.dj-preassigned-gate ul,
+.dj-tried-prompt p {
   margin: 0.5rem 0;
 }
 
-.dj-preassigned-gate-actions {
+.dj-preassigned-gate-actions,
+.dj-tried-prompt-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;

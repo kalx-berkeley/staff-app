@@ -6,13 +6,13 @@ import { showsAPI, passesAPI } from '../api';
 import { renderAndSettle } from '../../test/render';
 import type { OnAirIdentity, PassResponse, ShowResponse } from '../types';
 import { persona, withOnAir } from './testOnAir';
-import { setGiveawayOutcome } from './giveawayOutcome';
+import { clearGiveawayOutcome, markGiveawayOpened, setGiveawayOutcome } from './giveawayOutcome';
 import type { GiveawayOutcome } from './PassGiveawayForm';
 
 const DJ_TEST = persona(1, 'DJ Test');
 
 vi.mock('../api', () => ({
-  showsAPI: { get: vi.fn(), getArtistInfo: vi.fn() },
+  showsAPI: { get: vi.fn(), getArtistInfo: vi.fn(), recordAttempt: vi.fn() },
   passesAPI: { getWinnerForEdit: vi.fn(), updateWinner: vi.fn() },
   venuePassesAPI: { checkWinner: vi.fn() },
 }));
@@ -204,6 +204,113 @@ describe('DJ ShowDetail right after a giveaway', () => {
     expect(await screen.findByText('Venue:')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: "I'm off the mic" })).not.toBeInTheDocument();
+  });
+});
+
+describe('DJ ShowDetail after leaving the giveaway page without recording anything', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    clearGiveawayOutcome();
+  });
+
+  const available = { id: 6, show_id: 1, pass_type: 'pair', status: 'available' } as PassResponse;
+
+  const renderBack = async (show: ShowResponse) => {
+    markGiveawayOpened('1', 'visit-1');
+    vi.mocked(showsAPI.get).mockResolvedValue(show);
+    await renderAndSettle(
+      withOnAir(
+        <MemoryRouter initialEntries={['/dj/shows/1']}>
+          <ShowDetail />
+        </MemoryRouter>,
+        DJ_TEST,
+      ),
+    );
+    await screen.findByText('Venue:');
+  };
+
+  it('asks whether nobody called in, and records Tried for the giveaway page visit', async () => {
+    vi.mocked(showsAPI.recordAttempt).mockResolvedValue({
+      id: 9,
+      dj_name: 'DJ Test',
+      attempted_at: hoursAgo(0),
+    });
+    await renderBack(makeShow([available], { available_pair_count: 1 }));
+
+    expect(screen.getByRole('region', { name: 'Did nobody call in?' })).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'I announced them, nobody called: record Tried' }),
+    );
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Attempt recorded.');
+    expect(showsAPI.recordAttempt).toHaveBeenCalledWith(1, 'visit-1');
+    expect(screen.queryByRole('region', { name: 'Did nobody call in?' })).not.toBeInTheDocument();
+    expect(screen.getByText('Previous Giveaway Activity')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: "I'm off the mic" })).toBeInTheDocument();
+  });
+
+  it('records nothing when the DJ says they didn\'t announce the passes', async () => {
+    await renderBack(makeShow([available], { available_pair_count: 1 }));
+
+    fireEvent.click(screen.getByRole('button', { name: "I didn't announce them" }));
+
+    expect(screen.queryByRole('region', { name: 'Did nobody call in?' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(showsAPI.recordAttempt).not.toHaveBeenCalled();
+  });
+
+  it('keeps asking and shows the error when recording Tried fails', async () => {
+    vi.mocked(showsAPI.recordAttempt).mockRejectedValue({
+      detail: 'Cannot record attempts for closed shows',
+    });
+    await renderBack(makeShow([available], { available_pair_count: 1 }));
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'I announced them, nobody called: record Tried' }),
+    );
+
+    expect(await screen.findByText('Cannot record attempts for closed shows')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Did nobody call in?' })).toBeInTheDocument();
+  });
+
+  it("doesn't ask once the giveaway has closed", async () => {
+    await renderBack(makeShow([available], { available_pair_count: 1, status: 'closed' }));
+
+    expect(screen.queryByRole('region', { name: 'Did nobody call in?' })).not.toBeInTheDocument();
+  });
+
+  it("doesn't ask after Tried or Give Away on the giveaway page", async () => {
+    markGiveawayOpened('1', 'visit-1');
+    setGiveawayOutcome('1', 'tried');
+    vi.mocked(showsAPI.get).mockResolvedValue(makeShow([available], { available_pair_count: 1 }));
+    await renderAndSettle(
+      withOnAir(
+        <MemoryRouter initialEntries={['/dj/shows/1']}>
+          <ShowDetail />
+        </MemoryRouter>,
+        DJ_TEST,
+      ),
+    );
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Attempt recorded.');
+    expect(screen.queryByRole('region', { name: 'Did nobody call in?' })).not.toBeInTheDocument();
+  });
+
+  it("doesn't ask on another show's page", async () => {
+    markGiveawayOpened('2', 'visit-2');
+    vi.mocked(showsAPI.get).mockResolvedValue(makeShow([available], { available_pair_count: 1 }));
+    await renderAndSettle(
+      withOnAir(
+        <MemoryRouter initialEntries={['/dj/shows/1']}>
+          <ShowDetail />
+        </MemoryRouter>,
+        DJ_TEST,
+      ),
+    );
+    await screen.findByText('Venue:');
+
+    expect(screen.queryByRole('region', { name: 'Did nobody call in?' })).not.toBeInTheDocument();
   });
 });
 

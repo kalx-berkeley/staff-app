@@ -14,7 +14,7 @@ import { useShowCloseRecheck } from './useRefreshWhileVisible';
 import { canRecordDjGiveaways, formatShowRating, isDjGiveawayClosed, isMovieShow, isPreassignedTo } from '../utils';
 import { useGiveawayVisit } from '../tracking';
 import { useOnAir } from './onAirContext';
-import { setGiveawayOutcome } from './giveawayOutcome';
+import { markGiveawayOpened, setGiveawayOutcome } from './giveawayOutcome';
 import { formatCalendarDate, formatCalendarDateRange } from '../../common/dateTime';
 
 const GiveawayPage = () => {
@@ -62,6 +62,16 @@ const GiveawayPage = () => {
   }, [loadShow]);
   // A tab left open on this page must notice when the show closes
   useShowCloseRecheck(id, setShow);
+  // While Give Away and Tried can be used, tell the show page the DJ was here,
+  // so if they leave without either it can ask whether nobody called in
+  const formUsable =
+    !isViewOnly &&
+    show !== null &&
+    !isDjGiveawayClosed(show) &&
+    show.passes.some((p) => p.pass_type === 'pair' && p.status === 'available');
+  useEffect(() => {
+    if (id && formUsable) markGiveawayOpened(id, visitId);
+  }, [id, formUsable, visitId]);
 
   const formatDate = (dateStr: string) =>
     formatCalendarDate(dateStr, {

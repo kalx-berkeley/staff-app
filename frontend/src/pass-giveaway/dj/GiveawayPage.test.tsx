@@ -5,6 +5,7 @@ import GiveawayPage from './GiveawayPage';
 import { showsAPI } from '../api';
 import { renderAndSettle } from '../../test/render';
 import type { PassResponse, ShowResponse } from '../types';
+import { clearGiveawayOutcome, peekGiveawayOutcome, peekGiveawayVisitId } from './giveawayOutcome';
 
 vi.mock('../api', () => ({
   showsAPI: { get: vi.fn(), getArtistInfo: vi.fn() },
@@ -21,7 +22,7 @@ const auth = vi.hoisted(() => ({
   user: { email: null, role: 'dj', is_dj_network: true, is_station_office_network: true } as Record<string, unknown> | null,
 }));
 vi.mock('../../common/contexts/authHooks', () => ({ useAuth: () => ({ user: auth.user }) }));
-vi.mock('../tracking', () => ({ useGiveawayVisit: () => null }));
+vi.mock('../tracking', () => ({ useGiveawayVisit: () => 'visit-1' }));
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
@@ -75,6 +76,22 @@ describe('DJ GiveawayPage', () => {
     vi.clearAllMocks();
     localStorage.clear();
     auth.user = DJ_STUDIO_USER;
+    clearGiveawayOutcome();
+  });
+
+  it('tells the show page the DJ opened the form, so it can ask about Tried', async () => {
+    await renderPage(makeShow([pass(1)]));
+
+    expect(await screen.findByText('Giveaway form for pass 1')).toBeInTheDocument();
+    expect(peekGiveawayOutcome('1')).toBe('opened');
+    expect(peekGiveawayVisitId('1')).toBe('visit-1');
+  });
+
+  it("doesn't tell the show page anything when Tried can't be used", async () => {
+    await renderPage(makeShow([pass(1)], { status: 'closed' }));
+    await screen.findByRole('alert');
+
+    expect(peekGiveawayOutcome('1')).toBeNull();
   });
 
   it('lets a DJ studio computer give passes away', async () => {
@@ -90,6 +107,7 @@ describe('DJ GiveawayPage', () => {
 
     expect(await screen.findByText('Giveaway form for pass 1 (view only)')).toBeInTheDocument();
     expect(screen.getByRole('note')).toHaveTextContent('Giveaways can only be recorded from the DJ studio');
+    expect(peekGiveawayOutcome('1')).toBeNull();
   });
 
   it('records for real while impersonating the DJ studio network in staging', async () => {

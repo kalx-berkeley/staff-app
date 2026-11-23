@@ -8,7 +8,7 @@ import { usePageTitle } from '../../common/hooks/usePageTitle';
 import { DJ_SHOW_GIVEAWAY_WINDOW_HOURS, KALX_CALL_IN_PHONE, KALX_CALL_IN_PHONE_LETTERS, canDjEditWinner, findRecentDjGiveaway, formatShowRating, isDjGiveawayClosed, isMovieShow, isPreassignedTo } from '../utils';
 import { useOnAir } from './onAirContext';
 import WinnerEditForm from './WinnerEditForm';
-import { clearGiveawayOutcome, peekGiveawayOutcome } from './giveawayOutcome';
+import { clearGiveawayOutcome, peekGiveawayOutcome, peekGiveawayVisitId } from './giveawayOutcome';
 import WheelchairAccessibleChecks from './WheelchairAccessibleChecks';
 import GiveawayClosedNotice from './GiveawayClosedNotice';
 import { useShowCloseRecheck } from './useRefreshWhileVisible';
@@ -35,10 +35,22 @@ const ShowDetailPage = () => {
   // The DJ has just used their one pair for this show, so the "I'm off the
   // mic" button would only confuse them. After Tried, nobody called in, so
   // the pass is still available and the off-the-mic button stays.
-  const [{ justGaveAway, justTried }] = useState(() => {
+  const [{ justGaveAway, cameBackWithoutOutcome, giveawayVisitId }] = useState(() => {
     const outcome = peekGiveawayOutcome(id);
-    return { justGaveAway: outcome === 'given_away', justTried: outcome === 'tried' };
+    return {
+      justGaveAway: outcome === 'given_away',
+      cameBackWithoutOutcome: outcome === 'opened',
+      giveawayVisitId: peekGiveawayVisitId(id),
+    };
   });
+  const [justTried, setJustTried] = useState(() => peekGiveawayOutcome(id) === 'tried');
+  // The DJ left the giveaway form (browser Back or "Back to Show") without
+  // Give Away or Tried. They may have announced the passes and got no
+  // callers, or clicked "I'm off the mic" without ever going on air: ask.
+  const [triedPrompt, setTriedPrompt] = useState<'asking' | 'saving' | 'done'>(
+    cameBackWithoutOutcome ? 'asking' : 'done',
+  );
+  const [triedPromptError, setTriedPromptError] = useState<string | null>(null);
   useEffect(() => {
     clearGiveawayOutcome();
   }, []);
@@ -122,6 +134,24 @@ const ShowDetailPage = () => {
       const bPriority = bIsMe ? 1 : bIsUnassigned ? 2 : 3;
       return aPriority - bPriority;
     });
+  };
+
+  const recordTriedFromPrompt = async () => {
+    if (!show) return;
+    setTriedPromptError(null);
+    setTriedPrompt('saving');
+    try {
+      const attempt = await showsAPI.recordAttempt(show.id, giveawayVisitId);
+      setShow((prev) => prev && { ...prev, attempts: [attempt, ...prev.attempts] });
+      setTriedPrompt('done');
+      setJustTried(true);
+    } catch (err) {
+      const apiError = err as APIError;
+      setTriedPromptError(
+        typeof apiError.detail === 'string' ? apiError.detail : 'Failed to log attempt',
+      );
+      setTriedPrompt('asking');
+    }
   };
 
   const handleWinnerSaved = (updated: PassResponse) => {
@@ -360,6 +390,33 @@ const ShowDetailPage = () => {
           Pass pair given away
           {recentDjGiveaway?.recipient_name && <> to <strong>{recentDjGiveaway.recipient_name}</strong></>}. Thanks!
         </div>
+      )}
+
+      {canGiveAway && triedPrompt !== 'done' && (
+        <section className="dj-tried-prompt" aria-labelledby="dj-tried-prompt-title">
+          <h2 id="dj-tried-prompt-title">Did nobody call in?</h2>
+          <p>
+            You left the giveaway page without recording a winner or clicking Tried. If you
+            announced these passes on air and got no callers, record that you tried.
+          </p>
+          {triedPromptError && <div className="error-message">{triedPromptError}</div>}
+          <div className="dj-tried-prompt-actions">
+            <button
+              className="btn-primary"
+              onClick={recordTriedFromPrompt}
+              disabled={triedPrompt === 'saving'}
+            >
+              {triedPrompt === 'saving' ? 'Recording…' : 'I announced them, nobody called: record Tried'}
+            </button>
+            <button
+              className="btn-secondary"
+              onClick={() => setTriedPrompt('done')}
+              disabled={triedPrompt === 'saving'}
+            >
+              I didn&apos;t announce them
+            </button>
+          </div>
+        </section>
       )}
 
       {justTried && (

@@ -1,12 +1,20 @@
 import { useState, useEffect } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { AppNav, BuildInfo, ViewBadge } from '../components';
 import SpinMatchNotifier from './SpinMatchNotifier';
 import OnAirBanner from './OnAirBanner';
 import OnAirProvider from './OnAirProvider';
+import { clearGiveawayOutcome } from './giveawayOutcome';
 
 const DJLayout = () => {
   const [navOpen, setNavOpen] = useState(false);
+  const { pathname } = useLocation();
+
+  // The giveaway page's outcome is only for the show page it returns to. If
+  // the DJ goes anywhere else, a later visit to that show mustn't see it.
+  useEffect(() => {
+    if (!/^\/dj\/shows\/[^/]+(\/giveaway)?\/?$/.test(pathname)) clearGiveawayOutcome();
+  }, [pathname]);
 
   useEffect(() => {
     if (!navOpen) return;
