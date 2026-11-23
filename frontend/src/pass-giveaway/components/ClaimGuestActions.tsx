@@ -191,9 +191,11 @@ const ClaimGuestActions = ({
 
   return (
     <div className="claim-buttons guest-actions">
-      <button onClick={() => open('rename')} className="btn-small">
-        Fix guest name
-      </button>
+      {requireGuestName && (
+        <button onClick={() => open('rename')} className="btn-small">
+          Fix guest name
+        </button>
+      )}
       <button onClick={() => open('remove')} className="btn-small">
         Remove my guest
       </button>

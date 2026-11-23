@@ -1027,7 +1027,11 @@ describe('Staff ShowDetail', () => {
 
       it('corrects a guest name', async () => {
         const seated = { ...myPass, has_guest: true, guest_name: 'Sma' };
-        vi.mocked(showsAPI.get).mockResolvedValue({ ...fullShow, passes: [seated] });
+        vi.mocked(showsAPI.get).mockResolvedValue({
+          ...fullShow,
+          guest_list_requirements: { ...fullShow.guest_list_requirements, staff_guest_requires_name: true },
+          passes: [seated],
+        });
         vi.mocked(alternatesAPI.getQueue).mockResolvedValue(queue({ queue_open: false }));
         vi.mocked(passesAPI.updateGuestName).mockResolvedValue({ ...seated, guest_name: 'Sam' });
         await showPage();
@@ -1038,6 +1042,18 @@ describe('Staff ShowDetail', () => {
 
         expect(await screen.findByText("Your guest's name has been updated.")).toBeInTheDocument();
         expect(passesAPI.updateGuestName).toHaveBeenCalledWith(seated.id, 'Sam');
+      });
+
+      it("doesn't offer to fix the guest name when the venue doesn't need one", async () => {
+        vi.mocked(showsAPI.get).mockResolvedValue({
+          ...fullShow,
+          passes: [{ ...myPass, has_guest: true, guest_name: null }],
+        });
+        vi.mocked(alternatesAPI.getQueue).mockResolvedValue(queue({ queue_open: false }));
+        await showPage();
+
+        expect(screen.getByRole('button', { name: /remove my guest/i })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /fix guest name/i })).not.toBeInTheDocument();
       });
 
       it('hides a waiting guest\'s outcome while the close emails are held', async () => {
