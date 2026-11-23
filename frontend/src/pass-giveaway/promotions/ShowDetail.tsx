@@ -1457,7 +1457,7 @@ const ShowDetail = () => {
 
       <div className="passes-section">
         <h3>
-          Staff Passes ({show.available_staff_count}/{staffPasses.length} available)
+          Staff Passes ({staffPasses.filter((p) => p.status === 'claimed').length}/{staffPasses.length} claimed)
           <Tooltip text="Staff passes allow KALX staff to attend the show. These are separate from the on-air giveaway pairs and claimed directly by staff members." />
         </h3>
         <div className="passes-list">
@@ -1515,21 +1515,6 @@ const ShowDetail = () => {
                               ? 'confirmed'
                               : 'not confirmed until show closes'}</em>
                       </p>
-                    )}
-                    {pass.has_guest && show.status === 'published' && (
-                      <button
-                        onClick={() =>
-                          setGuestToRemove({
-                            passId: pass.id,
-                            guestName: pass.guest_name,
-                            hostName: pass.staff_name ?? null,
-                          })
-                        }
-                        className="btn-small btn-danger"
-                        disabled={removingGuestPassId === pass.id}
-                      >
-                        {removingGuestPassId === pass.id ? 'Removing…' : 'Remove guest'}
-                      </button>
                     )}
                     {pass.guest_waiting && (
                       <p className="pass-guest-note">

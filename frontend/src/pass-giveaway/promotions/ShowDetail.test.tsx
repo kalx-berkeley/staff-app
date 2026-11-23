@@ -802,6 +802,30 @@ describe('Promotions ShowDetail — alternates', () => {
       expect(screen.queryByText(/until show closes/i)).not.toBeInTheDocument();
     });
 
+    it('counts claimed staff passes and has no remove button for a seated guest', async () => {
+      const base = makeShow([]).passes[0];
+      const host = {
+        ...base,
+        id: 20,
+        pass_type: 'staff' as const,
+        status: 'claimed' as const,
+        staff_id: 30,
+        staff_name: 'Alex',
+        staff_phone: '5551234567',
+        has_guest: true,
+        guest_name: 'Sam',
+      };
+      const open = { ...base, id: 21, pass_type: 'staff' as const, status: 'available' as const };
+      vi.mocked(showsAPI.get).mockResolvedValue({ ...makeShow([host, open]), status: 'published' });
+      vi.mocked(alternatesAPI.getQueue).mockResolvedValue({ ...waitingQueue, waiting_guests: [] });
+
+      await renderShowDetail();
+
+      expect(await screen.findByText(/Staff Passes \(1\/2 claimed\)/)).toBeInTheDocument();
+      expect(screen.getByText(/\+1 guest reserved: Sam/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /remove guest/i })).not.toBeInTheDocument();
+    });
+
     it('marks staff released at close in the closed alternates list', async () => {
       vi.mocked(showsAPI.get).mockResolvedValue({ ...makeShow([]), status: 'closed' });
       vi.mocked(alternatesAPI.getQueue).mockResolvedValue({
