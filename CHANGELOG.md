@@ -6,6 +6,24 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.22.0] - 2026-11-24
+
+### Changed
+
+- Ask about a +1 guest's fallback as two questions: whether the staff member goes to the show without their guest, and whether a bumped guest goes on the alternate list or the staff member is told right away. A summary line says what the chosen answers do ([a66715b](https://github.com/kalx-berkeley/staff-app/commit/a66715b))
+- Start a new show's genre as film when its venue is a movie theater ([14a9176](https://github.com/kalx-berkeley/staff-app/commit/14a9176))
+- Count claimed staff passes, not available ones, in the promotions show page's Staff Passes heading, and drop its "Remove guest" button ([030d882](https://github.com/kalx-berkeley/staff-app/commit/030d882))
+- Only offer "Fix guest name" when the venue requires guest names ([029e7dd](https://github.com/kalx-berkeley/staff-app/commit/029e7dd))
+
+### Added
+
+- Ask DJs who leave the giveaway page without Give Away or Tried whether nobody called in, so they can record Tried from the show page ([9ed1ccf](https://github.com/kalx-berkeley/staff-app/commit/9ed1ccf))
+- Link to My Passes from the staff show page of a show the staff member has a staff or tabler pass for ([67aa2c4](https://github.com/kalx-berkeley/staff-app/commit/67aa2c4))
+
+### Fixed
+
+- Keep staff signed in when they follow a link into the site from somewhere else (Gmail, Slack, Airtable, …), instead of sending them to the Google account chooser. The login session cookie now stays SameSite=Lax when mod_auth_openidc extends it ([4c19b6a](https://github.com/kalx-berkeley/staff-app/commit/4c19b6a))
+
 ## [1.21.0] - 2026-11-22
 
 ### Changed
@@ -544,6 +562,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.22.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.21.0...v1.22.0
 [1.21.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.20.0...v1.21.0
 [1.20.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.19.0...v1.20.0
 [1.19.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.18.0...v1.19.0
