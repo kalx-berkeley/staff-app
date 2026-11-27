@@ -20,6 +20,7 @@ export { AlternateQueueList, AlternateGuestForm, WaitingGuestsList } from './Alt
 export { default as GuestFallbackOptions } from './GuestFallbackOptions';
 export { default as HoldCloseNotificationsHint } from './HoldCloseNotificationsHint';
 export { default as ClaimGuestActions } from './ClaimGuestActions';
+export { default as AddToCalendar } from './AddToCalendar';
 export { default as DescriptionCheckFeedback } from './DescriptionCheckFeedback';
 export { useDescriptionCheck } from './useDescriptionCheck';
 export type { DescriptionCheck } from './useDescriptionCheck';

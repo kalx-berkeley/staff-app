@@ -51,6 +51,28 @@ export function pacificDateString(value: string | Date = new Date()): string {
   return parseInstant(value).toLocaleDateString('en-CA', { timeZone: PACIFIC_TIME_ZONE });
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const calendarDateUtcMs = (date: string) => {
+  const [year, month, day] = date.split('-').map(Number);
+  return Date.UTC(year, month - 1, day);
+};
+
+/** The calendar date ("YYYY-MM-DD") `days` days after `date` (before, if negative). */
+export function addCalendarDays(date: string, days: number): string {
+  const d = new Date(calendarDateUtcMs(date) + days * DAY_MS);
+  return [
+    d.getUTCFullYear(),
+    String(d.getUTCMonth() + 1).padStart(2, '0'),
+    String(d.getUTCDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+/** How many days calendar date `to` is after `from` (negative if before). */
+export function calendarDaysBetween(from: string, to: string): number {
+  return Math.round((calendarDateUtcMs(to) - calendarDateUtcMs(from)) / DAY_MS);
+}
+
 /** "Wed, Nov 12, 2026": the default for `formatCalendarDate`. */
 export const CALENDAR_DATE: Intl.DateTimeFormatOptions = {
   weekday: 'short',

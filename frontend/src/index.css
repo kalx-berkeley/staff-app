@@ -1437,6 +1437,58 @@ fieldset.radio-group legend {
   padding: 0.75rem;
 }
 
+.calendar-export {
+  align-items: center;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  display: flex;
+  gap: 0.35rem;
+  margin: 0.35rem 0;
+  padding: 0.2rem 0.35rem 0.2rem 0.5rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  width: fit-content;
+}
+
+.calendar-export__label {
+  color: #6c757d;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 400;
+  letter-spacing: normal;
+  white-space: nowrap;
+}
+
+.calendar-export__actions {
+  display: flex;
+  gap: 0.1rem;
+}
+
+.calendar-export__icon {
+  align-items: center;
+  border: 0;
+  border-radius: 4px;
+  color: inherit;
+  display: inline-flex;
+  height: 1.55rem;
+  justify-content: center;
+  width: 1.55rem;
+}
+
+.calendar-export__icon:hover {
+  background: #f3f4f6;
+}
+
+.calendar-export__icon:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.calendar-export__icon svg {
+  height: 1.05rem;
+  width: 1.05rem;
+}
+
 .pass-header {
   display: flex;
   justify-content: space-between;
