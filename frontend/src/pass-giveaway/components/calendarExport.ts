@@ -1,4 +1,4 @@
-import { addCalendarDays, pacificWallTimeToInstant } from '../../common/dateTime';
+import { addCalendarDays, PACIFIC_TIME_ZONE } from '../../common/dateTime';
 
 export interface CalendarExportShow {
   id: number;
@@ -13,6 +13,28 @@ export interface CalendarExportShow {
 }
 
 export const DEFAULT_EVENT_DURATION_HOURS = 3;
+
+// RFC 5545 requires every TZID to be defined in the file. Google and Apple
+// recognize the IANA name on its own, but Outlook relies on this block.
+const PACIFIC_VTIMEZONE = [
+  'BEGIN:VTIMEZONE',
+  `TZID:${PACIFIC_TIME_ZONE}`,
+  'BEGIN:DAYLIGHT',
+  'TZOFFSETFROM:-0800',
+  'TZOFFSETTO:-0700',
+  'TZNAME:PDT',
+  'DTSTART:19700308T020000',
+  'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU',
+  'END:DAYLIGHT',
+  'BEGIN:STANDARD',
+  'TZOFFSETFROM:-0700',
+  'TZOFFSETTO:-0800',
+  'TZNAME:PST',
+  'DTSTART:19701101T020000',
+  'RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU',
+  'END:STANDARD',
+  'END:VTIMEZONE',
+];
 
 function compactUtc(date: Date): string {
   return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
@@ -34,6 +56,22 @@ function eventLocation(show: CalendarExportShow): string {
   return [show.venue.name, show.venue.address].filter(Boolean).join(', ');
 }
 
+/**
+ * Pacific wall-clock start and end as floating `YYYYMMDDTHHMMSS` strings. The
+ * calendar app resolves them in Pacific time (PACIFIC_TIME_ZONE), including DST.
+ */
+function pacificWallTimes(date: string, time: string): { start: string; end: string } {
+  const match = /^(\d{2}):(\d{2})(?::\d{2})?$/.exec(time);
+  if (!match) throw new RangeError(`Invalid show time: ${time}`);
+  const hour = Number(match[1]);
+  const minute = match[2];
+  const endHour = hour + DEFAULT_EVENT_DURATION_HOURS;
+  const endDate = addCalendarDays(date, Math.floor(endHour / 24));
+  const wallTime = (d: string, h: number) =>
+    `${compactDate(d)}T${String(h % 24).padStart(2, '0')}${minute}00`;
+  return { start: wallTime(date, hour), end: wallTime(endDate, endHour) };
+}
+
 function eventTimes(show: CalendarExportShow): {
   allDay: boolean;
   start: string;
@@ -51,9 +89,7 @@ function eventTimes(show: CalendarExportShow): {
     };
   }
 
-  const start = pacificWallTimeToInstant(startDate, show.show_time!);
-  const end = new Date(start.getTime() + DEFAULT_EVENT_DURATION_HOURS * 60 * 60 * 1000);
-  return { allDay: false, start: compactUtc(start), end: compactUtc(end) };
+  return { allDay: false, ...pacificWallTimes(startDate, show.show_time!) };
 }
 
 function eventDescription(allDay: boolean): string {
@@ -71,6 +107,7 @@ export function googleCalendarUrl(show: CalendarExportShow): string {
     details: eventDescription(times.allDay),
     location: eventLocation(show),
   });
+  if (!times.allDay) params.set('ctz', PACIFIC_TIME_ZONE);
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
@@ -78,16 +115,17 @@ export function calendarFile(show: CalendarExportShow, now = new Date()): string
   const times = eventTimes(show);
   const startLine = times.allDay
     ? `DTSTART;VALUE=DATE:${times.start}`
-    : `DTSTART:${times.start}`;
+    : `DTSTART;TZID=${PACIFIC_TIME_ZONE}:${times.start}`;
   const endLine = times.allDay
     ? `DTEND;VALUE=DATE:${times.end}`
-    : `DTEND:${times.end}`;
+    : `DTEND;TZID=${PACIFIC_TIME_ZONE}:${times.end}`;
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//KALX//Staff App//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
+    ...(times.allDay ? [] : PACIFIC_VTIMEZONE),
     'BEGIN:VEVENT',
     `UID:staff-pass-show-${show.id}@kalx.berkeley.edu`,
     `DTSTAMP:${compactUtc(now)}`,
