@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addCalendarDays,
+  calendarDaysBetween,
   formatCalendarDate,
   formatCalendarDateRange,
   formatPacific,
   formatPacificTime,
-  addCalendarDays,
   pacificDateString,
   parseInstant,
 } from './dateTime';
@@ -42,9 +43,24 @@ describe('pacificDateString', () => {
 });
 
 describe('addCalendarDays', () => {
-  it('adds days without changing the calendar date by viewer time zone', () => {
+  it('adds and subtracts days across months and years', () => {
+    expect(addCalendarDays('2026-11-20', 1)).toBe('2026-11-21');
+    expect(addCalendarDays('2026-11-30', 1)).toBe('2026-12-01');
     expect(addCalendarDays('2026-12-31', 1)).toBe('2027-01-01');
     expect(addCalendarDays('2026-03-01', -1)).toBe('2026-02-28');
+  });
+
+  it('is not thrown off by daylight saving time', () => {
+    expect(addCalendarDays('2026-11-01', 1)).toBe('2026-11-02');
+    expect(addCalendarDays('2026-03-08', -1)).toBe('2026-03-07');
+  });
+});
+
+describe('calendarDaysBetween', () => {
+  it('counts days forwards and backwards', () => {
+    expect(calendarDaysBetween('2026-11-20', '2026-11-21')).toBe(1);
+    expect(calendarDaysBetween('2026-11-21', '2026-11-19')).toBe(-2);
+    expect(calendarDaysBetween('2026-11-20', '2026-11-20')).toBe(0);
   });
 });
 

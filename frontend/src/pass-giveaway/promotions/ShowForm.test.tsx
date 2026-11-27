@@ -4,8 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ShowForm from './ShowForm';
 import { showsAPI, venuesAPI, venuesMyAPI } from '../api';
 import type { DescriptionAnalysis, PassResponse, ShowResponse, VenueResponse } from '../types';
-import { addDays } from './splitShow';
-import { pacificDateString } from '../../common/dateTime';
+import { addCalendarDays, pacificDateString } from '../../common/dateTime';
 
 // Mock the API
 vi.mock('../api', () => ({
@@ -1239,8 +1238,8 @@ describe('ShowForm', () => {
       const today = pacificDateString();
       vi.mocked(showsAPI.get).mockResolvedValue(
         coAnnounceShow({
-          show_date: addDays(today, 5),
-          planned_close_date: addDays(today, 3),
+          show_date: addCalendarDays(today, 5),
+          planned_close_date: addCalendarDays(today, 3),
           tabler_open_days: 7,
         }),
       );

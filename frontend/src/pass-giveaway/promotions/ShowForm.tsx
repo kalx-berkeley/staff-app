@@ -15,8 +15,8 @@ import {
   toStaffPayload,
 } from './enteredWinners';
 import type { OnAirWinnerRow, StaffWinnerRow } from './enteredWinners';
-import { addDays, daysBetween, describeDayOffset, formatClockTime } from './splitShow';
-import { formatCalendarDate, pacificDateString } from '../../common/dateTime';
+import { describeDayOffset, formatClockTime } from './splitShow';
+import { addCalendarDays, calendarDaysBetween, formatCalendarDate, pacificDateString } from '../../common/dateTime';
 
 interface DeleteConfirmModalProps {
   eventName: string;
@@ -286,7 +286,7 @@ const ShowForm = () => {
     closeTime: string;
   } | null>(null);
   const maxTablerOpenDays = plannedCloseDate
-    ? Math.max(0, daysBetween(pacificDateString(), plannedCloseDate))
+    ? Math.max(0, calendarDaysBetween(pacificDateString(), plannedCloseDate))
     : null;
   const tablerSettingsUnchanged =
     savedTablerSettings !== null &&
@@ -324,12 +324,12 @@ const ShowForm = () => {
   const [staffCloseDateOverride, setStaffCloseDateOverride] = useState<string | null>(null);
   const [staffCloseTimeOverride, setStaffCloseTimeOverride] = useState<string | null>(null);
   const staffShowDate =
-    staffShowDateOverride ?? (showDate && venueDayOffset ? addDays(showDate, venueDayOffset) : '');
+    staffShowDateOverride ?? (showDate && venueDayOffset ? addCalendarDays(showDate, venueDayOffset) : '');
   const staffShowTime = staffShowTimeOverride ?? showTime;
   const staffCloseDate =
     staffCloseDateOverride ??
     (plannedCloseDate && showDate && staffShowDate
-      ? addDays(plannedCloseDate, daysBetween(showDate, staffShowDate))
+      ? addCalendarDays(plannedCloseDate, calendarDaysBetween(showDate, staffShowDate))
       : '');
   const staffCloseTime = staffCloseTimeOverride ?? plannedCloseTime;
   const resetStaffShowOverrides = () => {
