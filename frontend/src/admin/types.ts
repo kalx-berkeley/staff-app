@@ -46,6 +46,12 @@ export interface AuditLogItem {
   details: Record<string, unknown> | null;
 }
 
+/** The values the audit log filters autocomplete to, from the entries the admin can see. */
+export interface AuditLogFilterOptions {
+  event_types: string[];
+  actor_emails: string[];
+}
+
 export interface AuditLogFilters {
   event_type?: string;
   area?: string;

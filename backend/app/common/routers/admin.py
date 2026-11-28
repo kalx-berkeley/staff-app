@@ -25,6 +25,7 @@ from app.auth import (
 )
 from app.common.areas import PASS_GIVEAWAY_AREA
 from app.common.schemas.admin import (
+    AuditLogFilterOptions,
     AuditLogItem,
     ImpersonateRequest,
     JobRunResult,
@@ -185,6 +186,36 @@ def end_impersonation(
     return {"status": "ok"}
 
 
+def _visible_audit_log(db: Session, admin: Staff):
+    """The audit log entries *admin* may see: everything for site admins, only
+    the pass giveaway's for promotions admins."""
+    query = db.query(AuditLog)
+    if not is_site_admin(db, admin):
+        query = query.filter(AuditLog.area == PASS_GIVEAWAY_AREA)
+    return query
+
+
+@router.get("/audit-log/filter-options", response_model=AuditLogFilterOptions)
+def get_audit_log_filter_options(
+    admin: Staff = Depends(get_site_or_promotions_admin),
+    db: Session = Depends(get_db),
+) -> AuditLogFilterOptions:
+    """
+    The event types and actor emails in the audit log entries the admin can
+    see, for the filters' autocomplete.
+    """
+    visible = _visible_audit_log(db, admin)
+
+    def distinct(column) -> list[str]:
+        rows = visible.with_entities(column).filter(column.isnot(None)).distinct()
+        return sorted(value for (value,) in rows if value)
+
+    return AuditLogFilterOptions(
+        event_types=distinct(AuditLog.event_type),
+        actor_emails=distinct(AuditLog.actor_email),
+    )
+
+
 @router.get("/audit-log", response_model=list[AuditLogItem])
 def get_audit_log(
     admin: Staff = Depends(get_site_or_promotions_admin),
@@ -207,9 +238,7 @@ def get_audit_log(
     Returns entries newest-first. Promotions admins who aren't site admins only
     get the pass giveaway's entries.
     """
-    query = db.query(AuditLog)
-    if not is_site_admin(db, admin):
-        query = query.filter(AuditLog.area == PASS_GIVEAWAY_AREA)
+    query = _visible_audit_log(db, admin)
     if event_type:
         query = query.filter(AuditLog.event_type == event_type)
     if area:

@@ -212,6 +212,63 @@ def test_promotions_admins_see_only_the_pass_giveaways_audit_log(
     assert workforms.json() == []
 
 
+def test_audit_log_filter_options_list_event_types_and_actors(
+    client: TestClient, db: Session
+):
+    _make_staff(db, "head@example.com", head_of="Music")
+    _log_one_event_per_area(db)
+    log_event(
+        db, event_type="show_created", actor_email="b@example.com", area=PASS_GIVEAWAY_AREA
+    )
+    log_event(
+        db, event_type="show_closed", actor_email="a@example.com", area=PASS_GIVEAWAY_AREA
+    )
+
+    response = client.get(
+        "/api/admin/audit-log/filter-options", headers=_as("head@example.com")
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "event_types": [
+            "airtable_sync_added",
+            "show_closed",
+            "show_created",
+            "workform_decision",
+        ],
+        "actor_emails": ["a@example.com", "b@example.com"],
+    }
+
+
+def test_promotions_admins_get_only_the_pass_giveaways_filter_options(
+    client: TestClient, db: Session
+):
+    _make_staff(db, "promo@example.com", department="Promotions")
+    _log_one_event_per_area(db)
+    log_event(
+        db,
+        event_type="workform_decision",
+        actor_email="head@example.com",
+        area=WORKFORMS_AREA,
+    )
+
+    response = client.get(
+        "/api/admin/audit-log/filter-options", headers=_as("promo@example.com")
+    )
+
+    assert response.json() == {"event_types": ["show_created"], "actor_emails": []}
+
+
+def test_staff_cannot_get_audit_log_filter_options(client: TestClient, db: Session):
+    _make_staff(db, "someone@example.com")
+
+    response = client.get(
+        "/api/admin/audit-log/filter-options", headers=_as("someone@example.com")
+    )
+
+    assert response.status_code == 403
+
+
 def test_department_head_can_impersonate_in_staging(
     client: TestClient, db: Session, staging
 ):

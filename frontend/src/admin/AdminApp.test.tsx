@@ -24,6 +24,7 @@ vi.mock('./api', () => ({
     startImpersonation: vi.fn(),
     listUsers: vi.fn(),
     getAuditLog: vi.fn(),
+    getAuditLogFilterOptions: vi.fn(),
     listShortLinks: vi.fn(),
     listDjQuizDeadlines: vi.fn(),
     setDjQuizDeadline: vi.fn(),
@@ -93,6 +94,10 @@ describe('KALX Staff Admin', () => {
       },
     ]);
     vi.mocked(adminAPI.listUsers).mockResolvedValue([]);
+    vi.mocked(adminAPI.getAuditLogFilterOptions).mockResolvedValue({
+      event_types: ['show_created', 'workform_decision'],
+      actor_emails: ['head@example.com'],
+    });
     vi.mocked(adminAPI.listShortLinks).mockResolvedValue([]);
     vi.mocked(adminAPI.listDjQuizDeadlines).mockResolvedValue([
       { year: 2026, deadline: '2026-09-30' },
@@ -136,6 +141,19 @@ describe('KALX Staff Admin', () => {
     expect(adminAPI.getAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({ area: 'KALX Workforms' }),
     );
+  });
+
+  it('suggests the event types and actor emails in the audit log', async () => {
+    await renderAdmin();
+    await screen.findByText('Sync users from Airtable');
+
+    const eventType = screen.getByRole('combobox', { name: 'Event type' });
+    const actorEmail = screen.getByRole('combobox', { name: 'Actor email' });
+    const suggestions = (input: HTMLElement) =>
+      Array.from(document.getElementById(input.getAttribute('list')!)!.querySelectorAll('option'))
+        .map((option) => option.value);
+    expect(suggestions(eventType)).toEqual(['show_created', 'workform_decision']);
+    expect(suggestions(actorEmail)).toEqual(['head@example.com']);
   });
 
   it("doesn't show promotions admins the audit log's area", async () => {

@@ -1,5 +1,6 @@
 import apiClient, { handleAPIError } from '../common/api';
 import type {
+  AuditLogFilterOptions,
   AuditLogFilters,
   AuditLogItem,
   ImpersonateRequest,
@@ -58,6 +59,17 @@ export const adminAPI = {
       const response = await apiClient.get<AuditLogItem[]>('/admin/audit-log', {
         params: filters,
       });
+      return response.data;
+    } catch (error) {
+      return handleAPIError(error);
+    }
+  },
+
+  getAuditLogFilterOptions: async (): Promise<AuditLogFilterOptions> => {
+    try {
+      const response = await apiClient.get<AuditLogFilterOptions>(
+        '/admin/audit-log/filter-options',
+      );
       return response.data;
     } catch (error) {
       return handleAPIError(error);

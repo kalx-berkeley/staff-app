@@ -1,8 +1,8 @@
-import { useState, type KeyboardEvent } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import { useAuth } from '../common/contexts/authHooks';
 import type { APIError } from '../common/types';
 import { adminAPI } from './api';
-import { AREAS, type AuditLogItem } from './types';
+import { AREAS, type AuditLogFilterOptions, type AuditLogItem } from './types';
 import { toPacificDateInputValue } from './utils';
 import { formatPacific } from '../common/dateTime';
 
@@ -30,6 +30,25 @@ export default function AuditLogSection() {
   const [actorEmail, setActorEmail] = useState('');
   const [since, setSince] = useState(defaultSince);
   const [until, setUntil] = useState(() => toPacificDateInputValue(new Date()));
+  const [filterOptions, setFilterOptions] = useState<AuditLogFilterOptions>({
+    event_types: [],
+    actor_emails: [],
+  });
+
+  // Suggestions for the event type and actor email filters. Without them the
+  // filters still work as plain text fields, so a failure is ignored.
+  useEffect(() => {
+    let cancelled = false;
+    adminAPI
+      .getAuditLogFilterOptions()
+      .then((options) => {
+        if (!cancelled) setFilterOptions(options);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const load = async (reset: boolean) => {
     setLoading(true);
@@ -86,6 +105,7 @@ export default function AuditLogSection() {
           type="text"
           placeholder="Event type"
           aria-label="Event type"
+          list="audit-log-event-types"
           value={eventType}
           onChange={(e) => setEventType(e.target.value)}
           onKeyDown={loadOnEnter}
@@ -94,10 +114,21 @@ export default function AuditLogSection() {
           type="text"
           placeholder="Actor email"
           aria-label="Actor email"
+          list="audit-log-actor-emails"
           value={actorEmail}
           onChange={(e) => setActorEmail(e.target.value)}
           onKeyDown={loadOnEnter}
         />
+        <datalist id="audit-log-event-types">
+          {filterOptions.event_types.map((t) => (
+            <option key={t} value={t} />
+          ))}
+        </datalist>
+        <datalist id="audit-log-actor-emails">
+          {filterOptions.actor_emails.map((email) => (
+            <option key={email} value={email} />
+          ))}
+        </datalist>
         <button className="btn-primary" onClick={() => load(true)} disabled={loading}>
           {loading && entries.length === 0 ? 'Loading…' : 'Load'}
         </button>

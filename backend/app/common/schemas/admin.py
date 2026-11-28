@@ -48,3 +48,12 @@ class AuditLogItem(BaseModel):
     entity_type: str | None
     entity_id: int | None
     details: Any | None
+
+
+class AuditLogFilterOptions(BaseModel):
+    """The values the audit log's filters can autocomplete to."""
+
+    # Every event type in the entries the admin can see, alphabetical
+    event_types: list[str]
+    # Every actor email in those entries, alphabetical
+    actor_emails: list[str]
