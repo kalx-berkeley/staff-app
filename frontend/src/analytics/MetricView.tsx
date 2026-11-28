@@ -1,10 +1,10 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import ExplanationPopover from './ExplanationPopover';
 import { formatValue } from './format';
 import Heatmap from './Heatmap';
 import { BalanceBar } from './MetricTable';
 import MetricTable from './MetricTable';
-import type { Metric, StatMetric } from './types';
+import type { Metric, StatMetric, TableMetric } from './types';
 
 // Recharts is only downloaded when a page has a chart
 const MetricChart = lazy(() => import('./MetricChart'));
@@ -34,13 +34,36 @@ export function StatCard({ metric }: { metric: StatMetric }) {
   );
 }
 
+// A table hidden behind a "Show" button until it's expanded.
+function CollapsedTable({ metric }: { metric: TableMetric }) {
+  const [open, setOpen] = useState(false);
+  const count = metric.rows.length;
+  if (count === 0) return <p className="analytics-empty">None in this time window.</p>;
+  return (
+    <>
+      <button
+        type="button"
+        className="btn-secondary btn-small"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {open ? 'Hide' : `Show all ${count}`}
+      </button>
+      {open && (
+        <MetricTable columns={metric.columns} rows={metric.rows} top={metric.top} label={metric.title} />
+      )}
+    </>
+  );
+}
+
 // One metric of any kind except stats, which StatCard shows.
 export default function MetricView({ metric }: { metric: Metric }) {
   if (metric.kind === 'stat') return <StatCard metric={metric} />;
   return (
     <section className="analytics-metric">
       <Title metric={metric} />
-      {metric.kind === 'table' && (
+      {metric.kind === 'table' && metric.collapsed && <CollapsedTable metric={metric} />}
+      {metric.kind === 'table' && !metric.collapsed && (
         <MetricTable columns={metric.columns} rows={metric.rows} top={metric.top} label={metric.title} />
       )}
       {metric.kind === 'series' && (

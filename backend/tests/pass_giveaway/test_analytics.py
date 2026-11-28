@@ -405,6 +405,40 @@ def test_reps_report_and_venue_creators(client, db, promo, venue):
     assert creators["Unknown creator"]["shows"] == 1
 
 
+def test_reps_posters_by_venue(client, db, promo, venue):
+    alice = _staff(db, "alice@example.com", "Promotions")
+    solo = Venue(name="The Chapel", address="2 Main St")
+    idle = Venue(name="The Independent", address="3 Main St")
+    gone = Venue(name="Gone", address="4 Main St", deleted=True)
+    db.add_all([solo, idle, gone])
+    db.commit()
+    posts = [(venue, promo), (venue, promo), (venue, alice), (solo, alice), (solo, alice)]
+    for i, (v, who) in enumerate(posts):
+        show = _show(db, v, -(i + 1))
+        log_event(
+            db,
+            "show_created",
+            actor_email=who.email,
+            entity_type="show",
+            entity_id=show.id,
+            area=PASS_GIVEAWAY_AREA,
+        )
+    _show(db, idle, -400)  # outside the window
+
+    metrics = _tab(client, "reps", window="preset=last_30_days")
+    rows = {r["venue"]: r for r in metrics["posters_by_venue"]["rows"]}
+    assert set(rows) == {"The Fox", "The Chapel"}
+    assert rows["The Fox"]["shows"] == 3
+    assert rows["The Fox"]["posted_by"] == "Promo 67%, Alice 33%"
+    assert [d["shows"] for d in rows["The Fox"]["_details"]["rows"]] == [2, 1]
+    assert rows["The Chapel"]["posted_by"] == "Alice"
+    assert "_details" not in rows["The Chapel"]
+
+    without = metrics["venues_without_shows"]
+    assert without["collapsed"] is True
+    assert [r["venue"] for r in without["rows"]] == ["The Independent"]
+
+
 # ---------------------------------------------------------------------------
 # Giveaway page visits
 

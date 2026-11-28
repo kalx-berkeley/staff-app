@@ -7,7 +7,8 @@ page shows in the metric's ⓘ popover. The kinds are:
 - ``stat``: one value, with an optional note.
 - ``table``: columns and rows. A row may carry ``_low_sample`` (shown
   greyed out with a "low sample" tag), ``_flag`` (highlighted) and
-  ``_details`` (a nested table, shown when the row is expanded).
+  ``_details`` (a nested table, shown when the row is expanded). A
+  ``collapsed`` table is hidden until it's expanded.
 - ``series``: rows with an x value and one or more series, drawn as a line or
   bar chart, with a table view.
 - ``heatmap``: hour-of-week cells.
@@ -88,8 +89,12 @@ def table(
     rows: list[dict],
     expl: dict,
     top: Optional[int] = None,
+    collapsed: bool = False,
 ) -> dict:
-    """A table; *top* shows that many rows before "Show all"."""
+    """
+    A table; *top* shows that many rows before "Show all". A *collapsed* table
+    is hidden until it's expanded.
+    """
     return {
         "id": id,
         "title": title,
@@ -97,6 +102,7 @@ def table(
         "columns": columns,
         "rows": rows,
         "top": top,
+        "collapsed": collapsed,
         "explanation": expl,
     }
 

@@ -1778,6 +1778,7 @@ def build_reps(db: Session, window: Window, params: Params) -> list[dict]:
     rows.sort(key=lambda r: (r["month"], -r["shows"], r["rep"].lower()), reverse=False)
     rows.sort(key=lambda r: r["month"], reverse=True)
     return [
+        *_posters_by_venue(db, shows, creators, names),
         table(
             "reps_by_month",
             "Shows by promotions rep, by month",
@@ -1801,7 +1802,97 @@ def build_reps(db: Session, window: Window, params: Params) -> list[dict]:
                     ' "Unknown creator". Ownership is compared with today\'s reps.'
                 ),
             ),
-        )
+        ),
+    ]
+
+
+def _percent_text(count: int, total: int) -> str:
+    return f"{round(100 * count / total)}%"
+
+
+def _posters_by_venue(
+    db: Session, shows: list[Show], creators: dict[int, str], names: dict[str, str]
+) -> list[dict]:
+    """Who posted each venue's shows, and the venues nobody posted shows for."""
+    by_venue: dict[int, Counter] = defaultdict(Counter)
+    for s in shows:
+        if s.venue_id is not None:
+            by_venue[s.venue_id][creators.get(s.id, "")] += 1
+
+    def poster(email: str) -> str:
+        return names.get(email, email) if email else "Unknown creator"
+
+    venues = db.query(Venue).filter(Venue.deleted.is_(False)).all()
+    rows = []
+    idle = []
+    for v in venues:
+        counts = by_venue.get(v.id)
+        if not counts:
+            idle.append({"venue_id": v.id, "venue": v.name})
+            continue
+        total = sum(counts.values())
+        ranked = sorted(counts.items(), key=lambda kv: (-kv[1], poster(kv[0]).lower()))
+        row = {
+            "venue_id": v.id,
+            "venue": v.name,
+            "shows": total,
+            "posted_by": (
+                poster(ranked[0][0])
+                if len(ranked) == 1
+                else ", ".join(f"{poster(e)} {_percent_text(n, total)}" for e, n in ranked)
+            ),
+        }
+        if len(ranked) > 1:
+            row["_details"] = {
+                "columns": [
+                    column("poster", "Posted by"),
+                    column("shows", "Shows", "number"),
+                    column("share", "Share", "percent"),
+                ],
+                "rows": [
+                    {"poster": poster(e), "shows": n, "share": n / total} for e, n in ranked
+                ],
+            }
+        rows.append(row)
+    rows.sort(key=lambda r: (-r["shows"], venue_sort_key(r["venue"])))
+    idle.sort(key=lambda r: venue_sort_key(r["venue"]))
+    venue_link = "/venues/{venue_id}"
+    excludes = (
+        'Shows created before the audit log existed (or imported) are under "Unknown'
+        ' creator".'
+    )
+    return [
+        table(
+            "posters_by_venue",
+            "Who posts each venue's shows",
+            [
+                column("venue", "Venue", link=venue_link),
+                column("shows", "Shows", "number"),
+                column("posted_by", "Posted by"),
+            ],
+            rows,
+            explanation(
+                "For each venue with shows in the window, who filled out the new show"
+                " form for them. When more than one person did, each one's share of the"
+                " venue's shows is shown; expand the row for the counts.",
+                "Show date",
+                includes=f"{_SHOW_SCOPE} The creator comes from the audit log.",
+                excludes=excludes,
+            ),
+        ),
+        table(
+            "venues_without_shows",
+            "Venues with no shows posted",
+            [column("venue", "Venue", link=venue_link)],
+            idle,
+            explanation(
+                "Venues with no published or closed shows whose show date is in the"
+                " window.",
+                "Show date",
+                excludes="Deleted venues.",
+            ),
+            collapsed=True,
+        ),
     ]
 
 

@@ -60,6 +60,8 @@ export interface TableMetric extends MetricBase {
   rows: MetricRow[];
   /** Rows shown before "Show all", or null for all of them. */
   top: number | null;
+  /** Hidden until it's expanded. */
+  collapsed?: boolean;
 }
 
 export interface SeriesMetric extends MetricBase {
