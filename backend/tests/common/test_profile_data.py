@@ -138,7 +138,7 @@ def test_replacing_a_photo_uploads_it_then_keeps_only_it(monkeypatch, airtable_c
     assert json.loads(keep.content) == {"fields": {"Photo": [{"id": "attNEW"}]}}
 
 
-def test_playlists_carry_their_show_and_automation(monkeypatch):
+def test_playlists_carry_their_show(monkeypatch):
     monkeypatch.setattr(config.settings, "spinitron_api_key", "key")
     _mock_client(
         monkeypatch,
@@ -153,7 +153,6 @@ def test_playlists_carry_their_show_and_automation(monkeypatch):
                     "start": "2026-10-19T02:00:00+0000",
                     "end": "2026-10-19T04:00:00+0000",
                     "title": "FREEFORM",
-                    "automation": 1,
                 }],
                 "_meta": {"pageCount": 1},
             },
@@ -162,7 +161,6 @@ def test_playlists_carry_their_show_and_automation(monkeypatch):
     start = datetime(2026, 10, 1, tzinfo=timezone.utc)
     [playlist] = asyncio.run(SpinitronService.fetch_playlists(start, start))
     assert playlist["show_id"] == 301137
-    assert playlist["automation"] is True
 
 
 def test_shift_sync_replaces_the_stored_playlists(db: Session, monkeypatch):
@@ -183,7 +181,6 @@ def test_shift_sync_replaces_the_stored_playlists(db: Session, monkeypatch):
         "start": datetime(2026, 9, 1, 17, tzinfo=timezone.utc),
         "end": datetime(2026, 9, 1, 19, tzinfo=timezone.utc),
         "title": "Night Moves",
-        "automation": False,
     }
     with patch(
         "app.common.services.spinitron_service.SpinitronService.fetch_playlists",

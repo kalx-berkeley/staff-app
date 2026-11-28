@@ -19,7 +19,6 @@ interface EligibilityChecklistProps {
 const REQUIREMENT_COUNT = 5;
 
 const REASONS: Record<NonNullable<PlaylistCheck['reason']>, string> = {
-  automated: 'Automated (no live DJ)',
   specialty: 'Specialty Music Show or Talk & Info Show',
   too_short: 'Shorter than 90 minutes',
 };
@@ -173,7 +172,12 @@ const EligibilityChecklist = ({ eligibility: e, otherStaffId }: EligibilityCheck
           <p>
             In the previous quarter ({e.shift.previous_quarter}) you need at least one DJ shift of{' '}
             {e.shift.min_minutes} minutes or more under your own DJ name, that isn’t a Specialty Music Show or Talk & Info Show. Quarters run Feb–Apr, May–Jul, Aug–Oct and Nov–Jan. Back-to-back playlists count as
-            one shift. Automated playlists, and shared names like DJ Trainee, don’t count.
+            one shift. Shared names like DJ Trainee don’t count.
+          </p>
+          <p className="eligibility-note">
+            This page can’t tell a live shift from a pre-recorded one, because Spinitron doesn’t
+            record which a playlist was. Every playlist under your own DJ name is counted as a
+            shift here.
           </p>
           <p>
             You can also meet this by submitting a 2-hour roboshow recording, but this page can’t see

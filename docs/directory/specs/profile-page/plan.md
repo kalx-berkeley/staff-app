@@ -76,7 +76,7 @@ Terms:
 | Q32 | Validation: First Name is required, and Surname is optional. Pronouns are free text, up to 40 characters. Phone is optional; if given, it must be a US 10-digit number, saved in the format `formatPhone` displays. DJ Name can have zero or more personas, and placeholder personas are refused. |
 | Q33 | **Retired** is separate from the existing **deleted** flag. Deleted is for mistakes, so its Spinitron IDs are ignored. A retired show's IDs still mark its playlists as specialty. |
 | Q34 | A retired show can't be pre-assigned passes and isn't offered in DJ name or show suggestions. It's listed in a collapsed "Retired shows" section with an "Un-retire" button. Passes already assigned to it stay as they are. Anyone who can edit a specialty show can retire or un-retire it, and both are audit-logged. Retired shows still need Spinitron IDs and appear in Q27's warning. |
-| Q35 | Spinitron marks roboshows `automation: 1`, but doesn't record who submitted them, so they can't satisfy the shift requirement. Playlists with `automation` set never count as a qualifying shift, and never join a back-to-back merge. The roboshow route stays as Q10 describes. |
+| Q35 | ~~Playlists with `automation` set never count.~~ Revised 2026-11-28: Spinitron's `automation` flag only says the station's automation system created the playlist, and live DJs' playlists often are, so it can't tell a roboshow from a live shift. It's no longer read or stored, every playlist under the person's own personas can count, and the checklist says the page can't tell a live shift from a pre-recorded one. The roboshow route stays as Q10 describes. |
 
 ## Sublist DJ eligibility rules
 
@@ -88,13 +88,13 @@ Airtable.
 |---|---|---|---|
 | Sublist DJ status | Status includes `Sublist DJ` | "On the DJ sublist" / "Not on the DJ sublist" | What the sublist is and who manages it |
 | Not on leave | Not `on_leave(staff, today)`, and no On leave status | "Not on leave" / "On leave until <date>" | Leave dates |
-| Shift last quarter | At least one qualifying shift that started in the previous complete quarter | "Last qualifying shift: <date>, <title>, <h:mm>" / "No qualifying shift in <May–Jul 2026>" | The rule (90 min, own persona, not specialty, not automated, back-to-back merged); every playlist found under your personas in the previous and current quarter, each marked counted or not with the reason (too short, specialty show <name>, automated); the roboshow note (Q10); "Shifts as of <time>" |
+| Shift last quarter | At least one qualifying shift that started in the previous complete quarter | "Last qualifying shift: <date>, <title>, <h:mm>" / "No qualifying shift in <May–Jul 2026>" | The rule (90 min, own persona, not specialty, back-to-back merged); every playlist found under your personas in the previous and current quarter, each marked counted or not with the reason (too short, specialty show <name>); the note that live and pre-recorded shifts can't be told apart (Q35); the roboshow note (Q10); "Shifts as of <time>" |
 | Workforms, last 3 months | Each of the 3 complete months is met (Q11, Q17) | "Jul 6 h ✓, Aug 4.5 h ✗, Sep 7 h ✓" | One line per month: approved / submitted hours per department, pending departments named, LOA months marked, a link to the month |
 | DJ Quiz | You've done the **current quiz year** | "2026 quiz done" / "2026 quiz due Sep 30, 2026" | The rule, your quiz years, the current deadline |
 
 **Shifts.** The playlists considered are those whose `persona_id` is one of the
 person's personas and isn't a placeholder. A playlist is excluded if
-`automation` is set or its `show_id` is a specialty show ID. The remaining
+its `show_id` is a specialty show ID. The remaining
 playlists, sorted by start, are merged into one shift whenever one's `end`
 equals the next one's `start`. A shift qualifies at 90 minutes or more, and it
 belongs to the quarter its first playlist started in, in Pacific time.

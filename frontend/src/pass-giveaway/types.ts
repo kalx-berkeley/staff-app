@@ -1079,9 +1079,7 @@ export interface OnAirIdentity {
 export interface OnAirInfo {
   /** Who giveaways are credited to now; null for no one. */
   current: OnAirIdentity | null;
-  /** The current slot is a Spinitron automation playlist: a pre-recorded show, with no one live. */
-  current_automation: boolean;
-  /** Spinitron's title for the current slot. */
+  /** Spinitron's title for the current slot, which names a slot that is no one (e.g. OVERNIGHTS). */
   current_title: string | null;
   /** When the current slot ends (ISO), so the page can look again then. */
   current_ends_at: string | null;

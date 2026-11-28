@@ -72,8 +72,10 @@ class Settings(BaseSettings):
     # Spinitron persona IDs that represent a rotating slot rather than a specific DJ
     # (e.g. "DJ Trainee", "KALX Overnights") — comma-separated. A show hosted by one
     # of these is treated the same as a show with no persona listed at all: the
-    # on-air schedule sync stores no DJ name for it, so the DJ Name field is neither
-    # auto-filled nor flagged as mismatched during that show.
+    # on-air schedule sync stores no DJ name for it, and the DJ pages treat its
+    # slot as no one on air, so giveaways then are unattributed. This list, not
+    # Spinitron's playlist `automation` flag, is how the app knows a slot has no
+    # live DJ (KALX Overnights is pre-recorded).
     # Current list: DJ Trainee (176287), Special Events Staff (186839),
     # KALX Overnights (169919), Sports Staff (195674), Campus Podcasts (176342),
     # Rotating Dj (193517).

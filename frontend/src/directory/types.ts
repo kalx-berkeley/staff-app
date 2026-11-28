@@ -49,7 +49,7 @@ export interface PlaylistCheck {
   // The length of the back-to-back block it's part of, if any
   shift_minutes: number | null;
   counted: boolean;
-  reason: 'automated' | 'specialty' | 'too_short' | null;
+  reason: 'specialty' | 'too_short' | null;
   quarter: 'previous' | 'current';
   url: string;
 }

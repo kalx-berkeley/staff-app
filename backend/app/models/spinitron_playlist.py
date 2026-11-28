@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, false
+from sqlalchemy import Column, DateTime, Integer, String
 
 from app.database import Base
 
@@ -21,8 +21,6 @@ class SpinitronPlaylist(Base):
     # Music Show or Talk & Info Show slot apart
     show_id = Column(Integer, nullable=True)
     title = Column(String, nullable=True)
-    # Aired with no live DJ (e.g. a roboshow)
-    automation = Column(Boolean, nullable=False, default=False, server_default=false())
     fetched_at = Column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )

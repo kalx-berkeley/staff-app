@@ -65,7 +65,7 @@ class PlaylistCheckResponse(BaseModel):
     # The length of the back-to-back block it's part of, if any
     shift_minutes: Optional[int] = None
     counted: bool
-    reason: Optional[Literal["automated", "specialty", "too_short"]] = None
+    reason: Optional[Literal["specialty", "too_short"]] = None
     quarter: Literal["previous", "current"]
     url: str
 

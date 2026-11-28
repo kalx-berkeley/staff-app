@@ -19,7 +19,6 @@ def _playlist(
     minutes: int,
     persona_id: int = 1,
     show_id: int | None = 100,
-    automation: bool = False,
     title: str | None = "FREEFORM",
 ) -> Playlist:
     return Playlist(
@@ -29,7 +28,6 @@ def _playlist(
         start=start,
         end=start + timedelta(minutes=minutes),
         title=title,
-        automation=automation,
     )
 
 
@@ -98,14 +96,13 @@ def test_a_gap_between_playlists_splits_the_shift():
     assert not any(s.qualifies for s in shifts)
 
 
-def test_specialty_shows_and_automated_playlists_dont_count_or_merge():
+def test_specialty_shows_dont_count_or_merge():
     day = date(2026, 6, 1)
     shifts, checks = rules.find_shifts(
         [
             _playlist(1, _at(day, 10), 60),
             _playlist(2, _at(day, 11), 60, show_id=900),
             _playlist(3, _at(day, 12), 60),
-            _playlist(4, _at(day, 13), 120, automation=True),
         ],
         {900},
     )
@@ -114,7 +111,6 @@ def test_specialty_shows_and_automated_playlists_dont_count_or_merge():
         (False, "too_short"),
         (False, "specialty"),
         (False, "too_short"),
-        (False, "automated"),
     ]
 
 

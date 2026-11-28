@@ -59,10 +59,8 @@ class SpinitronShowItem(TypedDict):
     end: datetime
     persona_id: Optional[int]
     title: Optional[str]
-    # Only on items from `/playlists`: the Spinitron show the playlist belongs
-    # to, and whether it aired with no live DJ (e.g. a roboshow)
+    # Only on items from `/playlists`: the Spinitron show the playlist belongs to
     show_id: NotRequired[Optional[int]]
-    automation: NotRequired[bool]
 
 
 class SpinitronSpinItem(TypedDict):
@@ -296,7 +294,6 @@ class SpinitronService:
                                 if item.get("show_id") is not None
                                 else None
                             ),
-                            automation=bool(item.get("automation")),
                         )
                     )
 

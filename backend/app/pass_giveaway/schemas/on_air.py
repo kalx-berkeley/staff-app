@@ -26,13 +26,11 @@ class OnAirIdentity(BaseModel):
 class OnAirResponse(BaseModel):
     """Who is on air now and next, from the Spinitron schedule and recent spins."""
 
-    # Who giveaways are credited to now; None for no one (automation,
-    # a placeholder persona, a gap, or Spinitron unavailable)
+    # Who giveaways are credited to now; None for no one (a placeholder
+    # persona such as KALX Overnights, a gap, or Spinitron unavailable)
     current: OnAirIdentity | None = None
-    # Whether the current slot is a Spinitron automation playlist (a
-    # pre-recorded show, so there's no one live to give away passes), and
-    # Spinitron's title for it, so the page can say so
-    current_automation: bool = False
+    # Spinitron's title for the current slot, so the page can name a slot
+    # that is no one
     current_title: str | None = None
     # When the current slot ends, so the page can look again then
     current_ends_at: UtcDatetime | None = None

@@ -56,7 +56,6 @@ async def sync_shift_playlists(db: Session, trigger: str = "scheduled") -> Optio
                 start=item["start"],
                 end=item["end"],
                 title=item["title"],
-                automation=item.get("automation", False),
                 fetched_at=now,
             )
         )

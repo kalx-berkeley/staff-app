@@ -116,20 +116,6 @@ class TestIdentityOfASlot:
         assert state.current is not None
         assert state.identity is None
 
-    async def test_automation_is_no_one(self, db: Session):
-        playlist(db, 10, -30, 30, persona_id=1, automation=True, title="Roboshow")
-        state = await on_air(db, NOW)
-        assert state.identity is None
-        assert (state.current.automation, state.current.title) == (True, "Roboshow")
-
-    async def test_an_automation_playlist_of_a_linked_show_is_no_one(self, db: Session):
-        # A pre-recorded Talk & Info Show: the page says it's pre-recorded
-        specialty(db, "Arts In Review", 555, category="talk")
-        playlist(db, 10, -30, 30, persona_id=1, show_id=555, automation=True)
-        state = await on_air(db, NOW)
-        assert state.identity is None
-        assert state.current.automation is True
-
     async def test_a_talk_show_is_the_show_whoever_hosts_it(self, db: Session):
         talk = specialty(db, "Morning Report", 555, category="talk")
         playlist(db, 10, -30, 30, persona_id=PLACEHOLDER, show_id=555)
@@ -294,18 +280,16 @@ class TestEndpoint:
         assert data["next"]["specialty_show_id"] == talk.id
         assert data["next_starts_at"] is not None
         assert data["can_switch_early"] is True
-        assert data["current_automation"] is False
 
-    def test_says_when_the_slot_is_pre_recorded(self, client: TestClient, db: Session):
+    def test_names_a_slot_that_is_no_one(self, client: TestClient, db: Session):
         now = datetime.now(timezone.utc).replace(microsecond=0)
         db.add(
             SpinitronPlaylist(
                 id=10,
                 start=now - timedelta(minutes=5),
                 end=now + timedelta(minutes=25),
-                persona_id=1,
-                title="Arts In Review",
-                automation=True,
+                persona_id=PLACEHOLDER,
+                title="OVERNIGHTS",
             )
         )
         db.commit()
@@ -313,8 +297,7 @@ class TestEndpoint:
             "/api/dj/on-air", headers={"X-Forwarded-For": DJ_STUDIO_IP}
         ).json()
         assert data["current"] is None
-        assert data["current_automation"] is True
-        assert data["current_title"] == "Arts In Review"
+        assert data["current_title"] == "OVERNIGHTS"
 
 
 class TestSlotResync:

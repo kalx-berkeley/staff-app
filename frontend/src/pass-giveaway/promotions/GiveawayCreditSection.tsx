@@ -16,7 +16,7 @@ const DAY_CHOICES = [30, 90, 365];
  * Promotions → Admin: giveaways and who they're credited to, with a way to
  * re-credit any of them (decision 28 of
  * docs/pass-giveaway/specs/spinitron-identity/plan.md). A giveaway made
- * while no one was on air (automation, a placeholder persona, a gap) is "Unattributed",
+ * while no one was on air (a placeholder persona such as KALX Overnights, a gap) is "Unattributed",
  * so the list starts with only those.
  */
 const GiveawayCreditSection = () => {
@@ -85,7 +85,7 @@ const GiveawayCreditSection = () => {
       <h3>Giveaway Credit</h3>
       <p className="field-hint">
         Who each on-air giveaway is credited to. The DJ pages credit whoever the Spinitron
-        schedule has on air; a giveaway made while no one was (automation, a placeholder persona, a gap)
+        schedule has on air; a giveaway made while no one was (a placeholder persona such as KALX Overnights, a gap)
         is unattributed. Re-credit a giveaway to a DJ or a show here; each change is
         recorded in the audit log.
       </p>

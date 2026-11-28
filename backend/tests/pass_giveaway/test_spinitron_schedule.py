@@ -511,7 +511,6 @@ class TestOnAirEndpoint:
         assert response.status_code == 200
         assert response.json() == {
             "current": None,
-            "current_automation": False,
             "current_title": None,
             "current_ends_at": None,
             "next": None,

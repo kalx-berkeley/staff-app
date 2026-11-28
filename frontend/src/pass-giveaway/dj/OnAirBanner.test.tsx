@@ -19,7 +19,6 @@ const inMinutes = (minutes: number) => new Date(Date.now() + minutes * 60_000).t
 
 const onAir = (overrides: Partial<OnAirInfo> = {}): OnAirInfo => ({
   current: persona(1, 'DJ One'),
-  current_automation: false,
   current_title: null,
   current_ends_at: inMinutes(5),
   next: persona(2, 'DJ Two'),
@@ -74,16 +73,14 @@ describe('OnAirBanner', () => {
     );
   });
 
-  it('says when the slot is a pre-recorded show', async () => {
+  it('names a slot with no DJ, such as KALX Overnights', async () => {
     vi.mocked(onAirAPI.getCurrent).mockResolvedValue(
-      onAir({ current: null, current_automation: true, current_title: 'Arts In Review' }),
+      onAir({ current: null, current_title: 'OVERNIGHTS' }),
     );
     await renderBanner();
 
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent(
-      "Spinitron lists Arts In Review as a pre-recorded show (automation), so there's no DJ on air",
-    );
+    expect(alert).toHaveTextContent('Spinitron lists OVERNIGHTS with no DJ on air right now');
     expect(alert).toHaveTextContent('recorded as unattributed');
     expect(alert).not.toHaveTextContent('No DJ is on air in the Spinitron schedule');
   });

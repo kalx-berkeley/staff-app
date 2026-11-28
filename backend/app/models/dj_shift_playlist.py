@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy import Column, DateTime, Integer, String
 
 from app.database import Base
 
@@ -24,8 +24,6 @@ class DjShiftPlaylist(Base):
     start = Column(DateTime(timezone=True), nullable=False, index=True)
     end = Column(DateTime(timezone=True), nullable=False)
     title = Column(String, nullable=True)
-    # Spinitron's "automation" flag: the playlist aired with no live DJ (e.g. a roboshow)
-    automation = Column(Boolean, nullable=False, default=False)
     fetched_at = Column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )

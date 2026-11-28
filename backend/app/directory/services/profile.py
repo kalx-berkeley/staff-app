@@ -134,7 +134,6 @@ def _shift_check(
                 start=r.start,
                 end=r.end,
                 title=r.title,
-                automation=r.automation,
             )
             for r in rows
         ),

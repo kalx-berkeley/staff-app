@@ -26,7 +26,6 @@ vi.mock('./pass-giveaway/api', () => ({
   onAirAPI: {
     getCurrent: vi.fn().mockResolvedValue({
       current: null,
-      current_automation: false,
       current_title: null,
       current_ends_at: null,
       next: null,

@@ -7,8 +7,13 @@ A schedule slot (a cached Spinitron playlist or show) is someone when:
 - its Spinitron show belongs to a Talk & Info Show: that show;
 - its Spinitron show belongs to a Specialty Music Show: that show, together
   with the slot's persona (giveaways credit both);
-- otherwise its persona, unless the slot aired as automation or its persona
-  is a placeholder (`SPINITRON_PLACEHOLDER_PERSONA_IDS`). Then it is no one.
+- otherwise its persona, unless its persona is a placeholder
+  (`SPINITRON_PLACEHOLDER_PERSONA_IDS`, such as KALX Overnights). Then it is
+  no one.
+
+Spinitron's `automation` flag on a playlist is ignored. It only says the
+playlist was created by the station's automation system, and live DJs'
+playlists often are, so it can't tell a pre-recorded slot from a live one.
 
 The slot's title doesn't matter: FREEFORM is only the title Spinitron gives a
 regular DJ's show they haven't named, so a FREEFORM slot is its persona.
@@ -90,8 +95,6 @@ class Slot:
     playlist_id: Optional[int] = None
     # Spinitron's title for the slot
     title: Optional[str] = None
-    # An automation playlist: a pre-recorded show, so no one is live
-    automation: bool = False
 
 
 @dataclass
@@ -158,12 +161,7 @@ class _Resolver:
         )
 
     def identity(self, row: _Row) -> Optional[OnAirIdentity]:
-        if isinstance(row, SpinitronPlaylist):
-            if row.automation:
-                return None
-            spinitron_show_id = row.show_id
-        else:
-            spinitron_show_id = row.id
+        spinitron_show_id = row.show_id if isinstance(row, SpinitronPlaylist) else row.id
         has_persona = row.persona_id is not None and row.persona_id not in self.placeholders
         show = self.shows.get(spinitron_show_id) if spinitron_show_id else None
         if show is not None:
@@ -192,7 +190,6 @@ class _Resolver:
             identity=self.identity(row),
             playlist_id=row.id if isinstance(row, SpinitronPlaylist) else None,
             title=row.title,
-            automation=isinstance(row, SpinitronPlaylist) and bool(row.automation),
         )
 
 
@@ -238,7 +235,6 @@ async def _cache_unknown_playlists(db: Session, playlist_ids: set[int]) -> None:
                 persona_id=SpinitronService.extract_persona_id(item),
                 show_id=int(item["show_id"]) if item.get("show_id") is not None else None,
                 title=(item.get("title") or "").strip() or None,
-                automation=bool(item.get("automation")),
             )
         )
     db.commit()

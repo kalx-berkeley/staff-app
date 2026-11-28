@@ -100,7 +100,6 @@ class SpinitronScheduleService:
                 persona_id=playlist["persona_id"],
                 show_id=playlist.get("show_id"),
                 title=playlist["title"],
-                automation=playlist.get("automation", False),
             )
             for playlist in playlists
         ]

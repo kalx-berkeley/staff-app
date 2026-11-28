@@ -86,7 +86,7 @@ def _pacific(year, month, day, hour) -> datetime:
     return datetime(year, month, day, hour + 7, tzinfo=timezone.utc)
 
 
-def _add_playlist(db, pid, start, minutes, persona_id=111, show_id=None, automation=False):
+def _add_playlist(db, pid, start, minutes, persona_id=111, show_id=None):
     db.add(
         DjShiftPlaylist(
             id=pid,
@@ -95,7 +95,6 @@ def _add_playlist(db, pid, start, minutes, persona_id=111, show_id=None, automat
             start=start,
             end=start + timedelta(minutes=minutes),
             title="Night Moves",
-            automation=automation,
         )
     )
 

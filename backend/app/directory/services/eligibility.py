@@ -10,8 +10,11 @@ The requirements:
 - Shift: a qualifying shift in the previous complete quarter. Quarters are
   offset by a month (Feb–Apr, May–Jul, Aug–Oct, Nov–Jan). A shift is one or
   more back-to-back playlists under the person's own personas, and qualifies
-  at 90 minutes or more. Automated playlists (roboshows) and specialty shows
-  don't count. Placeholder personas are never anyone's own.
+  at 90 minutes or more. Specialty shows don't count. Placeholder personas
+  are never anyone's own. A pre-recorded shift counts like a live one: no
+  Spinitron field tells them apart (its `automation` flag only says the
+  station's automation system created the playlist, which live DJs' playlists
+  often are), so the page says so.
 - Workforms: at least REQUIRED_MONTHLY_HOURS in each of the last 3 complete
   months. The older two count approved hours; the most recent one counts
   submitted hours that no department has denied, since decisions can take
@@ -121,7 +124,6 @@ class Playlist:
     start: datetime
     end: datetime
     title: Optional[str] = None
-    automation: bool = False
 
 
 @dataclass
@@ -133,7 +135,7 @@ class PlaylistCheck:
     # part of one
     shift_minutes: Optional[int]
     counted: bool
-    # Why it didn't count: "automated", "specialty" or "too_short"
+    # Why it didn't count: "specialty" or "too_short"
     reason: Optional[str] = None
     specialty_show: bool = False
 
@@ -189,8 +191,8 @@ def find_shifts(
     """
     Merge a person's playlists into shifts and say which count.
 
-    Automated playlists and specialty shows are left out and never join a
-    merge, so an automated hour can't stretch a live hour past 90 minutes.
+    Specialty shows are left out and never join a merge, so a specialty
+    show's hour can't stretch a shift past 90 minutes.
     Two playlists are back to back when one ends exactly when the next starts.
 
     :param playlists: The person's own playlists, oldest first (see `own_playlists`).
@@ -200,9 +202,7 @@ def find_shifts(
     shifts: List[Shift] = []
     excluded: Dict[int, str] = {}
     for playlist in playlists:
-        if playlist.automation:
-            excluded[playlist.id] = "automated"
-        elif playlist.show_id is not None and playlist.show_id in specialty_show_ids:
+        if playlist.show_id is not None and playlist.show_id in specialty_show_ids:
             excluded[playlist.id] = "specialty"
         elif shifts and shifts[-1].end == playlist.start:
             shifts[-1].playlists.append(playlist)
