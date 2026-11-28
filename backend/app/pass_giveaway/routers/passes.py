@@ -51,7 +51,7 @@ from app.pass_giveaway.services.pass_service import (
     normalize_phone,
     format_phone,
 )
-from app.common.services import audit_service
+from app.common.services import audit_service, tracking_service
 from app.pass_giveaway.services.spinitron_upcoming_schedule_service import (
     SpinitronUpcomingScheduleService,
 )
@@ -1253,10 +1253,17 @@ def check_winner_eligibility(
     show_id: int,
     exclude_pass_id: int | None = None,
     dj_access: bool = Depends(check_dj_access),
+    x_forwarded_user: str | None = Header(None, alias="X-Forwarded-User"),
+    x_forwarded_for: str | None = Header(None, alias="X-Forwarded-For"),
+    x_dj_network: str | None = Header(None, alias="X-DJ-Network"),
+    x_station_office_network: str | None = Header(None, alias="X-Station-Office-Network"),
     db: Session = Depends(get_db),
 ):
     """
     Check if a phone number is eligible to win passes at this venue.
+
+    A warning is logged with the request's network and signed-in user, so
+    KALX Staff Analytics can tell DJ studio warnings from others.
 
     Returns eligibility status and, if ineligible, details about when and where
     the person last won at this venue or a venue sharing its win frequency
@@ -1281,6 +1288,7 @@ def check_winner_eligibility(
         db,
         event_type="winner_frequency_warning",
         area=PASS_GIVEAWAY_AREA,
+        actor_email=x_forwarded_user,
         actor_role="dj",
         entity_type="venue",
         entity_id=venue_id,
@@ -1295,6 +1303,9 @@ def check_winner_eligibility(
             "last_win_venue": conflict["last_win_venue"],
             "matched_phone": conflict["matched_phone"],
             "linked_number": conflict["linked_number"],
+            "network": tracking_service.request_network(
+                x_dj_network, x_station_office_network, x_forwarded_for
+            ),
         },
     )
     return {

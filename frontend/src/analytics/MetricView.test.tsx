@@ -29,6 +29,15 @@ describe('MetricView collapsed tables', () => {
     expect(screen.queryByText('The Fillmore')).not.toBeInTheDocument();
   });
 
+  it('opens when a link points at it', () => {
+    render(
+      <MemoryRouter initialEntries={['/reps#venues-without-shows']}>
+        <MetricView metric={metric} />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('The Fillmore')).toBeInTheDocument();
+  });
+
   it('says so when there are none', () => {
     render(
       <MemoryRouter>

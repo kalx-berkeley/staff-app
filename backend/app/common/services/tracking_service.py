@@ -240,6 +240,65 @@ def event_counts(
     return rows
 
 
+def entity_event_counts(
+    db: Session,
+    event_types: Iterable[str],
+    entity_type: str,
+    entity_ids: Iterable[int],
+) -> list[EventCount]:
+    """
+    Every event of *event_types* about one of *entity_ids*, whenever it
+    happened, raw or rolled up (for metrics that place events by their
+    entity's date, such as a show's date).
+    """
+    types = list(event_types)
+    ids = list({i for i in entity_ids if i is not None})
+    if not ids:
+        return []
+    rows: list[EventCount] = []
+    for e in db.query(AnalyticsEvent).filter(
+        AnalyticsEvent.event_type.in_(types),
+        AnalyticsEvent.entity_type == entity_type,
+        AnalyticsEvent.entity_id.in_(ids),
+    ):
+        rows.append(
+            EventCount(
+                day=pacific_date(e.occurred_at),
+                event_type=e.event_type,
+                actor_email=e.actor_email,
+                network=e.network,
+                entity_type=e.entity_type,
+                entity_id=e.entity_id,
+                dimension=e.dimension,
+                count=1,
+                persona_id=e.persona_id,
+                specialty_show_id=e.specialty_show_id,
+                occurred_at=as_utc(e.occurred_at),
+                ref=e.ref,
+            )
+        )
+    for r in db.query(AnalyticsDailyCount).filter(
+        AnalyticsDailyCount.event_type.in_(types),
+        AnalyticsDailyCount.entity_type == entity_type,
+        AnalyticsDailyCount.entity_id.in_(ids),
+    ):
+        rows.append(
+            EventCount(
+                day=r.day,
+                event_type=r.event_type,
+                actor_email=r.actor_email,
+                network=r.network,
+                entity_type=r.entity_type,
+                entity_id=r.entity_id,
+                dimension=r.dimension,
+                count=r.count,
+                persona_id=r.persona_id,
+                specialty_show_id=r.specialty_show_id,
+            )
+        )
+    return rows
+
+
 def data_since(db: Session, event_types: Iterable[str]) -> Optional[date]:
     """The Pacific date of the earliest event of *event_types*, raw or rolled up."""
     types = list(event_types)

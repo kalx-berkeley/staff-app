@@ -74,10 +74,30 @@ def build_short_links(db: Session, window: Window, params: Params) -> list[dict]
             "Short links" + (f": /go/{only_slug}" if only_slug else ""),
             [
                 column("slug", "Short link"),
-                column("redirects", "Redirects", "number"),
-                column("users", "Unique users", "number"),
-                column("blocked_not_staff", "Blocked: not current staff", "number"),
-                column("blocked_dj_network", "Blocked: DJ studio", "number"),
+                column(
+                    "redirects",
+                    "Redirects",
+                    "number",
+                    help="Times staff were sent on to the link's target.",
+                ),
+                column(
+                    "users",
+                    "Unique users",
+                    "number",
+                    help="Distinct staff who were redirected.",
+                ),
+                column(
+                    "blocked_not_staff",
+                    "Blocked: not current staff",
+                    "number",
+                    help="Attempts from a Google account that isn't current staff.",
+                ),
+                column(
+                    "blocked_dj_network",
+                    "Blocked: DJ studio",
+                    "number",
+                    help="Attempts from a DJ studio computer, which can't sign in.",
+                ),
             ],
             rows,
             explanation(

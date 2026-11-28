@@ -19,7 +19,18 @@ from sqlalchemy.orm import Session
 
 from app.common.services.analytics_window import Window
 
-TABS = ("overview", "venues", "venue", "djs", "dj", "reps", "short_links", "usage")
+TABS = (
+    "overview",
+    "venues",
+    "venue",
+    "djs",
+    "dj",
+    "winners",
+    "winner",
+    "reps",
+    "short_links",
+    "usage",
+)
 
 Params = Dict[str, str]
 

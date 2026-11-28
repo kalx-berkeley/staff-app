@@ -9,4 +9,6 @@ export {
   UsagePage,
   VenuePage,
   VenuesPage,
+  WinnerPage,
+  WinnersPage,
 } from './pages';

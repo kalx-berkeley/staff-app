@@ -4908,11 +4908,12 @@ fieldset.radio-group legend {
 }
 
 .analytics-explain-popover {
-  position: absolute;
+  /* Placed by InfoPopover, fixed so a table's scrolling wrapper can't clip it */
+  position: fixed;
   z-index: 20;
-  top: 1.5rem;
-  left: -0.5rem;
   width: min(22rem, 80vw);
+  white-space: normal;
+  text-align: left;
   background: #fff;
   border: 1px solid var(--border-color);
   border-radius: 6px;
@@ -4945,6 +4946,52 @@ fieldset.radio-group legend {
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* Header text wraps, so a long label doesn't make its column wide */
+.analytics-table th,
+.analytics-table th.analytics-num {
+  white-space: normal;
+  vertical-align: bottom;
+  min-width: 4.5rem;
+  max-width: 9rem;
+}
+
+.analytics-th {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.1rem;
+}
+
+.analytics-num .analytics-th {
+  justify-content: flex-end;
+}
+
+.analytics-num .analytics-sort {
+  text-align: right;
+}
+
+.analytics-anchor {
+  color: #aaa;
+  font-weight: 400;
+  text-decoration: none;
+  padding: 0 0.15rem;
+}
+
+.analytics-anchor:hover,
+.analytics-anchor:focus {
+  color: var(--primary-color);
+}
+
+.analytics-anchor-copied {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #2a7a2a;
+}
+
+.analytics-stat,
+.analytics-metric {
+  scroll-margin-top: 1rem;
 }
 
 .analytics-sort {
@@ -5051,12 +5098,23 @@ fieldset.radio-group legend {
   font-variant-numeric: tabular-nums;
 }
 
+/* On a card, the number sits above its bar so the two fit the card's width */
+.analytics-stat-value .analytics-balance {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+
 .analytics-stat-value .analytics-balance-track {
-  width: 120px;
+  width: 100%;
+  max-width: 160px;
   height: 14px;
 }
 
 .analytics-stat-value .analytics-balance-label {
+  min-width: 0;
+  text-align: left;
   font-size: 1.4rem;
 }
 

@@ -49,6 +49,31 @@ export function DjPage() {
   );
 }
 
+export function WinnersPage() {
+  return (
+    <TabPage
+      tab="winners"
+      heading="On-air winners"
+      intro="Click a name for the winner's page: their wins, win-limit blocks and phone numbers."
+    />
+  );
+}
+
+export function WinnerPage() {
+  const { winId = '' } = useParams();
+  return (
+    <>
+      <BackLink to="/winners" label="All on-air winners" />
+      <TabPage
+        tab="winner"
+        heading="On-air winner"
+        params={{ win_id: winId }}
+        intro="To link this winner's phone numbers or review similar names, click a name under Phone numbers: it opens Promotions → Admin → Linked Callers."
+      />
+    </>
+  );
+}
+
 export function RepsPage() {
   return (
     <TabPage

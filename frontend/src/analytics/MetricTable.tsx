@@ -1,11 +1,16 @@
 import { Fragment, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { InfoPopover } from './ExplanationPopover';
 import { formatValue, sortValue } from './format';
 import { windowQuery } from './timeWindow';
 import type { MetricColumn, MetricRow } from './types';
 
-/** Numbers line up on the right, text on the left. */
-const isNumeric = (column: MetricColumn) => column.format !== 'text' && column.format !== 'date';
+/**
+ * Numbers line up on the right, text on the left. Balance bars ("points") are
+ * left-aligned, header included, so the header sits over the bar and its label.
+ */
+const isNumeric = (column: MetricColumn) =>
+  column.format !== 'text' && column.format !== 'date' && column.format !== 'points';
 
 const fillLink = (template: string, row: MetricRow, encode = false) =>
   template.replace(/\{(\w+)\}/g, (_, key: string) => {
@@ -116,10 +121,17 @@ export default function MetricTable({
                     sort?.key === c.key ? (sort.desc ? 'descending' : 'ascending') : undefined
                   }
                 >
-                  <button type="button" className="analytics-sort" onClick={() => toggleSort(c.key)}>
-                    {c.label || ' '}
-                    {sort?.key === c.key ? (sort.desc ? ' ▾' : ' ▴') : ''}
-                  </button>
+                  <span className="analytics-th">
+                    <button type="button" className="analytics-sort" onClick={() => toggleSort(c.key)}>
+                      {c.label || ' '}
+                      {sort?.key === c.key ? (sort.desc ? ' ▾' : ' ▴') : ''}
+                    </button>
+                    {c.help && (
+                      <InfoPopover label={`What "${c.label}" means`}>
+                        <p>{c.help}</p>
+                      </InfoPopover>
+                    )}
+                  </span>
                 </th>
               ))}
             </tr>

@@ -105,8 +105,18 @@ def build_usage(db: Session, window: Window, params: Params) -> list[dict]:
             "Use by sub-site",
             [
                 column("subsite", "Sub-site"),
-                column("users", "Users", "number"),
-                column("active_days", "Active days", "number"),
+                column(
+                    "users",
+                    "Users",
+                    "number",
+                    help="Distinct signed-in staff who used the sub-site in the window.",
+                ),
+                column(
+                    "active_days",
+                    "Active days",
+                    "number",
+                    help="Each user's days using the sub-site, added up.",
+                ),
             ],
             sorted(
                 (
@@ -133,8 +143,18 @@ def build_usage(db: Session, window: Window, params: Params) -> list[dict]:
             "Signed-in users",
             [
                 column("name", "Staff member"),
-                column("days", "Active days", "number"),
-                column("last_seen", "Last seen", "date"),
+                column(
+                    "days",
+                    "Active days",
+                    "number",
+                    help="Days in the window they used any sub-site, counted once a day.",
+                ),
+                column(
+                    "last_seen",
+                    "Last seen",
+                    "date",
+                    help="The last day in the window they used the app.",
+                ),
             ],
             sorted(
                 (

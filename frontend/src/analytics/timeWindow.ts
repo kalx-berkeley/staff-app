@@ -5,6 +5,7 @@
  */
 
 export const PRESETS: { value: string; label: string }[] = [
+  { value: 'this_month', label: 'This month' },
   { value: 'last_30_days', label: 'Last 30 days' },
   { value: 'last_month', label: 'Last month' },
   { value: 'this_quarter', label: 'This quarter' },
@@ -14,7 +15,7 @@ export const PRESETS: { value: string; label: string }[] = [
   { value: 'all_time', label: 'All time' },
 ];
 
-export const DEFAULT_PRESET = 'last_30_days';
+export const DEFAULT_PRESET = 'this_month';
 
 export const WINDOW_KEYS = ['preset', 'from', 'to'] as const;
 
@@ -32,6 +33,21 @@ export function readWindow(search: URLSearchParams): WindowParams {
   const preset = search.get('preset');
   return { preset: PRESETS.some((p) => p.value === preset) ? preset! : DEFAULT_PRESET };
 }
+
+/**
+ * A link to *anchor* (a section's ID) on the current page, with the window
+ * spelled out (the default preset when the URL has none), so whoever opens it
+ * sees the same window even after the default changes.
+ */
+export function sectionLink(anchor: string): string {
+  const { origin, pathname, search } = window.location;
+  const kept = new URLSearchParams(windowQuery(new URLSearchParams(search)));
+  if (!kept.get('preset') && !kept.get('from')) kept.set('preset', DEFAULT_PRESET);
+  return `${origin}${pathname}?${kept.toString()}#${anchor}`;
+}
+
+/** A metric's section anchor: its ID with hyphens (decision Q11). */
+export const anchorId = (metricId: string) => metricId.replace(/_/g, '-');
 
 /** Only the window's part of *search*, as a query string ("?…" or ""), for links. */
 export function windowQuery(search: URLSearchParams): string {

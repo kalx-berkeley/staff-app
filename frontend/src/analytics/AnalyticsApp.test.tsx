@@ -58,7 +58,7 @@ const METRICS: Metric[] = [
     explanation,
     columns: [
       { key: 'venue', label: 'Venue', format: 'text', link: '/venues/{venue_id}' },
-      { key: 'shows', label: 'Shows', format: 'number', link: null },
+      { key: 'shows', label: 'Shows', format: 'number', link: null, help: 'Shows in the window.' },
       { key: 'balance', label: 'Balance', format: 'points', link: null },
     ],
     rows: [
@@ -80,7 +80,7 @@ const METRICS: Metric[] = [
 ];
 
 const response = (overrides: Partial<TabResponse> = {}): TabResponse => ({
-  window: { start: '2026-10-11', end: '2026-11-09', preset: 'last_30_days', label: 'Last 30 days' },
+  window: { start: '2026-11-01', end: '2026-11-30', preset: 'this_month', label: 'This month' },
   title: null,
   metrics: METRICS,
   ...overrides,
@@ -116,7 +116,7 @@ describe('KALX Staff Analytics', () => {
     await renderAnalytics();
     expect(await screen.findByText('50%')).toBeInTheDocument();
     expect(screen.getByText('2 of 4 pass pairs')).toBeInTheDocument();
-    expect(analyticsAPI.getTab).toHaveBeenCalledWith('overview', { preset: 'last_30_days' }, {});
+    expect(analyticsAPI.getTab).toHaveBeenCalledWith('overview', { preset: 'this_month' }, {});
   });
 
   it('explains how a metric is calculated', async () => {
@@ -128,6 +128,48 @@ describe('KALX Staff Analytics', () => {
     expect(within(popover).getByText('Show date')).toBeInTheDocument();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('explains what a column means', async () => {
+    await renderAnalytics();
+    const table = await screen.findByRole('table', { name: 'Venues' });
+    fireEvent.click(within(table).getByRole('button', { name: 'What "Shows" means' }));
+    const popover = screen.getByRole('dialog', { name: 'What "Shows" means' });
+    expect(within(popover).getByText('Shows in the window.')).toBeInTheDocument();
+    // Name columns have none
+    expect(within(table).queryByRole('button', { name: 'What "Venue" means' })).not.toBeInTheDocument();
+  });
+
+  it('gives every section an anchor and copies a link to it', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    await renderAnalytics();
+    await screen.findByText('50%');
+    expect(document.getElementById('on-air-utilization')).not.toBeNull();
+    const link = screen.getByRole('link', { name: 'Link to "Venues" (copies the link)' });
+    expect(link).toHaveAttribute('href', '#venues');
+    expect(link.closest('section')).toHaveAttribute('id', 'venues');
+    fireEvent.click(link);
+    // The window is spelled out, so the link keeps showing this window
+    expect(writeText).toHaveBeenCalledWith(
+      `${window.location.origin}/analytics/?preset=this_month#venues`,
+    );
+    expect(await screen.findByText('Link copied')).toBeInTheDocument();
+  });
+
+  it('passes the win to the winner page', async () => {
+    vi.mocked(analyticsAPI.getTab).mockResolvedValue(response({ title: 'Jane Doe' }));
+    await renderAnalytics('/analytics/winners/12?preset=all_time');
+    expect(await screen.findByRole('heading', { name: 'Jane Doe' })).toBeInTheDocument();
+    expect(analyticsAPI.getTab).toHaveBeenCalledWith('winner', { preset: 'all_time' }, { win_id: '12' });
+    expect(screen.getByRole('link', { name: '← All on-air winners' })).toHaveAttribute(
+      'href',
+      '/analytics/winners?preset=all_time',
+    );
+    expect(screen.getByRole('link', { name: 'On-air winners' })).toHaveAttribute(
+      'href',
+      '/analytics/winners?preset=all_time',
+    );
   });
 
   it('changes the window and keeps it in the URL', async () => {

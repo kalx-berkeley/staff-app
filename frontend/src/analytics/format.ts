@@ -22,8 +22,10 @@ export function formatValue(value: unknown, format: MetricFormat): string {
       const n = Math.round(Number(value));
       return `${n > 0 ? '+' : ''}${n} pts`;
     }
-    case 'days':
-      return `${number.format(Number(value))} days`;
+    case 'days': {
+      const days = Math.round(Number(value));
+      return `${days} ${days === 1 ? 'day' : 'days'}`;
+    }
     case 'hours': {
       const hours = Number(value);
       return hours >= 48 ? `${number.format(hours / 24)} days` : `${number.format(hours)} h`;

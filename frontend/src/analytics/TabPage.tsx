@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useOutletContext, useSearchParams } from 'react-router-dom';
+import { useLocation, useOutletContext, useSearchParams } from 'react-router-dom';
 import { usePageTitle } from '../common/hooks/usePageTitle';
 import type { APIError } from '../common/types';
 import { analyticsAPI } from './api';
@@ -45,7 +45,16 @@ export default function TabPage({
   const windowKey = JSON.stringify(readWindow(search));
   const paramsKey = JSON.stringify(params ?? {});
 
+  const { hash } = useLocation();
+
   usePageTitle(data?.title ?? heading, ANALYTICS_TITLE);
+
+  // Go to the section a link points at once its metrics are on the page
+  useEffect(() => {
+    if (!data || !hash) return;
+    // (jsdom has no scrollIntoView)
+    document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView?.();
+  }, [data, hash]);
 
   useEffect(() => {
     let cancelled = false;

@@ -29,6 +29,8 @@ export interface MetricColumn {
   link: string | null;
   /** The link is elsewhere on the site (e.g. /pass-giveaway/...), not in the analytics site. */
   external?: boolean;
+  /** What the column means, shown in its header's ⓘ. */
+  help?: string | null;
 }
 
 export interface MetricRow {
@@ -105,6 +107,8 @@ export type AnalyticsTab =
   | 'venue'
   | 'djs'
   | 'dj'
+  | 'winners'
+  | 'winner'
   | 'reps'
   | 'short_links'
   | 'usage';

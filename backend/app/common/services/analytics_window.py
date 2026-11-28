@@ -7,6 +7,7 @@ from typing import Optional
 from app.common.services.tracking_service import PACIFIC, pacific_day_start_utc
 
 PRESETS = {
+    "this_month": "This month",
     "last_30_days": "Last 30 days",
     "last_month": "Last month",
     "this_quarter": "This quarter",
@@ -15,9 +16,10 @@ PRESETS = {
     "last_year": "Last year",
     "all_time": "All time",
 }
-DEFAULT_PRESET = "last_30_days"
+DEFAULT_PRESET = "this_month"
 
-# "All time" starts here, well before the app's first show
+# "All time" starts here, well before the app's first show, and runs to the
+# end of next year, so it includes upcoming shows
 ALL_TIME_START = date(2000, 1, 1)
 
 
@@ -62,24 +64,40 @@ def _quarter_start(d: date) -> date:
     return date(d.year, 3 * ((d.month - 1) // 3) + 1, 1)
 
 
+def _month_end(d: date) -> date:
+    first_of_next = (d.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return first_of_next - timedelta(days=1)
+
+
+def _quarter_end(d: date) -> date:
+    start = _quarter_start(d)
+    return _month_end(date(start.year, start.month + 2, 1))
+
+
 def preset_window(preset: str, today: date) -> Window:
-    """The dates *preset* covers on *today*."""
+    """
+    The dates *preset* covers on *today*. "This month", "this quarter" and
+    "this year" run to the end of the period (and "all time" to the end of
+    next year), so activity for upcoming shows counts as it happens.
+    """
+    if preset == "this_month":
+        return Window(today.replace(day=1), _month_end(today), preset)
     if preset == "last_30_days":
         return Window(today - timedelta(days=29), today, preset)
     if preset == "last_month":
         end = today.replace(day=1) - timedelta(days=1)
         return Window(end.replace(day=1), end, preset)
     if preset == "this_quarter":
-        return Window(_quarter_start(today), today, preset)
+        return Window(_quarter_start(today), _quarter_end(today), preset)
     if preset == "last_quarter":
         end = _quarter_start(today) - timedelta(days=1)
         return Window(_quarter_start(end), end, preset)
     if preset == "this_year":
-        return Window(date(today.year, 1, 1), today, preset)
+        return Window(date(today.year, 1, 1), date(today.year, 12, 31), preset)
     if preset == "last_year":
         return Window(date(today.year - 1, 1, 1), date(today.year - 1, 12, 31), preset)
     if preset == "all_time":
-        return Window(ALL_TIME_START, today, preset)
+        return Window(ALL_TIME_START, date(today.year + 1, 12, 31), preset)
     raise ValueError(f"Unknown time window {preset!r}")
 
 
@@ -91,7 +109,7 @@ def parse_window(
 ) -> Window:
     """
     The window a request asks for: a custom *start*–*end* range when both are
-    given, otherwise *preset* (default: the last 30 days).
+    given, otherwise *preset* (default: this month).
 
     :raises ValueError: For an unknown preset or a range that ends before it starts.
     """

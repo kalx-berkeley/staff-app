@@ -11,6 +11,7 @@ from app.common.services.analytics_window import today_pacific
 from app.common.services.audit_service import log_event
 from app.config import settings
 from app.models.analytics_event import AnalyticsEvent
+from app.models.audit_log import AuditLog
 from app.models.on_air_caller import (
     CommonCallerName,
     DismissedCallerPair,
@@ -158,7 +159,7 @@ def test_low_sample_venues_are_left_out_of_rankings(client, db, promo, venue):
     assert [r["venue"] for r in ranked] == ["Big Venue"]
 
 
-def test_weekday_time_and_promoter_breakdowns(client, db, promo, venue):
+def test_weekday_and_time_breakdowns(client, db, promo, venue):
     promoter = Promoter(name="Another Planet")
     db.add(promoter)
     db.commit()
@@ -167,9 +168,7 @@ def test_weekday_time_and_promoter_breakdowns(client, db, promo, venue):
     m = _tab(client, "overview")
     times = {r["time"]: r for r in m["utilization_by_show_time"]["rows"]}
     assert set(times) == {"6–9pm", "Unknown"}
-    assert [r["promoter"] for r in m["utilization_by_promoter"]["rows"]] == [
-        "Another Planet"
-    ]
+    assert "utilization_by_promoter" not in m
     assert sum(r["shows"] for r in m["utilization_by_weekday"]["rows"]) == 2
 
 
@@ -190,7 +189,14 @@ def test_staff_pass_reach_uses_todays_active_staff(client, db, promo, venue):
     m = _tab(client, "overview")
     # promo, a and b are Active
     assert m["staff_pass_reach"]["value"] == pytest.approx(1 / 3)
-    assert m["top_staff_claimants"]["rows"] == [{"name": "A", "claims": 1}]
+    [row] = m["top_staff_claimants"]["rows"]
+    assert (row["name"], row["claims"]) == ("A", 1)
+    assert row["_details"]["rows"] == [{
+        "show_date": show.show_date.isoformat(),
+        "show": "Show",
+        "venue": "The Fox",
+        "guest": "No",
+    }]
 
 
 # ---------------------------------------------------------------------------
@@ -220,7 +226,7 @@ def test_repeat_winners_and_share(client, db, promo, venue):
     _win(db, show, "Jane Doe", "5105550100")
     _win(db, show, "Jane D", "5105550100")
     _win(db, show, "Someone", "5105550199")
-    m = _tab(client, "overview")
+    m = _tab(client, "winners")
     rows = m["top_repeat_winners"]["rows"]
     assert len(rows) == 1
     assert rows[0]["wins"] == 2
@@ -237,7 +243,7 @@ def test_same_name_different_phones(client, db, promo, venue):
     _win(db, near, "Bob Smith", "5105550133")
     _win(db, near, "Solo Person", "5105550144")
 
-    rows = _tab(client, "overview")["same_name_different_phones"]["rows"]
+    rows = _tab(client, "winners")["same_name_different_phones"]["rows"]
     by_name = {r["name"]: r for r in rows}
     assert set(by_name) == {"jane  doe.", "Bob Smith"}
     jane = by_name["jane  doe."]
@@ -261,7 +267,7 @@ def test_same_name_groups_misspelled_names(client, db, promo, venue):
     _win(db, show, "Stephen R. Park", "5105550155")
 
     rows = {
-        r["name"]: r for r in _tab(client, "overview")["same_name_different_phones"]["rows"]
+        r["name"]: r for r in _tab(client, "winners")["same_name_different_phones"]["rows"]
     }
     assert set(rows) == {"John Smith", "Stephen R. Park"}
     assert rows["Stephen R. Park"]["spellings"] == "Stephen R. Park, Steven Park"
@@ -287,7 +293,7 @@ def test_same_name_flags_wins_at_sister_venues(client, db, promo, venue):
     _win(db, _show(db, unrelated, -10, pairs=0, staff=0), "Bob Smith", "5105550133")
 
     rows = {
-        r["name"]: r for r in _tab(client, "overview")["same_name_different_phones"]["rows"]
+        r["name"]: r for r in _tab(client, "winners")["same_name_different_phones"]["rows"]
     }
     # 9 days apart at venues sharing a 30-day limit
     assert rows["Jane Doe"]["_flag"] is True
@@ -309,12 +315,12 @@ def test_linked_caller_counts_as_one_repeat_winner(client, db, promo, venue):
     _win(db, show, "Jane Doe", "5105550100", days_ago=2)
     _win(db, show, "Jane Doe", "5105550111")
     _win(db, show, "Someone", "5105550199")
-    m = _tab(client, "overview")
+    m = _tab(client, "winners")
     assert m["top_repeat_winners"]["rows"] == []
     assert m["repeat_winner_share"]["value"] == 0
 
     _link(db, "5105550100", "5105550111")
-    m = _tab(client, "overview")
+    m = _tab(client, "winners")
     rows = m["top_repeat_winners"]["rows"]
     assert len(rows) == 1
     assert rows[0]["wins"] == 2
@@ -344,7 +350,7 @@ def test_same_name_status_and_highlight(client, db, promo, venue):
     db.add(CommonCallerName(name="cy young"))
     db.commit()
 
-    metric = _tab(client, "overview")["same_name_different_phones"]
+    metric = _tab(client, "winners")["same_name_different_phones"]
     rows = {r["name"]: r for r in metric["rows"]}
     assert rows["Jane Doe"]["status"] == "Linked"
     assert rows["Bob Smith"]["status"] == "Partly linked"
@@ -545,8 +551,15 @@ def test_djs_tab_has_a_row_per_persona_and_show(client, db, promo, venue):
     }
     talk_page = _tab(client, "dj", f"&dj=show-{talk.id}")
     assert (talk_page["dj_given"]["value"], talk_page["dj_tried"]["value"]) == (1, 1)
-    top = _tab(client, "overview")["top_djs_given"]["rows"]
-    assert top[0] == {"dj": "DJ Renamed", "dj_key": "persona-5", "given": 2}
+    assert rows["DJ Renamed"]["total"] == 2
+    assert rows["Morning Report"]["total"] == 2
+    overview = _tab(client, "overview")
+    assert "top_djs_given" not in overview
+    top = overview["top_djs_given_tried"]["rows"]
+    assert {(r["dj"], r["total"]) for r in top[:2]} == {
+        ("DJ Renamed", 2),
+        ("Morning Report", 2),
+    }
 
 
 def test_promotions_preview_is_not_tracked(client, db, promo, venue):
@@ -670,16 +683,18 @@ def test_venue_page_extras(client, db, promo, venue):
     db.commit()
     for event_type in ("alternate_joined", "alternate_joined", "alternate_promoted"):
         log_event(db, event_type, details={"show_id": show.id}, area=PASS_GIVEAWAY_AREA)
-    log_event(
-        db,
-        "winner_frequency_warning",
-        entity_type="venue",
-        entity_id=venue.id,
-        area=PASS_GIVEAWAY_AREA,
-    )
+    for _ in range(2):  # the same phone, show and day count once
+        log_event(
+            db,
+            "winner_frequency_warning",
+            entity_type="venue",
+            entity_id=venue.id,
+            details={"recipient_phone": "5105550100", "show_id": show.id},
+            area=PASS_GIVEAWAY_AREA,
+        )
 
     m = _tab(client, "venue", f"&venue_id={venue.id}")
-    assert m["venue_attempts"]["value"] == pytest.approx(1.0)
+    assert m["venue_announced"]["value"] == pytest.approx(1.0)
     assert m["venue_preassigned"]["value"] == pytest.approx(0.5)
     assert m["venue_unused"]["value"] == 3
     assert m["venue_lead_time"]["value"] == pytest.approx(18, abs=1)
@@ -688,3 +703,252 @@ def test_venue_page_extras(client, db, promo, venue):
     assert m["venue_lottery"]["value"] == 0
     r = client.get(f"/api/analytics/tabs/venue?venue_id={venue.id}", headers=PROMO)
     assert r.json()["title"] == "The Fox"
+
+
+# ---------------------------------------------------------------------------
+# Show date placement, announced shows and the per-column ⓘ
+
+
+def _given(db, show, *, persona_id=None, days_ago=1):
+    """Give away one of *show*'s available pass pairs."""
+    p = (
+        db.query(Pass)
+        .filter(
+            Pass.show_id == show.id, Pass.pass_type == "pair", Pass.status == "available"
+        )
+        .first()
+    )
+    p.status = "given_away"
+    p.given_away_at = NOW - timedelta(days=days_ago)
+    p.given_away_persona_id = persona_id
+    db.commit()
+    return p
+
+
+def _window(days_back: int, days_ahead: int) -> str:
+    start = today_pacific() - timedelta(days=days_back)
+    end = today_pacific() + timedelta(days=days_ahead)
+    return f"from={start.isoformat()}&to={end.isoformat()}"
+
+
+def test_activity_is_placed_by_show_date(client, db, promo, venue):
+    """Decision Q1: a giveaway counts in its show's window, not when it happened."""
+    db.add(SpinitronPersona(id=9, name="DJ Early"))
+    db.commit()
+    soon = _show(db, venue, 3, pairs=2)
+    long_ago = _show(db, venue, -60, pairs=2)
+    # Given away 40 days ago for a show 3 days out
+    _given(db, soon, persona_id=9, days_ago=40)
+    # Given away yesterday (late entry) for a show 60 days ago
+    _given(db, long_ago, persona_id=9, days_ago=1)
+    db.add(
+        ShowAttempt(show_id=soon.id, persona_id=9, attempted_at=NOW - timedelta(days=50))
+    )
+    db.add(
+        AnalyticsEvent(
+            event_type="giveaway_visit",
+            area=PASS_GIVEAWAY_AREA,
+            occurred_at=NOW - timedelta(days=50),
+            entity_type="show",
+            entity_id=soon.id,
+            dimension="given_away",
+            persona_id=9,
+        )
+    )
+    db.commit()
+
+    window = _window(10, 10)
+    overview = _tab(client, "overview", window=window)
+    assert overview["passes_given_away"]["value"] == 1
+    assert overview["giveaway_funnel"]["rows"][0]["visits"] == 1
+    [dj] = _tab(client, "djs", window=window)["djs"]["rows"]
+    assert (dj["given"], dj["tried_count"], dj["total"], dj["visits"]) == (1, 1, 2, 1)
+
+
+def test_announced_shows(client, db, promo, venue):
+    _show(db, venue, -2, pairs=2, given=1)  # announced: given away
+    tried = _show(db, venue, -3, pairs=1)
+    for _ in range(3):  # tried three times
+        db.add(ShowAttempt(show_id=tried.id, attempted_at=NOW))
+    _show(db, venue, -4, pairs=2)  # never announced
+    _show(db, venue, 4, pairs=2)  # upcoming: not complete yet
+    db.commit()
+
+    window = _window(30, 30)
+    card = _tab(client, "overview", window=window)["announced_shows"]
+    assert card["value"] == pytest.approx(2 / 3)
+    assert card["note"] == "2 of 3 shows"
+    [row] = _tab(client, "venues", window=window)["venues"]["rows"]
+    assert row["announced"] == pytest.approx(2 / 3)
+    assert "attempts_per_giveaway" not in row
+    venue_page = _tab(client, "venue", f"&venue_id={venue.id}", window=window)
+    assert venue_page["venue_announced"]["value"] == pytest.approx(2 / 3)
+
+    shows = {
+        d["show_date"]: d["announced"]
+        for r in _tab(client, "reps", window=window)["reps_by_month"]["rows"]
+        for d in r["_details"]["rows"]
+    }
+    # (1 given + 0 tried) ÷ 2 pairs; 3 tries ÷ 1 pair is over 100%
+    assert shows[(today_pacific() - timedelta(days=2)).isoformat()] == pytest.approx(0.5)
+    assert shows[(today_pacific() - timedelta(days=3)).isoformat()] == pytest.approx(3.0)
+
+
+# Plain name columns don't need an ⓘ (decision Q10)
+NAME_COLUMNS = {
+    "venue",
+    "dj",
+    "name",
+    "show",
+    "month",
+    "rep",
+    "creator",
+    "poster",
+    "group",
+    "what",
+    "weekday",
+    "time",
+    "slug",
+    "subsite",
+    "day",
+    "week",
+}
+
+
+def test_every_column_has_an_explanation(client, db, promo, venue):
+    show = _show(db, venue, -2, pairs=2, given=1)
+    _win(db, show, "Jane Doe", "5105550100")
+    _win(db, show, "Jane Doe", "5105550111")
+    win_id = db.query(OnAirWinner.id).first()[0]
+    pages = [
+        ("overview", ""),
+        ("venues", ""),
+        ("venue", f"&venue_id={venue.id}"),
+        ("djs", ""),
+        ("dj", "&dj=unknown"),
+        ("winners", ""),
+        ("winner", f"&win_id={win_id}"),
+        ("reps", ""),
+        ("short_links", ""),
+        ("usage", ""),
+    ]
+    missing = []
+    for tab, query in pages:
+        for metric in _tab(client, tab, query).values():
+            if metric["kind"] != "table":
+                continue
+            columns = list(metric["columns"])
+            for row in metric["rows"]:
+                columns += (row.get("_details") or {}).get("columns", [])
+            for c in columns:
+                if c["key"] not in NAME_COLUMNS and not c.get("help"):
+                    missing.append(f"{tab}/{metric['id']}/{c['key']}")
+    assert missing == []
+
+
+# ---------------------------------------------------------------------------
+# On-air winners tab, win-limit blocks and winner pages
+
+
+def _warn(db, show, phone, days_ago=1):
+    db.add(
+        AuditLog(
+            event_type="winner_frequency_warning",
+            area=PASS_GIVEAWAY_AREA,
+            occurred_at=NOW - timedelta(days=days_ago, hours=1),
+            entity_type="venue",
+            entity_id=show.venue_id,
+            details={"recipient_phone": phone, "show_id": show.id},
+        )
+    )
+    db.commit()
+
+
+def _winner_of(db, show, name, phone, days_ago=1):
+    _win(db, show, name, phone, days_ago=days_ago)
+    return db.query(OnAirWinner).order_by(OnAirWinner.id.desc()).first()
+
+
+def test_winners_tab_and_blocks(client, db, promo, venue):
+    old = _show(db, venue, -20, pairs=0, staff=0, name="Old show")
+    new = _show(db, venue, -2, pairs=0, staff=0, name="New show")
+    _winner_of(db, old, "Jane Doe", "5105550100", days_ago=21)
+    _winner_of(db, old, "Bob Smith", "5105550122", days_ago=21)
+    _winner_of(db, old, "Cy Young", "5105550177", days_ago=21)
+    # Jane is warned twice the same day (counted once), then wins on another number
+    _warn(db, new, "510-555-0100", days_ago=3)
+    _warn(db, new, "5105550100", days_ago=3)
+    _winner_of(db, new, "Jane Doe", "5105550111", days_ago=3)
+    # Bob is warned and the DJ overrides it
+    _warn(db, new, "5105550122", days_ago=3)
+    bob = _winner_of(db, new, "Bob Smith", "5105550122", days_ago=3)
+    log_event(
+        db,
+        "venue_frequency_override",
+        entity_type="pass",
+        entity_id=bob.pass_id,
+        area=PASS_GIVEAWAY_AREA,
+    )
+    # Cy is warned and doesn't win
+    _warn(db, new, "5105550177", days_ago=3)
+
+    window = _window(10, 10)
+    m = _tab(client, "winners", window=window)
+    blocks = {r["name"]: r for r in m["blocked_by_win_limit"]["rows"]}
+    assert {n: r["outcome"] for n, r in blocks.items()} == {
+        "Jane Doe": "Won with another number",
+        "Bob Smith": "Overridden",
+        "Cy Young": "Blocked",
+    }
+    assert {n for n, r in blocks.items() if r["_flag"]} == {"Jane Doe", "Cy Young"}
+    assert m["win_limit_blocks"]["value"] == 3
+    assert m["blocked_by_win_limit"]["columns"][0]["link"] == "/winners/{win_id}"
+
+    winners = {r["name"]: r for r in m["winners"]["rows"]}
+    # Cy has a block in the window but no win in it
+    assert set(winners) == {"Jane Doe", "Bob Smith"}
+    assert (winners["Bob Smith"]["wins"], winners["Bob Smith"]["all_time"]) == (1, 2)
+    assert winners["Bob Smith"]["blocks"] == 1
+    assert m["winners_count"]["value"] == 2
+    assert "top_repeat_winners" in m and "same_name_different_phones" in m
+
+    # Cy's page is reachable from the block even without a win in the window
+    page = _tab(client, "winner", f"&win_id={blocks['Cy Young']['win_id']}", window=window)
+    assert page["winner_wins_window"]["value"] == 0
+    assert page["winner_wins_all_time"]["value"] == 1
+    assert page["winner_blocks"]["value"] == 1
+    assert page["winner_blocks_table"]["rows"][0]["outcome"] == "Blocked"
+    r = client.get(
+        f"/api/analytics/tabs/winner?win_id={blocks['Cy Young']['win_id']}", headers=PROMO
+    )
+    assert r.json()["title"] == "Cy Young"
+
+    venue_page = _tab(client, "venue", f"&venue_id={venue.id}", window=window)
+    assert venue_page["venue_win_limits"]["value"] == 3
+    assert venue_page["venue_win_limits"]["note"] == "1 overrides"
+
+
+def test_winner_page_covers_a_linked_caller(client, db, promo, venue):
+    show = _show(db, venue, -2, pairs=0, staff=0)
+    far = _show(db, venue, -200, pairs=0, staff=0)
+    first = _winner_of(db, far, "Jane Doe", "5105550100", days_ago=201)
+    _winner_of(db, show, "Jane D.", "5105550111")
+    _link(db, "5105550100", "5105550111")
+
+    window = _window(10, 10)
+    page = _tab(client, "winner", f"&win_id={first.id}", window=window)
+    assert page["winner_wins_all_time"]["value"] == 2
+    assert page["winner_wins_window"]["value"] == 1
+    # Latest first, with the window's wins highlighted
+    assert [(r["winner"], r["_flag"]) for r in page["winner_wins"]["rows"]] == [
+        ("Jane D.", True),
+        ("Jane Doe", False),
+    ]
+    phones = {r["phone"]: r for r in page["winner_phones"]["rows"]}
+    assert set(phones) == {"5105550100", "5105550111"}
+    assert all(r["linked"] == "Yes" for r in phones.values())
+    assert page["winner_phones"]["columns"][1]["external"] is True
+
+    assert _tab(client, "winner", "&win_id=999") == {}
+    rows = _tab(client, "winners", window=window)["winners"]["rows"]
+    assert [(r["name"], r["all_time"]) for r in rows] == [("Jane D.", 2)]

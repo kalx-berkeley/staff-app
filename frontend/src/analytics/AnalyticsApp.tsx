@@ -12,6 +12,8 @@ const VenuesPage = lazySection(loadAnalytics, 'VenuesPage');
 const VenuePage = lazySection(loadAnalytics, 'VenuePage');
 const DjsPage = lazySection(loadAnalytics, 'DjsPage');
 const DjPage = lazySection(loadAnalytics, 'DjPage');
+const WinnersPage = lazySection(loadAnalytics, 'WinnersPage');
+const WinnerPage = lazySection(loadAnalytics, 'WinnerPage');
 const RepsPage = lazySection(loadAnalytics, 'RepsPage');
 const ShortLinksPage = lazySection(loadAnalytics, 'ShortLinksPage');
 const UsagePage = lazySection(loadAnalytics, 'UsagePage');
@@ -36,6 +38,8 @@ export default function AnalyticsApp() {
             <Route path="/venues/:venueId" element={<VenuePage />} />
             <Route path="/djs" element={<DjsPage />} />
             <Route path="/djs/:djKey" element={<DjPage />} />
+            <Route path="/winners" element={<WinnersPage />} />
+            <Route path="/winners/:winId" element={<WinnerPage />} />
             <Route path="/reps" element={<RepsPage />} />
             <Route path="/short-links" element={<ShortLinksPage />} />
             <Route path="/usage" element={<UsagePage />} />

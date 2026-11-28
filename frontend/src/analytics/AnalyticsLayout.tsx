@@ -16,6 +16,7 @@ const TABS = [
   { to: '/', label: 'Overview', end: true },
   { to: '/venues', label: 'Venues' },
   { to: '/djs', label: 'DJs' },
+  { to: '/winners', label: 'On-air winners' },
   { to: '/reps', label: 'Promotions reps' },
   { to: '/short-links', label: 'Short links' },
   { to: '/usage', label: 'Site usage' },

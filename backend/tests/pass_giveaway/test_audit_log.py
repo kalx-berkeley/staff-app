@@ -333,6 +333,9 @@ def test_winner_frequency_warning_audit(
     )
     assert row is not None
     assert row.details["recipient_phone"] == "555-9999"
+    # Who and where it came from, so analytics can tell DJ studio warnings apart
+    assert row.actor_email == promotions_staff.email
+    assert row.details["network"] is None
 
 
 # ---------------------------------------------------------------------------

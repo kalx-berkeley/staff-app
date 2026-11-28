@@ -44,11 +44,16 @@ def _as(email: str) -> dict:
         ("last_30_days", date(2026, 11, 9), date(2026, 10, 11), date(2026, 11, 9)),
         ("last_month", date(2026, 11, 9), date(2026, 10, 1), date(2026, 10, 31)),
         ("last_month", date(2026, 1, 15), date(2025, 12, 1), date(2025, 12, 31)),
-        ("this_quarter", date(2026, 11, 9), date(2026, 10, 1), date(2026, 11, 9)),
+        ("this_month", date(2026, 11, 9), date(2026, 11, 1), date(2026, 11, 30)),
+        ("this_month", date(2026, 2, 3), date(2026, 2, 1), date(2026, 2, 28)),
+        ("this_month", date(2026, 12, 31), date(2026, 12, 1), date(2026, 12, 31)),
+        ("this_quarter", date(2026, 11, 9), date(2026, 10, 1), date(2026, 12, 31)),
+        ("this_quarter", date(2026, 2, 1), date(2026, 1, 1), date(2026, 3, 31)),
         ("last_quarter", date(2026, 11, 9), date(2026, 7, 1), date(2026, 9, 30)),
         ("last_quarter", date(2026, 2, 1), date(2025, 10, 1), date(2025, 12, 31)),
-        ("this_year", date(2026, 11, 9), date(2026, 1, 1), date(2026, 11, 9)),
+        ("this_year", date(2026, 11, 9), date(2026, 1, 1), date(2026, 12, 31)),
         ("last_year", date(2026, 11, 9), date(2025, 1, 1), date(2025, 12, 31)),
+        ("all_time", date(2026, 11, 9), date(2000, 1, 1), date(2027, 12, 31)),
     ],
 )
 def test_presets(preset, today, start, end):
@@ -63,7 +68,7 @@ def test_custom_range_and_errors():
         date(2026, 2, 5),
         None,
     )
-    assert parse_window(None, None, None, today=date(2026, 11, 9)).preset == "last_30_days"
+    assert parse_window(None, None, None, today=date(2026, 11, 9)).preset == "this_month"
     with pytest.raises(ValueError):
         parse_window(None, date(2026, 2, 5), date(2026, 1, 5))
     with pytest.raises(ValueError):
@@ -99,7 +104,7 @@ def test_promotions_and_site_admins_can_read_tabs(
         r = client.get("/api/analytics/tabs/overview", headers=_as(email))
         assert r.status_code == 200, r.text
         body = r.json()
-        assert body["window"]["preset"] == "last_30_days"
+        assert body["window"]["preset"] == "this_month"
         assert all("explanation" in m for m in body["metrics"])
 
     assert (

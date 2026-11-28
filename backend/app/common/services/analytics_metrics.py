@@ -53,14 +53,24 @@ def column(
     fmt: str = "text",
     link: Optional[str] = None,
     external: bool = False,
+    help: Optional[str] = None,
 ) -> dict:
     """
     A table column. *link* is a path inside the analytics site with
     ``{field}`` placeholders filled from the row, e.g. ``/venues/{venue_id}``.
     With *external*, it's a path elsewhere on the site, e.g.
     ``/pass-giveaway/...``, and the placeholders' values are URL-encoded.
+    *help* is what the column means, shown in its header's ⓘ. Every column
+    but plain name columns (venue, DJ, month, person, show) should have one.
     """
-    return {"key": key, "label": label, "format": fmt, "link": link, "external": external}
+    return {
+        "key": key,
+        "label": label,
+        "format": fmt,
+        "link": link,
+        "external": external,
+        "help": help,
+    }
 
 
 def stat(
