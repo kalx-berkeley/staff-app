@@ -6,6 +6,18 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 ---
 
+## [1.23.0] - 2026-11-28
+
+### Changed
+
+- Stop treating Spinitron's automation flag as "no live DJ". Live DJs' playlists are often created by the station's automation system, so they were shown as a pre-recorded show and their giveaways went unattributed. A slot now counts as no one only when its persona is a placeholder, such as KALX Overnights. The directory's Sublist DJ shift check no longer leaves out automated playlists, and says it can't tell live shifts from pre-recorded ones ([2741395](https://github.com/kalx-berkeley/staff-app/commit/2741395))
+
+### Added
+
+- Add an "Add to Calendar" button (Google Calendar link or .ics file, in Pacific time) to the staff show page of a show the staff member has claimed a staff pass for ([d73d1ff](https://github.com/kalx-berkeley/staff-app/commit/d73d1ff)), ([4e9cb66](https://github.com/kalx-berkeley/staff-app/commit/4e9cb66))
+- Show who posts each venue's shows on KALX Staff Analytics' Promotions reps tab, with each person's share, plus a collapsed list of venues with no shows posted in the window ([e8c258e](https://github.com/kalx-berkeley/staff-app/commit/e8c258e))
+- Autocomplete the event type and actor email filters in KALX Staff Admin's audit log ([2895a0f](https://github.com/kalx-berkeley/staff-app/commit/2895a0f))
+
 ## [1.22.0] - 2026-11-24
 
 ### Changed
@@ -562,6 +574,7 @@ The format is based on [Common Changelog](https://common-changelog.org/).
 
 _Initial production release._
 
+[1.23.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.22.0...v1.23.0
 [1.22.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.21.0...v1.22.0
 [1.21.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.20.0...v1.21.0
 [1.20.0]: https://github.com/kalx-berkeley/staff-app/compare/v1.19.0...v1.20.0
